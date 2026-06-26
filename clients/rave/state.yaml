@@ -1,0 +1,11 @@
+client_id: rave
+client_name: Rave Coffee
+workflow: growth_blueprint_pipeline
+current_stage: creative_director
+status: campaign_world_ready
+next_agent: agents/creative_director.md
+inputs:
+  campaign_world: missing
+  growth_blueprint: missing
+outputs:
+  creative_directors_bible: pending
