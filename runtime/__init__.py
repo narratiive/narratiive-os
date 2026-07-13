@@ -1,6 +1,7 @@
 """Executable runtime primitives for Narratiive OS."""
 
 from .agent_manifest import AgentManifest, load_agent_manifest, parse_agent_manifest
+from .command_api import CommandError, RuntimeCommandAPI
 from .composition import RuntimeComponents, RuntimePaths, compose_local_runtime
 from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
 from .dispatch import (
@@ -32,6 +33,7 @@ from .repositories import (
 from .run_service import WorkflowRunService
 from .state_machine import InvalidTransition, WorkflowEngine
 from .worker import AgentExecutor, ExecutionResult, JsonArtifactExecutor, WorkerRunner
+from .wsgi_api import RuntimeWSGIApp
 
 __all__ = [
     "ArtifactRef",
@@ -75,4 +77,7 @@ __all__ = [
     "RuntimeComponents",
     "RuntimePaths",
     "compose_local_runtime",
+    "CommandError",
+    "RuntimeCommandAPI",
+    "RuntimeWSGIApp",
 ]
