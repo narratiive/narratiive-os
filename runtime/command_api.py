@@ -79,8 +79,13 @@ class RuntimeCommandAPI:
 
     def _dispatch_stage(self, request: Mapping[str, Any]) -> dict[str, Any]:
         run_id = self._required(request, "run_id")
+        client_id = str(request.get("client_id", "")).strip()
+        context = {"client_id": client_id} if client_id else None
         try:
-            job = self.runtime.dispatch_service.enqueue_current_stage(run_id)
+            job = self.runtime.dispatch_service.enqueue_current_stage(
+                run_id,
+                context=context,
+            )
         except RunNotFound as exc:
             raise CommandError("run_not_found", f"workflow run not found: {run_id}", 404) from exc
         except (ValueError, RuntimeError) as exc:

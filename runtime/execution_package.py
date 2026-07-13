@@ -7,6 +7,7 @@ from typing import Any, Iterable, Mapping
 
 from .agent_manifest import AgentManifest, load_agent_manifest
 from .dispatch import DispatchJob
+from .memory import SpecialistMemorySelector
 from .models import ArtifactRef
 
 
@@ -21,6 +22,7 @@ class ExecutionPackage:
     agent_ref: str
     instructions: str
     input_artifacts: tuple[dict[str, Any], ...]
+    memory_records: tuple[dict[str, Any], ...]
     context: Mapping[str, Any]
     expected_output_type: str
 
@@ -34,9 +36,15 @@ class ExecutionPackage:
 class ExecutionPackageBuilder:
     """Builds deterministic provider-neutral packages from dispatch jobs."""
 
-    def __init__(self, repository_root: str | Path, output_type_by_stage: Mapping[str, str]) -> None:
+    def __init__(
+        self,
+        repository_root: str | Path,
+        output_type_by_stage: Mapping[str, str],
+        memory_selector: SpecialistMemorySelector | None = None,
+    ) -> None:
         self.repository_root = Path(repository_root)
         self.output_type_by_stage = dict(output_type_by_stage)
+        self.memory_selector = memory_selector
 
     def build(
         self,
@@ -50,6 +58,19 @@ class ExecutionPackageBuilder:
         if not output_type:
             raise ValueError(f"no expected output type configured for stage: {job.stage_id}")
         artifacts = tuple(_artifact_to_dict(item) for item in input_artifacts)
+        package_context = dict(context or job.payload or {})
+        memory_records: tuple[dict[str, Any], ...] = ()
+        if self.memory_selector is not None:
+            client_id = str(package_context.get("client_id", "")).strip()
+            if client_id:
+                memory_records = tuple(
+                    record.to_dict()
+                    for record in self.memory_selector.select(
+                        client_id=client_id,
+                        run_id=job.run_id,
+                        stage_id=job.stage_id,
+                    )
+                )
         return ExecutionPackage(
             schema_version=1,
             job_id=job.job_id,
@@ -60,7 +81,8 @@ class ExecutionPackageBuilder:
             agent_ref=job.agent_ref,
             instructions=manifest.instructions,
             input_artifacts=artifacts,
-            context=dict(context or job.payload or {}),
+            memory_records=memory_records,
+            context=package_context,
             expected_output_type=output_type,
         )
 

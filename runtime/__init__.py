@@ -14,6 +14,15 @@ from .dispatch import (
 from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig, ProviderTransportError
+from .memory import (
+    DEFAULT_SPECIALIST_MEMORY_POLICY,
+    FileMemoryStore,
+    MemoryIntegrityError,
+    MemoryKind,
+    MemoryRecord,
+    MemoryScope,
+    SpecialistMemorySelector,
+)
 from .models import ArtifactRef, StageRecord, WorkflowState
 from .pipeline_runner import DeterministicProvider, PipelineRunner, load_pipeline_fixture
 from .provider import (
@@ -40,6 +49,13 @@ __all__ = [
     "ArtifactRef",
     "StageRecord",
     "WorkflowState",
+    "MemoryKind",
+    "MemoryScope",
+    "MemoryRecord",
+    "MemoryIntegrityError",
+    "FileMemoryStore",
+    "SpecialistMemorySelector",
+    "DEFAULT_SPECIALIST_MEMORY_POLICY",
     "PipelineRunner",
     "DeterministicProvider",
     "load_pipeline_fixture",

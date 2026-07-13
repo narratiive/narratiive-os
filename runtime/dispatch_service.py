@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from uuid import uuid4
 
 from .dispatch import DispatchJob, DispatchQueue, JobStatus
@@ -24,7 +24,11 @@ class DispatchService:
         self.queue = queue
         self.run_service = run_service
 
-    def enqueue_current_stage(self, run_id: str) -> DispatchJob:
+    def enqueue_current_stage(
+        self,
+        run_id: str,
+        context: Mapping[str, object] | None = None,
+    ) -> DispatchJob:
         state = self.runs.load(run_id)
         if not state.current_stage_id:
             raise ValueError("workflow has no current stage")
@@ -38,6 +42,7 @@ class DispatchService:
             stage_id=stage.stage_id,
             agent_ref=stage.agent_ref,
             payload={
+                **dict(context or {}),
                 "workflow_id": state.workflow_id,
                 "run_id": run_id,
                 "stage_id": stage.stage_id,
