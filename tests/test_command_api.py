@@ -4,9 +4,20 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from runtime.blueprint_orchestrator import (
+    BlueprintContextArtifacts,
+    BlueprintOrchestrator,
+    BlueprintRequest,
+    FakeBlueprintEngine,
+    FileBlueprintStore,
+)
 from runtime.command_api import CommandError, RuntimeCommandAPI
 from runtime.composition import compose_local_runtime
 from runtime.wsgi_api import RuntimeWSGIApp
+
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+BLUEPRINT_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "blueprint" / "rave_raw_response.md"
 
 
 class CommandAPITests(unittest.TestCase):
@@ -33,6 +44,18 @@ class CommandAPITests(unittest.TestCase):
         )
         self.runtime = compose_local_runtime(self.root / "state", self.repo)
         self.api = RuntimeCommandAPI(self.runtime)
+        self.blueprint_store = FileBlueprintStore(self.root / "blueprints")
+        self.blueprint_orchestrator = BlueprintOrchestrator(
+            artifact_catalog=self.runtime.artifact_catalog,
+            prompt_registry=self.runtime.prompt_registry,
+            engine=FakeBlueprintEngine(
+                BLUEPRINT_FIXTURE.read_text(encoding="utf-8"),
+                provider_id="anthropic",
+                model_id="claude-sonnet-4-5",
+            ),
+            store=self.blueprint_store,
+            prompt_source_path=REPO_ROOT / "templates" / "Growth_Blueprint.md",
+        )
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -144,6 +167,82 @@ class CommandAPITests(unittest.TestCase):
         self.assertEqual(captured["status"], "400 Bad Request")
         self.assertFalse(payload["ok"])
         self.assertEqual(payload["error"]["code"], "invalid_json")
+
+    def test_blueprint_generate_command_returns_versioned_structured_output(self):
+        api = RuntimeCommandAPI(
+            self.runtime,
+            blueprint_orchestrator=self.blueprint_orchestrator,
+        )
+        research = self.runtime.artifact_catalog.register(
+            run_id="rave-run",
+            stage_id="research_analyst",
+            artifact_type="completed_research",
+            content="Approved research packet for legacy workspace.",
+            producer="research_analyst@1",
+        )
+        strategy = self.runtime.artifact_catalog.register(
+            run_id="rave-run",
+            stage_id="strategy_director",
+            artifact_type="completed_growth_blueprint",
+            content="Approved growth blueprint for legacy workspace.",
+            parent_artifact_ids=(research.artifact.artifact_id,),
+            producer="strategy_director@1",
+        )
+        campaign = self.runtime.artifact_catalog.register(
+            run_id="rave-run",
+            stage_id="campaign_world_generator",
+            artifact_type="completed_campaign_world",
+            content="Approved campaign world for legacy workspace.",
+            parent_artifact_ids=(strategy.artifact.artifact_id,),
+            producer="campaign_world_generator@1",
+        )
+        creative = self.runtime.artifact_catalog.register(
+            run_id="rave-run",
+            stage_id="creative_director",
+            artifact_type="completed_creative_directors_bible",
+            content="Approved creative bible for legacy workspace.",
+            parent_artifact_ids=(campaign.artifact.artifact_id,),
+            producer="creative_director@1",
+        )
+        quality = self.runtime.artifact_catalog.register(
+            run_id="rave-run",
+            stage_id="quality_reviewer",
+            artifact_type="completed_quality_review",
+            content="Approved quality review for legacy workspace.",
+            parent_artifact_ids=(creative.artifact.artifact_id,),
+            producer="quality_reviewer@1",
+        )
+        request_payload = BlueprintRequest(
+            request_id="legacy-blueprint-request-1",
+            workspace_id="legacy",
+            client_id="legacy",
+            approved=True,
+            approved_context=BlueprintContextArtifacts(
+                research_artifacts=(research,),
+                strategy_artifacts=(strategy,),
+                campaign_artifacts=(campaign,),
+                creative_artifacts=(creative,),
+                quality_artifacts=(quality,),
+                evidence_ids=("ev_deadbeef", "ev_cafebabe"),
+            ),
+        ).to_dict()
+
+        result = api.handle(
+            {
+                "command": "blueprints.generate",
+                "request": request_payload,
+            }
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(result["command"], "blueprints.generate")
+        self.assertEqual(result["data"]["status"], "complete")
+        self.assertEqual(result["data"]["prompt_version"], 1)
+        self.assertEqual(result["data"]["structured_blueprint"]["document_title"], "RAVE Blueprint")
+        self.assertIn(
+            "Slide 1 — The Category Signal",
+            [section["heading"] for section in result["data"]["structured_blueprint"]["sections"]],
+        )
 
 
 if __name__ == "__main__":
