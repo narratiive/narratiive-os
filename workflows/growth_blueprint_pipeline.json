@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "workflow_id": "growth_blueprint_pipeline",
+  "stages": [
+    {
+      "stage_id": "research_analyst",
+      "agent_ref": "agents/research_analyst.md",
+      "required_inputs": [
+        "client_inputs",
+        "source_material"
+      ]
+    },
+    {
+      "stage_id": "strategy_director",
+      "agent_ref": "agents/strategy_director.md",
+      "required_inputs": [
+        "completed_research_inputs"
+      ]
+    },
+    {
+      "stage_id": "campaign_world_generator",
+      "agent_ref": "agents/campaign_world_generator.md",
+      "required_inputs": [
+        "completed_growth_blueprint"
+      ]
+    },
+    {
+      "stage_id": "creative_director",
+      "agent_ref": "agents/creative_director.md",
+      "required_inputs": [
+        "completed_campaign_world"
+      ]
+    },
+    {
+      "stage_id": "quality_reviewer",
+      "agent_ref": "agents/quality_reviewer.md",
+      "required_inputs": [
+        "completed_creative_directors_bible"
+      ]
+    }
+  ]
+}
