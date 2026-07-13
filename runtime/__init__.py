@@ -41,6 +41,16 @@ from .repositories import (
     WorkflowEvent,
 )
 from .run_service import WorkflowRunService
+from .revision_graph import (
+    RevisionCategory,
+    RevisionIssue,
+    RevisionOwner,
+    RevisionPlan,
+    RevisionRouter,
+    RevisionService,
+    RevisionSeverity,
+    StageDependencyGraph,
+)
 from .scoring import (
     ArtifactSignal,
     ConfidenceEngine,
@@ -72,6 +82,14 @@ __all__ = [
     "ConfidenceScorecard",
     "ConfidenceEngine",
     "ScoreRecommendation",
+    "RevisionCategory",
+    "RevisionSeverity",
+    "RevisionOwner",
+    "RevisionIssue",
+    "RevisionPlan",
+    "StageDependencyGraph",
+    "RevisionRouter",
+    "RevisionService",
     "PipelineRunner",
     "DeterministicProvider",
     "load_pipeline_fixture",

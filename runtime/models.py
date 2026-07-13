@@ -52,6 +52,7 @@ class StageRecord:
     missing_inputs: list[str] = field(default_factory=list)
     failure_reason: str | None = None
     retry_count: int = 0
+    revision_count: int = 0
     started_at: str | None = None
     completed_at: str | None = None
 

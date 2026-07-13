@@ -36,8 +36,13 @@ class DispatchService:
         if stage.status != StageStatus.READY:
             raise ValueError(f"stage is not ready for dispatch: {stage.status.value}")
 
+        revision_suffix = (
+            f"--revision-{stage.revision_count}"
+            if stage.revision_count
+            else ""
+        )
         job = DispatchJob(
-            job_id=f"{run_id}--{stage.stage_id}",
+            job_id=f"{run_id}--{stage.stage_id}{revision_suffix}",
             run_id=run_id,
             stage_id=stage.stage_id,
             agent_ref=stage.agent_ref,

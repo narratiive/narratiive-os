@@ -10,6 +10,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from runtime.definitions import load_workflow_definition
+from runtime.artifact_catalog import FileArtifactCatalog
 from runtime.dispatch import FileDispatchQueue
 from runtime.execution_package import ExecutionPackageBuilder
 from runtime.memory import (
@@ -65,6 +66,7 @@ def main() -> None:
         if not memory_store.contains(client_id, record.memory_id):
             memory_store.append(record)
     provider = DeterministicProvider.from_fixture(fixture)
+    artifact_catalog = FileArtifactCatalog(runtime_root / "artifact-catalog")
     executor = ProviderExecutor(
         package_builder=ExecutionPackageBuilder(
             repository_root,
@@ -74,6 +76,7 @@ def main() -> None:
         ),
         provider=provider,
         artifact_writer=ArtifactWriter(runtime_root / "artifacts"),
+        artifact_catalog=artifact_catalog,
     )
     events = JsonlEventLog(runtime_root / "events")
     runner = PipelineRunner(

@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
+from .artifact_catalog import FileArtifactCatalog
 from .dispatch import DispatchJob
 from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .models import ArtifactRef
@@ -84,10 +85,12 @@ class ProviderExecutor:
         package_builder: ExecutionPackageBuilder,
         provider: ProviderClient,
         artifact_writer: ArtifactWriter,
+        artifact_catalog: FileArtifactCatalog | None = None,
     ) -> None:
         self.package_builder = package_builder
         self.provider = provider
         self.artifact_writer = artifact_writer
+        self.artifact_catalog = artifact_catalog
 
     def execute(self, job: DispatchJob) -> ExecutionResult:
         input_artifacts = tuple(
@@ -109,6 +112,19 @@ class ProviderExecutor:
                 },
             )
         artifact = self.artifact_writer.write(response)
+        if self.artifact_catalog is not None:
+            record = self.artifact_catalog.register(
+                run_id=package.run_id,
+                stage_id=package.stage_id,
+                artifact_type=package.expected_output_type,
+                content=response.content,
+                parent_artifact_ids=(
+                    item["artifact_id"] for item in package.input_artifacts
+                ),
+                producer=f"{package.agent_id}@{package.agent_version}",
+                metadata=dict(response.metadata or {}),
+            )
+            artifact = record.artifact
         return ExecutionResult(
             outputs=(artifact,),
             next_available_inputs=(response.output_type,),

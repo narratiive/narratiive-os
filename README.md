@@ -23,3 +23,7 @@ each execution package.
 The Quality Reviewer may also receive a deterministic confidence scorecard. Its
 recommendation is advisory; the reviewer continues to apply the stricter artifact
 and evidence policy in its agent contract.
+
+Machine-readable revision issues resolve to one specialist owner and invalidate
+only that stage and its downstream dependants. Each invalidation is event logged;
+immutable artifact-catalog versions are never deleted.
