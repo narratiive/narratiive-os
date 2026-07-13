@@ -42,6 +42,9 @@ class DeterministicProvider:
                 "input_artifact_ids": [
                     item["artifact_id"] for item in package.input_artifacts
                 ],
+                "memory_ids": [
+                    item["memory_id"] for item in package.memory_records
+                ],
                 **dict(self.metadata.get(package.stage_id, {})),
             },
         )
@@ -86,7 +89,13 @@ class PipelineRunner:
             executor=executor,
         )
 
-    def run(self, run_id: str, available_inputs: Iterable[str]) -> WorkflowState:
+    def run(
+        self,
+        run_id: str,
+        available_inputs: Iterable[str],
+        *,
+        client_id: str | None = None,
+    ) -> WorkflowState:
         supplied_inputs = set(available_inputs)
         if not self.runs.exists(run_id):
             self.run_service.create_run(self.definition, run_id, supplied_inputs)
@@ -123,7 +132,8 @@ class PipelineRunner:
             if stage.status != StageStatus.READY:
                 return state
 
-            self.dispatch.enqueue_current_stage(run_id)
+            context = {"client_id": client_id} if client_id is not None else None
+            self.dispatch.enqueue_current_stage(run_id, context=context)
             job = self.worker.run_once()
             if job is None:
                 return self.runs.load(run_id)

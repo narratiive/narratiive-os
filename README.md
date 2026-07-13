@@ -15,3 +15,7 @@ python3 scripts/run_pipeline.py \
 Run the command again with the same runtime root and run ID to load the completed
 run without regenerating artifacts. A retryable provider failure leaves completed
 stages persisted so the same command can resume from the interrupted stage.
+
+Fixture memory is persisted in append-only client journals under the runtime root.
+Client and run scope plus specialist selection rules determine which records enter
+each execution package.

@@ -1,5 +1,6 @@
 {
   "run_id": "rave-synthetic",
+  "client_id": "rave",
   "available_inputs": [
     "client_inputs",
     "source_material"
@@ -15,5 +16,24 @@
     "quality_reviewer": {
       "verdict": "APPROVE"
     }
-  }
+  },
+  "memory_records": [
+    {
+      "memory_id": "rave-brand-context",
+      "kind": "context",
+      "scope": "client",
+      "content": "RAVE Coffee is the client for this synthetic pipeline run."
+    },
+    {
+      "memory_id": "rave-run-evidence--{run_id}",
+      "kind": "evidence",
+      "scope": "run",
+      "content": "Synthetic evidence is for deterministic validation only.",
+      "stage_ids": [
+        "research_analyst",
+        "strategy_director",
+        "quality_reviewer"
+      ]
+    }
+  ]
 }

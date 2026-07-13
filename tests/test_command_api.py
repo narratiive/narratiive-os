@@ -55,8 +55,15 @@ class CommandAPITests(unittest.TestCase):
         fetched = self.api.handle({"command": "runs.get", "run_id": "run-1"})
         self.assertEqual(fetched["data"]["run_id"], "run-1")
 
-        dispatched = self.api.handle({"command": "stages.dispatch", "run_id": "run-1"})
+        dispatched = self.api.handle(
+            {
+                "command": "stages.dispatch",
+                "run_id": "run-1",
+                "client_id": "rave",
+            }
+        )
         self.assertEqual(dispatched["data"]["stage_id"], "research")
+        self.assertEqual(dispatched["data"]["payload"]["client_id"], "rave")
 
         job = self.api.handle({"command": "jobs.get", "job_id": dispatched["data"]["job_id"]})
         self.assertEqual(job["data"]["status"], "pending")

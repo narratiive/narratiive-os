@@ -12,6 +12,13 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from runtime.definitions import load_workflow_definition
 from runtime.dispatch import FileDispatchQueue
 from runtime.execution_package import ExecutionPackageBuilder
+from runtime.memory import (
+    FileMemoryStore,
+    MemoryKind,
+    MemoryRecord,
+    MemoryScope,
+    SpecialistMemorySelector,
+)
 from runtime.pipeline_runner import (
     DeterministicProvider,
     PipelineRunner,
@@ -44,13 +51,25 @@ def main() -> None:
     run_id = args.run_id or str(fixture.get("run_id", "")).strip()
     if not run_id:
         raise ValueError("run_id must be supplied by --run-id or the fixture")
+    client_id = str(fixture.get("client_id", "")).strip()
+    if not client_id:
+        raise ValueError("fixture must define client_id")
 
     catalog = SpecialistCatalog(repository_root, args.workflow)
     deployments = catalog.deploy(FilePromptRegistry(runtime_root / "prompts"))
     output_types = {item.stage_id: item.output_type for item in deployments}
+    memory_store = FileMemoryStore(runtime_root / "memory")
+    for item in fixture.get("memory_records", ()):
+        record = _memory_record(item, client_id=client_id, run_id=run_id)
+        if not memory_store.contains(client_id, record.memory_id):
+            memory_store.append(record)
     provider = DeterministicProvider.from_fixture(fixture)
     executor = ProviderExecutor(
-        package_builder=ExecutionPackageBuilder(repository_root, output_types),
+        package_builder=ExecutionPackageBuilder(
+            repository_root,
+            output_types,
+            memory_selector=SpecialistMemorySelector(memory_store),
+        ),
         provider=provider,
         artifact_writer=ArtifactWriter(runtime_root / "artifacts"),
     )
@@ -62,7 +81,11 @@ def main() -> None:
         queue=FileDispatchQueue(runtime_root / "jobs"),
         executor=executor,
     )
-    state = runner.run(run_id, fixture.get("available_inputs", ()))
+    state = runner.run(
+        run_id,
+        fixture.get("available_inputs", ()),
+        client_id=client_id,
+    )
     payload = {
         "run_id": state.run_id,
         "workflow_id": state.workflow_id,
@@ -80,6 +103,33 @@ def main() -> None:
         "event_count": len(events.read(run_id)),
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _memory_record(item, *, client_id: str, run_id: str) -> MemoryRecord:
+    if not isinstance(item, dict):
+        raise ValueError("memory_records entries must be objects")
+    scope = MemoryScope(str(item["scope"]))
+    return MemoryRecord(
+        memory_id=str(item["memory_id"]).format(
+            client_id=client_id,
+            run_id=run_id,
+        ),
+        client_id=client_id,
+        run_id=run_id if scope == MemoryScope.RUN else None,
+        kind=MemoryKind(str(item["kind"])),
+        scope=scope,
+        content=str(item["content"]),
+        origin_stage_id=(
+            str(item["origin_stage_id"])
+            if item.get("origin_stage_id") is not None
+            else None
+        ),
+        stage_ids=tuple(str(value) for value in item.get("stage_ids") or ()),
+        source_artifact_ids=tuple(
+            str(value) for value in item.get("source_artifact_ids") or ()
+        ),
+        metadata=dict(item.get("metadata") or {}),
+    )
 
 
 if __name__ == "__main__":

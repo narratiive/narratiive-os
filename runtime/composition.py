@@ -7,6 +7,7 @@ from .dispatch import FileDispatchQueue
 from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig
+from .memory import FileMemoryStore, SpecialistMemorySelector
 from .provider import ArtifactWriter, ProviderExecutor
 from .repositories import FileWorkflowRunRepository, JsonlEventLog
 from .run_service import WorkflowRunService
@@ -34,6 +35,10 @@ class RuntimePaths:
     def artifacts(self) -> Path:
         return self.root / "artifacts"
 
+    @property
+    def memory(self) -> Path:
+        return self.root / "memory"
+
 
 @dataclass(slots=True)
 class RuntimeComponents:
@@ -43,6 +48,8 @@ class RuntimeComponents:
     dispatch_queue: FileDispatchQueue
     run_service: WorkflowRunService
     dispatch_service: DispatchService
+    memory_store: FileMemoryStore
+    memory_selector: SpecialistMemorySelector
 
     def http_worker(
         self,
@@ -55,6 +62,7 @@ class RuntimeComponents:
         package_builder = ExecutionPackageBuilder(
             repository_root=self.paths.repository_root,
             output_type_by_stage=output_type_by_stage,
+            memory_selector=self.memory_selector,
         )
         executor = ProviderExecutor(
             package_builder=package_builder,
@@ -80,6 +88,7 @@ def compose_local_runtime(root: str | Path, repository_root: str | Path) -> Runt
     dispatch_queue = FileDispatchQueue(paths.jobs)
     run_service = WorkflowRunService(run_repository, event_log)
     dispatch_service = DispatchService(run_repository, event_log, dispatch_queue, run_service)
+    memory_store = FileMemoryStore(paths.memory)
 
     return RuntimeComponents(
         paths=paths,
@@ -88,4 +97,6 @@ def compose_local_runtime(root: str | Path, repository_root: str | Path) -> Runt
         dispatch_queue=dispatch_queue,
         run_service=run_service,
         dispatch_service=dispatch_service,
+        memory_store=memory_store,
+        memory_selector=SpecialistMemorySelector(memory_store),
     )

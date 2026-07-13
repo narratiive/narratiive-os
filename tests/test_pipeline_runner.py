@@ -6,6 +6,13 @@ from pathlib import Path
 from runtime.definitions import load_workflow_definition
 from runtime.dispatch import FileDispatchQueue
 from runtime.execution_package import ExecutionPackageBuilder
+from runtime.memory import (
+    FileMemoryStore,
+    MemoryKind,
+    MemoryRecord,
+    MemoryScope,
+    SpecialistMemorySelector,
+)
 from runtime.models import StageStatus, WorkflowStatus
 from runtime.pipeline_runner import DeterministicProvider, PipelineRunner, load_pipeline_fixture
 from runtime.provider import ArtifactWriter, ProviderExecutor
@@ -53,9 +60,13 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def make_runner(self, provider):
+    def make_runner(self, provider, memory_selector=None):
         executor = ProviderExecutor(
-            package_builder=ExecutionPackageBuilder(REPOSITORY_ROOT, self.output_types),
+            package_builder=ExecutionPackageBuilder(
+                REPOSITORY_ROOT,
+                self.output_types,
+                memory_selector=memory_selector,
+            ),
             provider=provider,
             artifact_writer=ArtifactWriter(self.root / "artifacts"),
         )
@@ -144,6 +155,52 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
         ]
         self.assertEqual(completed.count("research_analyst"), 1)
         self.assertEqual(completed.count("strategy_director"), 1)
+
+    def test_specialists_receive_only_selected_memory(self) -> None:
+        memory_store = FileMemoryStore(self.root / "memory")
+        memory_store.append(
+            MemoryRecord(
+                memory_id="brand-context",
+                client_id="rave",
+                kind=MemoryKind.CONTEXT,
+                scope=MemoryScope.CLIENT,
+                content="RAVE brand context",
+            )
+        )
+        memory_store.append(
+            MemoryRecord(
+                memory_id="run-evidence",
+                client_id="rave",
+                run_id="rave-memory",
+                kind=MemoryKind.EVIDENCE,
+                scope=MemoryScope.RUN,
+                content="RAVE run evidence",
+            )
+        )
+        provider = DeterministicProvider.from_fixture(self.fixture)
+        state = self.make_runner(
+            provider,
+            memory_selector=SpecialistMemorySelector(memory_store),
+        ).run(
+            "rave-memory",
+            self.fixture["available_inputs"],
+            client_id="rave",
+        )
+
+        memory_ids = {
+            stage.stage_id: stage.output_artifacts[0].metadata["memory_ids"]
+            for stage in state.stages
+        }
+        self.assertEqual(
+            memory_ids["research_analyst"],
+            ["brand-context", "run-evidence"],
+        )
+        self.assertEqual(memory_ids["campaign_world_generator"], ["brand-context"])
+        self.assertEqual(memory_ids["creative_director"], ["brand-context"])
+        self.assertEqual(
+            memory_ids["quality_reviewer"],
+            ["brand-context", "run-evidence"],
+        )
 
     def test_fixture_requires_stage_outputs(self) -> None:
         with self.assertRaises(ValueError):
