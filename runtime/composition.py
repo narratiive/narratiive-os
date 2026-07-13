@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Mapping
 
 from .approvals import ApprovalService
 from .artifact_catalog import FileArtifactCatalog
@@ -10,7 +11,8 @@ from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig
 from .memory import FileMemoryStore, SpecialistMemorySelector
-from .provider import ArtifactWriter, ProviderExecutor
+from .provider import ArtifactWriter, ProviderClient, ProviderExecutor
+from .provider_routing import ModelRouter, RouteTarget, RoutedProviderClient
 from .prompt_registry import FilePromptRegistry
 from .repositories import FileWorkflowRunRepository, JsonlEventLog
 from .run_service import WorkflowRunService
@@ -94,6 +96,34 @@ class RuntimeComponents:
         executor = ProviderExecutor(
             package_builder=package_builder,
             provider=HttpProviderClient(provider_config),
+            artifact_writer=ArtifactWriter(self.paths.artifacts),
+            artifact_catalog=self.artifact_catalog,
+        )
+        return WorkerRunner(
+            worker_id=worker_id,
+            dispatcher=self.dispatch_service,
+            executor=executor,
+            lease_seconds=lease_seconds,
+        )
+
+    def routed_worker(
+        self,
+        *,
+        worker_id: str,
+        router: ModelRouter,
+        providers: Mapping[RouteTarget, ProviderClient],
+        output_type_by_stage: dict[str, str],
+        lease_seconds: int = 300,
+    ) -> WorkerRunner:
+        package_builder = ExecutionPackageBuilder(
+            repository_root=self.paths.repository_root,
+            output_type_by_stage=output_type_by_stage,
+            memory_selector=self.memory_selector,
+            confidence_engine=ConfidenceEngine(),
+        )
+        executor = ProviderExecutor(
+            package_builder=package_builder,
+            provider=RoutedProviderClient(router=router, providers=providers),
             artifact_writer=ArtifactWriter(self.paths.artifacts),
             artifact_catalog=self.artifact_catalog,
         )

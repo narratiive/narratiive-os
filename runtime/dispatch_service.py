@@ -122,15 +122,18 @@ class DispatchService:
                 "next_stage_id": state.current_stage_id,
             },
         )
+        completion_payload: dict[str, object] = {
+            "job_id": job_id,
+            "stage_id": job.stage_id,
+            "worker_id": worker_id,
+            "output_artifact_ids": [item.artifact_id for item in output_list],
+        }
+        if result and isinstance(result.get("routing"), Mapping):
+            completion_payload["routing"] = _routing_audit(result["routing"])
         self._event(
             job.run_id,
             "dispatch.completed",
-            {
-                "job_id": job_id,
-                "stage_id": job.stage_id,
-                "worker_id": worker_id,
-                "output_artifact_ids": [item.artifact_id for item in output_list],
-            },
+            completion_payload,
         )
         return state
 
@@ -171,3 +174,22 @@ class DispatchService:
                 workspace_id=self.runs.load(run_id).workspace_id,
             )
         )
+
+
+def _routing_audit(routing: Mapping[object, object]) -> dict[str, object]:
+    allowed_fields = (
+        "provider_id",
+        "model_id",
+        "policy_id",
+        "policy_version",
+        "routing_reason",
+        "fallback_index",
+        "workspace_id",
+        "stage_id",
+        "specialist_id",
+    )
+    return {
+        field: routing[field]
+        for field in allowed_fields
+        if field in routing and isinstance(routing[field], (str, int))
+    }

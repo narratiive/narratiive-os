@@ -41,3 +41,20 @@ commands. Each workspace has separate run, event, job, memory, prompt, artifact,
 approval stores; mismatched client or run references are rejected. Requests without
 a workspace remain on the compatible `legacy` runtime. `workspaces.migrate_legacy`
 copies existing unscoped data into a named workspace without deleting its source.
+
+## Live provider routing
+
+Production workers can wrap provider clients with `ModelRouter` and
+`RoutedProviderClient`, or use `RuntimeComponents.routed_worker`. Routing policies
+select an explicit primary and ordered fallback chain by workspace, stage and
+specialist. A provider/model must be declared in `ProviderCapabilityRegistry`,
+configured on the worker and marked `available` or `degraded` in
+`ProviderHealthRegistry` before it can be selected; unreported health fails closed.
+
+`EnvironmentTextProviderClient` is the built-in OpenAI-compatible live text
+adapter. Its `LiveTextProviderConfig` names the environment variables that contain
+the endpoint and API key (for example `NARRATIIVE_LIVE_ENDPOINT` and
+`NARRATIIVE_LIVE_API_KEY`). Credential values are read only when a request is made
+and are never added to routing policies, events, artifacts or provider metadata.
+The existing `DeterministicProvider` remains available for fixtures and local dry
+runs.
