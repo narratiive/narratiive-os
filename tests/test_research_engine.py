@@ -5,6 +5,7 @@ import shutil
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "research"
@@ -19,6 +20,31 @@ from runtime.research_engine import (  # noqa: E402
     sha256_hex,
     normalise_text,
 )
+
+
+class FakeHTTPResponse:
+    def __init__(self, payload: bytes, url: str) -> None:
+        self._payload = payload
+        self._url = url
+        self._offset = 0
+
+    def read(self, size: int = -1) -> bytes:
+        if self._offset >= len(self._payload):
+            return b""
+        if size is None or size < 0:
+            size = len(self._payload) - self._offset
+        chunk = self._payload[self._offset : self._offset + size]
+        self._offset += len(chunk)
+        return chunk
+
+    def geturl(self) -> str:
+        return self._url
+
+    def __enter__(self) -> "FakeHTTPResponse":
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> bool:
+        return False
 
 
 class ResearchEngineTests(unittest.TestCase):
@@ -157,6 +183,93 @@ class ResearchEngineTests(unittest.TestCase):
         self.assertTrue(any("does not reference any evidence IDs" in item["reason"] for item in run.evidence_pack.unsupported_claims))
         self.assertTrue(any(item["missing_evidence_ids"] for item in run.evidence_pack.unsupported_claims))
 
+    def test_run_rejects_cross_workspace_sources_without_persisting_foreign_state(self) -> None:
+        engine = ResearchEngine(
+            root=self.root,
+            adapters=[WebRetrievalAdapter(fetcher=lambda uri, timeout: b"cross-workspace evidence")],
+        )
+        source = EvidenceSource(
+            source_id="foreign-web",
+            workspace_id="OtherWorkspace",
+            source_type="web",
+            uri="https://example.com/foreign",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("example.com",),
+                max_bytes=10_000,
+                timeout_seconds=2,
+            ),
+        )
+
+        run = engine.run(
+            ResearchJob(
+                job_id="job-foreign",
+                workspace_id="Rave",
+                query="cross workspace",
+                sources=(source,),
+            )
+        )
+
+        self.assertEqual(run.status, "blocked")
+        self.assertTrue(any("workspace_id does not match" in blocker for blocker in run.blockers))
+        self.assertEqual(run.deduplicated_record_count, 0)
+        self.assertEqual(run.evidence_pack.sources, [])
+        self.assertFalse((self.root / "research" / "workspaces" / "otherworkspace").exists())
+
+    def test_run_references_aliases_for_duplicate_evidence_ids(self) -> None:
+        workspace_id = "Rave"
+        text = "Duplicate content that should collapse into a canonical record."
+        source_one = EvidenceSource(
+            source_id="web-source-1",
+            workspace_id=workspace_id,
+            source_type="web",
+            uri="https://example.com/one",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("example.com",),
+                max_bytes=10_000,
+                timeout_seconds=2,
+            ),
+        )
+        source_two = EvidenceSource(
+            source_id="web-source-2",
+            workspace_id=workspace_id,
+            source_type="web",
+            uri="https://example.com/two",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("example.com",),
+                max_bytes=10_000,
+                timeout_seconds=2,
+            ),
+        )
+        second_evidence_id = f"ev_{sha256_hex(f'{workspace_id}|{source_two.source_id}|{sha256_hex(text)}')[:16]}"
+        claim = MaterialClaim(
+            claim_id="claim-alias",
+            statement="The duplicate claim should still resolve via the second evidence ID.",
+            evidence_ids=(second_evidence_id,),
+        )
+        engine = ResearchEngine(
+            root=self.root,
+            adapters=[WebRetrievalAdapter(fetcher=lambda uri, timeout: text.encode("utf-8"))],
+        )
+
+        run = engine.run(
+            ResearchJob(
+                job_id="job-alias",
+                workspace_id=workspace_id,
+                query="duplicate evidence",
+                sources=(source_one, source_two),
+                claims=(claim,),
+            )
+        )
+
+        self.assertEqual(run.status, "complete")
+        self.assertEqual(run.deduplicated_record_count, 1)
+        self.assertEqual(len(run.evidence_pack.records), 1)
+        self.assertEqual(run.evidence_pack.evidence_aliases.get(second_evidence_id), run.evidence_pack.records[0]["evidence_id"])
+        self.assertEqual(run.evidence_pack.claims[0]["resolved_evidence_ids"], [run.evidence_pack.records[0]["evidence_id"]])
+
     def test_web_and_local_adapters_enforce_safety_rules(self) -> None:
         web_source = EvidenceSource(
             source_id="web-source-3",
@@ -196,6 +309,47 @@ class ResearchEngineTests(unittest.TestCase):
         self.assertIn("not approved", web_batch.blocker or "")
         self.assertIsNotNone(local_batch.blocker)
         self.assertIn("escapes the workspace scope", local_batch.blocker or "")
+
+    def test_web_adapter_rejects_private_address_destinations(self) -> None:
+        source = EvidenceSource(
+            source_id="web-source-private",
+            workspace_id="Rave",
+            source_type="web",
+            uri="https://127.0.0.1/private",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("127.0.0.1",),
+                max_bytes=5_000,
+                timeout_seconds=1,
+            ),
+        )
+        batch = WebRetrievalAdapter(fetcher=lambda uri, timeout: b"ignored").collect(
+            ResearchJob(job_id="job-private", workspace_id="Rave", query="test", sources=(source,)),
+            source,
+        )
+        self.assertIsNotNone(batch.blocker)
+        self.assertIn("unsafe address", batch.blocker or "")
+
+    def test_web_adapter_rejects_redirects_outside_allowlist(self) -> None:
+        source = EvidenceSource(
+            source_id="web-source-redirect",
+            workspace_id="Rave",
+            source_type="web",
+            uri="https://example.com/start",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("example.com",),
+                max_bytes=5_000,
+                timeout_seconds=1,
+            ),
+        )
+        with patch("runtime.research_engine.urllib.request.urlopen", return_value=FakeHTTPResponse(b"redirected content", "https://malicious.example.net/landing")):
+            batch = WebRetrievalAdapter().collect(
+                ResearchJob(job_id="job-redirect", workspace_id="Rave", query="test", sources=(source,)),
+                source,
+            )
+        self.assertIsNotNone(batch.blocker)
+        self.assertIn("not approved", batch.blocker or "")
 
     def test_web_adapter_enforces_size_limit(self) -> None:
         source = EvidenceSource(

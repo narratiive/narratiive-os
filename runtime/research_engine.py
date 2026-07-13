@@ -10,7 +10,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import ipaddress
 import re
+import socket
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -23,7 +25,7 @@ from typing import Any, Protocol, runtime_checkable
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MAX_BYTES = 250_000
 DEFAULT_TIMEOUT_SECONDS = 10
-DEFAULT_ALLOWED_SCHEMES = ("https", "http", "file")
+DEFAULT_ALLOWED_SCHEMES = ("https",)
 
 
 def utc_now() -> str:
@@ -93,6 +95,7 @@ class EvidenceRecord:
     content_hash: str
     provenance: list[dict[str, Any]] = field(default_factory=list)
     source_ids: list[str] = field(default_factory=list)
+    aliases: list[str] = field(default_factory=list)
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -132,6 +135,7 @@ class EvidencePack:
     records: list[dict[str, Any]]
     claims: list[dict[str, Any]]
     unsupported_claims: list[dict[str, Any]]
+    evidence_aliases: dict[str, str]
     missing_inputs: list[str]
     blockers: list[str]
     status: str
@@ -185,22 +189,13 @@ class WebRetrievalAdapter:
         if not source.uri:
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Web source URI is missing.")
 
+        original_url = self._validate_web_url(source.uri, policy, context="source URL")
         parsed = urllib.parse.urlparse(source.uri)
-        if parsed.scheme not in policy.allowed_schemes:
-            return EvidenceBatch(
-                source_id=source.source_id,
-                adapter=self.name,
-                blocker=f"Web source scheme '{parsed.scheme}' is not permitted.",
-            )
-        if policy.allowed_domains and parsed.hostname not in set(policy.allowed_domains):
-            return EvidenceBatch(
-                source_id=source.source_id,
-                adapter=self.name,
-                blocker=f"Web source domain '{parsed.hostname or ''}' is not approved.",
-            )
 
         try:
-            raw = self._fetch_bytes(source.uri, policy.timeout_seconds, policy.max_bytes)
+            raw, final_url = self._fetch_bytes(source.uri, policy.timeout_seconds, policy.max_bytes)
+            if final_url:
+                self._validate_web_url(final_url, policy, context="redirect destination")
         except Exception as exc:  # noqa: BLE001
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker=str(exc))
         text = self._decode_web_bytes(raw)
@@ -211,14 +206,14 @@ class WebRetrievalAdapter:
                 "adapter": self.name,
                 "source_id": source.source_id,
                 "workspace_id": job.workspace_id,
-                "uri": source.uri,
+                "uri": original_url,
                 "retrieved_at": utc_now(),
                 "content_hash": content_hash,
             }
         ]
         record = EvidenceRecord(
             evidence_id=evidence_id,
-            workspace_id=job.workspace_id,
+            workspace_id=source.workspace_id,
             source_id=source.source_id,
             source_type=source.source_type,
             uri=source.uri,
@@ -233,9 +228,18 @@ class WebRetrievalAdapter:
         )
         return EvidenceBatch(source_id=source.source_id, adapter=self.name, records=[record])
 
-    def _fetch_bytes(self, uri: str, timeout_seconds: int, max_bytes: int) -> bytes:
+    def _fetch_bytes(self, uri: str, timeout_seconds: int, max_bytes: int) -> tuple[bytes, str | None]:
         if self.fetcher is not None:
             payload = self.fetcher(uri, timeout_seconds)
+            final_url = None
+            if isinstance(payload, dict) and "content" in payload:
+                final_url = payload.get("final_url") or payload.get("url")
+                payload = payload["content"]
+            elif isinstance(payload, tuple):
+                if len(payload) == 2:
+                    payload, final_url = payload
+                elif len(payload) > 2:
+                    payload, final_url = payload[0], payload[1]
             if isinstance(payload, str):
                 payload = payload.encode("utf-8")
             if not isinstance(payload, (bytes, bytearray)):
@@ -243,7 +247,7 @@ class WebRetrievalAdapter:
             data = bytes(payload)
             if len(data) > max_bytes:
                 raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
-            return data
+            return data, (str(final_url) if final_url is not None else None)
 
         request = urllib.request.Request(uri, method="GET")
         with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
@@ -257,7 +261,8 @@ class WebRetrievalAdapter:
                 total += len(chunk)
                 if total > max_bytes:
                     raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
-        return b"".join(chunks)
+            final_url = getattr(response, "geturl", lambda: uri)()
+        return b"".join(chunks), final_url
 
     def _decode_web_bytes(self, data: bytes) -> str:
         text = data.decode("utf-8", errors="replace")
@@ -268,6 +273,41 @@ class WebRetrievalAdapter:
 
     def _evidence_id(self, workspace_id: str, source_id: str, content_hash: str) -> str:
         return f"ev_{sha256_hex(f'{workspace_id}|{source_id}|{content_hash}')[:16]}"
+
+    def _validate_web_url(self, url: str, policy: EvidenceSourcePolicy, *, context: str) -> str:
+        parsed = urllib.parse.urlparse(url)
+        if parsed.scheme not in policy.allowed_schemes:
+            raise RuntimeError(f"Web {context} scheme '{parsed.scheme}' is not permitted.")
+        if not parsed.hostname:
+            raise RuntimeError(f"Web {context} is missing a hostname.")
+        hostname = parsed.hostname
+        if policy.allowed_domains and hostname not in set(policy.allowed_domains):
+            raise RuntimeError(f"Web {context} domain '{hostname}' is not approved.")
+        self._reject_unsafe_destination(hostname, context)
+        return url
+
+    def _reject_unsafe_destination(self, hostname: str, context: str) -> None:
+        candidates: list[ipaddress._BaseAddress] = []
+        try:
+            candidates.append(ipaddress.ip_address(hostname))
+        except ValueError:
+            try:
+                resolved = socket.getaddrinfo(hostname, None)
+            except socket.gaierror as exc:
+                raise RuntimeError(f"Web {context} could not be resolved: {hostname}") from exc
+            for family, _, _, _, sockaddr in resolved:
+                address = sockaddr[0]
+                try:
+                    candidates.append(ipaddress.ip_address(address))
+                except ValueError:
+                    continue
+
+        if not candidates:
+            raise RuntimeError(f"Web {context} could not be resolved: {hostname}")
+
+        for candidate in candidates:
+            if candidate.is_loopback or candidate.is_private or candidate.is_link_local or candidate.is_reserved or candidate.is_multicast or candidate.is_unspecified:
+                raise RuntimeError(f"Web {context} resolves to an unsafe address: {hostname}")
 
 
 class LocalDocumentIngestionAdapter:
@@ -285,6 +325,12 @@ class LocalDocumentIngestionAdapter:
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Document source is not approved.")
         if not policy.allow_local_files:
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Local file ingestion is not permitted.")
+        if source.workspace_id.strip() != job.workspace_id.strip():
+            return EvidenceBatch(
+                source_id=source.source_id,
+                adapter=self.name,
+                blocker="Document source workspace does not match the research job workspace.",
+            )
 
         workspace_root = (self.root / "research" / "workspaces" / slugify(job.workspace_id)).resolve()
         workspace_root.mkdir(parents=True, exist_ok=True)
@@ -325,7 +371,7 @@ class LocalDocumentIngestionAdapter:
         ]
         record = EvidenceRecord(
             evidence_id=evidence_id,
-            workspace_id=job.workspace_id,
+            workspace_id=source.workspace_id,
             source_id=source.source_id,
             source_type=source.source_type,
             uri=str(path.relative_to(workspace_root)),
@@ -409,11 +455,18 @@ class ResearchEngine:
         blockers: list[str] = []
         warnings: list[str] = []
         collected: list[EvidenceRecord] = []
+        accepted_sources: list[EvidenceSource] = []
 
         if not job.sources:
             blockers.append("No evidence sources supplied.")
 
         for source in job.sources:
+            if source.workspace_id.strip() != job.workspace_id.strip():
+                blockers.append(
+                    f"{source.source_id}: source workspace_id does not match research job workspace_id."
+                )
+                continue
+            accepted_sources.append(source)
             adapter = self._select_adapter(source)
             if adapter is None:
                 blockers.append(f"No adapter available for {source.source_id} ({source.source_type}).")
@@ -428,9 +481,9 @@ class ResearchEngine:
             warnings.extend(batch.warnings)
             collected.extend(batch.records)
 
-        deduped_records = self._dedupe_records(collected)
+        deduped_records, evidence_aliases = self._dedupe_records(collected)
         records_by_id = {record.evidence_id: record for record in deduped_records}
-        claims, unsupported_claims, claim_missing_inputs = self._validate_claims(job.claims, records_by_id)
+        claims, unsupported_claims, claim_missing_inputs = self._validate_claims(job.claims, records_by_id, evidence_aliases)
         missing_inputs = list(dict.fromkeys([*job.missing_inputs, *claim_missing_inputs]))
 
         latest_pack = self.store.latest_pack(job.workspace_id)
@@ -444,6 +497,16 @@ class ResearchEngine:
                 lineage.append(previous_pack_id)
 
         pack_status = self._pack_status(blockers, missing_inputs, unsupported_claims, deduped_records)
+        accepted_job = ResearchJob(
+            job_id=job.job_id,
+            workspace_id=job.workspace_id,
+            query=job.query,
+            sources=tuple(accepted_sources),
+            claims=job.claims,
+            missing_inputs=job.missing_inputs,
+            created_at=job.created_at,
+            lineage=job.lineage,
+        )
         pack = EvidencePack(
             pack_id=self._pack_id(job, deduped_records),
             workspace_id=job.workspace_id,
@@ -452,14 +515,15 @@ class ResearchEngine:
             created_at=job.created_at,
             previous_pack_id=previous_pack_id,
             lineage=list(dict.fromkeys(lineage)),
-            sources=[self._source_as_dict(source) for source in job.sources],
+            sources=[self._source_as_dict(source) for source in accepted_sources],
             records=[record.as_dict() for record in deduped_records],
             claims=claims,
             unsupported_claims=unsupported_claims,
+            evidence_aliases=evidence_aliases,
             missing_inputs=missing_inputs,
             blockers=list(dict.fromkeys(blockers)),
             status=pack_status,
-            source_policy=self._job_policy(job),
+            source_policy=self._job_policy(accepted_job),
         )
         pack_path = self.store.save(pack)
         return ResearchRun(
@@ -478,8 +542,9 @@ class ResearchEngine:
                 return adapter
         return None
 
-    def _dedupe_records(self, records: list[EvidenceRecord]) -> list[EvidenceRecord]:
+    def _dedupe_records(self, records: list[EvidenceRecord]) -> tuple[list[EvidenceRecord], dict[str, str]]:
         deduped: dict[str, EvidenceRecord] = {}
+        aliases: dict[str, str] = {}
         for record in records:
             existing = deduped.get(record.content_hash)
             if existing is None:
@@ -487,12 +552,21 @@ class ResearchEngine:
                 continue
             existing.source_ids = self._unique(existing.source_ids + record.source_ids)
             existing.provenance = self._unique_dicts(existing.provenance + record.provenance)
-        return list(deduped.values())
+            existing.aliases = self._unique(existing.aliases + [record.evidence_id] + record.aliases)
+            aliases[record.evidence_id] = existing.evidence_id
+            for alias in record.aliases:
+                aliases[alias] = existing.evidence_id
+        for record in deduped.values():
+            aliases[record.evidence_id] = record.evidence_id
+            for alias in record.aliases:
+                aliases[alias] = record.evidence_id
+        return list(deduped.values()), aliases
 
     def _validate_claims(
         self,
         claims: tuple[MaterialClaim, ...],
         records_by_id: dict[str, EvidenceRecord],
+        evidence_aliases: dict[str, str],
     ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[str]]:
         supported: list[dict[str, Any]] = []
         unsupported: list[dict[str, Any]] = []
@@ -500,7 +574,8 @@ class ResearchEngine:
 
         for claim in claims:
             evidence_ids = [evidence_id for evidence_id in claim.evidence_ids if evidence_id]
-            missing_evidence_ids = [evidence_id for evidence_id in evidence_ids if evidence_id not in records_by_id]
+            resolved_evidence_ids = [evidence_aliases.get(evidence_id, evidence_id) for evidence_id in evidence_ids]
+            missing_evidence_ids = [evidence_id for evidence_id, resolved in zip(evidence_ids, resolved_evidence_ids) if resolved not in records_by_id]
             if claim.importance == "material" and not evidence_ids:
                 unsupported.append(
                     {
@@ -519,6 +594,7 @@ class ResearchEngine:
                         "statement": claim.statement,
                         "reason": "Referenced evidence IDs were not collected for this research job.",
                         "evidence_ids": evidence_ids,
+                        "resolved_evidence_ids": resolved_evidence_ids,
                         "missing_evidence_ids": missing_evidence_ids,
                     }
                 )
@@ -528,6 +604,7 @@ class ResearchEngine:
                     "claim_id": claim.claim_id,
                     "statement": claim.statement,
                     "evidence_ids": evidence_ids,
+                    "resolved_evidence_ids": resolved_evidence_ids,
                     "importance": claim.importance,
                     "metadata": claim.metadata,
                 }
