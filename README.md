@@ -19,3 +19,7 @@ stages persisted so the same command can resume from the interrupted stage.
 Fixture memory is persisted in append-only client journals under the runtime root.
 Client and run scope plus specialist selection rules determine which records enter
 each execution package.
+
+The Quality Reviewer may also receive a deterministic confidence scorecard. Its
+recommendation is advisory; the reviewer continues to apply the stricter artifact
+and evidence policy in its agent contract.

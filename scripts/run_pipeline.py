@@ -27,6 +27,7 @@ from runtime.pipeline_runner import (
 from runtime.prompt_registry import FilePromptRegistry
 from runtime.provider import ArtifactWriter, ProviderExecutor
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
+from runtime.scoring import ConfidenceEngine
 from runtime.specialists import SpecialistCatalog
 
 
@@ -69,6 +70,7 @@ def main() -> None:
             repository_root,
             output_types,
             memory_selector=SpecialistMemorySelector(memory_store),
+            confidence_engine=ConfidenceEngine(),
         ),
         provider=provider,
         artifact_writer=ArtifactWriter(runtime_root / "artifacts"),
@@ -85,6 +87,7 @@ def main() -> None:
         run_id,
         fixture.get("available_inputs", ()),
         client_id=client_id,
+        scoring_input=fixture.get("scoring_input"),
     )
     payload = {
         "run_id": state.run_id,

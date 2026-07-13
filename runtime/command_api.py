@@ -81,6 +81,17 @@ class RuntimeCommandAPI:
         run_id = self._required(request, "run_id")
         client_id = str(request.get("client_id", "")).strip()
         context = {"client_id": client_id} if client_id else None
+        scoring_input = request.get("scoring_input")
+        if scoring_input is not None and not isinstance(scoring_input, Mapping):
+            raise CommandError(
+                "invalid_scoring_input",
+                "scoring_input must be an object",
+            )
+        if scoring_input is not None:
+            context = {
+                **dict(context or {}),
+                "scoring_input": dict(scoring_input),
+            }
         try:
             job = self.runtime.dispatch_service.enqueue_current_stage(
                 run_id,

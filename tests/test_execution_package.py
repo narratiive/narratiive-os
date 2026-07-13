@@ -71,6 +71,7 @@ class ExecutionPackageBuilderTests(unittest.TestCase):
         self.assertEqual(package.context["client_name"], "Rave")
         self.assertEqual(package.input_artifacts[0]["artifact_id"], "source-1")
         self.assertEqual(package.memory_records, ())
+        self.assertIsNone(package.confidence_scorecard)
         self.assertIn("Do not invent evidence", package.instructions)
         self.assertEqual(package.to_dict()["schema_version"], 1)
 

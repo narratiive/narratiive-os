@@ -96,6 +96,18 @@ class ProviderExecutor:
         package = self.package_builder.build(job, input_artifacts=input_artifacts)
         response = self.provider.generate(package)
         self._validate(package, response)
+        if package.confidence_scorecard is not None:
+            response = ProviderResponse(
+                job_id=response.job_id,
+                run_id=response.run_id,
+                stage_id=response.stage_id,
+                output_type=response.output_type,
+                content=response.content,
+                metadata={
+                    **dict(response.metadata or {}),
+                    "confidence_scorecard": package.confidence_scorecard,
+                },
+            )
         artifact = self.artifact_writer.write(response)
         return ExecutionResult(
             outputs=(artifact,),
