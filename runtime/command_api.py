@@ -11,6 +11,11 @@ from .dispatch import JobNotFound
 from .repositories import RunNotFound
 from .revision_graph import RevisionIssue
 from .serialization import workflow_to_dict
+from .workspaces import (
+    CrossWorkspaceReference,
+    WorkspaceNotFound,
+    WorkspaceRuntimeManager,
+)
 
 
 class CommandError(ValueError):
@@ -204,6 +209,121 @@ class RuntimeCommandAPI:
         if not target.is_file():
             raise CommandError("definition_not_found", f"workflow definition not found: {relative}", 404)
         return target
+
+    @staticmethod
+    def _required(request: Mapping[str, Any], field: str) -> str:
+        value = str(request.get(field, "")).strip()
+        if not value:
+            raise CommandError("missing_field", f"{field} is required")
+        return value
+
+
+class WorkspaceCommandAPI:
+    """Workspace router for Tony/n8n with legacy request compatibility."""
+
+    def __init__(
+        self,
+        legacy_runtime: RuntimeComponents,
+        manager: WorkspaceRuntimeManager,
+    ) -> None:
+        self.legacy_api = RuntimeCommandAPI(legacy_runtime)
+        self.manager = manager
+
+    def handle(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        command = str(request.get("command", "")).strip()
+        if command == "workspaces.list":
+            workspaces = [
+                workspace.to_dict()
+                for workspace in self.manager.repository.list()
+            ]
+            return {
+                "ok": True,
+                "command": command,
+                "data": {"workspaces": workspaces, "count": len(workspaces)},
+            }
+        if command == "workspaces.create":
+            try:
+                workspace = self.manager.create(
+                    self._required(request, "workspace_id"),
+                    self._required(request, "client_id"),
+                    self._required(request, "display_name"),
+                )
+            except ValueError as exc:
+                raise CommandError("workspace_creation_failed", str(exc), 409) from exc
+            return {"ok": True, "command": command, "data": workspace.to_dict()}
+        if command == "workspaces.get":
+            try:
+                workspace = self.manager.repository.get(
+                    self._required(request, "workspace_id")
+                )
+            except WorkspaceNotFound as exc:
+                raise CommandError("workspace_not_found", str(exc), 404) from exc
+            return {"ok": True, "command": command, "data": workspace.to_dict()}
+        if command == "workspaces.migrate_legacy":
+            try:
+                workspace = self.manager.migrate_legacy(
+                    workspace_id=self._required(request, "workspace_id"),
+                    client_id=self._required(request, "client_id"),
+                    display_name=self._required(request, "display_name"),
+                )
+            except ValueError as exc:
+                raise CommandError("workspace_migration_failed", str(exc), 409) from exc
+            return {"ok": True, "command": command, "data": workspace.to_dict()}
+
+        workspace_id = str(request.get("workspace_id", "")).strip()
+        if not workspace_id:
+            return self.legacy_api.handle(request)
+        try:
+            workspace = self.manager.repository.get(workspace_id)
+        except WorkspaceNotFound as exc:
+            raise CommandError(
+                "workspace_not_found",
+                f"workspace not found: {workspace_id}",
+                404,
+            ) from exc
+
+        supplied_client = str(request.get("client_id", "")).strip()
+        if supplied_client and supplied_client != workspace.client_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                "client_id belongs to a different workspace",
+                409,
+            )
+        scoped_request = dict(request)
+        scoped_request["client_id"] = workspace.client_id
+        self._reject_cross_workspace_run(scoped_request, workspace_id)
+        result = RuntimeCommandAPI(
+            self.manager.runtime(workspace_id)
+        ).handle(scoped_request)
+        result["workspace_id"] = workspace_id
+        return result
+
+    def _reject_cross_workspace_run(
+        self,
+        request: Mapping[str, Any],
+        workspace_id: str,
+    ) -> None:
+        run_id = str(request.get("run_id", "")).strip()
+        if not run_id:
+            job_id = str(request.get("job_id", "")).strip()
+            if "--" in job_id:
+                run_id = job_id.split("--", 1)[0]
+        if not run_id or str(request.get("command")) == "runs.create":
+            return
+        selected = self.manager.runtime(workspace_id)
+        if selected.run_repository.exists(run_id):
+            return
+        owner = self.manager.locate_run(run_id)
+        if owner and owner != workspace_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                str(
+                    CrossWorkspaceReference(
+                        f"run {run_id} belongs to workspace {owner}"
+                    )
+                ),
+                409,
+            )
 
     @staticmethod
     def _required(request: Mapping[str, Any], field: str) -> str:

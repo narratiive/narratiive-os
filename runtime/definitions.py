@@ -22,7 +22,13 @@ class WorkflowDefinition:
     schema_version: int = 1
     approval_required: bool = False
 
-    def new_state(self, run_id: str) -> WorkflowState:
+    def new_state(
+        self,
+        run_id: str,
+        *,
+        workspace_id: str = "legacy",
+        client_id: str = "legacy",
+    ) -> WorkflowState:
         return WorkflowState(
             workflow_id=self.workflow_id,
             run_id=run_id,
@@ -35,6 +41,8 @@ class WorkflowDefinition:
                 for stage in self.stages
             ],
             approval_required=self.approval_required,
+            workspace_id=workspace_id,
+            client_id=client_id,
         )
 
 

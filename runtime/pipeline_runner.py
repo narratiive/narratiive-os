@@ -83,10 +83,19 @@ class PipelineRunner:
         queue: DispatchQueue,
         executor: AgentExecutor,
         worker_id: str = "pipeline-runner",
+        workspace_id: str = "legacy",
+        client_id: str = "legacy",
     ) -> None:
         self.definition = definition
         self.runs = runs
-        self.run_service = WorkflowRunService(runs, event_log)
+        self.workspace_id = workspace_id
+        self.client_id = client_id
+        self.run_service = WorkflowRunService(
+            runs,
+            event_log,
+            workspace_id=workspace_id,
+            client_id=client_id,
+        )
         self.dispatch = DispatchService(runs, event_log, queue, self.run_service)
         self.worker = WorkerRunner(
             worker_id=worker_id,
@@ -103,6 +112,9 @@ class PipelineRunner:
         scoring_input: Mapping[str, Any] | None = None,
     ) -> WorkflowState:
         supplied_inputs = set(available_inputs)
+        effective_client_id = client_id or self.client_id
+        if self.workspace_id != "legacy" and effective_client_id != self.client_id:
+            raise ValueError("client_id belongs to a different workspace")
         if not self.runs.exists(run_id):
             self.run_service.create_run(self.definition, run_id, supplied_inputs)
 
@@ -138,7 +150,10 @@ class PipelineRunner:
             if stage.status != StageStatus.READY:
                 return state
 
-            context = {"client_id": client_id} if client_id is not None else None
+            context = {
+                "client_id": effective_client_id,
+                "workspace_id": self.workspace_id,
+            }
             if stage.stage_id == "quality_reviewer" and scoring_input is not None:
                 context = {
                     **dict(context or {}),

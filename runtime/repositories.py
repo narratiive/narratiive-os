@@ -39,6 +39,7 @@ class WorkflowEvent:
     event_type: str
     payload: dict[str, Any]
     occurred_at: str
+    workspace_id: str = "legacy"
 
     @classmethod
     def create(
@@ -48,6 +49,7 @@ class WorkflowEvent:
         run_id: str,
         event_type: str,
         payload: dict[str, Any] | None = None,
+        workspace_id: str = "legacy",
     ) -> "WorkflowEvent":
         if not event_id.strip():
             raise ValueError("event_id must not be empty")
@@ -55,12 +57,14 @@ class WorkflowEvent:
             raise ValueError("run_id must not be empty")
         if not event_type.strip():
             raise ValueError("event_type must not be empty")
+        _validate_identifier(workspace_id, "workspace_id")
         return cls(
             event_id=event_id,
             run_id=run_id,
             event_type=event_type,
             payload=dict(payload or {}),
             occurred_at=datetime.now(timezone.utc).isoformat(),
+            workspace_id=workspace_id,
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -70,6 +74,7 @@ class WorkflowEvent:
             "event_type": self.event_type,
             "payload": self.payload,
             "occurred_at": self.occurred_at,
+            "workspace_id": self.workspace_id,
         }
 
     @classmethod
@@ -80,17 +85,30 @@ class WorkflowEvent:
             event_type=data["event_type"],
             payload=dict(data.get("payload") or {}),
             occurred_at=data["occurred_at"],
+            workspace_id=str(data.get("workspace_id", "legacy")),
         )
 
 
 class FileWorkflowRunRepository:
     """Atomic JSON persistence for workflow snapshots."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        workspace_id: str = "legacy",
+        client_id: str = "legacy",
+    ) -> None:
         self.root = Path(root)
+        _validate_identifier(workspace_id, "workspace_id")
+        _validate_identifier(client_id, "client_id")
+        self.workspace_id = workspace_id
+        self.client_id = client_id
         self.root.mkdir(parents=True, exist_ok=True)
 
     def save(self, state: WorkflowState) -> None:
+        if state.workspace_id != self.workspace_id or state.client_id != self.client_id:
+            raise ValueError("workflow belongs to a different workspace")
         target = self._path(state.run_id)
         payload = json.dumps(workflow_to_dict(state), indent=2, sort_keys=True)
         fd, temporary = tempfile.mkstemp(prefix=f".{state.run_id}.", suffix=".tmp", dir=self.root)
@@ -110,7 +128,10 @@ class FileWorkflowRunRepository:
         if not path.exists():
             raise RunNotFound(run_id)
         with path.open("r", encoding="utf-8") as handle:
-            return workflow_from_dict(json.load(handle))
+            state = workflow_from_dict(json.load(handle))
+        if state.workspace_id != self.workspace_id or state.client_id != self.client_id:
+            raise ValueError("workflow belongs to a different workspace")
+        return state
 
     def exists(self, run_id: str) -> bool:
         return self._path(run_id).exists()
@@ -126,11 +147,15 @@ class FileWorkflowRunRepository:
 class JsonlEventLog:
     """Append-only JSONL event history, partitioned by workflow run."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, workspace_id: str = "legacy") -> None:
         self.root = Path(root)
+        _validate_identifier(workspace_id, "workspace_id")
+        self.workspace_id = workspace_id
         self.root.mkdir(parents=True, exist_ok=True)
 
     def append(self, event: WorkflowEvent) -> None:
+        if event.workspace_id != self.workspace_id:
+            raise ValueError("event belongs to a different workspace")
         path = self._path(event.run_id)
         line = json.dumps(event.to_dict(), separators=(",", ":"), sort_keys=True)
         with path.open("a", encoding="utf-8") as handle:
@@ -149,7 +174,10 @@ class JsonlEventLog:
                 if not line.strip():
                     continue
                 try:
-                    events.append(WorkflowEvent.from_dict(json.loads(line)))
+                    event = WorkflowEvent.from_dict(json.loads(line))
+                    if event.workspace_id != self.workspace_id:
+                        raise ValueError("event belongs to a different workspace")
+                    events.append(event)
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
                     raise ValueError(f"invalid event at {path}:{line_number}") from exc
         return events

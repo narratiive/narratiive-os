@@ -21,10 +21,12 @@ class ArtifactRecord:
     parent_artifact_ids: tuple[str, ...] = ()
     producer: str | None = None
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    workspace_id: str = "legacy"
 
     def __post_init__(self) -> None:
         if not self.run_id.strip() or not self.stage_id.strip():
             raise ValueError("run_id and stage_id must not be empty")
+        _safe(self.workspace_id, "workspace_id")
         if self.version <= 0:
             raise ValueError("version must be positive")
         if self.artifact.artifact_id in self.parent_artifact_ids:
@@ -46,14 +48,16 @@ class ArtifactRecord:
             parent_artifact_ids=tuple(data.get("parent_artifact_ids") or ()),
             producer=data.get("producer"),
             created_at=data["created_at"],
+            workspace_id=str(data.get("workspace_id", "legacy")),
         )
 
 
 class FileArtifactCatalog:
     """Immutable content store and lineage index for workflow artifacts."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, workspace_id: str = "legacy") -> None:
         self.root = Path(root)
+        self.workspace_id = _safe(workspace_id, "workspace_id")
         self.content_root = self.root / "content"
         self.records_root = self.root / "records"
         self.content_root.mkdir(parents=True, exist_ok=True)
@@ -80,6 +84,13 @@ class FileArtifactCatalog:
             raise ValueError("content must not be empty")
         if not extension.startswith(".") or "/" in extension or "\\" in extension:
             raise ValueError("invalid extension")
+        parent_ids = tuple(dict.fromkeys(parent_artifact_ids))
+        for parent_id in parent_ids:
+            if not self.get(parent_id):
+                raise ValueError(
+                    f"parent artifact not found in workspace {self.workspace_id}: "
+                    f"{parent_id}"
+                )
 
         data = content.encode("utf-8")
         checksum = hashlib.sha256(data).hexdigest()
@@ -94,15 +105,19 @@ class FileArtifactCatalog:
             artifact_type=artifact_type,
             location=str(content_path),
             checksum=checksum,
-            metadata=dict(metadata or {}),
+            metadata={
+                **dict(metadata or {}),
+                "workspace_id": self.workspace_id,
+            },
         )
         record = ArtifactRecord(
             artifact=artifact,
             run_id=run_id,
             stage_id=stage_id,
             version=version,
-            parent_artifact_ids=tuple(dict.fromkeys(parent_artifact_ids)),
+            parent_artifact_ids=parent_ids,
             producer=producer,
+            workspace_id=self.workspace_id,
         )
         record_path = self.records_root / f"{run_id}--{stage_id}--{artifact_type}--v{version}.json"
         if record_path.exists():
@@ -144,7 +159,12 @@ class FileArtifactCatalog:
     def list_all(self) -> list[ArtifactRecord]:
         records: list[ArtifactRecord] = []
         for path in sorted(self.records_root.glob("*.json")):
-            records.append(ArtifactRecord.from_dict(json.loads(path.read_text(encoding="utf-8"))))
+            record = ArtifactRecord.from_dict(
+                json.loads(path.read_text(encoding="utf-8"))
+            )
+            if record.workspace_id != self.workspace_id:
+                raise ValueError("artifact belongs to a different workspace")
+            records.append(record)
         return records
 
     def _next_version(self, run_id: str, stage_id: str, artifact_type: str) -> int:

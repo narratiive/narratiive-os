@@ -11,17 +11,25 @@ from .execution_package import ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig
 from .memory import FileMemoryStore, SpecialistMemorySelector
 from .provider import ArtifactWriter, ProviderExecutor
+from .prompt_registry import FilePromptRegistry
 from .repositories import FileWorkflowRunRepository, JsonlEventLog
 from .run_service import WorkflowRunService
 from .revision_graph import RevisionService
 from .scoring import ConfidenceEngine
 from .worker import WorkerRunner
+from .workspaces import (
+    LEGACY_WORKSPACE_ID,
+    FileWorkspaceRepository,
+    Workspace,
+)
 
 
 @dataclass(frozen=True, slots=True)
 class RuntimePaths:
     root: Path
     repository_root: Path
+    workspace_id: str = LEGACY_WORKSPACE_ID
+    client_id: str = LEGACY_WORKSPACE_ID
 
     @property
     def runs(self) -> Path:
@@ -47,6 +55,10 @@ class RuntimePaths:
     def artifact_catalog(self) -> Path:
         return self.root / "artifact-catalog"
 
+    @property
+    def prompts(self) -> Path:
+        return self.root / "prompts"
+
 
 @dataclass(slots=True)
 class RuntimeComponents:
@@ -61,6 +73,9 @@ class RuntimeComponents:
     artifact_catalog: FileArtifactCatalog
     revision_service: RevisionService
     approval_service: ApprovalService
+    workspace: Workspace
+    prompt_registry: FilePromptRegistry
+    workspace_repository: FileWorkspaceRepository | None = None
 
     def http_worker(
         self,
@@ -91,18 +106,82 @@ class RuntimeComponents:
 
 
 def compose_local_runtime(root: str | Path, repository_root: str | Path) -> RuntimeComponents:
-    paths = RuntimePaths(Path(root).resolve(), Path(repository_root).resolve())
+    workspace = Workspace(
+        LEGACY_WORKSPACE_ID,
+        LEGACY_WORKSPACE_ID,
+        "Legacy unscoped runtime",
+    )
+    return _compose_runtime(
+        RuntimePaths(
+            Path(root).resolve(),
+            Path(repository_root).resolve(),
+            workspace.workspace_id,
+            workspace.client_id,
+        ),
+        workspace,
+    )
+
+
+def compose_workspace_runtime(
+    root: str | Path,
+    repository_root: str | Path,
+    workspace: Workspace,
+    *,
+    workspace_repository: FileWorkspaceRepository | None = None,
+) -> RuntimeComponents:
+    base_root = Path(root).resolve()
+    paths = RuntimePaths(
+        base_root / "workspaces" / workspace.workspace_id,
+        Path(repository_root).resolve(),
+        workspace.workspace_id,
+        workspace.client_id,
+    )
+    return _compose_runtime(
+        paths,
+        workspace,
+        workspace_repository=workspace_repository,
+    )
+
+
+def _compose_runtime(
+    paths: RuntimePaths,
+    workspace: Workspace,
+    *,
+    workspace_repository: FileWorkspaceRepository | None = None,
+) -> RuntimeComponents:
     if not paths.repository_root.exists() or not paths.repository_root.is_dir():
         raise ValueError("repository_root must be an existing directory")
     paths.root.mkdir(parents=True, exist_ok=True)
 
-    run_repository = FileWorkflowRunRepository(paths.runs)
-    event_log = JsonlEventLog(paths.events)
+    run_repository = FileWorkflowRunRepository(
+        paths.runs,
+        workspace_id=workspace.workspace_id,
+        client_id=workspace.client_id,
+    )
+    event_log = JsonlEventLog(
+        paths.events, workspace_id=workspace.workspace_id
+    )
     dispatch_queue = FileDispatchQueue(paths.jobs)
-    run_service = WorkflowRunService(run_repository, event_log)
+    run_service = WorkflowRunService(
+        run_repository,
+        event_log,
+        workspace_id=workspace.workspace_id,
+        client_id=workspace.client_id,
+    )
     dispatch_service = DispatchService(run_repository, event_log, dispatch_queue, run_service)
-    memory_store = FileMemoryStore(paths.memory)
-    artifact_catalog = FileArtifactCatalog(paths.artifact_catalog)
+    memory_store = FileMemoryStore(
+        paths.memory,
+        workspace_id=workspace.workspace_id,
+        client_id=(
+            workspace.client_id
+            if workspace.workspace_id != LEGACY_WORKSPACE_ID
+            else None
+        ),
+    )
+    artifact_catalog = FileArtifactCatalog(
+        paths.artifact_catalog,
+        workspace_id=workspace.workspace_id,
+    )
 
     revision_service = RevisionService(
         run_repository,
@@ -125,4 +204,10 @@ def compose_local_runtime(root: str | Path, repository_root: str | Path) -> Runt
             event_log,
             revision_service,
         ),
+        workspace=workspace,
+        prompt_registry=FilePromptRegistry(
+            paths.prompts,
+            workspace_id=workspace.workspace_id,
+        ),
+        workspace_repository=workspace_repository,
     )

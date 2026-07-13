@@ -46,6 +46,7 @@ class ApprovalRecord:
     rationale: str | None = None
     revision_id: str | None = None
     comments: tuple[ApprovalComment, ...] = ()
+    workspace_id: str = "legacy"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -60,6 +61,7 @@ class ApprovalRecord:
             "rationale": self.rationale,
             "revision_id": self.revision_id,
             "comments": [comment.to_dict() for comment in self.comments],
+            "workspace_id": self.workspace_id,
         }
 
 
@@ -140,6 +142,7 @@ class ApprovalService:
                     "decided_at": None,
                     "rationale": None,
                     "revision_id": None,
+                    "workspace_id": event.workspace_id,
                 }
                 comments = []
                 continue
@@ -356,6 +359,7 @@ class ApprovalService:
                 run_id=run_id,
                 event_type=event_type,
                 payload=payload,
+                workspace_id=self.runs.load(run_id).workspace_id,
             )
         )
 

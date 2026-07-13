@@ -73,6 +73,8 @@ class WorkflowState:
     current_stage_id: str | None = None
     revision_owner: str | None = None
     approval_required: bool = False
+    workspace_id: str = "legacy"
+    client_id: str = "legacy"
     created_at: str = field(default_factory=lambda: _utc_now())
     updated_at: str = field(default_factory=lambda: _utc_now())
 
@@ -81,6 +83,8 @@ class WorkflowState:
             raise ValueError("workflow_id must not be empty")
         if not self.run_id.strip():
             raise ValueError("run_id must not be empty")
+        if not self.workspace_id.strip() or not self.client_id.strip():
+            raise ValueError("workspace_id and client_id must not be empty")
         stage_ids = [stage.stage_id for stage in self.stages]
         if len(stage_ids) != len(set(stage_ids)):
             raise ValueError("stage_id values must be unique")

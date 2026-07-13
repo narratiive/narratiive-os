@@ -17,10 +17,14 @@ class WorkflowRunService:
         repository: WorkflowRunRepository,
         event_log: EventLog,
         engine: WorkflowEngine | None = None,
+        workspace_id: str = "legacy",
+        client_id: str = "legacy",
     ) -> None:
         self.repository = repository
         self.event_log = event_log
         self.engine = engine or WorkflowEngine()
+        self.workspace_id = workspace_id
+        self.client_id = client_id
 
     def create_run(
         self,
@@ -30,7 +34,11 @@ class WorkflowRunService:
     ) -> WorkflowState:
         if self.repository.exists(run_id):
             raise ValueError(f"workflow run already exists: {run_id}")
-        state = definition.new_state(run_id)
+        state = definition.new_state(
+            run_id,
+            workspace_id=self.workspace_id,
+            client_id=self.client_id,
+        )
         self.engine.initialise(state, available_inputs)
         self._commit(
             state,
@@ -89,6 +97,7 @@ class WorkflowRunService:
                             item.artifact_id for item in output_list
                         ],
                     },
+                    workspace_id=state.workspace_id,
                 )
             )
         return state
@@ -162,5 +171,6 @@ class WorkflowRunService:
                 run_id=state.run_id,
                 event_type=event_type,
                 payload=payload,
+                workspace_id=state.workspace_id,
             )
         )
