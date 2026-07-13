@@ -18,6 +18,7 @@ from .repositories import (
 )
 from .run_service import WorkflowRunService
 from .state_machine import InvalidTransition, WorkflowEngine
+from .worker import AgentExecutor, ExecutionResult, JsonArtifactExecutor, WorkerRunner
 
 __all__ = [
     "ArtifactRef",
@@ -39,4 +40,8 @@ __all__ = [
     "JobStatus",
     "LeaseConflict",
     "DispatchService",
+    "AgentExecutor",
+    "ExecutionResult",
+    "JsonArtifactExecutor",
+    "WorkerRunner",
 ]
