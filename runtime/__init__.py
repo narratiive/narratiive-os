@@ -1,5 +1,6 @@
 """Executable runtime primitives for Narratiive OS."""
 
+from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
 from .models import ArtifactRef, StageRecord, WorkflowState
 from .repositories import (
     FileWorkflowRunRepository,
@@ -7,6 +8,7 @@ from .repositories import (
     RunNotFound,
     WorkflowEvent,
 )
+from .run_service import WorkflowRunService
 from .state_machine import InvalidTransition, WorkflowEngine
 
 __all__ = [
@@ -19,4 +21,8 @@ __all__ = [
     "JsonlEventLog",
     "RunNotFound",
     "WorkflowEvent",
+    "StageDefinition",
+    "WorkflowDefinition",
+    "load_workflow_definition",
+    "WorkflowRunService",
 ]
