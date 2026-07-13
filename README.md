@@ -34,3 +34,10 @@ can use the existing command gateway with `approvals.list`, `approvals.get`,
 `approvals.approve`, `approvals.revise`, `approvals.comment`, and
 `approvals.block`; every reviewer comment and decision is append-only and duplicate
 command IDs replay without creating a second audit event.
+
+The command gateway also supports isolated client workspaces. Create identities with
+`workspaces.create`, then include `workspace_id` on run, dispatch, job, and approval
+commands. Each workspace has separate run, event, job, memory, prompt, artifact, and
+approval stores; mismatched client or run references are rejected. Requests without
+a workspace remain on the compatible `legacy` runtime. `workspaces.migrate_legacy`
+copies existing unscoped data into a named workspace without deleting its source.

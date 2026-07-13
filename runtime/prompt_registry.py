@@ -18,6 +18,7 @@ class PromptVersion:
     checksum: str
     metadata: dict[str, Any] = field(default_factory=dict)
     created_at: str = field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    workspace_id: str = "legacy"
 
     def __post_init__(self) -> None:
         if not self.prompt_id.strip():
@@ -26,13 +27,15 @@ class PromptVersion:
             raise ValueError("version must be positive")
         if not self.content.strip():
             raise ValueError("content must not be empty")
+        _safe(self.workspace_id)
 
 
 class FilePromptRegistry:
     """Versioned prompt store with explicit activation and rollback."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, workspace_id: str = "legacy") -> None:
         self.root = Path(root)
+        self.workspace_id = _safe(workspace_id)
         self.versions_root = self.root / "versions"
         self.active_root = self.root / "active"
         self.versions_root.mkdir(parents=True, exist_ok=True)
@@ -51,6 +54,7 @@ class FilePromptRegistry:
             content=content,
             checksum=checksum,
             metadata=dict(metadata or {}),
+            workspace_id=self.workspace_id,
         )
         path = self._version_path(prompt_id, version)
         self._atomic_write(path, json.dumps(asdict(prompt), indent=2, sort_keys=True) + "\n")
@@ -87,13 +91,19 @@ class FilePromptRegistry:
         if not path.exists():
             raise KeyError(f"prompt version not found: {prompt_id}@{version}")
         data = json.loads(path.read_text(encoding="utf-8"))
-        return PromptVersion(**data)
+        prompt = PromptVersion(**data)
+        if prompt.workspace_id != self.workspace_id:
+            raise ValueError("prompt belongs to a different workspace")
+        return prompt
 
     def history(self, prompt_id: str) -> list[PromptVersion]:
         prompt_id = _safe(prompt_id)
         versions: list[PromptVersion] = []
         for path in sorted(self.versions_root.glob(f"{prompt_id}--v*.json")):
-            versions.append(PromptVersion(**json.loads(path.read_text(encoding="utf-8"))))
+            prompt = PromptVersion(**json.loads(path.read_text(encoding="utf-8")))
+            if prompt.workspace_id != self.workspace_id:
+                raise ValueError("prompt belongs to a different workspace")
+            versions.append(prompt)
         return sorted(versions, key=lambda item: item.version)
 
     def _next_version(self, prompt_id: str) -> int:

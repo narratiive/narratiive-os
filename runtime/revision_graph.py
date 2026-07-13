@@ -291,5 +291,6 @@ class RevisionService:
                 run_id=run_id,
                 event_type=event_type,
                 payload=payload,
+                workspace_id=self.runs.load(run_id).workspace_id,
             )
         )

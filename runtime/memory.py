@@ -36,6 +36,7 @@ class MemoryRecord:
     kind: MemoryKind
     scope: MemoryScope
     content: str
+    workspace_id: str = "legacy"
     run_id: str | None = None
     origin_stage_id: str | None = None
     stage_ids: tuple[str, ...] = ()
@@ -51,6 +52,7 @@ class MemoryRecord:
     def __post_init__(self) -> None:
         _safe(self.memory_id, "memory_id")
         _safe(self.client_id, "client_id")
+        _safe(self.workspace_id, "workspace_id")
         if self.scope == MemoryScope.RUN:
             _safe(self.run_id or "", "run_id")
         elif self.run_id is not None:
@@ -77,6 +79,7 @@ class MemoryRecord:
         payload = {
             "memory_id": self.memory_id,
             "client_id": self.client_id,
+            "workspace_id": self.workspace_id,
             "run_id": self.run_id,
             "kind": self.kind.value,
             "scope": self.scope.value,
@@ -98,6 +101,7 @@ class MemoryRecord:
         return cls(
             memory_id=str(data["memory_id"]),
             client_id=str(data["client_id"]),
+            workspace_id=str(data.get("workspace_id", "legacy")),
             run_id=str(data["run_id"]) if data.get("run_id") is not None else None,
             kind=MemoryKind(str(data["kind"])),
             scope=MemoryScope(str(data["scope"])),
@@ -128,11 +132,25 @@ class MemoryStore(Protocol):
 class FileMemoryStore:
     """Append-only, checksum-chained memory journals partitioned by client."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        workspace_id: str = "legacy",
+        client_id: str | None = None,
+    ) -> None:
         self.root = Path(root)
+        self.workspace_id = _safe(workspace_id, "workspace_id")
+        self.client_id = (
+            _safe(client_id, "client_id") if client_id is not None else None
+        )
         self.root.mkdir(parents=True, exist_ok=True)
 
     def append(self, record: MemoryRecord) -> MemoryRecord:
+        if record.workspace_id != self.workspace_id:
+            raise ValueError("memory belongs to a different workspace")
+        if self.client_id is not None and record.client_id != self.client_id:
+            raise ValueError("memory belongs to a different workspace client")
         if record.sequence or record.previous_checksum or record.checksum:
             raise ValueError("only new memory records may be appended")
         existing = self._read_all(record.client_id)
@@ -167,6 +185,8 @@ class FileMemoryStore:
         run_id: str | None = None,
     ) -> tuple[MemoryRecord, ...]:
         _safe(client_id, "client_id")
+        if self.client_id is not None and client_id != self.client_id:
+            raise ValueError("cross-workspace memory reference")
         if run_id is not None:
             _safe(run_id, "run_id")
         return tuple(
@@ -195,6 +215,10 @@ class FileMemoryStore:
                     raise MemoryIntegrityError(
                         f"client scope mismatch at {path}:{line_number}"
                     )
+                if record.workspace_id != self.workspace_id:
+                    raise MemoryIntegrityError(
+                        f"workspace scope mismatch at {path}:{line_number}"
+                    )
                 if record.sequence != line_number:
                     raise MemoryIntegrityError(
                         f"memory sequence mismatch at {path}:{line_number}"
@@ -203,7 +227,10 @@ class FileMemoryStore:
                     raise MemoryIntegrityError(
                         f"memory chain mismatch at {path}:{line_number}"
                     )
-                if record.checksum != _record_checksum(record):
+                if record.checksum not in {
+                    _record_checksum(record),
+                    _record_checksum(record, include_workspace=False),
+                }:
                     raise MemoryIntegrityError(
                         f"memory checksum mismatch at {path}:{line_number}"
                     )
@@ -290,9 +317,16 @@ class SpecialistMemorySelector:
         )
 
 
-def _record_checksum(record: MemoryRecord) -> str:
+def _record_checksum(
+    record: MemoryRecord,
+    *,
+    include_workspace: bool = True,
+) -> str:
+    values = record.to_dict(include_checksum=False)
+    if not include_workspace:
+        values.pop("workspace_id", None)
     payload = json.dumps(
-        record.to_dict(include_checksum=False),
+        values,
         separators=(",", ":"),
         sort_keys=True,
     ).encode("utf-8")

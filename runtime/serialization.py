@@ -68,6 +68,8 @@ def workflow_to_dict(state: WorkflowState) -> dict[str, Any]:
         "current_stage_id": state.current_stage_id,
         "revision_owner": state.revision_owner,
         "approval_required": state.approval_required,
+        "workspace_id": state.workspace_id,
+        "client_id": state.client_id,
         "created_at": state.created_at,
         "updated_at": state.updated_at,
         "stages": [stage_to_dict(stage) for stage in state.stages],
@@ -86,6 +88,8 @@ def workflow_from_dict(data: dict[str, Any]) -> WorkflowState:
         current_stage_id=data.get("current_stage_id"),
         revision_owner=data.get("revision_owner"),
         approval_required=bool(data.get("approval_required", False)),
+        workspace_id=str(data.get("workspace_id", "legacy")),
+        client_id=str(data.get("client_id", "legacy")),
         created_at=data["created_at"],
         updated_at=data["updated_at"],
     )

@@ -5,15 +5,19 @@ import os
 from pathlib import Path
 from wsgiref.simple_server import make_server
 
-from .command_api import RuntimeCommandAPI
+from .command_api import WorkspaceCommandAPI
 from .composition import compose_local_runtime
 from .production_gateway import GatewayConfig, ProductionGateway
 from .wsgi_api import RuntimeWSGIApp
+from .workspaces import WorkspaceRuntimeManager
 
 
 def build_app(*, repository_root: str | Path, runtime_root: str | Path, api_key: str) -> ProductionGateway:
-    runtime = compose_local_runtime(repository_root=repository_root, runtime_root=runtime_root)
-    command_api = RuntimeCommandAPI(runtime)
+    runtime = compose_local_runtime(root=runtime_root, repository_root=repository_root)
+    command_api = WorkspaceCommandAPI(
+        runtime,
+        WorkspaceRuntimeManager(runtime_root, repository_root),
+    )
     wsgi = RuntimeWSGIApp(command_api)
     return ProductionGateway(
         wsgi,

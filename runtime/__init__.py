@@ -10,8 +10,13 @@ from .approvals import (
     ApprovalService,
     ApprovalStatus,
 )
-from .command_api import CommandError, RuntimeCommandAPI
-from .composition import RuntimeComponents, RuntimePaths, compose_local_runtime
+from .command_api import CommandError, RuntimeCommandAPI, WorkspaceCommandAPI
+from .composition import (
+    RuntimeComponents,
+    RuntimePaths,
+    compose_local_runtime,
+    compose_workspace_runtime,
+)
 from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
 from .dispatch import (
     DispatchJob,
@@ -72,9 +77,23 @@ from .scoring import (
 from .state_machine import InvalidTransition, WorkflowEngine
 from .worker import AgentExecutor, ExecutionResult, JsonArtifactExecutor, WorkerRunner
 from .wsgi_api import RuntimeWSGIApp
+from .workspaces import (
+    LEGACY_WORKSPACE_ID,
+    CrossWorkspaceReference,
+    FileWorkspaceRepository,
+    Workspace,
+    WorkspaceNotFound,
+    WorkspaceRuntimeManager,
+)
 
 __all__ = [
     "ArtifactRef",
+    "Workspace",
+    "WorkspaceNotFound",
+    "CrossWorkspaceReference",
+    "FileWorkspaceRepository",
+    "WorkspaceRuntimeManager",
+    "LEGACY_WORKSPACE_ID",
     "ApprovalStatus",
     "ApprovalComment",
     "ApprovalRecord",
@@ -147,7 +166,9 @@ __all__ = [
     "RuntimeComponents",
     "RuntimePaths",
     "compose_local_runtime",
+    "compose_workspace_runtime",
     "CommandError",
     "RuntimeCommandAPI",
+    "WorkspaceCommandAPI",
     "RuntimeWSGIApp",
 ]
