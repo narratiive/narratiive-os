@@ -3,6 +3,7 @@ import unittest
 from runtime.execution_package import ExecutionPackage
 from runtime.provider import ProviderResponse
 from runtime.provider_routing import (
+    AmbiguousRoutingPolicy,
     CostClass,
     LatencyClass,
     ModelCapabilities,
@@ -134,6 +135,66 @@ class ProviderRoutingTests(unittest.TestCase):
         self.assertEqual(decision.target, self.primary)
         self.assertEqual(decision.policy_id, "rave-research")
         self.assertEqual(decision.policy_version, "3")
+
+    def test_equally_specific_policies_fail_closed(self) -> None:
+        self.health.set(
+            ProviderHealthRecord(self.primary, ProviderAvailability.AVAILABLE)
+        )
+        router = ModelRouter(
+            capabilities=self.capabilities,
+            health=self.health,
+            policies=(
+                RoutingPolicy(
+                    policy_id="research-a",
+                    version="1",
+                    workspace_id="rave",
+                    stage_id="research",
+                    primary=self.primary,
+                ),
+                RoutingPolicy(
+                    policy_id="research-b",
+                    version="2",
+                    workspace_id="rave",
+                    stage_id="research",
+                    primary=self.primary,
+                ),
+            ),
+        )
+
+        with self.assertRaisesRegex(
+            AmbiguousRoutingPolicy,
+            "multiple equally specific routing policies",
+        ):
+            router.route(package(workspace_id="rave"))
+
+    def test_policy_ids_and_versions_never_break_specificity_ties(self) -> None:
+        self.health.set(
+            ProviderHealthRecord(self.primary, ProviderAvailability.AVAILABLE)
+        )
+        older_lexical_policy = RoutingPolicy(
+            policy_id="aaa-policy",
+            version="1",
+            primary=self.primary,
+            stage_id="research",
+        )
+        newer_lexical_policy = RoutingPolicy(
+            policy_id="zzz-policy",
+            version="999",
+            primary=self.primary,
+            stage_id="research",
+        )
+        for policies in (
+            (older_lexical_policy, newer_lexical_policy),
+            (newer_lexical_policy, older_lexical_policy),
+        ):
+            with self.subTest(policy_order=[item.policy_id for item in policies]):
+                router = ModelRouter(
+                    capabilities=self.capabilities,
+                    health=self.health,
+                    policies=policies,
+                )
+                with self.assertRaises(AmbiguousRoutingPolicy):
+                    router.route(package())
 
     def test_fallback_selection_is_deterministic_and_auditable(self) -> None:
         self.health.set(

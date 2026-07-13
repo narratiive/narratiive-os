@@ -44,14 +44,7 @@ class EnvironmentTextProviderClient:
             raise ProviderConfigurationError(
                 f"live provider endpoint is not configured in {self.config.endpoint_env}"
             )
-        parsed_endpoint = urlsplit(endpoint)
-        if (
-            parsed_endpoint.scheme not in {"http", "https"}
-            or not parsed_endpoint.netloc
-            or parsed_endpoint.username
-            or parsed_endpoint.password
-        ):
-            raise ProviderConfigurationError("live provider endpoint must be a credential-free URL")
+        _validate_endpoint(endpoint)
 
         api_key = os.environ.get(self.config.api_key_env, "").strip()
         if not api_key:
@@ -135,3 +128,20 @@ def _response_content(payload: str) -> str:
     if not isinstance(content, str) or not content.strip():
         raise ProviderTransportError("live provider returned malformed output")
     return content
+
+
+def _validate_endpoint(endpoint: str) -> None:
+    parsed = urlsplit(endpoint)
+    if not parsed.netloc or parsed.username or parsed.password:
+        raise ProviderConfigurationError("live provider endpoint must be a credential-free URL")
+    if parsed.scheme == "https":
+        return
+    if parsed.scheme == "http" and parsed.hostname in {
+        "localhost",
+        "127.0.0.1",
+        "::1",
+    }:
+        return
+    raise ProviderConfigurationError(
+        "live provider endpoint must use HTTPS unless its hostname is loopback"
+    )

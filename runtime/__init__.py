@@ -54,6 +54,7 @@ from .provider import (
     provider_response_from_json,
 )
 from .provider_routing import (
+    AmbiguousRoutingPolicy,
     CostClass,
     LatencyClass,
     ModelCapabilities,
@@ -188,6 +189,7 @@ __all__ = [
     "EnvironmentTextProviderClient",
     "LiveTextProviderConfig",
     "ProviderConfigurationError",
+    "AmbiguousRoutingPolicy",
     "CostClass",
     "LatencyClass",
     "ModelCapabilities",

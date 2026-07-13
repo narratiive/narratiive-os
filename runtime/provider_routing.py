@@ -170,6 +170,10 @@ class NoAvailableProvider(RuntimeError):
     pass
 
 
+class AmbiguousRoutingPolicy(RuntimeError):
+    pass
+
+
 class ModelRouter:
     def __init__(
         self,
@@ -203,16 +207,30 @@ class ModelRouter:
                 f"no routing policy for workspace={workspace_id}, stage={package.stage_id}, "
                 f"specialist={package.agent_id}"
             )
-        policy = sorted(
-            matching,
-            key=lambda item: (
-                -(item.workspace_id == workspace_id),
-                -(item.stage_id == package.stage_id),
-                -(item.specialist_id == package.agent_id),
-                item.policy_id,
-                item.version,
-            ),
-        )[0]
+        specificity = {
+            policy: (
+                policy.workspace_id == workspace_id,
+                policy.stage_id == package.stage_id,
+                policy.specialist_id == package.agent_id,
+            )
+            for policy in matching
+        }
+        highest_specificity = max(specificity.values())
+        most_specific = [
+            policy
+            for policy in matching
+            if specificity[policy] == highest_specificity
+        ]
+        if len(most_specific) != 1:
+            matches = ", ".join(
+                sorted(f"{policy.policy_id}@{policy.version}" for policy in most_specific)
+            )
+            raise AmbiguousRoutingPolicy(
+                "multiple equally specific routing policies match "
+                f"workspace={workspace_id}, stage={package.stage_id}, "
+                f"specialist={package.agent_id}: {matches}"
+            )
+        policy = most_specific[0]
 
         configured = set(configured_targets) if configured_targets is not None else None
         skipped: list[str] = []

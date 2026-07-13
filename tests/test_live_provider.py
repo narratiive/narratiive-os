@@ -9,7 +9,12 @@ from unittest.mock import patch
 
 from runtime.composition import compose_workspace_runtime
 from runtime.definitions import StageDefinition, WorkflowDefinition
-from runtime.live_provider import EnvironmentTextProviderClient, LiveTextProviderConfig
+from runtime.execution_package import ExecutionPackage
+from runtime.live_provider import (
+    EnvironmentTextProviderClient,
+    LiveTextProviderConfig,
+    ProviderConfigurationError,
+)
 from runtime.models import StageStatus
 from runtime.provider_routing import (
     CostClass,
@@ -54,6 +59,101 @@ class LiveTextHandler(BaseHTTPRequestHandler):
 class FailIfCalledProvider:
     def generate(self, package):
         raise AssertionError("unavailable primary provider must not be called")
+
+
+class FakeLiveResponse:
+    status = 200
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        return False
+
+    def read(self):
+        return json.dumps(
+            {"choices": [{"message": {"content": "safe live output"}}]}
+        ).encode("utf-8")
+
+
+class LiveProviderEndpointSafetyTests(unittest.TestCase):
+    endpoint_env = "NARRATIIVE_TEST_ENDPOINT_SAFETY_URL"
+    api_key_env = "NARRATIIVE_TEST_ENDPOINT_SAFETY_KEY"
+
+    def setUp(self) -> None:
+        self.client = EnvironmentTextProviderClient(
+            LiveTextProviderConfig(
+                provider_id="live-text",
+                model_id="text-v1",
+                endpoint_env=self.endpoint_env,
+                api_key_env=self.api_key_env,
+            )
+        )
+        self.package = ExecutionPackage(
+            schema_version=1,
+            job_id="job-1",
+            run_id="run-1",
+            stage_id="research",
+            agent_id="research_analyst",
+            agent_version="1.0",
+            agent_ref="agents/research.md",
+            instructions="Research supplied evidence.",
+            input_artifacts=(),
+            memory_records=(),
+            confidence_scorecard=None,
+            context={"workspace_id": "rave"},
+            expected_output_type="completed_research",
+        )
+
+    def _assert_endpoint_is_allowed(self, endpoint: str) -> None:
+        with patch.dict(
+            os.environ,
+            {self.endpoint_env: endpoint, self.api_key_env: "temporary-secret"},
+            clear=False,
+        ), patch(
+            "runtime.live_provider.urlopen",
+            return_value=FakeLiveResponse(),
+        ) as request:
+            response = self.client.generate(self.package)
+        self.assertEqual(response.content, "safe live output")
+        request.assert_called_once()
+
+    def test_accepts_https_endpoint(self) -> None:
+        self._assert_endpoint_is_allowed("https://models.example.com/v1/chat/completions")
+
+    def test_accepts_localhost_http_endpoint(self) -> None:
+        self._assert_endpoint_is_allowed("http://localhost:8080/v1/chat/completions")
+
+    def test_accepts_ipv4_loopback_http_endpoint(self) -> None:
+        self._assert_endpoint_is_allowed("http://127.0.0.1:8080/v1/chat/completions")
+
+    def test_accepts_ipv6_loopback_http_endpoint(self) -> None:
+        self._assert_endpoint_is_allowed("http://[::1]:8080/v1/chat/completions")
+
+    def test_rejects_remote_http_before_reading_or_sending_credential(self) -> None:
+        with patch.dict(
+            os.environ,
+            {self.endpoint_env: "http://models.example.com/v1/chat/completions"},
+            clear=False,
+        ):
+            os.environ.pop(self.api_key_env, None)
+            with patch("runtime.live_provider.urlopen") as request:
+                with self.assertRaisesRegex(ProviderConfigurationError, "must use HTTPS"):
+                    self.client.generate(self.package)
+        request.assert_not_called()
+
+    def test_rejects_embedded_url_credentials(self) -> None:
+        with patch.dict(
+            os.environ,
+            {
+                self.endpoint_env: "https://user:password@models.example.com/v1",
+                self.api_key_env: "temporary-secret",
+            },
+            clear=False,
+        ), patch("runtime.live_provider.urlopen") as request:
+            with self.assertRaisesRegex(ProviderConfigurationError, "credential-free"):
+                self.client.generate(self.package)
+        request.assert_not_called()
 
 
 class LiveProviderIntegrationTests(unittest.TestCase):
