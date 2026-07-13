@@ -1,6 +1,7 @@
 {
   "schema_version": 1,
   "workflow_id": "growth_blueprint_pipeline",
+  "approval_required": true,
   "stages": [
     {
       "stage_id": "research_analyst",

@@ -21,6 +21,7 @@ class WorkflowStatus(str, Enum):
     ACTIVE = "active"
     BLOCKED = "blocked"
     FAILED = "failed"
+    AWAITING_APPROVAL = "awaiting_approval"
     COMPLETE = "complete"
 
 
@@ -71,6 +72,7 @@ class WorkflowState:
     status: WorkflowStatus = WorkflowStatus.ACTIVE
     current_stage_id: str | None = None
     revision_owner: str | None = None
+    approval_required: bool = False
     created_at: str = field(default_factory=lambda: _utc_now())
     updated_at: str = field(default_factory=lambda: _utc_now())
 

@@ -94,7 +94,7 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
 
         expected_stages = [stage.stage_id for stage in state.stages]
         self.assertEqual(provider.calls, expected_stages)
-        self.assertEqual(state.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(state.status, WorkflowStatus.AWAITING_APPROVAL)
         self.assertTrue(all(stage.status == StageStatus.COMPLETED for stage in state.stages))
 
         for index, stage in enumerate(state.stages):
@@ -126,7 +126,7 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
 
         second = runner.run("rave-idempotent", self.fixture["available_inputs"])
 
-        self.assertEqual(second.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(second.status, WorkflowStatus.AWAITING_APPROVAL)
         self.assertEqual(len(provider.calls), 5)
         self.assertEqual(len(self.events.read(second.run_id)), event_count)
 
@@ -148,7 +148,7 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
         )
         resumed = runner.run("rave-resume", self.fixture["available_inputs"])
 
-        self.assertEqual(resumed.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(resumed.status, WorkflowStatus.AWAITING_APPROVAL)
         self.assertEqual(
             [stage.output_artifacts[0].artifact_id for stage in resumed.stages[:2]],
             first_artifact_ids,

@@ -3,10 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from .approvals import ApprovalService
+from .artifact_catalog import FileArtifactCatalog
 from .dispatch import FileDispatchQueue
 from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackageBuilder
-from .artifact_catalog import FileArtifactCatalog
 from .http_provider import HttpProviderClient, HttpProviderConfig
 from .memory import FileMemoryStore, SpecialistMemorySelector
 from .provider import ArtifactWriter, ProviderExecutor
@@ -59,6 +60,7 @@ class RuntimeComponents:
     memory_selector: SpecialistMemorySelector
     artifact_catalog: FileArtifactCatalog
     revision_service: RevisionService
+    approval_service: ApprovalService
 
     def http_worker(
         self,
@@ -102,6 +104,11 @@ def compose_local_runtime(root: str | Path, repository_root: str | Path) -> Runt
     memory_store = FileMemoryStore(paths.memory)
     artifact_catalog = FileArtifactCatalog(paths.artifact_catalog)
 
+    revision_service = RevisionService(
+        run_repository,
+        event_log,
+        artifact_catalog,
+    )
     return RuntimeComponents(
         paths=paths,
         run_repository=run_repository,
@@ -112,9 +119,10 @@ def compose_local_runtime(root: str | Path, repository_root: str | Path) -> Runt
         memory_store=memory_store,
         memory_selector=SpecialistMemorySelector(memory_store),
         artifact_catalog=artifact_catalog,
-        revision_service=RevisionService(
+        revision_service=revision_service,
+        approval_service=ApprovalService(
             run_repository,
             event_log,
-            artifact_catalog,
+            revision_service,
         ),
     )

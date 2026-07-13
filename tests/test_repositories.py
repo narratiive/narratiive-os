@@ -32,6 +32,7 @@ class FileWorkflowRunRepositoryTests(unittest.TestCase):
                     )
                 ],
                 status=WorkflowStatus.ACTIVE,
+                approval_required=True,
                 current_stage_id="research_analyst",
             )
 
@@ -40,6 +41,7 @@ class FileWorkflowRunRepositoryTests(unittest.TestCase):
 
             self.assertEqual(restored.run_id, state.run_id)
             self.assertEqual(restored.status, WorkflowStatus.ACTIVE)
+            self.assertTrue(restored.approval_required)
             self.assertEqual(restored.stage("research_analyst").status, StageStatus.COMPLETED)
             self.assertEqual(restored.stage("research_analyst").retry_count, 1)
             self.assertEqual(restored.stage("research_analyst").revision_count, 2)

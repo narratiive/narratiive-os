@@ -86,7 +86,7 @@ class RevisionGraphIntegrationTests(unittest.TestCase):
             "run-1",
             {"client_inputs", "source_material"},
         )
-        self.assertEqual(state.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(state.status, WorkflowStatus.AWAITING_APPROVAL)
 
     def _rerun(self, available_inputs=None):
         provider = DeterministicProvider(self.outputs)
@@ -161,7 +161,7 @@ class RevisionGraphIntegrationTests(unittest.TestCase):
                 "quality_reviewer",
             ],
         )
-        self.assertEqual(completed.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(completed.status, WorkflowStatus.AWAITING_APPROVAL)
         self.assertTrue(
             (self.root / "jobs" / "run-1--strategy_director--revision-1.json").is_file()
         )
@@ -233,7 +233,7 @@ class RevisionGraphIntegrationTests(unittest.TestCase):
                 "validated_product_proof",
             }
         )
-        self.assertEqual(completed.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(completed.status, WorkflowStatus.AWAITING_APPROVAL)
         self.assertEqual(
             provider.calls,
             [stage.stage_id for stage in self.definition.stages],
