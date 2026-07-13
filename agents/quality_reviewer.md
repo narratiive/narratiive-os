@@ -28,10 +28,15 @@ Optional inputs:
 - Brand guidelines.
 - Legal or compliance requirements.
 - Previous review findings and revision notes.
+- Deterministic confidence scorecard with evidence, source, strategy, creative
+  and overall-risk reasons.
 
 Input handling rules:
 
 - Treat the artifact chain and supplied client context as the only source of truth.
+- Treat a confidence scorecard as advisory evidence, not as an automatic verdict.
+- Verify score reasons against supplied artifacts and apply reviewer policy when it
+  is stricter than the score recommendation.
 - Use lineage to distinguish original evidence from later interpretation.
 - Do not introduce new strategy, facts, proof points, references, or creative ideas.
 - Mark missing parent artifacts as a blocking failure.

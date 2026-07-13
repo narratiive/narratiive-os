@@ -85,6 +85,17 @@ class CommandAPITests(unittest.TestCase):
             self.api.handle({"command": "system.destroy"})
         self.assertEqual(error.exception.status, 404)
 
+    def test_dispatch_rejects_non_object_scoring_input(self):
+        with self.assertRaises(CommandError) as error:
+            self.api.handle(
+                {
+                    "command": "stages.dispatch",
+                    "run_id": "run-1",
+                    "scoring_input": [],
+                }
+            )
+        self.assertEqual(error.exception.code, "invalid_scoring_input")
+
     def test_wsgi_gateway_returns_structured_response(self):
         app = RuntimeWSGIApp(self.api)
         request = json.dumps({"command": "health"}).encode("utf-8")

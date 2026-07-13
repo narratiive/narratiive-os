@@ -35,5 +35,69 @@
         "quality_reviewer"
       ]
     }
-  ]
+  ],
+  "scoring_input": {
+    "artifacts": [
+      {
+        "artifact_id": "rave-research",
+        "stage_id": "research_analyst",
+        "parent_artifact_ids": [],
+        "expected_parent_artifact_ids": [],
+        "open_inputs": [],
+        "strategic_checks": {},
+        "creative_checks": {}
+      },
+      {
+        "artifact_id": "rave-strategy",
+        "stage_id": "strategy_director",
+        "parent_artifact_ids": ["rave-research"],
+        "expected_parent_artifact_ids": ["rave-research"],
+        "open_inputs": [],
+        "strategic_checks": {
+          "growth_problem": true,
+          "positioning": true,
+          "strategic_choice": true
+        },
+        "creative_checks": {}
+      },
+      {
+        "artifact_id": "rave-campaign",
+        "stage_id": "campaign_world_generator",
+        "parent_artifact_ids": ["rave-strategy"],
+        "expected_parent_artifact_ids": ["rave-strategy"],
+        "open_inputs": [],
+        "strategic_checks": {},
+        "creative_checks": {
+          "campaign_translation": true
+        }
+      },
+      {
+        "artifact_id": "rave-creative",
+        "stage_id": "creative_director",
+        "parent_artifact_ids": ["rave-campaign"],
+        "expected_parent_artifact_ids": ["rave-campaign"],
+        "open_inputs": [],
+        "strategic_checks": {},
+        "creative_checks": {
+          "distinctive_platform": true,
+          "production_guidance": true
+        }
+      }
+    ],
+    "evidence": [
+      {
+        "evidence_id": "audience-need",
+        "supported": true,
+        "source_quality": 90,
+        "source_artifact_ids": ["rave-research"]
+      },
+      {
+        "evidence_id": "product-proof",
+        "supported": true,
+        "source_quality": 80,
+        "source_artifact_ids": ["rave-research"]
+      }
+    ],
+    "unsupported_claims": []
+  }
 }

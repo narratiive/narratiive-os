@@ -41,6 +41,15 @@ from .repositories import (
     WorkflowEvent,
 )
 from .run_service import WorkflowRunService
+from .scoring import (
+    ArtifactSignal,
+    ConfidenceEngine,
+    ConfidenceScorecard,
+    DimensionScore,
+    EvidenceSignal,
+    ScoreRecommendation,
+    ScoringInput,
+)
 from .state_machine import InvalidTransition, WorkflowEngine
 from .worker import AgentExecutor, ExecutionResult, JsonArtifactExecutor, WorkerRunner
 from .wsgi_api import RuntimeWSGIApp
@@ -56,6 +65,13 @@ __all__ = [
     "FileMemoryStore",
     "SpecialistMemorySelector",
     "DEFAULT_SPECIALIST_MEMORY_POLICY",
+    "ArtifactSignal",
+    "EvidenceSignal",
+    "ScoringInput",
+    "DimensionScore",
+    "ConfidenceScorecard",
+    "ConfidenceEngine",
+    "ScoreRecommendation",
     "PipelineRunner",
     "DeterministicProvider",
     "load_pipeline_fixture",

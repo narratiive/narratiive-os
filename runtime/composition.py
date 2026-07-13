@@ -11,6 +11,7 @@ from .memory import FileMemoryStore, SpecialistMemorySelector
 from .provider import ArtifactWriter, ProviderExecutor
 from .repositories import FileWorkflowRunRepository, JsonlEventLog
 from .run_service import WorkflowRunService
+from .scoring import ConfidenceEngine
 from .worker import WorkerRunner
 
 
@@ -63,6 +64,7 @@ class RuntimeComponents:
             repository_root=self.paths.repository_root,
             output_type_by_stage=output_type_by_stage,
             memory_selector=self.memory_selector,
+            confidence_engine=ConfidenceEngine(),
         )
         executor = ProviderExecutor(
             package_builder=package_builder,

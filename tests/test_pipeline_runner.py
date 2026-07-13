@@ -17,6 +17,7 @@ from runtime.models import StageStatus, WorkflowStatus
 from runtime.pipeline_runner import DeterministicProvider, PipelineRunner, load_pipeline_fixture
 from runtime.provider import ArtifactWriter, ProviderExecutor
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
+from runtime.scoring import ConfidenceEngine
 from runtime.specialists import SpecialistCatalog
 
 
@@ -60,12 +61,18 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def make_runner(self, provider, memory_selector=None):
+    def make_runner(
+        self,
+        provider,
+        memory_selector=None,
+        confidence_engine=None,
+    ):
         executor = ProviderExecutor(
             package_builder=ExecutionPackageBuilder(
                 REPOSITORY_ROOT,
                 self.output_types,
                 memory_selector=memory_selector,
+                confidence_engine=confidence_engine,
             ),
             provider=provider,
             artifact_writer=ArtifactWriter(self.root / "artifacts"),
@@ -201,6 +208,38 @@ class PipelineRunnerIntegrationTests(unittest.TestCase):
             memory_ids["quality_reviewer"],
             ["brand-context", "run-evidence"],
         )
+
+    def test_quality_reviewer_receives_advisory_scorecard(self) -> None:
+        provider = DeterministicProvider.from_fixture(self.fixture)
+        state = self.make_runner(
+            provider,
+            confidence_engine=ConfidenceEngine(),
+        ).run(
+            "rave-scorecard",
+            self.fixture["available_inputs"],
+            client_id="rave",
+            scoring_input=self.fixture["scoring_input"],
+        )
+
+        recommendations = {
+            stage.stage_id: stage.output_artifacts[0].metadata[
+                "scorecard_recommendation"
+            ]
+            for stage in state.stages
+        }
+        self.assertTrue(
+            all(
+                recommendation is None
+                for stage_id, recommendation in recommendations.items()
+                if stage_id != "quality_reviewer"
+            )
+        )
+        self.assertEqual(recommendations["quality_reviewer"], "approve")
+        quality_metadata = state.stage("quality_reviewer").output_artifacts[0].metadata
+        scorecard = quality_metadata["confidence_scorecard"]
+        self.assertEqual(scorecard["recommendation"], "approve")
+        self.assertEqual(len(scorecard["input_checksum"]), 64)
+        self.assertTrue(scorecard["overall_risk"]["reasons"])
 
     def test_fixture_requires_stage_outputs(self) -> None:
         with self.assertRaises(ValueError):

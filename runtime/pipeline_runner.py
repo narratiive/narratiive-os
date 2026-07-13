@@ -45,6 +45,11 @@ class DeterministicProvider:
                 "memory_ids": [
                     item["memory_id"] for item in package.memory_records
                 ],
+                "scorecard_recommendation": (
+                    package.confidence_scorecard["recommendation"]
+                    if package.confidence_scorecard is not None
+                    else None
+                ),
                 **dict(self.metadata.get(package.stage_id, {})),
             },
         )
@@ -95,6 +100,7 @@ class PipelineRunner:
         available_inputs: Iterable[str],
         *,
         client_id: str | None = None,
+        scoring_input: Mapping[str, Any] | None = None,
     ) -> WorkflowState:
         supplied_inputs = set(available_inputs)
         if not self.runs.exists(run_id):
@@ -133,6 +139,11 @@ class PipelineRunner:
                 return state
 
             context = {"client_id": client_id} if client_id is not None else None
+            if stage.stage_id == "quality_reviewer" and scoring_input is not None:
+                context = {
+                    **dict(context or {}),
+                    "scoring_input": dict(scoring_input),
+                }
             self.dispatch.enqueue_current_stage(run_id, context=context)
             job = self.worker.run_once()
             if job is None:

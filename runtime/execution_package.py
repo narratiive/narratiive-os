@@ -9,6 +9,7 @@ from .agent_manifest import AgentManifest, load_agent_manifest
 from .dispatch import DispatchJob
 from .memory import SpecialistMemorySelector
 from .models import ArtifactRef
+from .scoring import ConfidenceEngine, ScoringInput
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +24,7 @@ class ExecutionPackage:
     instructions: str
     input_artifacts: tuple[dict[str, Any], ...]
     memory_records: tuple[dict[str, Any], ...]
+    confidence_scorecard: dict[str, Any] | None
     context: Mapping[str, Any]
     expected_output_type: str
 
@@ -41,10 +43,12 @@ class ExecutionPackageBuilder:
         repository_root: str | Path,
         output_type_by_stage: Mapping[str, str],
         memory_selector: SpecialistMemorySelector | None = None,
+        confidence_engine: ConfidenceEngine | None = None,
     ) -> None:
         self.repository_root = Path(repository_root)
         self.output_type_by_stage = dict(output_type_by_stage)
         self.memory_selector = memory_selector
+        self.confidence_engine = confidence_engine
 
     def build(
         self,
@@ -71,6 +75,16 @@ class ExecutionPackageBuilder:
                         stage_id=job.stage_id,
                     )
                 )
+        confidence_scorecard = None
+        raw_scoring_input = package_context.get("scoring_input")
+        if (
+            self.confidence_engine is not None
+            and job.stage_id == "quality_reviewer"
+            and isinstance(raw_scoring_input, Mapping)
+        ):
+            confidence_scorecard = self.confidence_engine.score(
+                ScoringInput.from_dict(raw_scoring_input)
+            ).to_dict()
         return ExecutionPackage(
             schema_version=1,
             job_id=job.job_id,
@@ -82,6 +96,7 @@ class ExecutionPackageBuilder:
             instructions=manifest.instructions,
             input_artifacts=artifacts,
             memory_records=memory_records,
+            confidence_scorecard=confidence_scorecard,
             context=package_context,
             expected_output_type=output_type,
         )
