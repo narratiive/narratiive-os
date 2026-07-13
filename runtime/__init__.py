@@ -12,6 +12,15 @@ from .dispatch import (
 from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .models import ArtifactRef, StageRecord, WorkflowState
+from .provider import (
+    ArtifactWriter,
+    InvalidProviderResponse,
+    ProviderClient,
+    ProviderExecutor,
+    ProviderResponse,
+    provider_response_from_dict,
+    provider_response_from_json,
+)
 from .repositories import (
     FileWorkflowRunRepository,
     JsonlEventLog,
@@ -51,4 +60,11 @@ __all__ = [
     "parse_agent_manifest",
     "ExecutionPackage",
     "ExecutionPackageBuilder",
+    "ArtifactWriter",
+    "InvalidProviderResponse",
+    "ProviderClient",
+    "ProviderExecutor",
+    "ProviderResponse",
+    "provider_response_from_dict",
+    "provider_response_from_json",
 ]
