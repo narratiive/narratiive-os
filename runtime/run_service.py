@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from uuid import uuid4
 
 from .definitions import WorkflowDefinition
-from .models import ArtifactRef, WorkflowState
+from .models import ArtifactRef, WorkflowState, WorkflowStatus
 from .repositories import EventLog, WorkflowEvent, WorkflowRunRepository
 from .state_machine import WorkflowEngine
 
@@ -72,6 +72,25 @@ class WorkflowRunService:
                 "workflow_status": state.status.value,
             },
         )
+        if state.status == WorkflowStatus.AWAITING_APPROVAL:
+            approval_id = (
+                f"approval-{state.run_id}-"
+                f"{state.stage(stage_id).revision_count}"
+            )
+            self.event_log.append(
+                WorkflowEvent.create(
+                    event_id=f"evt-{uuid4().hex}",
+                    run_id=state.run_id,
+                    event_type="approval.requested",
+                    payload={
+                        "approval_id": approval_id,
+                        "stage_id": stage_id,
+                        "artifact_ids": [
+                            item.artifact_id for item in output_list
+                        ],
+                    },
+                )
+            )
         return state
 
     def block_stage(self, run_id: str, stage_id: str, missing_inputs: Iterable[str]) -> WorkflowState:

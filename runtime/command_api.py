@@ -4,10 +4,12 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Mapping
 
+from .approvals import ApprovalConflict, ApprovalNotFound
 from .composition import RuntimeComponents
 from .definitions import load_workflow_definition
 from .dispatch import JobNotFound
 from .repositories import RunNotFound
+from .revision_graph import RevisionIssue
 from .serialization import workflow_to_dict
 
 
@@ -36,6 +38,12 @@ class RuntimeCommandAPI:
             "runs.create": self._create_run,
             "stages.dispatch": self._dispatch_stage,
             "jobs.get": self._get_job,
+            "approvals.list": self._list_approvals,
+            "approvals.get": self._get_approval,
+            "approvals.approve": self._approve,
+            "approvals.revise": self._revise,
+            "approvals.comment": self._comment,
+            "approvals.block": self._block,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -112,6 +120,81 @@ class RuntimeCommandAPI:
         payload = asdict(job)
         payload["status"] = job.status.value
         return payload
+
+    def _list_approvals(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        records = [
+            record.to_dict() for record in self.runtime.approval_service.queue()
+        ]
+        return {"approvals": records, "count": len(records)}
+
+    def _get_approval(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        run_id = self._required(request, "run_id")
+        try:
+            current = self.runtime.approval_service.current(run_id)
+            history = self.runtime.approval_service.history(run_id)
+        except ApprovalNotFound as exc:
+            raise CommandError(
+                "approval_not_found",
+                f"approval not found for workflow run: {run_id}",
+                404,
+            ) from exc
+        return {
+            "current": current.to_dict(),
+            "history": [record.to_dict() for record in history],
+        }
+
+    def _approve(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        return self._approval_decision(request, "approve")
+
+    def _block(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        return self._approval_decision(request, "block")
+
+    def _comment(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            return self.runtime.approval_service.comment(
+                self._required(request, "run_id"),
+                self._required(request, "command_id"),
+                self._required(request, "reviewer_id"),
+                self._required(request, "comment"),
+            ).to_dict()
+        except (ApprovalConflict, ApprovalNotFound, ValueError) as exc:
+            raise CommandError("approval_command_failed", str(exc), 409) from exc
+
+    def _revise(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        raw_issue = request.get("revision")
+        if not isinstance(raw_issue, Mapping):
+            raise CommandError(
+                "invalid_revision",
+                "revision must be an object",
+            )
+        try:
+            issue = RevisionIssue.from_dict(dict(raw_issue))
+            if issue.run_id != self._required(request, "run_id"):
+                raise ValueError("revision run_id must match command run_id")
+            return self.runtime.approval_service.revise(
+                issue,
+                self._required(request, "command_id"),
+                self._required(request, "reviewer_id"),
+                self._required(request, "rationale"),
+            ).to_dict()
+        except (ApprovalConflict, ApprovalNotFound, KeyError, ValueError) as exc:
+            raise CommandError("approval_command_failed", str(exc), 409) from exc
+
+    def _approval_decision(
+        self,
+        request: Mapping[str, Any],
+        decision: str,
+    ) -> dict[str, Any]:
+        try:
+            handler = getattr(self.runtime.approval_service, decision)
+            return handler(
+                self._required(request, "run_id"),
+                self._required(request, "command_id"),
+                self._required(request, "reviewer_id"),
+                self._required(request, "rationale"),
+            ).to_dict()
+        except (ApprovalConflict, ApprovalNotFound, ValueError) as exc:
+            raise CommandError("approval_command_failed", str(exc), 409) from exc
 
     def _repository_path(self, relative: str) -> Path:
         root = self.runtime.paths.repository_root.resolve()

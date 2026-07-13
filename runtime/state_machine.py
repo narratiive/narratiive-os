@@ -70,7 +70,11 @@ class WorkflowEngine:
             self._evaluate_readiness(state, next_stage, set(next_available_inputs))
         else:
             state.current_stage_id = None
-            state.status = WorkflowStatus.COMPLETE
+            state.status = (
+                WorkflowStatus.AWAITING_APPROVAL
+                if state.approval_required
+                else WorkflowStatus.COMPLETE
+            )
         self._refresh_workflow(state)
         return state
 
@@ -138,7 +142,10 @@ class WorkflowEngine:
 
     @staticmethod
     def _refresh_workflow(state: WorkflowState) -> None:
-        if state.status == WorkflowStatus.COMPLETE:
+        if state.status in {
+            WorkflowStatus.COMPLETE,
+            WorkflowStatus.AWAITING_APPROVAL,
+        }:
             state.touch()
             return
         current = state.stage(state.current_stage_id) if state.current_stage_id else None

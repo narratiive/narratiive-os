@@ -1,6 +1,15 @@
 """Executable runtime primitives for Narratiive OS."""
 
 from .agent_manifest import AgentManifest, load_agent_manifest, parse_agent_manifest
+from .approvals import (
+    ApprovalComment,
+    ApprovalConflict,
+    ApprovalNotFound,
+    ApprovalRecord,
+    ApprovalResult,
+    ApprovalService,
+    ApprovalStatus,
+)
 from .command_api import CommandError, RuntimeCommandAPI
 from .composition import RuntimeComponents, RuntimePaths, compose_local_runtime
 from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
@@ -66,6 +75,13 @@ from .wsgi_api import RuntimeWSGIApp
 
 __all__ = [
     "ArtifactRef",
+    "ApprovalStatus",
+    "ApprovalComment",
+    "ApprovalRecord",
+    "ApprovalResult",
+    "ApprovalNotFound",
+    "ApprovalConflict",
+    "ApprovalService",
     "StageRecord",
     "WorkflowState",
     "MemoryKind",

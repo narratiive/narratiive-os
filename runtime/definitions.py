@@ -20,6 +20,7 @@ class WorkflowDefinition:
     workflow_id: str
     stages: tuple[StageDefinition, ...]
     schema_version: int = 1
+    approval_required: bool = False
 
     def new_state(self, run_id: str) -> WorkflowState:
         return WorkflowState(
@@ -33,6 +34,7 @@ class WorkflowDefinition:
                 )
                 for stage in self.stages
             ],
+            approval_required=self.approval_required,
         )
 
 
@@ -68,4 +70,12 @@ def workflow_definition_from_dict(data: dict[str, Any]) -> WorkflowDefinition:
         required = tuple(str(item).strip() for item in raw.get("required_inputs", []) if str(item).strip())
         stages.append(StageDefinition(stage_id, agent_ref, required))
 
-    return WorkflowDefinition(workflow_id=workflow_id, stages=tuple(stages), schema_version=version)
+    approval_required = data.get("approval_required", False)
+    if not isinstance(approval_required, bool):
+        raise ValueError("approval_required must be a boolean")
+    return WorkflowDefinition(
+        workflow_id=workflow_id,
+        stages=tuple(stages),
+        schema_version=version,
+        approval_required=approval_required,
+    )
