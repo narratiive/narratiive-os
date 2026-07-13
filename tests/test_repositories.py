@@ -28,6 +28,7 @@ class FileWorkflowRunRepositoryTests(unittest.TestCase):
                             )
                         ],
                         retry_count=1,
+                        revision_count=2,
                     )
                 ],
                 status=WorkflowStatus.ACTIVE,
@@ -41,6 +42,7 @@ class FileWorkflowRunRepositoryTests(unittest.TestCase):
             self.assertEqual(restored.status, WorkflowStatus.ACTIVE)
             self.assertEqual(restored.stage("research_analyst").status, StageStatus.COMPLETED)
             self.assertEqual(restored.stage("research_analyst").retry_count, 1)
+            self.assertEqual(restored.stage("research_analyst").revision_count, 2)
             self.assertEqual(
                 restored.stage("research_analyst").output_artifacts[0].metadata,
                 {"client": "Rave"},

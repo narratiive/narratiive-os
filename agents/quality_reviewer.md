@@ -60,9 +60,13 @@ Produce one structured quality review in Markdown containing:
 
 Each finding must include:
 
+- Revision ID and category.
 - Severity: `critical`, `major`, `minor`, or `observation`.
 - Artifact and section.
+- Affected artifact IDs when lineage is available.
 - Evidence for the finding.
+- Evidence requirement when new support is required.
+- Blocking status.
 - Why it matters.
 - Required correction.
 - Owner: Research Analyst, Strategy Director, Campaign World Generator, Creative Director, or Human decision.

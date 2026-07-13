@@ -36,6 +36,7 @@ def stage_to_dict(stage: StageRecord) -> dict[str, Any]:
         "missing_inputs": list(stage.missing_inputs),
         "failure_reason": stage.failure_reason,
         "retry_count": stage.retry_count,
+        "revision_count": stage.revision_count,
         "started_at": stage.started_at,
         "completed_at": stage.completed_at,
     }
@@ -52,6 +53,7 @@ def stage_from_dict(data: dict[str, Any]) -> StageRecord:
         missing_inputs=list(data.get("missing_inputs") or []),
         failure_reason=data.get("failure_reason"),
         retry_count=int(data.get("retry_count", 0)),
+        revision_count=int(data.get("revision_count", 0)),
         started_at=data.get("started_at"),
         completed_at=data.get("completed_at"),
     )
