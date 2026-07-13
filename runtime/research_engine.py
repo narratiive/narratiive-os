@@ -27,6 +27,8 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_MAX_BYTES = 250_000
 DEFAULT_TIMEOUT_SECONDS = 10
 DEFAULT_ALLOWED_SCHEMES = ("https",)
+DEFAULT_MAX_REDIRECTS = 5
+REDIRECT_STATUS_CODES = {301, 302, 303, 307, 308}
 
 
 def utc_now() -> str:
@@ -173,10 +175,18 @@ class EvidenceAdapter(Protocol):
 
 class WebRetrievalAdapter:
     name = "web_retrieval"
-    max_redirects = 5
 
-    def __init__(self, fetcher: Any | None = None) -> None:
+    def __init__(
+        self,
+        fetcher: Any | None = None,
+        resolver: Any | None = None,
+        opener_factory: Any | None = None,
+        max_redirects: int = DEFAULT_MAX_REDIRECTS,
+    ) -> None:
         self.fetcher = fetcher
+        self.resolver = resolver or self._default_resolver
+        self.opener_factory = opener_factory or self._default_opener_factory
+        self.max_redirects = max_redirects
 
     def supports(self, source: EvidenceSource) -> bool:
         if source.source_type not in {"web", "webpage", "url"}:
@@ -192,10 +202,20 @@ class WebRetrievalAdapter:
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Web source URI is missing.")
 
         try:
-            original_url = self._validate_web_url(source.uri, policy, context="source URL")
+            original_url = self._validate_web_url(
+                source.uri,
+                policy,
+                context="source URL",
+                resolve_host=self.fetcher is None,
+            )
             raw, final_url = self._fetch_bytes(source.uri, policy, timeout_seconds=policy.timeout_seconds, max_bytes=policy.max_bytes)
             if final_url:
-                self._validate_web_url(final_url, policy, context="redirect destination")
+                self._validate_web_url(
+                    final_url,
+                    policy,
+                    context="redirect destination",
+                    resolve_host=self.fetcher is None,
+                )
         except Exception as exc:  # noqa: BLE001
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker=str(exc))
         parsed = urllib.parse.urlparse(original_url)
@@ -229,7 +249,7 @@ class WebRetrievalAdapter:
         )
         return EvidenceBatch(source_id=source.source_id, adapter=self.name, records=[record])
 
-    def _fetch_bytes(self, uri: str, timeout_seconds: int, max_bytes: int) -> tuple[bytes, str | None]:
+    def _fetch_bytes(self, uri: str, policy: EvidenceSourcePolicy, timeout_seconds: int, max_bytes: int) -> tuple[bytes, str | None]:
         if self.fetcher is not None:
             payload = self.fetcher(uri, timeout_seconds)
             final_url = None
@@ -252,13 +272,13 @@ class WebRetrievalAdapter:
 
         current_url = uri
         redirects = 0
-        opener = urllib.request.build_opener(self._no_redirect_handler())
+        opener = self.opener_factory()
         while True:
             request = urllib.request.Request(current_url, method="GET")
             try:
                 response = opener.open(request, timeout=timeout_seconds)
             except urllib.error.HTTPError as exc:
-                if exc.code not in {301, 302, 303, 307, 308}:
+                if exc.code not in REDIRECT_STATUS_CODES:
                     raise RuntimeError(f"Web source returned HTTP {exc.code}.") from exc
                 location = exc.headers.get("Location") if exc.headers else None
                 if not location:
@@ -285,6 +305,16 @@ class WebRetrievalAdapter:
                         raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
             return b"".join(chunks), final_url
 
+    def _default_opener_factory(self) -> Any:
+        return urllib.request.build_opener(self._no_redirect_handler())
+
+    def _default_resolver(self, host: str) -> list[str]:
+        addresses: list[str] = []
+        for family, socktype, proto, canonname, sockaddr in socket.getaddrinfo(host, None):
+            if sockaddr and sockaddr[0]:
+                addresses.append(str(sockaddr[0]))
+        return addresses
+
     def _decode_web_bytes(self, data: bytes) -> str:
         text = data.decode("utf-8", errors="replace")
         text = re.sub(r"<script.*?</script>", " ", text, flags=re.IGNORECASE | re.DOTALL)
@@ -295,7 +325,7 @@ class WebRetrievalAdapter:
     def _evidence_id(self, workspace_id: str, source_id: str, content_hash: str) -> str:
         return f"ev_{sha256_hex(f'{workspace_id}|{source_id}|{content_hash}')[:16]}"
 
-    def _validate_web_url(self, url: str, policy: EvidenceSourcePolicy, *, context: str) -> str:
+    def _validate_web_url(self, url: str, policy: EvidenceSourcePolicy, *, context: str, resolve_host: bool = True) -> str:
         parsed = urllib.parse.urlparse(url)
         if parsed.scheme not in policy.allowed_schemes:
             raise RuntimeError(f"Web {context} scheme '{parsed.scheme}' is not permitted.")
@@ -304,20 +334,21 @@ class WebRetrievalAdapter:
         hostname = parsed.hostname
         if policy.allowed_domains and hostname not in set(policy.allowed_domains):
             raise RuntimeError(f"Web {context} domain '{hostname}' is not approved.")
-        self._reject_unsafe_destination(hostname, context)
+        self._reject_unsafe_destination(hostname, context, resolve_host=resolve_host)
         return url
 
-    def _reject_unsafe_destination(self, hostname: str, context: str) -> None:
+    def _reject_unsafe_destination(self, hostname: str, context: str, *, resolve_host: bool = True) -> None:
         candidates: list[ipaddress._BaseAddress] = []
         try:
             candidates.append(ipaddress.ip_address(hostname))
         except ValueError:
+            if not resolve_host:
+                return
             try:
-                resolved = socket.getaddrinfo(hostname, None)
+                resolved = self.resolver(hostname)
             except socket.gaierror as exc:
                 raise RuntimeError(f"Web {context} could not be resolved: {hostname}") from exc
-            for family, _, _, _, sockaddr in resolved:
-                address = sockaddr[0]
+            for address in resolved:
                 try:
                     candidates.append(ipaddress.ip_address(address))
                 except ValueError:
