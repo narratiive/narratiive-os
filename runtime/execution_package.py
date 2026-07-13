@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from .agent_manifest import AgentManifest, load_agent_manifest
+from .dispatch import DispatchJob
+from .models import ArtifactRef
+
+
+@dataclass(frozen=True, slots=True)
+class ExecutionPackage:
+    schema_version: int
+    job_id: str
+    run_id: str
+    stage_id: str
+    agent_id: str
+    agent_version: str
+    agent_ref: str
+    instructions: str
+    input_artifacts: tuple[dict[str, Any], ...]
+    context: Mapping[str, Any]
+    expected_output_type: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    def to_json(self) -> str:
+        return json.dumps(self.to_dict(), indent=2, sort_keys=True)
+
+
+class ExecutionPackageBuilder:
+    """Builds deterministic provider-neutral packages from dispatch jobs."""
+
+    def __init__(self, repository_root: str | Path, output_type_by_stage: Mapping[str, str]) -> None:
+        self.repository_root = Path(repository_root)
+        self.output_type_by_stage = dict(output_type_by_stage)
+
+    def build(
+        self,
+        job: DispatchJob,
+        *,
+        input_artifacts: Iterable[ArtifactRef] = (),
+        context: Mapping[str, Any] | None = None,
+    ) -> ExecutionPackage:
+        manifest = self._load_manifest(job.agent_ref)
+        output_type = self.output_type_by_stage.get(job.stage_id)
+        if not output_type:
+            raise ValueError(f"no expected output type configured for stage: {job.stage_id}")
+        artifacts = tuple(_artifact_to_dict(item) for item in input_artifacts)
+        return ExecutionPackage(
+            schema_version=1,
+            job_id=job.job_id,
+            run_id=job.run_id,
+            stage_id=job.stage_id,
+            agent_id=manifest.agent_id,
+            agent_version=manifest.version,
+            agent_ref=job.agent_ref,
+            instructions=manifest.instructions,
+            input_artifacts=artifacts,
+            context=dict(context or job.payload or {}),
+            expected_output_type=output_type,
+        )
+
+    def _load_manifest(self, agent_ref: str) -> AgentManifest:
+        path = (self.repository_root / agent_ref).resolve()
+        root = self.repository_root.resolve()
+        if root != path and root not in path.parents:
+            raise ValueError("agent_ref must resolve inside repository_root")
+        if not path.exists() or not path.is_file():
+            raise FileNotFoundError(f"agent manifest not found: {agent_ref}")
+        return load_agent_manifest(path)
+
+
+def _artifact_to_dict(artifact: ArtifactRef) -> dict[str, Any]:
+    return {
+        "artifact_id": artifact.artifact_id,
+        "artifact_type": artifact.artifact_type,
+        "location": artifact.location,
+        "checksum": artifact.checksum,
+        "metadata": dict(artifact.metadata),
+    }

@@ -1,5 +1,6 @@
 """Executable runtime primitives for Narratiive OS."""
 
+from .agent_manifest import AgentManifest, load_agent_manifest, parse_agent_manifest
 from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
 from .dispatch import (
     DispatchJob,
@@ -9,6 +10,7 @@ from .dispatch import (
     LeaseConflict,
 )
 from .dispatch_service import DispatchService
+from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .models import ArtifactRef, StageRecord, WorkflowState
 from .repositories import (
     FileWorkflowRunRepository,
@@ -44,4 +46,9 @@ __all__ = [
     "ExecutionResult",
     "JsonArtifactExecutor",
     "WorkerRunner",
+    "AgentManifest",
+    "load_agent_manifest",
+    "parse_agent_manifest",
+    "ExecutionPackage",
+    "ExecutionPackageBuilder",
 ]
