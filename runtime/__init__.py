@@ -15,6 +15,7 @@ from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig, ProviderTransportError
 from .models import ArtifactRef, StageRecord, WorkflowState
+from .pipeline_runner import DeterministicProvider, PipelineRunner, load_pipeline_fixture
 from .provider import (
     ArtifactWriter,
     InvalidProviderResponse,
@@ -39,6 +40,9 @@ __all__ = [
     "ArtifactRef",
     "StageRecord",
     "WorkflowState",
+    "PipelineRunner",
+    "DeterministicProvider",
+    "load_pipeline_fixture",
     "InvalidTransition",
     "WorkflowEngine",
     "FileWorkflowRunRepository",

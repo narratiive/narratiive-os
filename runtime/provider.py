@@ -90,7 +90,10 @@ class ProviderExecutor:
         self.artifact_writer = artifact_writer
 
     def execute(self, job: DispatchJob) -> ExecutionResult:
-        package = self.package_builder.build(job)
+        input_artifacts = tuple(
+            ArtifactRef(**item) for item in job.payload.get("input_artifacts", ())
+        )
+        package = self.package_builder.build(job, input_artifacts=input_artifacts)
         response = self.provider.generate(package)
         self._validate(package, response)
         artifact = self.artifact_writer.write(response)

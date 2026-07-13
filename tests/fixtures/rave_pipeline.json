@@ -1,0 +1,19 @@
+{
+  "run_id": "rave-synthetic",
+  "available_inputs": [
+    "client_inputs",
+    "source_material"
+  ],
+  "stage_outputs": {
+    "research_analyst": "# RAVE Research\nSynthetic evidence fixture for RAVE Coffee.",
+    "strategy_director": "# RAVE Growth Blueprint\nA deterministic strategy derived from the research fixture.",
+    "campaign_world_generator": "# RAVE Campaign World\nA deterministic campaign world derived from the blueprint.",
+    "creative_director": "# RAVE Creative Director's Bible\nDeterministic production guidance derived from the campaign world.",
+    "quality_reviewer": "# Quality Review\n\nVerdict: APPROVE\n\nThe synthetic artifact chain is complete and traceable."
+  },
+  "stage_metadata": {
+    "quality_reviewer": {
+      "verdict": "APPROVE"
+    }
+  }
+}
