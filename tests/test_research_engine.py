@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import hashlib
+import io
 import shutil
 import tempfile
 import unittest
+import urllib.error
+from email.message import Message
 from pathlib import Path
-from unittest.mock import patch
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "research"
@@ -20,31 +22,6 @@ from runtime.research_engine import (  # noqa: E402
     sha256_hex,
     normalise_text,
 )
-
-
-class FakeHTTPResponse:
-    def __init__(self, payload: bytes, url: str) -> None:
-        self._payload = payload
-        self._url = url
-        self._offset = 0
-
-    def read(self, size: int = -1) -> bytes:
-        if self._offset >= len(self._payload):
-            return b""
-        if size is None or size < 0:
-            size = len(self._payload) - self._offset
-        chunk = self._payload[self._offset : self._offset + size]
-        self._offset += len(chunk)
-        return chunk
-
-    def geturl(self) -> str:
-        return self._url
-
-    def __enter__(self) -> "FakeHTTPResponse":
-        return self
-
-    def __exit__(self, exc_type, exc, tb) -> bool:
-        return False
 
 
 class ResearchEngineTests(unittest.TestCase):
@@ -330,7 +307,41 @@ class ResearchEngineTests(unittest.TestCase):
         self.assertIsNotNone(batch.blocker)
         self.assertIn("unsafe address", batch.blocker or "")
 
-    def test_web_adapter_rejects_redirects_outside_allowlist(self) -> None:
+    def test_web_adapter_rejects_private_redirect_targets_before_following_them(self) -> None:
+        source = EvidenceSource(
+            source_id="web-source-private-redirect",
+            workspace_id="Rave",
+            source_type="web",
+            uri="https://example.com/start",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=("example.com", "internal.example.com"),
+                max_bytes=5_000,
+                timeout_seconds=1,
+            ),
+        )
+
+        calls: list[str] = []
+
+        class RedirectingOpener:
+            def open(self, request, timeout=None):  # noqa: ANN001
+                calls.append(request.full_url)
+                headers = Message()
+                headers["Location"] = "https://internal.example.com/private"
+                raise urllib.error.HTTPError(request.full_url, 302, "Found", headers, io.BytesIO(b""))
+
+        batch = WebRetrievalAdapter(
+            resolver=lambda host: ["93.184.216.34"] if host == "example.com" else ["127.0.0.1"],
+            opener_factory=lambda: RedirectingOpener(),
+        ).collect(
+            ResearchJob(job_id="job-private-redirect", workspace_id="Rave", query="test", sources=(source,)),
+            source,
+        )
+        self.assertIsNotNone(batch.blocker)
+        self.assertIn("unsafe address", batch.blocker or "")
+        self.assertEqual(calls, ["https://example.com/start"])
+
+    def test_web_adapter_rejects_redirects_outside_allowlist_without_following_them(self) -> None:
         source = EvidenceSource(
             source_id="web-source-redirect",
             workspace_id="Rave",
@@ -343,13 +354,26 @@ class ResearchEngineTests(unittest.TestCase):
                 timeout_seconds=1,
             ),
         )
-        with patch("runtime.research_engine.urllib.request.urlopen", return_value=FakeHTTPResponse(b"redirected content", "https://malicious.example.net/landing")):
-            batch = WebRetrievalAdapter().collect(
-                ResearchJob(job_id="job-redirect", workspace_id="Rave", query="test", sources=(source,)),
-                source,
-            )
+
+        calls: list[str] = []
+
+        class RedirectingOpener:
+            def open(self, request, timeout=None):  # noqa: ANN001
+                calls.append(request.full_url)
+                headers = Message()
+                headers["Location"] = "https://malicious.example.net/landing"
+                raise urllib.error.HTTPError(request.full_url, 302, "Found", headers, io.BytesIO(b""))
+
+        batch = WebRetrievalAdapter(
+            resolver=lambda host: ["93.184.216.34"],
+            opener_factory=lambda: RedirectingOpener(),
+        ).collect(
+            ResearchJob(job_id="job-redirect", workspace_id="Rave", query="test", sources=(source,)),
+            source,
+        )
         self.assertIsNotNone(batch.blocker)
         self.assertIn("not approved", batch.blocker or "")
+        self.assertEqual(calls, ["https://example.com/start"])
 
     def test_web_adapter_enforces_size_limit(self) -> None:
         source = EvidenceSource(

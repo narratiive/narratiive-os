@@ -20,6 +20,7 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Protocol, runtime_checkable
+from urllib.parse import urljoin
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -172,6 +173,7 @@ class EvidenceAdapter(Protocol):
 
 class WebRetrievalAdapter:
     name = "web_retrieval"
+    max_redirects = 5
 
     def __init__(self, fetcher: Any | None = None) -> None:
         self.fetcher = fetcher
@@ -189,15 +191,14 @@ class WebRetrievalAdapter:
         if not source.uri:
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Web source URI is missing.")
 
-        original_url = self._validate_web_url(source.uri, policy, context="source URL")
-        parsed = urllib.parse.urlparse(source.uri)
-
         try:
-            raw, final_url = self._fetch_bytes(source.uri, policy.timeout_seconds, policy.max_bytes)
+            original_url = self._validate_web_url(source.uri, policy, context="source URL")
+            raw, final_url = self._fetch_bytes(source.uri, policy, timeout_seconds=policy.timeout_seconds, max_bytes=policy.max_bytes)
             if final_url:
                 self._validate_web_url(final_url, policy, context="redirect destination")
         except Exception as exc:  # noqa: BLE001
             return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker=str(exc))
+        parsed = urllib.parse.urlparse(original_url)
         text = self._decode_web_bytes(raw)
         content_hash = sha256_hex(text)
         evidence_id = self._evidence_id(job.workspace_id, source.source_id, content_hash)
@@ -249,20 +250,40 @@ class WebRetrievalAdapter:
                 raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
             return data, (str(final_url) if final_url is not None else None)
 
-        request = urllib.request.Request(uri, method="GET")
-        with urllib.request.urlopen(request, timeout=timeout_seconds) as response:
+        current_url = uri
+        redirects = 0
+        opener = urllib.request.build_opener(self._no_redirect_handler())
+        while True:
+            request = urllib.request.Request(current_url, method="GET")
+            try:
+                response = opener.open(request, timeout=timeout_seconds)
+            except urllib.error.HTTPError as exc:
+                if exc.code not in {301, 302, 303, 307, 308}:
+                    raise RuntimeError(f"Web source returned HTTP {exc.code}.") from exc
+                location = exc.headers.get("Location") if exc.headers else None
+                if not location:
+                    raise RuntimeError("Web source redirected without a Location header.") from exc
+                next_url = urljoin(current_url, location)
+                redirects += 1
+                if redirects > self.max_redirects:
+                    raise RuntimeError(f"Web source exceeded redirect limit of {self.max_redirects}.")
+                self._validate_web_url(next_url, policy, context="redirect destination")
+                current_url = next_url
+                continue
+            final_url = getattr(response, "geturl", lambda: current_url)() or current_url
+            self._validate_web_url(final_url, policy, context="redirect destination")
             chunks: list[bytes] = []
             total = 0
-            while True:
-                chunk = response.read(8192)
-                if not chunk:
-                    break
-                chunks.append(chunk)
-                total += len(chunk)
-                if total > max_bytes:
-                    raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
-            final_url = getattr(response, "geturl", lambda: uri)()
-        return b"".join(chunks), final_url
+            with response:
+                while True:
+                    chunk = response.read(8192)
+                    if not chunk:
+                        break
+                    chunks.append(chunk)
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise RuntimeError(f"Web source exceeded size limit of {max_bytes} bytes.")
+            return b"".join(chunks), final_url
 
     def _decode_web_bytes(self, data: bytes) -> str:
         text = data.decode("utf-8", errors="replace")
@@ -308,6 +329,13 @@ class WebRetrievalAdapter:
         for candidate in candidates:
             if candidate.is_loopback or candidate.is_private or candidate.is_link_local or candidate.is_reserved or candidate.is_multicast or candidate.is_unspecified:
                 raise RuntimeError(f"Web {context} resolves to an unsafe address: {hostname}")
+
+    def _no_redirect_handler(self) -> urllib.request.HTTPRedirectHandler:
+        class NoRedirectHandler(urllib.request.HTTPRedirectHandler):
+            def redirect_request(self, req, fp, code, msg, headers, newurl):  # type: ignore[override]
+                return None
+
+        return NoRedirectHandler()
 
 
 class LocalDocumentIngestionAdapter:
