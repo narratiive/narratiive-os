@@ -13,6 +13,7 @@ from .approvals import ApprovalConflict, ApprovalNotFound
 from .composition import RuntimeComponents
 from .definitions import load_workflow_definition
 from .dispatch import JobNotFound
+from .opportunity_card_pipeline import OpportunityCardRequest, OpportunityCardService
 from .repositories import RunNotFound
 from .revision_graph import RevisionIssue
 from .serialization import workflow_to_dict
@@ -37,15 +38,18 @@ class RuntimeCommandAPI:
         self,
         runtime: RuntimeComponents,
         blueprint_orchestrator: BlueprintOrchestrator | None = None,
+        opportunity_card_service: OpportunityCardService | None = None,
     ) -> None:
         self.runtime = runtime
         self.blueprint_orchestrator = blueprint_orchestrator
+        self.opportunity_card_service = opportunity_card_service
 
     def handle(self, request: Mapping[str, Any]) -> dict[str, Any]:
-        command = str(request.get("command", "")).strip()
+        command = self._normalize_command(str(request.get("command", "")).strip())
         if not command:
             raise CommandError("missing_command", "command is required")
 
+        command = self._alias_command(command)
         handlers = {
             "health": self._health,
             "runs.list": self._list_runs,
@@ -62,6 +66,12 @@ class RuntimeCommandAPI:
             "blueprints.generate": self._blueprint_generate,
             "blueprints.get": self._blueprint_get,
             "blueprints.list": self._blueprint_list,
+            "opportunity": self._opportunity_create,
+            "opportunity.create": self._opportunity_create,
+            "opportunity.status": self._opportunity_status,
+            "opportunity.review": self._opportunity_review,
+            "opportunity.approve": self._opportunity_approve,
+            "opportunity.revise": self._opportunity_revise,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -245,6 +255,72 @@ class RuntimeCommandAPI:
         versions = [record.to_dict() for record in orchestrator.list(workspace_id, client_id, blueprint_id)]
         return {"versions": versions, "count": len(versions)}
 
+    def _opportunity_create(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        service = self._opportunity_service()
+        payload = self._opportunity_payload(request)
+        company_url = self._required(payload, "company_url")
+        opportunity_request = OpportunityCardRequest.from_company_url(
+            company_url,
+            company_name=str(payload.get("company_name", "")).strip() or None,
+            requested_by=str(payload.get("requested_by", "runtime")).strip() or "runtime",
+            workspace_id=str(payload.get("workspace_id", "")).strip() or None,
+            client_id=str(payload.get("client_id", "")).strip() or None,
+            draft_mode=bool(payload.get("draft_mode", True)),
+            metadata=dict(payload.get("metadata") or {}),
+        )
+        record = service.generate(opportunity_request)
+        return {
+            "job_id": record.job_id,
+            "workspace_id": record.workspace_id,
+            "client_id": record.client_id,
+            "version": record.version,
+            "status": record.status,
+            "review_ready": record.status == "ready_for_review",
+            "company_name": record.opportunity_card.company_name,
+            "company_url": record.opportunity_card.company_url,
+            "summary": self._opportunity_summary(record),
+        }
+
+    def _opportunity_status(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        service = self._opportunity_service()
+        payload = self._opportunity_payload(request)
+        record = service.review(
+            self._required(payload, "job_id"),
+            workspace_id=str(payload.get("workspace_id", "")).strip() or None,
+            client_id=str(payload.get("client_id", "")).strip() or None,
+        )
+        return record.to_dict()
+
+    def _opportunity_review(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        return self._opportunity_status(request)
+
+    def _opportunity_approve(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        service = self._opportunity_service()
+        payload = self._opportunity_payload(request)
+        record = service.approve(
+            self._required(payload, "job_id"),
+            reviewer_id=str(payload.get("reviewer_id", "Matt")).strip() or "Matt",
+            rationale=str(payload.get("rationale", "")).strip(),
+            workspace_id=str(payload.get("workspace_id", "")).strip() or None,
+            client_id=str(payload.get("client_id", "")).strip() or None,
+        )
+        return record.to_dict()
+
+    def _opportunity_revise(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        service = self._opportunity_service()
+        payload = self._opportunity_payload(request)
+        instruction = str(payload.get("instruction", "")).strip()
+        if not instruction:
+            raise CommandError("missing_field", "instruction is required")
+        record = service.revise(
+            self._required(payload, "job_id"),
+            instruction,
+            reviewer_id=str(payload.get("reviewer_id", "Matt")).strip() or "Matt",
+            workspace_id=str(payload.get("workspace_id", "")).strip() or None,
+            client_id=str(payload.get("client_id", "")).strip() or None,
+        )
+        return record.to_dict()
+
     def _repository_path(self, relative: str) -> Path:
         root = self.runtime.paths.repository_root.resolve()
         target = (root / relative).resolve()
@@ -270,6 +346,29 @@ class RuntimeCommandAPI:
             )
         return self.blueprint_orchestrator
 
+    def _opportunity_service(self) -> OpportunityCardService:
+        if self.opportunity_card_service is None:
+            raise CommandError(
+                "opportunity_card_engine_unavailable",
+                "opportunity card orchestration is not configured",
+                503,
+            )
+        return self.opportunity_card_service
+
+    @staticmethod
+    def _normalize_command(command: str) -> str:
+        return command.lstrip("/")
+
+    @staticmethod
+    def _alias_command(command: str) -> str:
+        aliases = {
+            "opportunity-status": "opportunity.status",
+            "opportunity-review": "opportunity.review",
+            "opportunity-approve": "opportunity.approve",
+            "opportunity-revise": "opportunity.revise",
+        }
+        return aliases.get(command, command)
+
     @staticmethod
     def _blueprint_payload(request: Mapping[str, Any]) -> dict[str, Any]:
         payload = request.get("request")
@@ -278,6 +377,24 @@ class RuntimeCommandAPI:
         if not isinstance(payload, Mapping):
             raise CommandError("invalid_blueprint_request", "request must be an object")
         return dict(payload)
+
+    @staticmethod
+    def _opportunity_payload(request: Mapping[str, Any]) -> dict[str, Any]:
+        payload = request.get("request")
+        if payload is None:
+            payload = {key: value for key, value in request.items() if key != "command"}
+        if not isinstance(payload, Mapping):
+            raise CommandError("invalid_opportunity_request", "request must be an object")
+        return dict(payload)
+
+    @staticmethod
+    def _opportunity_summary(record: Any) -> str:
+        card = record.opportunity_card
+        return (
+            f"{card.company_name}: {record.status} | "
+            f"{card.commercial_diagnosis.statement} | "
+            f"Next: {card.recommended_next_conversation}"
+        )
 
 
 class WorkspaceCommandAPI:
@@ -288,13 +405,16 @@ class WorkspaceCommandAPI:
         legacy_runtime: RuntimeComponents,
         manager: WorkspaceRuntimeManager,
         blueprint_orchestrator: BlueprintOrchestrator | None = None,
+        opportunity_card_service: OpportunityCardService | None = None,
     ) -> None:
         self.legacy_api = RuntimeCommandAPI(
             legacy_runtime,
             blueprint_orchestrator=blueprint_orchestrator,
+            opportunity_card_service=opportunity_card_service,
         )
         self.manager = manager
         self.blueprint_orchestrator = blueprint_orchestrator
+        self.opportunity_card_service = opportunity_card_service
 
     def handle(self, request: Mapping[str, Any]) -> dict[str, Any]:
         command = str(request.get("command", "")).strip()
@@ -363,6 +483,9 @@ class WorkspaceCommandAPI:
         blueprint_orchestrator = self.blueprint_orchestrator
         if blueprint_orchestrator is not None:
             blueprint_orchestrator = blueprint_orchestrator.for_runtime(runtime)
+        opportunity_card_service = self.opportunity_card_service
+        if opportunity_card_service is not None:
+            opportunity_card_service = opportunity_card_service.for_runtime(runtime)
         if str(scoped_request.get("command", "")).strip() == "blueprints.generate":
             scoped_request = self._scope_blueprint_request(
                 scoped_request,
@@ -372,6 +495,7 @@ class WorkspaceCommandAPI:
         result = RuntimeCommandAPI(
             runtime,
             blueprint_orchestrator=blueprint_orchestrator,
+            opportunity_card_service=opportunity_card_service,
         ).handle(scoped_request)
         result["workspace_id"] = workspace_id
         return result
