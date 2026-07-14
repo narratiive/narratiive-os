@@ -136,6 +136,7 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.assertEqual(record.routing_policy_version, "1")
         self.assertEqual(record.structured_blueprint.document_title, "RAVE Blueprint")
         self.assertEqual(record.canon_bundle.bundle_id, "blueprint-canon-v1")
+        self.assertEqual(record.canon_bundle.canon_version, "1.0.0")
         self.assertEqual(record.canon_bundle.prompt_asset_id, "blueprint_population_system")
         self.assertEqual(
             [component.asset_id for component in record.canon_bundle.components],
@@ -143,6 +144,8 @@ class BlueprintOrchestratorTests(unittest.TestCase):
                 "blueprint_population_system",
                 "blueprint_schema_v3",
                 "visual_framework_library_v1",
+                "founder_grade_rules",
+                "visual_intelligence_system_v1",
             ],
         )
         self.assertTrue(record.raw_response_artifact.artifact.location.endswith(".md"))
@@ -204,6 +207,8 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
         schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
         visual_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md").read_text(encoding="utf-8")
+        founder_text = (REPO_ROOT / "knowledge" / "blueprint" / "founder-grade-rules.md").read_text(encoding="utf-8")
+        visual_intelligence_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md").read_text(encoding="utf-8")
         self.assertEqual(
             prompt.metadata["source_path"],
             str(REPO_ROOT / "knowledge" / "blueprint" / "population-system.md"),
@@ -217,6 +222,7 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             hashlib.sha256(population_text.encode("utf-8")).hexdigest(),
         )
         self.assertEqual(prompt.metadata["bundle"]["bundle_id"], "blueprint-canon-v1")
+        self.assertEqual(prompt.metadata["bundle"]["canon_version"], "1.0.0")
         self.assertEqual(prompt.metadata["bundle"]["prompt_asset_id"], "blueprint_population_system")
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_path"],
@@ -241,6 +247,30 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][1]["asset_id"],
             "visual_framework_library_v1",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "founder-grade-rules.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_checksum"],
+            hashlib.sha256(founder_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["asset_id"],
+            "founder_grade_rules",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["source_checksum"],
+            hashlib.sha256(visual_intelligence_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["asset_id"],
+            "visual_intelligence_system_v1",
         )
         self.assertEqual(prompt.metadata["prompt_asset"]["source_title"], "Narratiive Blueprint Population System")
         self.assertEqual(prompt.metadata["prompt_asset"]["drive_document_id"], "1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE")

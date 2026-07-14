@@ -30,6 +30,7 @@ from .blueprint_orchestrator import (
 from .blueprint_knowledge_registry import (
     BlueprintCanonBundle,
     BlueprintCanonBundleComponent,
+    BlueprintCanonVersion,
     BlueprintKnowledgeAsset,
     BlueprintKnowledgeRegistry,
     BlueprintSchemaSlide,
@@ -190,6 +191,7 @@ __all__ = [
     "BlueprintKnowledgeAsset",
     "BlueprintCanonBundleComponent",
     "BlueprintCanonBundle",
+    "BlueprintCanonVersion",
     "BlueprintSchemaSlide",
     "BlueprintSchemaV3",
     "BlueprintKnowledgeRegistry",

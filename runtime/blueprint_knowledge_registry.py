@@ -185,6 +185,10 @@ class BlueprintCanonBundle:
             _ensure_tuple_strings(self.compatibility_notes, "compatibility_notes"),
         )
 
+    @property
+    def canon_version(self) -> str:
+        return self.version
+
     def component(self, asset_id: str) -> BlueprintCanonBundleComponent:
         asset_id = _safe_identifier(asset_id, "asset_id")
         for component in self.components:
@@ -196,6 +200,7 @@ class BlueprintCanonBundle:
         return {
             "bundle_id": self.bundle_id,
             "version": self.version,
+            "canon_version": self.canon_version,
             "status": self.status,
             "prompt_asset_id": self.prompt_asset_id,
             "supporting_asset_ids": list(self.supporting_asset_ids),
@@ -203,6 +208,9 @@ class BlueprintCanonBundle:
             "checksum": self.checksum,
             "compatibility_notes": list(self.compatibility_notes),
         }
+
+
+BlueprintCanonVersion = BlueprintCanonBundle
 
 
 @dataclass(frozen=True, slots=True)
@@ -428,6 +436,7 @@ class BlueprintKnowledgeRegistry:
                 {
                     "bundle_id": bundle.bundle_id,
                     "version": bundle.version,
+                    "canon_version": bundle.canon_version,
                     "status": bundle.status,
                     "prompt_asset_id": bundle.prompt_asset_id,
                     "supporting_asset_ids": list(bundle.supporting_asset_ids),

@@ -246,6 +246,8 @@ class CommandAPITests(unittest.TestCase):
         population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
         schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
         visual_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md").read_text(encoding="utf-8")
+        founder_text = (REPO_ROOT / "knowledge" / "blueprint" / "founder-grade-rules.md").read_text(encoding="utf-8")
+        visual_intelligence_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md").read_text(encoding="utf-8")
         self.assertEqual(
             prompt.metadata["source_path"],
             str(REPO_ROOT / "knowledge" / "blueprint" / "population-system.md"),
@@ -259,6 +261,7 @@ class CommandAPITests(unittest.TestCase):
             hashlib.sha256(population_text.encode("utf-8")).hexdigest(),
         )
         self.assertEqual(prompt.metadata["bundle"]["bundle_id"], "blueprint-canon-v1")
+        self.assertEqual(prompt.metadata["bundle"]["canon_version"], "1.0.0")
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_path"],
             str(REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md"),
@@ -282,6 +285,30 @@ class CommandAPITests(unittest.TestCase):
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][1]["asset_id"],
             "visual_framework_library_v1",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "founder-grade-rules.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_checksum"],
+            hashlib.sha256(founder_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["asset_id"],
+            "founder_grade_rules",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["source_checksum"],
+            hashlib.sha256(visual_intelligence_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][3]["asset_id"],
+            "visual_intelligence_system_v1",
         )
         self.assertIn(
             "Act I — Thesis and Commercial Question",

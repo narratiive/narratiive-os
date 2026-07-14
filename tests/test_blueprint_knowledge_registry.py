@@ -28,6 +28,8 @@ class BlueprintKnowledgeRegistryTests(unittest.TestCase):
                 "blueprint_population_system",
                 "blueprint_schema_v3",
                 "visual_framework_library_v1",
+                "founder_grade_rules",
+                "visual_intelligence_system_v1",
             ],
         )
         self.assertEqual(
@@ -39,10 +41,17 @@ class BlueprintKnowledgeRegistryTests(unittest.TestCase):
             [
                 "knowledge/blueprint/blueprint-schema-v3.md",
                 "knowledge/blueprint/visual-framework-library-v1.md",
+                "knowledge/blueprint/founder-grade-rules.md",
+                "knowledge/blueprint/visual-intelligence-system-v1.md",
             ],
         )
         self.assertEqual(len(schema.acts), 6)
         self.assertEqual(len(schema.slides), 30)
+        self.assertIn("Target quality threshold: 9.5/10 founder-grade.", registry.asset("founder_grade_rules").read_text())
+        visual_intelligence = registry.asset("visual_intelligence_system_v1").read_text()
+        self.assertIn("Visual communication is always preferred to written explanation.", visual_intelligence)
+        self.assertIn("Founder Insight Boxes", visual_intelligence)
+        self.assertIn("SO WHAT?", visual_intelligence)
 
     def test_rejects_manifest_checksum_tampering(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
