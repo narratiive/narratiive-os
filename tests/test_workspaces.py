@@ -6,6 +6,7 @@ from pathlib import Path
 
 from runtime.command_api import CommandError, WorkspaceCommandAPI
 from runtime.blueprint_orchestrator import BlueprintOrchestrator, FakeBlueprintEngine
+from runtime.blueprint_knowledge_registry import BlueprintKnowledgeRegistry
 from runtime.composition import compose_local_runtime
 from runtime.definitions import load_workflow_definition
 from runtime.execution_package import ExecutionPackageBuilder
@@ -243,10 +244,7 @@ class MultiClientWorkspaceTests(unittest.TestCase):
                 provider_id="router-provider",
                 model_id="blueprint-model-v1",
             ),
-            prompt_source_path=REPOSITORY_ROOT / "agents" / "strategy_director.md",
-            supporting_instruction_source_paths=(
-                REPOSITORY_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-            ),
+            knowledge_registry=BlueprintKnowledgeRegistry.from_default(),
         )
         api = WorkspaceCommandAPI(legacy, self.manager, blueprint_orchestrator=orchestrator)
 

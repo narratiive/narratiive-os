@@ -27,6 +27,14 @@ from .blueprint_orchestrator import (
     BlueprintRoutingMismatchError,
     StructuredBlueprint,
 )
+from .blueprint_knowledge_registry import (
+    BlueprintCanonBundle,
+    BlueprintCanonBundleComponent,
+    BlueprintKnowledgeAsset,
+    BlueprintKnowledgeRegistry,
+    BlueprintSchemaSlide,
+    BlueprintSchemaV3,
+)
 from .command_api import CommandError, RuntimeCommandAPI, WorkspaceCommandAPI
 from .composition import (
     RuntimeComponents,
@@ -179,6 +187,12 @@ __all__ = [
     "FileBlueprintStore",
     "BlueprintRoutingMismatchError",
     "StructuredBlueprint",
+    "BlueprintKnowledgeAsset",
+    "BlueprintCanonBundleComponent",
+    "BlueprintCanonBundle",
+    "BlueprintSchemaSlide",
+    "BlueprintSchemaV3",
+    "BlueprintKnowledgeRegistry",
     "StageRecord",
     "WorkflowState",
     "MemoryKind",
