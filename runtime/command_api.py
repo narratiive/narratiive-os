@@ -359,9 +359,19 @@ class WorkspaceCommandAPI:
         scoped_request = dict(request)
         scoped_request["client_id"] = workspace.client_id
         self._reject_cross_workspace_run(scoped_request, workspace_id)
+        runtime = self.manager.runtime(workspace_id)
+        blueprint_orchestrator = self.blueprint_orchestrator
+        if blueprint_orchestrator is not None:
+            blueprint_orchestrator = blueprint_orchestrator.for_runtime(runtime)
+        if str(scoped_request.get("command", "")).strip() == "blueprints.generate":
+            scoped_request = self._scope_blueprint_request(
+                scoped_request,
+                workspace_id=workspace_id,
+                client_id=workspace.client_id,
+            )
         result = RuntimeCommandAPI(
-            self.manager.runtime(workspace_id),
-            blueprint_orchestrator=self.blueprint_orchestrator,
+            runtime,
+            blueprint_orchestrator=blueprint_orchestrator,
         ).handle(scoped_request)
         result["workspace_id"] = workspace_id
         return result
@@ -399,3 +409,36 @@ class WorkspaceCommandAPI:
         if not value:
             raise CommandError("missing_field", f"{field} is required")
         return value
+
+    @staticmethod
+    def _scope_blueprint_request(
+        request: Mapping[str, Any],
+        *,
+        workspace_id: str,
+        client_id: str,
+    ) -> dict[str, Any]:
+        scoped = dict(request)
+        payload = scoped.get("request")
+        if payload is None:
+            payload = {key: value for key, value in scoped.items() if key != "command"}
+        if not isinstance(payload, Mapping):
+            raise CommandError("invalid_blueprint_request", "request must be an object")
+        payload = dict(payload)
+        existing_workspace_id = str(payload.get("workspace_id", "")).strip()
+        existing_client_id = str(payload.get("client_id", "")).strip()
+        if existing_workspace_id and existing_workspace_id != workspace_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                "blueprint request workspace_id belongs to a different workspace",
+                409,
+            )
+        if existing_client_id and existing_client_id != client_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                "blueprint request client_id belongs to a different workspace",
+                409,
+            )
+        payload["workspace_id"] = workspace_id
+        payload["client_id"] = client_id
+        scoped["request"] = payload
+        return scoped

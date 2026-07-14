@@ -24,6 +24,7 @@ from .blueprint_orchestrator import (
     ClaudeBlueprintEngine,
     FakeBlueprintEngine,
     FileBlueprintStore,
+    BlueprintRoutingMismatchError,
     StructuredBlueprint,
 )
 from .command_api import CommandError, RuntimeCommandAPI, WorkspaceCommandAPI
@@ -176,6 +177,7 @@ __all__ = [
     "ClaudeBlueprintEngine",
     "FakeBlueprintEngine",
     "FileBlueprintStore",
+    "BlueprintRoutingMismatchError",
     "StructuredBlueprint",
     "StageRecord",
     "WorkflowState",

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,13 +9,16 @@ from runtime.artifact_catalog import ArtifactRecord
 from runtime.blueprint_orchestrator import (
     BlueprintBlockedError,
     BlueprintContextArtifacts,
+    BlueprintRoutingMismatchError,
     BlueprintOrchestrator,
     BlueprintRequest,
     FakeBlueprintEngine,
     FileBlueprintStore,
+    ClaudeBlueprintEngine,
 )
 from runtime.command_api import RuntimeCommandAPI
 from runtime.composition import compose_workspace_runtime
+from runtime.provider import ProviderResponse
 from runtime.workspaces import Workspace
 
 
@@ -34,15 +38,18 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.fixture_response = FIXTURE_PATH.read_text(encoding="utf-8")
         self.engine = FakeBlueprintEngine(
             self.fixture_response,
-            provider_id="anthropic",
-            model_id="claude-sonnet-4-5",
+            provider_id="router-provider",
+            model_id="blueprint-model-v1",
         )
         self.orchestrator = BlueprintOrchestrator(
             artifact_catalog=self.catalog,
             prompt_registry=self.prompts,
             engine=self.engine,
             store=self.store,
-            prompt_source_path=REPO_ROOT / "templates" / "Growth_Blueprint.md",
+            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
+            supporting_instruction_source_paths=(
+                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+            ),
         )
 
         self.research = self.catalog.register(
@@ -109,14 +116,25 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             requested_by="testing",
         )
 
+    @staticmethod
+    def _flatten_slide_headings(sections):
+        slides = []
+        for act in sections:
+            slides.extend(act.children)
+        return slides
+
     def test_generates_and_versions_a_blueprint_without_flattening_the_raw_response(self) -> None:
         record = self.orchestrator.generate(self._request(request_id="blueprint-request-001"))
 
         self.assertEqual(record.version, 1)
         self.assertEqual(record.status, "complete")
         self.assertEqual(record.prompt_version, 1)
-        self.assertEqual(record.provider_id, "anthropic")
-        self.assertEqual(record.model_id, "claude-sonnet-4-5")
+        self.assertEqual(record.provider_id, "router-provider")
+        self.assertEqual(record.model_id, "blueprint-model-v1")
+        self.assertEqual(record.requested_provider_id, "router-provider")
+        self.assertEqual(record.requested_model_id, "blueprint-model-v1")
+        self.assertEqual(record.routing_policy_id, "static")
+        self.assertEqual(record.routing_policy_version, "1")
         self.assertEqual(record.structured_blueprint.document_title, "RAVE Blueprint")
         self.assertTrue(record.raw_response_artifact.artifact.location.endswith(".md"))
         self.assertEqual(
@@ -124,13 +142,90 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             self.fixture_response,
         )
         self.assertGreater(len(record.structured_blueprint.sections), 0)
-        self.assertIn("Slide 1 — The Category Signal", [section.heading for section in record.structured_blueprint.sections])
+        self.assertEqual(
+            [section.heading for section in record.structured_blueprint.sections],
+            [
+                "Act I — Thesis and Commercial Question",
+                "Act II — Market, Category and Competition",
+                "Act III — Audience and Demand Pools",
+                "Act IV — Strategic Platform",
+                "Act V — Campaign and Activation",
+            ],
+        )
+        slides = self._flatten_slide_headings(record.structured_blueprint.sections)
+        self.assertEqual(len(slides), 30)
+        self.assertGreaterEqual(
+            sum(
+                1
+                for act in record.structured_blueprint.sections
+                for slide in act.children
+                if any(child.heading == "Founder Insight" for child in slide.children)
+            ),
+            10,
+        )
+        self.assertGreaterEqual(
+            sum(
+                1
+                for act in record.structured_blueprint.sections
+                for slide in act.children
+                if any(child.heading == "So What" for child in slide.children)
+            ),
+            10,
+        )
+        self.assertTrue(
+            any(
+                child.heading == "Visual / Layout Direction"
+                for act in record.structured_blueprint.sections
+                for slide in act.children
+                for child in slide.children
+            )
+        )
+        self.assertTrue(
+            any(
+                child.heading == "Source Notes"
+                for act in record.structured_blueprint.sections
+                for slide in act.children
+                for child in slide.children
+            )
+        )
         self.assertIn("ev_deadbeef", record.structured_blueprint.evidence_ids)
         self.assertEqual(record.change_summary, ())
         self.assertTrue(record.artifact_lineage)
+        prompt = self.prompts.active("claude-growth-blueprint")
+        strategy_director_text = (REPO_ROOT / "agents" / "strategy_director.md").read_text(encoding="utf-8")
+        pipeline_text = (REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md").read_text(encoding="utf-8")
         self.assertEqual(
-            self.prompts.active("claude-growth-blueprint").metadata["source_path"],
+            prompt.metadata["source_path"],
+            str(REPO_ROOT / "agents" / "strategy_director.md"),
+        )
+        self.assertEqual(
+            prompt.content,
+            strategy_director_text,
+        )
+        self.assertEqual(
+            prompt.checksum,
+            hashlib.sha256(strategy_director_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["output_template_path"],
             str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][0]["source_path"],
+            str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][0]["source_checksum"],
+            hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"],
+            [
+                {
+                    "source_path": str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
+                    "source_checksum": hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
+                }
+            ],
         )
         self.assertTrue((self.store.root / "workspaces" / "rave" / "clients" / "rave" / "rave_blueprint" / "versions" / "v1.json").exists())
 
@@ -188,17 +283,61 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             prompt_registry=self.prompts,
             engine=FakeBlueprintEngine(
                 "# RAVE Blueprint\n\n## Slide 1 — Draft\n\nThis draft never cites evidence.",
-                provider_id="anthropic",
-                model_id="claude-sonnet-4-5",
+                provider_id="router-provider",
+                model_id="blueprint-model-v1",
             ),
             store=FileBlueprintStore(self.root / "blueprints-invalid"),
-            prompt_source_path=REPO_ROOT / "templates" / "Growth_Blueprint.md",
+            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
+            supporting_instruction_source_paths=(
+                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+            ),
         )
         record = invalid.generate(self._request(request_id="blueprint-request-invalid"))
 
         self.assertEqual(record.status, "invalid")
         self.assertTrue(any(finding.code == "missing_evidence_references" for finding in record.validation_findings))
         self.assertTrue(record.raw_response_artifact.artifact.location)
+
+    def test_claude_only_routing_mismatch_fails_closed(self) -> None:
+        fixture_response = self.fixture_response
+
+        class RoutedMismatchProvider:
+            def generate(self, package):
+                return ProviderResponse(
+                    job_id=package.job_id,
+                    run_id=package.run_id,
+                    stage_id=package.stage_id,
+                    output_type=package.expected_output_type,
+                    content=fixture_response,
+                    metadata={
+                        "provider_id": "fallback-provider",
+                        "model_id": "fallback-model",
+                        "routing": {
+                            "provider_id": "fallback-provider",
+                            "model_id": "fallback-model",
+                            "policy_id": "claude_only",
+                            "policy_version": "1",
+                        },
+                    },
+                )
+
+        blocked = BlueprintOrchestrator(
+            artifact_catalog=self.catalog,
+            prompt_registry=self.prompts,
+            engine=ClaudeBlueprintEngine(
+                provider=RoutedMismatchProvider(),
+                prompt_registry=self.prompts,
+                prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
+            ),
+            store=FileBlueprintStore(self.root / "blueprints-mismatch"),
+            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
+            supporting_instruction_source_paths=(
+                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+            ),
+        )
+
+        with self.assertRaises(BlueprintRoutingMismatchError):
+            blocked.generate(self._request(request_id="blueprint-request-mismatch"))
 
     def test_runtime_command_api_exposes_blueprint_generation(self) -> None:
         api = RuntimeCommandAPI(self.runtime, blueprint_orchestrator=self.orchestrator)

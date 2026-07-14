@@ -17,7 +17,10 @@ from .research_engine import sha256_hex, slugify, utc_now
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROMPT_ID = "claude-growth-blueprint"
-DEFAULT_PROMPT_SOURCE = REPO_ROOT / "templates" / "Growth_Blueprint.md"
+DEFAULT_PROMPT_SOURCE = REPO_ROOT / "agents" / "strategy_director.md"
+DEFAULT_PROMPT_SUPPORTING_SOURCES = (
+    REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+)
 DEFAULT_STAGE_ID = "blueprint_generation"
 DEFAULT_AGENT_ID = "blueprint_orchestrator"
 DEFAULT_OUTPUT_TYPE = "structured_blueprint"
@@ -318,12 +321,24 @@ class BlueprintEngineResponse:
     prompt_id: str
     prompt_version: int
     prompt_checksum: str
+    requested_provider_id: str = ""
+    requested_model_id: str = ""
+    routing_policy_id: str = ""
+    routing_policy_version: str = ""
     provider_metadata: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _safe_identifier(self.provider_id, "provider_id")
         _safe_identifier(self.model_id, "model_id")
         _safe_identifier(self.prompt_id, "prompt_id")
+        if self.requested_provider_id:
+            _safe_identifier(self.requested_provider_id, "requested_provider_id")
+        if self.requested_model_id:
+            _safe_identifier(self.requested_model_id, "requested_model_id")
+        if self.routing_policy_id:
+            _safe_identifier(self.routing_policy_id, "routing_policy_id")
+        if self.routing_policy_version:
+            _safe_identifier(self.routing_policy_version, "routing_policy_version")
         object.__setattr__(self, "provider_metadata", dict(self.provider_metadata or {}))
 
     def to_dict(self) -> dict[str, Any]:
@@ -334,6 +349,10 @@ class BlueprintEngineResponse:
             "prompt_id": self.prompt_id,
             "prompt_version": self.prompt_version,
             "prompt_checksum": self.prompt_checksum,
+            "requested_provider_id": self.requested_provider_id,
+            "requested_model_id": self.requested_model_id,
+            "routing_policy_id": self.routing_policy_id,
+            "routing_policy_version": self.routing_policy_version,
             "provider_metadata": dict(self.provider_metadata),
         }
 
@@ -351,6 +370,10 @@ class BlueprintVersionRecord:
     prompt_checksum: str
     provider_id: str
     model_id: str
+    requested_provider_id: str
+    requested_model_id: str
+    routing_policy_id: str
+    routing_policy_version: str
     structured_blueprint: StructuredBlueprint
     raw_response_artifact: ArtifactRecord
     structured_artifact: ArtifactRecord
@@ -382,6 +405,10 @@ class BlueprintVersionRecord:
             "prompt_checksum": self.prompt_checksum,
             "provider_id": self.provider_id,
             "model_id": self.model_id,
+            "requested_provider_id": self.requested_provider_id,
+            "requested_model_id": self.requested_model_id,
+            "routing_policy_id": self.routing_policy_id,
+            "routing_policy_version": self.routing_policy_version,
             "structured_blueprint": self.structured_blueprint.to_dict(),
             "raw_response_artifact": self.raw_response_artifact.to_dict(),
             "structured_artifact": self.structured_artifact.to_dict(),
@@ -409,6 +436,10 @@ class BlueprintVersionRecord:
             prompt_checksum=str(data["prompt_checksum"]),
             provider_id=str(data["provider_id"]),
             model_id=str(data["model_id"]),
+            requested_provider_id=str(data.get("requested_provider_id", data["provider_id"])),
+            requested_model_id=str(data.get("requested_model_id", data["model_id"])),
+            routing_policy_id=str(data.get("routing_policy_id", "")),
+            routing_policy_version=str(data.get("routing_policy_version", "")),
             structured_blueprint=StructuredBlueprint(
                 blueprint_id=str(structured_blueprint["blueprint_id"]),
                 request_id=str(structured_blueprint["request_id"]),
@@ -476,6 +507,10 @@ class FakeBlueprintEngine:
             prompt_id=prompt.prompt_id,
             prompt_version=prompt.version,
             prompt_checksum=prompt.checksum,
+            requested_provider_id=self.provider_id,
+            requested_model_id=self.model_id,
+            routing_policy_id="static",
+            routing_policy_version="1",
             provider_metadata={
                 "provider_id": self.provider_id,
                 "model_id": self.model_id,
@@ -496,6 +531,8 @@ class ClaudeBlueprintEngine:
         prompt_id: str = DEFAULT_PROMPT_ID,
         stage_id: str = DEFAULT_STAGE_ID,
         agent_id: str = DEFAULT_AGENT_ID,
+        routing_policy_id: str = "claude_only",
+        routing_policy_version: str = "1",
         expected_provider_id: str = "anthropic",
         expected_model_id: str = "claude-sonnet-4-5",
     ) -> None:
@@ -505,6 +542,8 @@ class ClaudeBlueprintEngine:
         self.prompt_id = prompt_id
         self.stage_id = stage_id
         self.agent_id = agent_id
+        self.routing_policy_id = routing_policy_id
+        self.routing_policy_version = routing_policy_version
         self.expected_provider_id = expected_provider_id
         self.expected_model_id = expected_model_id
 
@@ -534,12 +573,47 @@ class ClaudeBlueprintEngine:
             expected_output_type=DEFAULT_OUTPUT_TYPE,
         )
         response = self.provider.generate(package)
-        provider_id = str(response.metadata.get("provider_id") if response.metadata else self.expected_provider_id)
-        model_id = str(response.metadata.get("model_id") if response.metadata else self.expected_model_id)
-        if provider_id != self.expected_provider_id:
-            provider_id = self.expected_provider_id
-        if model_id != self.expected_model_id:
-            model_id = self.expected_model_id
+        response_metadata = dict(response.metadata or {})
+        routing_metadata = response_metadata.get("routing")
+        if routing_metadata is not None and not isinstance(routing_metadata, Mapping):
+            raise BlueprintRoutingMismatchError(
+                "blueprint routing metadata must be an object when provided"
+            )
+        requested_provider_id = self.expected_provider_id
+        requested_model_id = self.expected_model_id
+        requested_routing_policy_id = self.routing_policy_id
+        requested_routing_policy_version = self.routing_policy_version
+        if isinstance(routing_metadata, Mapping):
+            requested_provider_id = str(
+                routing_metadata.get("provider_id") or requested_provider_id
+            ).strip()
+            requested_model_id = str(
+                routing_metadata.get("model_id") or requested_model_id
+            ).strip()
+            requested_routing_policy_id = str(
+                routing_metadata.get("policy_id") or requested_routing_policy_id
+            ).strip()
+            requested_routing_policy_version = str(
+                routing_metadata.get("policy_version") or requested_routing_policy_version
+            ).strip()
+        provider_id = str(response_metadata.get("provider_id", "")).strip()
+        model_id = str(response_metadata.get("model_id", "")).strip()
+        if not provider_id or not model_id:
+            raise BlueprintRoutingMismatchError(
+                "blueprint provider response did not include provider/model metadata"
+            )
+        if (
+            requested_routing_policy_id == "claude_only"
+            and (
+                provider_id != self.expected_provider_id
+                or model_id != self.expected_model_id
+            )
+        ):
+            raise BlueprintRoutingMismatchError(
+                "blueprint routing policy resolved to "
+                f"{provider_id}/{model_id} but Claude-only execution requires "
+                f"{self.expected_provider_id}/{self.expected_model_id}"
+            )
         return BlueprintEngineResponse(
             raw_response=response.content,
             provider_id=provider_id,
@@ -547,7 +621,11 @@ class ClaudeBlueprintEngine:
             prompt_id=prompt.prompt_id,
             prompt_version=prompt.version,
             prompt_checksum=prompt.checksum,
-            provider_metadata=dict(response.metadata or {}),
+            requested_provider_id=requested_provider_id,
+            requested_model_id=requested_model_id,
+            routing_policy_id=requested_routing_policy_id,
+            routing_policy_version=requested_routing_policy_version,
+            provider_metadata=response_metadata,
         )
 
     def _context(self, request: BlueprintRequest, prompt: PromptVersion) -> dict[str, Any]:
@@ -580,6 +658,10 @@ class ClaudeBlueprintEngine:
 
 
 class BlueprintBlockedError(RuntimeError):
+    pass
+
+
+class BlueprintRoutingMismatchError(BlueprintBlockedError):
     pass
 
 
@@ -646,6 +728,7 @@ class BlueprintOrchestrator:
         engine: BlueprintEngine,
         store: FileBlueprintStore | None = None,
         prompt_source_path: str | Path = DEFAULT_PROMPT_SOURCE,
+        supporting_instruction_source_paths: tuple[str | Path, ...] = DEFAULT_PROMPT_SUPPORTING_SOURCES,
         prompt_id: str = DEFAULT_PROMPT_ID,
     ) -> None:
         self.artifact_catalog = artifact_catalog
@@ -653,7 +736,21 @@ class BlueprintOrchestrator:
         self.engine = engine
         self.store = store or FileBlueprintStore(Path(self.artifact_catalog.root).parent / "blueprints")
         self.prompt_source_path = Path(prompt_source_path)
+        self.supporting_instruction_source_paths = tuple(
+            Path(path) for path in supporting_instruction_source_paths
+        )
         self.prompt_id = prompt_id
+
+    def for_runtime(self, runtime: Any) -> "BlueprintOrchestrator":
+        return BlueprintOrchestrator(
+            artifact_catalog=runtime.artifact_catalog,
+            prompt_registry=runtime.prompt_registry,
+            engine=self.engine,
+            store=FileBlueprintStore(Path(runtime.artifact_catalog.root).parent / "blueprints"),
+            prompt_source_path=self.prompt_source_path,
+            supporting_instruction_source_paths=self.supporting_instruction_source_paths,
+            prompt_id=self.prompt_id,
+        )
 
     def generate(self, request: BlueprintRequest) -> BlueprintVersionRecord:
         self._validate_request(request)
@@ -673,6 +770,10 @@ class BlueprintOrchestrator:
                 "prompt_checksum": prompt.checksum,
                 "provider_id": response.provider_id,
                 "model_id": response.model_id,
+                "requested_provider_id": response.requested_provider_id,
+                "requested_model_id": response.requested_model_id,
+                "routing_policy_id": response.routing_policy_id,
+                "routing_policy_version": response.routing_policy_version,
                 "request_id": request.request_id,
             },
         )
@@ -689,6 +790,10 @@ class BlueprintOrchestrator:
                 "prompt_checksum": prompt.checksum,
                 "provider_id": response.provider_id,
                 "model_id": response.model_id,
+                "requested_provider_id": response.requested_provider_id,
+                "requested_model_id": response.requested_model_id,
+                "routing_policy_id": response.routing_policy_id,
+                "routing_policy_version": response.routing_policy_version,
                 "request_id": request.request_id,
             },
         )
@@ -707,6 +812,10 @@ class BlueprintOrchestrator:
             prompt_checksum=prompt.checksum,
             provider_id=response.provider_id,
             model_id=response.model_id,
+            requested_provider_id=response.requested_provider_id,
+            requested_model_id=response.requested_model_id,
+            routing_policy_id=response.routing_policy_id,
+            routing_policy_version=response.routing_policy_version,
             structured_blueprint=structured_blueprint,
             raw_response_artifact=raw_artifact,
             structured_artifact=structured_artifact,
@@ -752,20 +861,40 @@ class BlueprintOrchestrator:
         if not self.prompt_source_path.is_file():
             raise BlueprintBlockedError(f"Blueprint prompt source not found: {self.prompt_source_path}")
         content = self.prompt_source_path.read_text(encoding="utf-8")
+        metadata = self._prompt_metadata(content)
         history = self.prompt_registry.history(self.prompt_id)
-        if history and history[-1].content == content:
+        if history and history[-1].content == content and history[-1].metadata == metadata:
             prompt = history[-1]
         else:
             prompt = self.prompt_registry.publish(
                 self.prompt_id,
                 content,
-                metadata={
-                    "source_path": str(self.prompt_source_path),
-                    "purpose": "claude_blueprint_orchestration",
-                },
+                metadata=metadata,
             )
         self.prompt_registry.activate(self.prompt_id, prompt.version)
         return prompt
+
+    def _prompt_metadata(self, content: str) -> dict[str, Any]:
+        supporting_sources = []
+        for source_path in self.supporting_instruction_source_paths:
+            if not source_path.is_file():
+                raise BlueprintBlockedError(
+                    f"Blueprint supporting instruction source not found: {source_path}"
+                )
+            source_content = source_path.read_text(encoding="utf-8")
+            supporting_sources.append(
+                {
+                    "source_path": str(source_path),
+                    "source_checksum": sha256_hex(source_content),
+                }
+            )
+        return {
+            "source_path": str(self.prompt_source_path),
+            "source_checksum": sha256_hex(content),
+            "purpose": "claude_blueprint_orchestration",
+            "output_template_path": str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
+            "supporting_instruction_sources": supporting_sources,
+        }
 
     def _structure_response(
         self,
@@ -888,6 +1017,10 @@ class BlueprintOrchestrator:
             ("prompt_checksum", previous.prompt_checksum, prompt.checksum, "Prompt content changed."),
             ("provider_id", previous.provider_id, response.provider_id, "Provider changed."),
             ("model_id", previous.model_id, response.model_id, "Model changed."),
+            ("requested_provider_id", previous.requested_provider_id, response.requested_provider_id, "Requested provider changed."),
+            ("requested_model_id", previous.requested_model_id, response.requested_model_id, "Requested model changed."),
+            ("routing_policy_id", previous.routing_policy_id, response.routing_policy_id, "Routing policy changed."),
+            ("routing_policy_version", previous.routing_policy_version, response.routing_policy_version, "Routing policy version changed."),
             ("status", previous.status, structured_blueprint.status, "Validation status changed."),
             ("outline_hash", previous.structured_blueprint.outline_hash, structured_blueprint.outline_hash, "Blueprint outline changed."),
             ("raw_response_checksum", previous.raw_response_artifact.artifact.checksum, raw_artifact.artifact.checksum, "Raw response changed."),

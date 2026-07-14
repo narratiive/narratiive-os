@@ -5,6 +5,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from runtime.command_api import CommandError, WorkspaceCommandAPI
+from runtime.blueprint_orchestrator import BlueprintOrchestrator, FakeBlueprintEngine
 from runtime.composition import compose_local_runtime
 from runtime.definitions import load_workflow_definition
 from runtime.execution_package import ExecutionPackageBuilder
@@ -231,6 +232,36 @@ class MultiClientWorkspaceTests(unittest.TestCase):
             foreign_client.exception.code,
             "cross_workspace_reference",
         )
+
+    def test_workspace_blueprint_requests_reject_cross_workspace_nested_payload(self):
+        legacy = compose_local_runtime(self.runtime_root, REPOSITORY_ROOT)
+        orchestrator = BlueprintOrchestrator(
+            artifact_catalog=legacy.artifact_catalog,
+            prompt_registry=legacy.prompt_registry,
+            engine=FakeBlueprintEngine(
+                "# RAVE Blueprint\n\n## Slide 1 — Draft\n\nThis draft never cites evidence.",
+                provider_id="router-provider",
+                model_id="blueprint-model-v1",
+            ),
+            prompt_source_path=REPOSITORY_ROOT / "agents" / "strategy_director.md",
+            supporting_instruction_source_paths=(
+                REPOSITORY_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+            ),
+        )
+        api = WorkspaceCommandAPI(legacy, self.manager, blueprint_orchestrator=orchestrator)
+
+        with self.assertRaises(CommandError) as error:
+            api.handle(
+                {
+                    "command": "blueprints.generate",
+                    "workspace_id": "rave",
+                    "request": {
+                        "workspace_id": "maeving",
+                        "client_id": "maeving",
+                    },
+                }
+            )
+        self.assertEqual(error.exception.code, "cross_workspace_reference")
 
     def test_legacy_unscoped_data_migrates_without_deleting_source(self):
         legacy = compose_local_runtime(self.runtime_root, REPOSITORY_ROOT)

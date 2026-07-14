@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import tempfile
@@ -50,11 +51,14 @@ class CommandAPITests(unittest.TestCase):
             prompt_registry=self.runtime.prompt_registry,
             engine=FakeBlueprintEngine(
                 BLUEPRINT_FIXTURE.read_text(encoding="utf-8"),
-                provider_id="anthropic",
-                model_id="claude-sonnet-4-5",
+                provider_id="router-provider",
+                model_id="blueprint-model-v1",
             ),
             store=self.blueprint_store,
-            prompt_source_path=REPO_ROOT / "templates" / "Growth_Blueprint.md",
+            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
+            supporting_instruction_source_paths=(
+                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
+            ),
         )
 
     def tearDown(self):
@@ -239,8 +243,35 @@ class CommandAPITests(unittest.TestCase):
         self.assertEqual(result["data"]["status"], "complete")
         self.assertEqual(result["data"]["prompt_version"], 1)
         self.assertEqual(result["data"]["structured_blueprint"]["document_title"], "RAVE Blueprint")
+        prompt = self.runtime.prompt_registry.active("claude-growth-blueprint")
+        strategy_director_text = (REPO_ROOT / "agents" / "strategy_director.md").read_text(encoding="utf-8")
+        pipeline_text = (REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md").read_text(encoding="utf-8")
+        self.assertEqual(
+            prompt.metadata["source_path"],
+            str(REPO_ROOT / "agents" / "strategy_director.md"),
+        )
+        self.assertEqual(
+            prompt.content,
+            strategy_director_text,
+        )
+        self.assertEqual(
+            prompt.checksum,
+            hashlib.sha256(strategy_director_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["output_template_path"],
+            str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][0]["source_path"],
+            str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][0]["source_checksum"],
+            hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
+        )
         self.assertIn(
-            "Slide 1 — The Category Signal",
+            "Act I — Thesis and Commercial Question",
             [section["heading"] for section in result["data"]["structured_blueprint"]["sections"]],
         )
 
