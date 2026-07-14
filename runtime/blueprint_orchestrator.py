@@ -845,6 +845,7 @@ class BlueprintOrchestrator:
             requested_model_id=response.requested_model_id,
             routing_policy_id=response.routing_policy_id,
             routing_policy_version=response.routing_policy_version,
+            canon_bundle=bundle,
             structured_blueprint=structured_blueprint,
             raw_response_artifact=raw_artifact,
             structured_artifact=structured_artifact,
@@ -924,6 +925,12 @@ class BlueprintOrchestrator:
             "source_modified_at": prompt_asset.source_modified_at,
             "source_checksum": prompt_asset.checksum,
             "purpose": "claude_blueprint_orchestration",
+            "prompt_asset": {
+                **prompt_asset.to_dict(),
+                "source_path": str(prompt_asset.path(self.knowledge_registry.root)),
+                "source_checksum": prompt_asset.checksum,
+            },
+            "bundle": bundle.to_dict(),
             "canon_bundle": bundle.to_dict(),
             "supporting_instruction_sources": supporting_sources,
         }
@@ -957,7 +964,8 @@ class BlueprintOrchestrator:
                     location="raw_response",
                 )
             )
-        if len(schema.acts) != len(sections):
+        response_sections = display_sections if display_sections else sections
+        if len(schema.acts) != len(response_sections):
             findings.append(
                 BlueprintValidationFinding(
                     code="schema_act_count_mismatch",
@@ -966,13 +974,13 @@ class BlueprintOrchestrator:
                     location="raw_response",
                     details={
                         "expected_acts": len(schema.acts),
-                        "observed_acts": len(sections),
+                        "observed_acts": len(response_sections),
                     },
                 )
             )
         flattened_slides = tuple(
             slide
-            for act in sections
+            for act in response_sections
             for slide in act.children
         )
         if len(flattened_slides) != len(schema.slides):

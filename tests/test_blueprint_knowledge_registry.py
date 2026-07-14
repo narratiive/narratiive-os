@@ -54,8 +54,9 @@ class BlueprintKnowledgeRegistryTests(unittest.TestCase):
         visual_intelligence = registry.asset("visual_intelligence_system_v1").read_text()
         self.assertIn("# NARRATIIVE BLUEPRINT POPULATION SYSTEM", population)
         self.assertIn("The architecture never changes.", population)
-        self.assertIn("## AUDIENCE TENSIONS / DECISION CONTEXT", population)
-        self.assertIn("The objective is to change the way the client thinks.", population)
+        self.assertIn("## WHY IS GROWTH HARDER THAN IT APPEARS?", population)
+        self.assertIn("## FINAL STRATEGIC PRINCIPLE", population)
+        self.assertIn("The statement should be memorable enough to be repeated internally.", population)
         self.assertIn("V3.1 UPDATE (RAVE REVIEW LEARNINGS)", schema_text)
         self.assertIn("Source of truth: 02 Growth Blueprint System + Narratiive Growth Blueprint 30-slide structure + Blueprint Population System + Master Context + Founder Brief + Scoring System + Founder-Grade Upgrade Rules.", schema_text)
         self.assertIn("SLIDE 01 — COVER", schema_text)
@@ -85,7 +86,8 @@ class BlueprintKnowledgeRegistryTests(unittest.TestCase):
                 else:
                     shutil.copy2(path, destination)
 
-            manifest_path = blueprint_root / "manifest.json"
+            manifest_path = root / "manifest.json"
+            shutil.copy2(BLUEPRINT_ROOT / "manifest.json", manifest_path)
             manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
             manifest["assets"][0]["checksum"] = "tampered"
             manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
