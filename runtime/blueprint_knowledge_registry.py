@@ -458,7 +458,110 @@ class BlueprintKnowledgeRegistry:
         return bundle
 
 
-def _load_schema(text: str, repository_path: str) -> BlueprintSchemaV3:
+_SCHEMA_ACT_RE = re.compile(r"^(?P<range>\d+-\d+)\s+Act\s+(?P<act_no>\d+)\s+[—-]\s+(?P<title>.+)$")
+_SCHEMA_SLIDE_HEADER_RE = re.compile(r"^SLIDE\s+(?P<slide_no>\d+)\s+[—-]\s+(?P<slide_name>.+)$")
+_SCHEMA_FIELD_RE = re.compile(r'^\s*"?(?P<field>[A-Za-z0-9_ ]+)"?\s*:\s*(?P<value>.+?)(?:,\s*)?$')
+
+
+def _parse_schema_value(value: str) -> Any:
+    cleaned = value.strip()
+    if cleaned.endswith(","):
+        cleaned = cleaned[:-1].rstrip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        if cleaned.startswith('"') and cleaned.endswith('"'):
+            return cleaned[1:-1]
+        return cleaned
+
+
+def _load_schema_literal(text: str, repository_path: str) -> BlueprintSchemaV3:
+    acts: list[str] = []
+    slides: list[BlueprintSchemaSlide] = []
+    current_slide: dict[str, Any] | None = None
+    collecting_object = False
+
+    def finish_slide() -> None:
+        nonlocal current_slide
+        if not current_slide:
+            return
+        slides.append(
+            BlueprintSchemaSlide(
+                slide_no=int(current_slide["slide_no"]),
+                slide_name=str(current_slide.get("slide_name", "")).strip(),
+                act=str(current_slide.get("act", "")).strip(),
+                purpose=str(current_slide.get("purpose", "")).strip(),
+                visual_type=str(current_slide.get("visual_type", "")).strip(),
+                layout_type=str(current_slide.get("layout_type", "")).strip(),
+                content_requirements=tuple(current_slide.get("content_requirements", ())),
+                inputs=tuple(current_slide.get("inputs", ())),
+                outputs=tuple(current_slide.get("outputs", ())),
+                so_what_test=str(current_slide.get("so_what_test", "")).strip(),
+            )
+        )
+        current_slide = None
+
+    for raw_line in text.splitlines():
+        line = raw_line.rstrip()
+        act_match = _SCHEMA_ACT_RE.match(line)
+        if act_match:
+            acts.append(f"Act {act_match.group('act_no')} — {act_match.group('title').strip()}")
+            continue
+
+        slide_header = _SCHEMA_SLIDE_HEADER_RE.match(line)
+        if slide_header:
+            finish_slide()
+            current_slide = {
+                "slide_no": int(slide_header.group("slide_no")),
+                "slide_name": slide_header.group("slide_name").strip(),
+                "content_requirements": [],
+                "inputs": [],
+                "outputs": [],
+            }
+            collecting_object = False
+            continue
+
+        if current_slide is None:
+            continue
+
+        stripped = line.strip()
+        if stripped == "{":
+            collecting_object = True
+            continue
+        if stripped == "}":
+            finish_slide()
+            collecting_object = False
+            continue
+        if not collecting_object or not stripped:
+            continue
+
+        field_match = _SCHEMA_FIELD_RE.match(line)
+        if not field_match:
+            continue
+        field = field_match.group("field").strip().lower().replace(" ", "_")
+        value = _parse_schema_value(field_match.group("value"))
+        if field in {"content_requirements", "inputs", "outputs"}:
+            if not isinstance(value, list):
+                raise ValueError(f"schema field {field} must be a list")
+            current_slide.setdefault(field, []).extend(str(item) for item in value)
+        elif field in {"slide_no"}:
+            current_slide[field] = int(value)
+        else:
+            current_slide[field] = value
+
+    finish_slide()
+    if len(acts) != 6:
+        raise ValueError(f"Blueprint schema must define 6 acts, found {len(acts)}")
+    if len(slides) != 30:
+        raise ValueError(f"Blueprint schema must define 30 slides, found {len(slides)}")
+    return BlueprintSchemaV3(
+        source_path=repository_path,
+        acts=tuple(dict.fromkeys(acts)),
+        slides=tuple(sorted(slides, key=lambda item: item.slide_no)),
+    )
+
+
+def _load_schema_legacy(text: str, repository_path: str) -> BlueprintSchemaV3:
     act_re = re.compile(r"^##\s+Act\s+\d+\s+—\s+(.+)\s*$")
     slide_re = re.compile(r"^###\s+Slide\s+(\d+)\s+—\s+(.+)\s*$")
     field_re = re.compile(r"^\s*-\s*([^:]+):\s*(.*\S)\s*$")
@@ -528,3 +631,9 @@ def _load_schema(text: str, repository_path: str) -> BlueprintSchemaV3:
         acts=tuple(dict.fromkeys(acts)),
         slides=tuple(sorted(slides, key=lambda item: item.slide_no)),
     )
+
+
+def _load_schema(text: str, repository_path: str) -> BlueprintSchemaV3:
+    if "SLIDE 01 — COVER" in text and '"slide_no": 1' in text:
+        return _load_schema_literal(text, repository_path)
+    return _load_schema_legacy(text, repository_path)

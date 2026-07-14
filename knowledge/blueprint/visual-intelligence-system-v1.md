@@ -1,5 +1,4 @@
 NARRATIIVE VISUAL INTELLIGENCE SYSTEM v1
-
 PURPOSE
 The purpose of this document is to ensure that every Narratiive Blueprint feels like the work of a senior strategist and a creative director working together.
 Most strategy decks fail because they communicate insight through text.

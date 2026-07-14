@@ -3,7 +3,7 @@
   "assets": [
     {
       "asset_id": "blueprint_population_system",
-      "checksum": "1bab31820bf7746b213e47da89ec2ca0576f4f2fb324e29ea4391faf8df31db4",
+      "checksum": "5c8a2a28d2ee4de02318b9c2e85005dd0cdca13284baad0bfc3417809319b032",
       "drive_document_id": "1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE",
       "drive_url": "https://docs.google.com/document/d/1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE/edit",
       "owner": "Narratiive",
@@ -15,7 +15,7 @@
     },
     {
       "asset_id": "blueprint_schema_v3",
-      "checksum": "b7f6b4416d0cc83f2fa19ed6afbe59b535386edbc50e8164abe653fab41d5921",
+      "checksum": "c0180f431361671fc024b26f157746ca760a0add132dc46084e5370bb29839c8",
       "drive_document_id": "18j_yOeNN6I8fNyBmDKYN8uP9GO--b4cdlgUXH6CiCRQ",
       "drive_url": "https://docs.google.com/document/d/18j_yOeNN6I8fNyBmDKYN8uP9GO--b4cdlgUXH6CiCRQ/edit",
       "owner": "Narratiive",
@@ -27,7 +27,7 @@
     },
     {
       "asset_id": "visual_framework_library_v1",
-      "checksum": "db8c4a157021b371f1a76ccb7ab6ca98f756a057625347e977a7a1ecaa2cc90c",
+      "checksum": "e89ea7a645580d75af51c96ad6905a707e0207e828715fdd46a3b5e90e5dfad1",
       "drive_document_id": "1W3U_4XJNGdh5ijJ_FFDHj9PAK7pZbAhv8-DgK95okYs",
       "drive_url": "https://docs.google.com/document/d/1W3U_4XJNGdh5ijJ_FFDHj9PAK7pZbAhv8-DgK95okYs/edit",
       "owner": "Narratiive",
@@ -39,7 +39,7 @@
     },
     {
       "asset_id": "visual_intelligence_system_v1",
-      "checksum": "595ee26402262e89e8e9f7a5f6b7a6e9df077a390d55d99172cb48c3c1c5ad6c",
+      "checksum": "2980693684b75d6055425ca979c724d5560c0b6598278ab0a211fdc2ca21fc16",
       "drive_document_id": "1dEwxMtXOQJZToviRsYcCSStJfM-P25uUUZrx9Z50Y2A",
       "drive_url": "https://docs.google.com/document/d/1dEwxMtXOQJZToviRsYcCSStJfM-P25uUUZrx9Z50Y2A/edit",
       "owner": "Narratiive",
@@ -54,7 +54,7 @@
     {
       "bundle_id": "blueprint-canon-v1",
       "canon_version": "1.0.0",
-      "checksum": "046fe3f02c18a66e6c6d51f914d1e3f1e46756c4ae200ed26fe720f805888323",
+      "checksum": "9eb29736cd8a25991a02ab3eda909aab1e278de0305a2c352b92cced6dfbdc95",
       "compatibility_notes": [
         "Immutable production canon imported from Google Drive.",
         "Treat the source documents as read-only production IP."
@@ -62,25 +62,25 @@
       "components": [
         {
           "asset_id": "blueprint_population_system",
-          "checksum": "1bab31820bf7746b213e47da89ec2ca0576f4f2fb324e29ea4391faf8df31db4",
+          "checksum": "5c8a2a28d2ee4de02318b9c2e85005dd0cdca13284baad0bfc3417809319b032",
           "repository_path": "knowledge/blueprint/population-system.md",
           "version": "1.0.0"
         },
         {
           "asset_id": "blueprint_schema_v3",
-          "checksum": "b7f6b4416d0cc83f2fa19ed6afbe59b535386edbc50e8164abe653fab41d5921",
+          "checksum": "c0180f431361671fc024b26f157746ca760a0add132dc46084e5370bb29839c8",
           "repository_path": "knowledge/blueprint/blueprint-schema-v3.md",
           "version": "3.0.0"
         },
         {
           "asset_id": "visual_framework_library_v1",
-          "checksum": "db8c4a157021b371f1a76ccb7ab6ca98f756a057625347e977a7a1ecaa2cc90c",
+          "checksum": "e89ea7a645580d75af51c96ad6905a707e0207e828715fdd46a3b5e90e5dfad1",
           "repository_path": "knowledge/blueprint/visual-framework-library-v1.md",
           "version": "1.0.0"
         },
         {
           "asset_id": "visual_intelligence_system_v1",
-          "checksum": "595ee26402262e89e8e9f7a5f6b7a6e9df077a390d55d99172cb48c3c1c5ad6c",
+          "checksum": "2980693684b75d6055425ca979c724d5560c0b6598278ab0a211fdc2ca21fc16",
           "repository_path": "knowledge/blueprint/visual-intelligence-system-v1.md",
           "version": "1.0.0"
         }
