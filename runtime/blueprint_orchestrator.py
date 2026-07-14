@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping, Protocol, runtime_checkable
+from typing import Any, Mapping, Protocol, Sequence, runtime_checkable
 
 from .artifact_catalog import ArtifactRecord, FileArtifactCatalog
 from .execution_package import ExecutionPackage
@@ -14,6 +15,8 @@ from .blueprint_knowledge_registry import (
     BlueprintCanonBundle,
     BlueprintCanonBundleComponent,
     BlueprintKnowledgeRegistry,
+    BlueprintSchemaSlide,
+    BlueprintSchemaV3,
 )
 from .prompt_registry import FilePromptRegistry, PromptVersion
 from .provider import ProviderClient
@@ -222,8 +225,8 @@ class BlueprintValidationFinding:
     def __post_init__(self) -> None:
         _safe_identifier(self.code, "code")
         severity = str(self.severity).strip().lower()
-        if severity not in {"info", "warning", "error"}:
-            raise ValueError("severity must be info, warning, or error")
+        if severity not in {"info", "warning", "error", "blocking"}:
+            raise ValueError("severity must be info, warning, error, or blocking")
         object.__setattr__(self, "severity", severity)
         object.__setattr__(
             self,
@@ -248,6 +251,366 @@ class BlueprintValidationFinding:
             "details": dict(self.details),
         }
 
+    @property
+    def is_blocking(self) -> bool:
+        return self.severity == "blocking"
+
+
+ValidationFinding = BlueprintValidationFinding
+
+
+@dataclass(frozen=True, slots=True)
+class EvidenceReference:
+    evidence_id: str
+    source_note: str = ""
+    slide_no: int | None = None
+    slide_name: str = ""
+    claim: str = ""
+    confidence: float = 1.0
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        _safe_identifier(self.evidence_id, "evidence_id")
+        object.__setattr__(self, "source_note", str(self.source_note).strip())
+        object.__setattr__(self, "slide_name", str(self.slide_name).strip())
+        object.__setattr__(self, "claim", str(self.claim).strip())
+        object.__setattr__(self, "confidence", float(self.confidence))
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "evidence_id": self.evidence_id,
+            "source_note": self.source_note,
+            "slide_no": self.slide_no,
+            "slide_name": self.slide_name,
+            "claim": self.claim,
+            "confidence": self.confidence,
+            "extensions": dict(self.extensions),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SourceNote:
+    text: str
+    evidence_ids: tuple[str, ...] = ()
+    evidence_references: tuple[EvidenceReference, ...] = ()
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "text", str(self.text).strip())
+        object.__setattr__(
+            self,
+            "evidence_ids",
+            tuple(dict.fromkeys(str(item).strip() for item in self.evidence_ids if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "evidence_references",
+            tuple(self.evidence_references),
+        )
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "text": self.text,
+            "evidence_ids": list(self.evidence_ids),
+            "evidence_references": [reference.to_dict() for reference in self.evidence_references],
+            "extensions": dict(self.extensions),
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class SlideContent:
+    thesis: tuple[str, ...] = ()
+    founder_insight: tuple[str, ...] = ()
+    so_what: tuple[str, ...] = ()
+    source_notes: tuple[SourceNote, ...] = ()
+    visual_direction: tuple[str, ...] = ()
+    speaker_notes: tuple[str, ...] = ()
+    evidence_references: tuple[EvidenceReference, ...] = ()
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(
+            self,
+            "thesis",
+            tuple(dict.fromkeys(str(item).strip() for item in self.thesis if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "founder_insight",
+            tuple(dict.fromkeys(str(item).strip() for item in self.founder_insight if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "so_what",
+            tuple(dict.fromkeys(str(item).strip() for item in self.so_what if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "source_notes",
+            tuple(self.source_notes),
+        )
+        object.__setattr__(
+            self,
+            "visual_direction",
+            tuple(dict.fromkeys(str(item).strip() for item in self.visual_direction if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "speaker_notes",
+            tuple(dict.fromkeys(str(item).strip() for item in self.speaker_notes if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "evidence_references",
+            tuple(self.evidence_references),
+        )
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "thesis": list(self.thesis),
+            "founder_insight": list(self.founder_insight),
+            "so_what": list(self.so_what),
+            "source_notes": [note.to_dict() for note in self.source_notes],
+            "visual_direction": list(self.visual_direction),
+            "speaker_notes": list(self.speaker_notes),
+            "evidence_references": [reference.to_dict() for reference in self.evidence_references],
+            "extensions": dict(self.extensions),
+        }
+
+    def to_legacy_sections(self) -> tuple["BlueprintSection", ...]:
+        sections: list[BlueprintSection] = []
+        if self.thesis:
+            sections.append(BlueprintSection("Thesis", 4, "\n".join(self.thesis), ()))
+        if self.founder_insight:
+            sections.append(BlueprintSection("Founder Insight", 4, "\n".join(self.founder_insight), ()))
+        if self.so_what:
+            sections.append(BlueprintSection("So What", 4, "\n".join(self.so_what), ()))
+        if self.source_notes:
+            sections.append(
+                BlueprintSection(
+                    "Source Notes",
+                    4,
+                    "\n".join(
+                        f"- {note.text}" if not note.text.startswith("-") else note.text
+                        for note in self.source_notes
+                    ),
+                    (),
+                )
+            )
+        if self.visual_direction:
+            sections.append(
+                BlueprintSection("Visual / Layout Direction", 4, "\n".join(self.visual_direction), ())
+            )
+        if self.speaker_notes:
+            sections.append(BlueprintSection("Speaker Notes", 4, "\n".join(self.speaker_notes), ()))
+        for heading, value in self.extensions.items():
+            sections.append(_extension_to_section(heading, value))
+        return tuple(sections)
+
+
+@dataclass(frozen=True, slots=True)
+class BlueprintSlide:
+    slide_no: int
+    slide_name: str
+    act: str
+    purpose: str
+    visual_type: str
+    layout_type: str
+    content_requirements: tuple[str, ...]
+    inputs: tuple[str, ...]
+    outputs: tuple[str, ...]
+    so_what_test: str
+    content: SlideContent = field(default_factory=SlideContent)
+    confidence: float = 1.0
+    validation_findings: tuple[BlueprintValidationFinding, ...] = ()
+    source_slide_name: str = ""
+    source_act_name: str = ""
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.slide_no <= 0:
+            raise ValueError("slide_no must be positive")
+        object.__setattr__(self, "slide_name", str(self.slide_name).strip())
+        object.__setattr__(self, "act", str(self.act).strip())
+        object.__setattr__(self, "purpose", str(self.purpose).strip())
+        object.__setattr__(self, "visual_type", str(self.visual_type).strip())
+        object.__setattr__(self, "layout_type", str(self.layout_type).strip())
+        object.__setattr__(
+            self,
+            "content_requirements",
+            tuple(dict.fromkeys(str(item).strip() for item in self.content_requirements if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "inputs",
+            tuple(dict.fromkeys(str(item).strip() for item in self.inputs if str(item).strip())),
+        )
+        object.__setattr__(
+            self,
+            "outputs",
+            tuple(dict.fromkeys(str(item).strip() for item in self.outputs if str(item).strip())),
+        )
+        object.__setattr__(self, "so_what_test", str(self.so_what_test).strip())
+        object.__setattr__(self, "content", self.content)
+        object.__setattr__(self, "validation_findings", tuple(self.validation_findings))
+        object.__setattr__(self, "source_slide_name", str(self.source_slide_name).strip())
+        object.__setattr__(self, "source_act_name", str(self.source_act_name).strip())
+        object.__setattr__(self, "confidence", float(self.confidence))
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    @property
+    def heading(self) -> str:
+        return f"Slide {self.slide_no} — {self.slide_name}"
+
+    @property
+    def children(self) -> tuple[BlueprintSection, ...]:
+        return self.content.to_legacy_sections()
+
+    @property
+    def founder_insight(self) -> tuple[str, ...]:
+        return self.content.founder_insight
+
+    @property
+    def so_what(self) -> tuple[str, ...]:
+        return self.content.so_what
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "slide_no": self.slide_no,
+            "slide_name": self.slide_name,
+            "act": self.act,
+            "purpose": self.purpose,
+            "visual_type": self.visual_type,
+            "layout_type": self.layout_type,
+            "content_requirements": list(self.content_requirements),
+            "inputs": list(self.inputs),
+            "outputs": list(self.outputs),
+            "so_what_test": self.so_what_test,
+            "content": self.content.to_dict(),
+            "confidence": self.confidence,
+            "validation_findings": [finding.to_dict() for finding in self.validation_findings],
+            "source_slide_name": self.source_slide_name,
+            "source_act_name": self.source_act_name,
+            "extensions": dict(self.extensions),
+        }
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return {
+            "heading": self.source_slide_name or self.heading,
+            "level": 3,
+            "body": "",
+            "children": [section.to_dict() for section in self.children],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BlueprintAct:
+    act_no: int
+    act_name: str
+    slides: tuple[BlueprintSlide, ...]
+    confidence: float = 1.0
+    validation_findings: tuple[BlueprintValidationFinding, ...] = ()
+    source_act_name: str = ""
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.act_no <= 0:
+            raise ValueError("act_no must be positive")
+        object.__setattr__(self, "act_name", str(self.act_name).strip())
+        object.__setattr__(self, "slides", tuple(self.slides))
+        object.__setattr__(self, "validation_findings", tuple(self.validation_findings))
+        object.__setattr__(self, "source_act_name", str(self.source_act_name).strip())
+        object.__setattr__(self, "confidence", float(self.confidence))
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    @property
+    def heading(self) -> str:
+        return self.act_name
+
+    @property
+    def children(self) -> tuple[BlueprintSlide, ...]:
+        return self.slides
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "act_no": self.act_no,
+            "act_name": self.act_name,
+            "slides": [slide.to_dict() for slide in self.slides],
+            "confidence": self.confidence,
+            "validation_findings": [finding.to_dict() for finding in self.validation_findings],
+            "source_act_name": self.source_act_name,
+            "extensions": dict(self.extensions),
+        }
+
+    def to_legacy_dict(self) -> dict[str, Any]:
+        return {
+            "heading": self.source_act_name or self.heading,
+            "level": 2,
+            "body": "",
+            "children": [slide.to_legacy_dict() for slide in self.slides],
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class BlueprintLineage:
+    canon_bundle: BlueprintCanonBundle
+    prompt_id: str
+    prompt_version: int
+    prompt_checksum: str
+    provider_id: str
+    model_id: str
+    requested_provider_id: str
+    requested_model_id: str
+    routing_policy_id: str
+    routing_policy_version: str
+    evidence_pack_ids: tuple[str, ...]
+    raw_response_artifact: ArtifactRecord
+    structured_artifact: ArtifactRecord | None = None
+    artifact_lineage: tuple[str, ...] = ()
+    extensions: dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "prompt_id", str(self.prompt_id).strip())
+        object.__setattr__(self, "prompt_version", int(self.prompt_version))
+        object.__setattr__(self, "prompt_checksum", str(self.prompt_checksum).strip())
+        object.__setattr__(self, "provider_id", str(self.provider_id).strip())
+        object.__setattr__(self, "model_id", str(self.model_id).strip())
+        object.__setattr__(self, "requested_provider_id", str(self.requested_provider_id).strip())
+        object.__setattr__(self, "requested_model_id", str(self.requested_model_id).strip())
+        object.__setattr__(self, "routing_policy_id", str(self.routing_policy_id).strip())
+        object.__setattr__(self, "routing_policy_version", str(self.routing_policy_version).strip())
+        object.__setattr__(
+            self,
+            "evidence_pack_ids",
+            tuple(dict.fromkeys(str(item).strip() for item in self.evidence_pack_ids if str(item).strip())),
+        )
+        object.__setattr__(self, "artifact_lineage", tuple(dict.fromkeys(self.artifact_lineage)))
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    def to_dict(self) -> dict[str, Any]:
+        data = {
+            "canon_bundle": self.canon_bundle.to_dict(),
+            "prompt_id": self.prompt_id,
+            "prompt_version": self.prompt_version,
+            "prompt_checksum": self.prompt_checksum,
+            "provider_id": self.provider_id,
+            "model_id": self.model_id,
+            "requested_provider_id": self.requested_provider_id,
+            "requested_model_id": self.requested_model_id,
+            "routing_policy_id": self.routing_policy_id,
+            "routing_policy_version": self.routing_policy_version,
+            "evidence_pack_ids": list(self.evidence_pack_ids),
+            "raw_response_artifact": self.raw_response_artifact.to_dict(),
+            "artifact_lineage": list(self.artifact_lineage),
+            "extensions": dict(self.extensions),
+        }
+        if self.structured_artifact is not None:
+            data["structured_artifact"] = self.structured_artifact.to_dict()
+        return data
+
 
 @dataclass(frozen=True, slots=True)
 class BlueprintChangeSummary:
@@ -271,20 +634,26 @@ class BlueprintChangeSummary:
 @dataclass(frozen=True, slots=True)
 class StructuredBlueprint:
     blueprint_id: str
+    blueprint_version: int
     request_id: str
     workspace_id: str
     client_id: str
     document_title: str
     raw_response: str
-    sections: tuple[BlueprintSection, ...]
+    acts: tuple[BlueprintAct, ...]
+    lineage: BlueprintLineage
     validation_findings: tuple[BlueprintValidationFinding, ...]
     outline_hash: str
     evidence_ids: tuple[str, ...]
     status: str
+    confidence: float = 1.0
     created_at: str = field(default_factory=utc_now)
+    extensions: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         _safe_identifier(self.blueprint_id, "blueprint_id")
+        if self.blueprint_version <= 0:
+            raise ValueError("blueprint_version must be positive")
         _safe_identifier(self.request_id, "request_id")
         _safe_identifier(self.workspace_id, "workspace_id")
         _safe_identifier(self.client_id, "client_id")
@@ -296,22 +665,108 @@ class StructuredBlueprint:
             "evidence_ids",
             tuple(dict.fromkeys(str(item).strip() for item in self.evidence_ids if str(item).strip())),
         )
+        object.__setattr__(self, "acts", tuple(self.acts))
+        object.__setattr__(self, "lineage", self.lineage)
+        object.__setattr__(self, "validation_findings", tuple(self.validation_findings))
+        object.__setattr__(self, "confidence", float(self.confidence))
+        object.__setattr__(self, "extensions", dict(self.extensions or {}))
+
+    @property
+    def sections(self) -> tuple[BlueprintAct, ...]:
+        return self.acts
+
+    @property
+    def slides(self) -> tuple[BlueprintSlide, ...]:
+        return tuple(slide for act in self.acts for slide in act.slides)
+
+    @property
+    def canon_bundle(self) -> BlueprintCanonBundle:
+        return self.lineage.canon_bundle
+
+    @property
+    def prompt_id(self) -> str:
+        return self.lineage.prompt_id
+
+    @property
+    def prompt_version(self) -> int:
+        return self.lineage.prompt_version
+
+    @property
+    def prompt_checksum(self) -> str:
+        return self.lineage.prompt_checksum
+
+    @property
+    def provider_id(self) -> str:
+        return self.lineage.provider_id
+
+    @property
+    def model_id(self) -> str:
+        return self.lineage.model_id
+
+    @property
+    def requested_provider_id(self) -> str:
+        return self.lineage.requested_provider_id
+
+    @property
+    def requested_model_id(self) -> str:
+        return self.lineage.requested_model_id
+
+    @property
+    def routing_policy_id(self) -> str:
+        return self.lineage.routing_policy_id
+
+    @property
+    def routing_policy_version(self) -> str:
+        return self.lineage.routing_policy_version
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "blueprint_id": self.blueprint_id,
+            "blueprint_version": self.blueprint_version,
             "request_id": self.request_id,
             "workspace_id": self.workspace_id,
             "client_id": self.client_id,
             "document_title": self.document_title,
             "raw_response": self.raw_response,
-            "sections": [section.to_dict() for section in self.sections],
+            "acts": [act.to_dict() for act in self.acts],
+            "sections": [act.to_legacy_dict() for act in self.acts],
+            "slides": [slide.to_dict() for slide in self.slides],
+            "lineage": self.lineage.to_dict(),
             "validation_findings": [finding.to_dict() for finding in self.validation_findings],
             "outline_hash": self.outline_hash,
             "evidence_ids": list(self.evidence_ids),
             "status": self.status,
+            "confidence": self.confidence,
             "created_at": self.created_at,
+            "extensions": dict(self.extensions),
         }
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> "StructuredBlueprint":
+        acts_data = data.get("acts")
+        if acts_data is None:
+            acts_data = data.get("sections") or []
+        acts = _load_acts(acts_data)
+        lineage_data = data.get("lineage") or {}
+        lineage = _load_lineage(lineage_data)
+        return cls(
+            blueprint_id=str(data["blueprint_id"]),
+            blueprint_version=int(data.get("blueprint_version", data.get("version", 1))),
+            request_id=str(data["request_id"]),
+            workspace_id=str(data["workspace_id"]),
+            client_id=str(data["client_id"]),
+            document_title=str(data.get("document_title", "")),
+            raw_response=str(data["raw_response"]),
+            acts=acts,
+            lineage=lineage,
+            validation_findings=_load_findings(data.get("validation_findings") or []),
+            outline_hash=str(data["outline_hash"]),
+            evidence_ids=tuple(data.get("evidence_ids") or ()),
+            status=str(data.get("status", "complete")),
+            confidence=float(data.get("confidence", 1.0)),
+            created_at=str(data.get("created_at", utc_now())),
+            extensions=dict(data.get("extensions") or {}),
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -425,7 +880,7 @@ class BlueprintVersionRecord:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> "BlueprintVersionRecord":
-        structured_blueprint = data.get("structured_blueprint") or {}
+        structured_blueprint = StructuredBlueprint.from_dict(data.get("structured_blueprint") or {})
         request = BlueprintRequest.from_dict(data["request"])
         return cls(
             blueprint_id=str(data["blueprint_id"]),
@@ -443,38 +898,8 @@ class BlueprintVersionRecord:
             requested_model_id=str(data.get("requested_model_id", data["model_id"])),
             routing_policy_id=str(data.get("routing_policy_id", "")),
             routing_policy_version=str(data.get("routing_policy_version", "")),
-            canon_bundle=BlueprintCanonBundle(
-                bundle_id=str(data["canon_bundle"]["bundle_id"]),
-                version=str(data["canon_bundle"]["version"]),
-                status=str(data["canon_bundle"].get("status", "active")),
-                prompt_asset_id=str(data["canon_bundle"]["prompt_asset_id"]),
-                supporting_asset_ids=tuple(data["canon_bundle"].get("supporting_asset_ids") or ()),
-                components=tuple(
-                    BlueprintCanonBundleComponent(
-                        asset_id=str(component["asset_id"]),
-                        version=str(component["version"]),
-                        checksum=str(component["checksum"]),
-                        repository_path=str(component["repository_path"]),
-                    )
-                    for component in data["canon_bundle"].get("components") or []
-                ),
-                checksum=str(data["canon_bundle"].get("checksum", "")),
-                compatibility_notes=tuple(data["canon_bundle"].get("compatibility_notes") or ()),
-            ),
-            structured_blueprint=StructuredBlueprint(
-                blueprint_id=str(structured_blueprint["blueprint_id"]),
-                request_id=str(structured_blueprint["request_id"]),
-                workspace_id=str(structured_blueprint["workspace_id"]),
-                client_id=str(structured_blueprint["client_id"]),
-                document_title=str(structured_blueprint.get("document_title", "")),
-                raw_response=str(structured_blueprint["raw_response"]),
-                sections=_load_sections(structured_blueprint.get("sections") or []),
-                validation_findings=_load_findings(structured_blueprint.get("validation_findings") or []),
-                outline_hash=str(structured_blueprint["outline_hash"]),
-                evidence_ids=tuple(structured_blueprint.get("evidence_ids") or ()),
-                status=str(structured_blueprint.get("status", "complete")),
-                created_at=str(structured_blueprint.get("created_at", utc_now())),
-            ),
+            canon_bundle=structured_blueprint.canon_bundle,
+            structured_blueprint=structured_blueprint,
             raw_response_artifact=ArtifactRecord.from_dict(data["raw_response_artifact"]),
             structured_artifact=ArtifactRecord.from_dict(data["structured_artifact"]),
             validation_findings=_load_findings(data.get("validation_findings") or []),
@@ -774,7 +1199,8 @@ class BlueprintOrchestrator:
         bundle = self.knowledge_registry.active_bundle()
         prompt = self._load_prompt_version()
         response = self.engine.generate(request, prompt)
-        structured_blueprint, findings = self._structure_response(request, response)
+        previous = self.store.latest(request.workspace_id, request.client_id, request.blueprint_id)
+        version = previous.version + 1 if previous else 1
         raw_artifact = self.artifact_catalog.register(
             run_id=request.blueprint_id,
             stage_id=DEFAULT_STAGE_ID,
@@ -795,6 +1221,14 @@ class BlueprintOrchestrator:
                 "canon_bundle": bundle.to_dict(),
                 "request_id": request.request_id,
             },
+        )
+        structured_blueprint, findings = self._structure_response(
+            request,
+            response,
+            raw_artifact,
+            prompt=prompt,
+            bundle=bundle,
+            blueprint_version=version,
         )
         structured_artifact = self.artifact_catalog.register(
             run_id=request.blueprint_id,
@@ -817,8 +1251,6 @@ class BlueprintOrchestrator:
                 "request_id": request.request_id,
             },
         )
-        previous = self.store.latest(request.workspace_id, request.client_id, request.blueprint_id)
-        version = previous.version + 1 if previous else 1
         change_summary = self._summarise_changes(
             previous,
             request,
@@ -942,12 +1374,16 @@ class BlueprintOrchestrator:
         self,
         request: BlueprintRequest,
         response: BlueprintEngineResponse,
+        raw_artifact: ArtifactRecord,
+        *,
+        prompt: PromptVersion,
+        bundle: BlueprintCanonBundle,
+        blueprint_version: int,
     ) -> tuple[StructuredBlueprint, tuple[BlueprintValidationFinding, ...]]:
-        sections = _parse_markdown_sections(response.raw_response)
-        document_title = sections[0].heading if sections and sections[0].level == 1 else ""
-        display_sections = sections[0].children if document_title and sections[0].children else sections
-        evidence_ids = tuple(dict.fromkeys(_evidence_ids(response.raw_response)))
         schema = self.knowledge_registry.schema()
+        sections = _parse_markdown_sections(response.raw_response)
+        document_title, response_roots = _unpack_response_sections(sections)
+        evidence_ids = tuple(dict.fromkeys(_evidence_ids(response.raw_response)))
         findings: list[BlueprintValidationFinding] = []
         if not response.raw_response.strip():
             findings.append(
@@ -958,7 +1394,7 @@ class BlueprintOrchestrator:
                     location="raw_response",
                 )
             )
-        if not sections:
+        if not response_roots:
             findings.append(
                 BlueprintValidationFinding(
                     code="missing_outline",
@@ -967,38 +1403,18 @@ class BlueprintOrchestrator:
                     location="raw_response",
                 )
             )
-        response_sections = display_sections if display_sections else sections
-        if len(schema.acts) != len(response_sections):
-            findings.append(
-                BlueprintValidationFinding(
-                    code="schema_act_count_mismatch",
-                    severity="warning",
-                    message="Blueprint response did not match the canonical 6-act schema.",
-                    location="raw_response",
-                    details={
-                        "expected_acts": len(schema.acts),
-                        "observed_acts": len(response_sections),
-                    },
-                )
-            )
-        flattened_slides = tuple(
-            slide
-            for act in response_sections
-            for slide in act.children
+        raw_candidates = _collect_slide_candidates(response_roots)
+        raw_act_count = len([section for section in response_roots if _is_act_heading(section.heading)])
+        legacy_mode = raw_act_count < len(schema.acts)
+        canonical_acts, alignment_findings = _canonicalise_blueprint_response(
+            schema=schema,
+            roots=response_roots,
+            raw_candidates=raw_candidates,
+            evidence_ids=evidence_ids,
+            request=request,
+            legacy_mode=legacy_mode,
         )
-        if len(flattened_slides) != len(schema.slides):
-            findings.append(
-                BlueprintValidationFinding(
-                    code="schema_slide_count_mismatch",
-                    severity="error",
-                    message="Blueprint response did not match the canonical 30-slide schema.",
-                    location="raw_response",
-                    details={
-                        "expected_slides": len(schema.slides),
-                        "observed_slides": len(flattened_slides),
-                    },
-                )
-            )
+        findings.extend(alignment_findings)
         missing_evidence = [item for item in request.approved_context.evidence_ids if item not in evidence_ids]
         if missing_evidence:
             findings.append(
@@ -1028,28 +1444,47 @@ class BlueprintOrchestrator:
                             for child in section.children
                         ],
                     }
-                    for section in sections
+                    for section in response_roots
                 ]
             )
         )
         status = self._status(request, findings)
+        confidence = _confidence_from_findings(tuple(findings))
         structured = StructuredBlueprint(
             blueprint_id=request.blueprint_id,
+            blueprint_version=blueprint_version,
             request_id=request.request_id,
             workspace_id=request.workspace_id,
             client_id=request.client_id,
             document_title=document_title,
             raw_response=response.raw_response,
-            sections=display_sections,
+            acts=canonical_acts,
+            lineage=BlueprintLineage(
+                canon_bundle=bundle,
+                prompt_id=prompt.prompt_id,
+                prompt_version=prompt.version,
+                prompt_checksum=prompt.checksum,
+                provider_id=response.provider_id,
+                model_id=response.model_id,
+                requested_provider_id=response.requested_provider_id or response.provider_id,
+                requested_model_id=response.requested_model_id or response.model_id,
+                routing_policy_id=response.routing_policy_id,
+                routing_policy_version=response.routing_policy_version,
+                evidence_pack_ids=request.approved_context.evidence_ids,
+                raw_response_artifact=raw_artifact,
+                structured_artifact=None,
+                artifact_lineage=(raw_artifact.artifact.artifact_id,),
+            ),
             validation_findings=tuple(findings),
             outline_hash=outline_hash,
             evidence_ids=evidence_ids,
             status=status,
+            confidence=confidence,
         )
         return structured, tuple(findings)
 
     def _status(self, request: BlueprintRequest, findings: list[BlueprintValidationFinding]) -> str:
-        if any(finding.severity == "error" for finding in findings):
+        if any(finding.severity in {"error", "blocking"} for finding in findings):
             return "invalid"
         if request.draft_mode and not request.approved:
             return "draft"
@@ -1127,7 +1562,7 @@ def _load_sections(items: list[dict[str, Any]]) -> tuple[BlueprintSection, ...]:
         BlueprintSection(
             heading=str(item.get("heading", "")),
             level=int(item.get("level", 1)),
-            body=str(item.get("body", "")),
+            body=_normalise_text_blob(str(item.get("body", ""))),
             children=_load_sections(item.get("children") or []),
         )
         for item in items
@@ -1170,7 +1605,7 @@ def _parse_markdown_sections(text: str) -> tuple[BlueprintSection, ...]:
             {
                 "heading": item["heading"],
                 "level": item["level"],
-                "body": "\n".join(item["body"]).strip("\n"),
+                "body": _normalise_text_blob("\n".join(item["body"]).strip("\n")),
                 "children": item["children"],
             }
             for item in root
@@ -1181,3 +1616,851 @@ def _parse_markdown_sections(text: str) -> tuple[BlueprintSection, ...]:
 def _evidence_ids(text: str) -> tuple[str, ...]:
     marker_re = re.compile(r"\bev_[A-Za-z0-9_:-]+\b")
     return tuple(dict.fromkeys(marker_re.findall(text)))
+
+
+def _normalise_heading(value: str) -> str:
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9]+", " ", str(value).lower())).strip()
+
+
+def _normalise_text_blob(text: str) -> str:
+    value = str(text or "")
+    stripped = value.strip()
+    if stripped.startswith("[") and stripped.endswith("]"):
+        try:
+            parsed = ast.literal_eval(stripped)
+        except (ValueError, SyntaxError):
+            return value
+        if isinstance(parsed, (list, tuple)):
+            parts = [str(item).strip() for item in parsed if str(item).strip()]
+            if parts:
+                return "\n".join(parts)
+    return value
+
+
+def _split_paragraphs(text: str) -> tuple[str, ...]:
+    text = _normalise_text_blob(text)
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for line in str(text or "").splitlines():
+        stripped = line.strip()
+        if not stripped:
+            if current:
+                paragraphs.append(" ".join(current).strip())
+                current = []
+            continue
+        current.append(stripped)
+    if current:
+        paragraphs.append(" ".join(current).strip())
+    return tuple(item for item in paragraphs if item)
+
+
+def _parse_slide_heading(heading: str) -> tuple[int | None, str]:
+    text = str(heading).strip()
+    match = re.match(r"^(?:slide\s+)?(?P<number>\d+)\s*[—-]\s*(?P<name>.*\S)\s*$", text, re.IGNORECASE)
+    if match is None:
+        malformed = re.match(
+            r"^(?:slide\s+)?(?P<number>\d+)(?P<suffix>[A-Za-z0-9.]+)\s*[—-]\s*(?P<name>.*\S)\s*$",
+            text,
+            re.IGNORECASE,
+        )
+        if malformed is not None:
+            return None, malformed.group("name").strip()
+        return None, text
+    return int(match.group("number")), match.group("name").strip()
+
+
+def _section_payload(section: BlueprintSection) -> dict[str, Any]:
+    return {
+        "heading": section.heading,
+        "level": section.level,
+        "body": section.body,
+        "children": [_section_payload(child) for child in section.children],
+    }
+
+
+def _extension_to_section(heading: str, value: Any) -> BlueprintSection:
+    if isinstance(value, BlueprintSection):
+        return value
+    if isinstance(value, Mapping):
+        return BlueprintSection(
+            heading=str(heading).strip(),
+            level=int(value.get("level", 4)),
+            body=_normalise_text_blob(str(value.get("body", ""))),
+            children=_load_sections(value.get("children") or []),
+        )
+    if isinstance(value, (list, tuple)):
+        body = "\n".join(str(item) for item in value if str(item).strip())
+        return BlueprintSection(str(heading).strip(), 4, body, ())
+    return BlueprintSection(str(heading).strip(), 4, str(value).strip(), ())
+
+
+def _parse_source_notes(section: BlueprintSection) -> tuple[SourceNote, ...]:
+    lines: list[str] = []
+    body = _normalise_text_blob(section.body)
+    if body.strip():
+        lines.extend(body.splitlines())
+    for child in section.children:
+        child_body = _normalise_text_blob(child.body)
+        if child_body.strip() or child.children:
+            lines.append(child_body if child_body.strip() else child.heading)
+    notes: list[SourceNote] = []
+    for line in lines:
+        text = line.strip()
+        if not text:
+            continue
+        if text[:1] in {"-", "*", "•"}:
+            text = text[1:].strip()
+        evidence_ids = tuple(dict.fromkeys(_evidence_ids(text)))
+        evidence_refs = tuple(
+            EvidenceReference(
+                evidence_id=evidence_id,
+                source_note=text,
+            )
+            for evidence_id in evidence_ids
+        )
+        notes.append(
+            SourceNote(
+                text=text,
+                evidence_ids=evidence_ids,
+                evidence_references=evidence_refs,
+            )
+        )
+    return tuple(notes)
+
+
+def _parse_slide_content(
+    slide_node: BlueprintSection,
+    *,
+    legacy_mode: bool,
+) -> tuple[SlideContent, tuple[ValidationFinding, ...]]:
+    thesis: list[str] = []
+    founder_insight: list[str] = []
+    so_what: list[str] = []
+    source_notes: list[SourceNote] = []
+    visual_direction: list[str] = []
+    speaker_notes: list[str] = []
+    evidence_refs: list[EvidenceReference] = []
+    extensions: dict[str, Any] = {}
+    findings: list[ValidationFinding] = []
+    canonical_sections = {
+        "thesis": "thesis",
+        "founder insight": "founder_insight",
+        "so what": "so_what",
+        "implication": "so_what",
+        "source notes": "source_notes",
+        "visual layout direction": "visual_direction",
+        "visual direction": "visual_direction",
+        "speaker notes": "speaker_notes",
+    }
+
+    for section in slide_node.children:
+        key = canonical_sections.get(_normalise_heading(section.heading))
+        if key == "thesis":
+            thesis.extend(_split_paragraphs(section.body) or (section.body.strip(),))
+            continue
+        if key == "founder_insight":
+            founder_insight.extend(_split_paragraphs(section.body) or (section.body.strip(),))
+            continue
+        if key == "so_what":
+            so_what.extend(_split_paragraphs(section.body) or (section.body.strip(),))
+            continue
+        if key == "source_notes":
+            parsed = _parse_source_notes(section)
+            source_notes.extend(parsed)
+            for note in parsed:
+                evidence_refs.extend(note.evidence_references)
+            continue
+        if key == "visual_direction":
+            visual_direction.extend(_split_paragraphs(section.body) or (section.body.strip(),))
+            continue
+        if key == "speaker_notes":
+            speaker_notes.extend(_split_paragraphs(section.body) or (section.body.strip(),))
+            continue
+        extensions[section.heading] = _section_payload(section)
+
+    if legacy_mode and "Thesis" in extensions:
+        findings.append(
+            ValidationFinding(
+                code="legacy_slide_alias",
+                severity="info",
+                message="Legacy slide sections were preserved as Blueprint extensions.",
+                location=f"slide.{slide_node.heading}",
+                details={"source_heading": slide_node.heading},
+            )
+        )
+    if slide_node.body.strip():
+        body_paragraphs = _split_paragraphs(slide_node.body) or (slide_node.body.strip(),)
+        extensions["body"] = body_paragraphs
+        if not any((thesis, founder_insight, so_what, source_notes, visual_direction, speaker_notes)):
+            thesis.extend(body_paragraphs)
+            findings.append(
+                ValidationFinding(
+                    code="slide_body_preserved",
+                    severity="info",
+                    message="Slide body text was preserved in the structured thesis field.",
+                    location=f"slide.{slide_node.heading}",
+                )
+            )
+
+    content = SlideContent(
+        thesis=tuple(thesis),
+        founder_insight=tuple(founder_insight),
+        so_what=tuple(so_what),
+        source_notes=tuple(source_notes),
+        visual_direction=tuple(visual_direction),
+        speaker_notes=tuple(speaker_notes),
+        evidence_references=_unique_evidence_references(evidence_refs),
+        extensions=extensions,
+    )
+    return content, tuple(findings)
+
+
+@dataclass(frozen=True, slots=True)
+class _ParsedSlideCandidate:
+    node: BlueprintSection
+    slide_no: int | None
+    slide_name: str
+    source_act_name: str
+
+
+def _is_act_heading(heading: str) -> bool:
+    return _normalise_heading(heading).startswith("act ")
+
+
+def _unpack_response_sections(sections: tuple[BlueprintSection, ...]) -> tuple[str, tuple[BlueprintSection, ...]]:
+    if not sections:
+        return "", ()
+    first = sections[0]
+    if first.level == 1:
+        title = first.heading
+        if first.children:
+            return title, first.children
+        return title, tuple(sections[1:])
+    return "", sections
+
+
+def _collect_slide_candidates(
+    sections: tuple[BlueprintSection, ...],
+    current_act: str = "",
+) -> tuple[_ParsedSlideCandidate, ...]:
+    candidates: list[_ParsedSlideCandidate] = []
+    for section in sections:
+        slide_no, slide_name = _parse_slide_heading(section.heading)
+        if slide_no is not None or re.match(
+            r"^(?:slide\s+)?\d+\S*",
+            str(section.heading).strip(),
+            re.IGNORECASE,
+        ):
+            candidates.append(
+                _ParsedSlideCandidate(
+                    node=section,
+                    slide_no=slide_no,
+                    slide_name=slide_name,
+                    source_act_name=current_act,
+                )
+            )
+            continue
+        next_act = current_act
+        if _is_act_heading(section.heading):
+            next_act = section.heading
+        candidates.extend(_collect_slide_candidates(section.children, next_act))
+    return tuple(candidates)
+
+
+def _canonical_act_name_for_slide(schema: BlueprintSchemaV3, slide: BlueprintSchemaSlide) -> str:
+    if slide.slide_no == 1 or _normalise_heading(slide.act) in {"title", "cover"}:
+        return schema.acts[0]
+    for act_name in schema.acts:
+        if _normalise_heading(act_name) == _normalise_heading(slide.act):
+            return act_name
+    return schema.acts[0]
+
+
+def _canonicalise_blueprint_response(
+    *,
+    schema: BlueprintSchemaV3,
+    roots: tuple[BlueprintSection, ...],
+    raw_candidates: tuple[_ParsedSlideCandidate, ...],
+    evidence_ids: tuple[str, ...],
+    request: BlueprintRequest,
+    legacy_mode: bool,
+) -> tuple[tuple[BlueprintAct, ...], tuple[BlueprintValidationFinding, ...]]:
+    by_no: dict[int, list[_ParsedSlideCandidate]] = {}
+    by_name: dict[str, list[_ParsedSlideCandidate]] = {}
+    for candidate in raw_candidates:
+        if candidate.slide_no is not None:
+            by_no.setdefault(candidate.slide_no, []).append(candidate)
+        if candidate.slide_name:
+            by_name.setdefault(_normalise_heading(candidate.slide_name), []).append(candidate)
+
+    findings: list[BlueprintValidationFinding] = []
+    canonical_acts: list[BlueprintAct] = []
+    schema_slides_by_act: dict[str, list[BlueprintSchemaSlide]] = {}
+    for slide in schema.slides:
+        schema_slides_by_act.setdefault(_canonical_act_name_for_slide(schema, slide), []).append(slide)
+
+    observed_slide_numbers = {candidate.slide_no for candidate in raw_candidates if candidate.slide_no is not None}
+    canonical_slide_numbers = {slide.slide_no for slide in schema.slides}
+    extra_slides = sorted(number for number in observed_slide_numbers if number not in canonical_slide_numbers)
+    if extra_slides:
+        findings.append(
+            BlueprintValidationFinding(
+                code="extra_slide_numbers_present",
+                severity="warning",
+                message="The response contained slide numbers outside the canonical schema.",
+                location="raw_response",
+                details={"extra_slide_numbers": extra_slides},
+            )
+        )
+
+    for act_index, act_name in enumerate(schema.acts, start=1):
+        act_slides: list[BlueprintSlide] = []
+        act_findings: list[BlueprintValidationFinding] = []
+        source_act_names: list[str] = []
+        for schema_slide in schema_slides_by_act.get(act_name, []):
+            candidates = by_no.get(schema_slide.slide_no, [])
+            matched_by = "number"
+            if not candidates:
+                candidates = by_name.get(_normalise_heading(schema_slide.slide_name), [])
+                matched_by = "name"
+            selected = candidates[0] if candidates else None
+            slide_findings: list[BlueprintValidationFinding] = []
+            if selected is None:
+                slide_content = SlideContent()
+                source_slide_name = ""
+                source_act_name = ""
+                extensions = {
+                    "expected_schema_slide": schema_slide.to_dict(),
+                    "missing": True,
+                }
+                slide_findings.append(
+                    BlueprintValidationFinding(
+                        code="missing_slide",
+                        severity="warning" if legacy_mode else "blocking",
+                        message="The canonical slide is missing from the response.",
+                        location=f"slide.{schema_slide.slide_no}",
+                        details={
+                            "expected_slide_no": schema_slide.slide_no,
+                            "expected_slide_name": schema_slide.slide_name,
+                            "expected_act": act_name,
+                        },
+                    )
+                )
+            else:
+                slide_content, content_findings = _parse_slide_content(selected.node, legacy_mode=False)
+                slide_findings.extend(content_findings)
+                source_slide_name = selected.node.heading
+                source_act_name = selected.source_act_name
+                extensions = dict(slide_content.extensions)
+                extensions["source_candidates"] = [_section_payload(candidate.node) for candidate in candidates]
+                extensions["matched_by"] = matched_by
+                extensions["selected_source_heading"] = selected.node.heading
+                if source_act_name:
+                    extensions["selected_source_act"] = source_act_name
+                if len(candidates) > 1:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="duplicate_slide",
+                            severity="error",
+                            message="Multiple sections matched the same canonical slide.",
+                            location=f"slide.{schema_slide.slide_no}",
+                            details={
+                                "candidate_count": len(candidates),
+                                "candidate_headings": [candidate.node.heading for candidate in candidates],
+                            },
+                        )
+                    )
+                    extensions["duplicate_source_sections"] = [
+                        _section_payload(candidate.node) for candidate in candidates[1:]
+                    ]
+                if matched_by == "name" and _extract_slide_number(selected.node.heading) is None:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="malformed_slide_number",
+                            severity="warning",
+                            message="The response matched a slide by name because the slide number was missing or malformed.",
+                            location=f"slide.{schema_slide.slide_no}",
+                            details={
+                                "expected_slide_no": schema_slide.slide_no,
+                                "selected_heading": selected.node.heading,
+                            },
+                        )
+                    )
+                if _normalise_heading(schema_slide.slide_name) != _normalise_heading(selected.slide_name):
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="canonical_slide_name_mismatch",
+                            severity="warning",
+                            message="The matched slide name differs from the canonical schema name.",
+                            location=f"slide.{schema_slide.slide_no}",
+                            details={
+                                "expected_slide_name": schema_slide.slide_name,
+                                "observed_slide_name": selected.slide_name,
+                            },
+                        )
+                    )
+                if source_act_name and _normalise_heading(source_act_name) != _normalise_heading(act_name):
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="wrong_act_membership",
+                            severity="warning" if legacy_mode else "error",
+                            message="The slide appeared under the wrong act in the raw response.",
+                            location=f"slide.{schema_slide.slide_no}",
+                            details={
+                                "expected_act": act_name,
+                                "observed_act": source_act_name,
+                            },
+                        )
+                    )
+                if slide_content.founder_insight:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="founder_insight_retained",
+                            severity="info",
+                            message="Founder Insight content was retained in the structured slide.",
+                            location=f"slide.{schema_slide.slide_no}",
+                        )
+                    )
+                if slide_content.so_what:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="so_what_retained",
+                            severity="info",
+                            message="So What content was retained in the structured slide.",
+                            location=f"slide.{schema_slide.slide_no}",
+                        )
+                    )
+                if slide_content.source_notes:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="source_notes_retained",
+                            severity="info",
+                            message="Source Notes were retained in the structured slide.",
+                            location=f"slide.{schema_slide.slide_no}",
+                        )
+                    )
+                if slide_content.visual_direction:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="visual_direction_retained",
+                            severity="info",
+                            message="Visual direction was retained in the structured slide.",
+                            location=f"slide.{schema_slide.slide_no}",
+                        )
+                    )
+
+            content_checks = {
+                "thesis": bool(slide_content.thesis),
+                "founder insight": bool(slide_content.founder_insight),
+                "so what": bool(slide_content.so_what),
+                "source notes": bool(slide_content.source_notes),
+                "visual / layout direction": bool(slide_content.visual_direction),
+                "visual direction": bool(slide_content.visual_direction),
+                "speaker notes": bool(slide_content.speaker_notes),
+            }
+            for requirement in schema_slide.content_requirements:
+                requirement_key = _normalise_heading(requirement)
+                if requirement_key in content_checks and not content_checks[requirement_key]:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="missing_content_requirement",
+                            severity="warning" if legacy_mode else "error",
+                            message="A canonical slide content requirement was not present in the response.",
+                            location=f"slide.{schema_slide.slide_no}",
+                            details={
+                                "required": requirement,
+                                "slide_no": schema_slide.slide_no,
+                                "slide_name": schema_slide.slide_name,
+                            },
+                        )
+                    )
+
+            if schema_slide.slide_no == 12:
+                combined_text = " ".join(
+                    [
+                        " ".join(slide_content.thesis),
+                        " ".join(slide_content.founder_insight),
+                        " ".join(slide_content.so_what),
+                        " ".join(note.text for note in slide_content.source_notes),
+                    ]
+                ).lower()
+                if any(token in combined_text for token in (" men ", " women ", " age ", " income ")):
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="behavioural_demand_pool_rule",
+                            severity="warning",
+                            message="Demand pools should read as behavioural discoveries, not demographic labels.",
+                            location=f"slide.{schema_slide.slide_no}",
+                        )
+                    )
+
+            if schema_slide.slide_no == 27 and not slide_content.visual_direction:
+                slide_findings.append(
+                    BlueprintValidationFinding(
+                        code="slide_27_visual_direction_missing",
+                        severity="warning" if legacy_mode else "error",
+                        message="Slide 27 must retain a visual or layout direction cue.",
+                        location="slide.27",
+                    )
+                )
+            if schema_slide.slide_no == 28:
+                combined_text = " ".join(
+                    [
+                        " ".join(slide_content.thesis),
+                        " ".join(slide_content.founder_insight),
+                        " ".join(slide_content.so_what),
+                        " ".join(note.text for note in slide_content.source_notes),
+                        " ".join(slide_content.visual_direction),
+                        " ".join(slide_content.speaker_notes),
+                    ]
+                ).lower()
+                if "growth priorities" not in combined_text and "dependencies" not in combined_text:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="slide_28_growth_priorities_dependencies_missing",
+                            severity="warning" if legacy_mode else "error",
+                            message="Slide 28 should distinguish growth priorities from dependencies.",
+                            location="slide.28",
+                        )
+                    )
+            if schema_slide.slide_no == 29:
+                if not slide_content.source_notes:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="slide_29_measurement_sources_missing",
+                            severity="warning" if legacy_mode else "error",
+                            message="Slide 29 must retain measurement source notes.",
+                            location="slide.29",
+                        )
+                    )
+                if not slide_content.so_what:
+                    slide_findings.append(
+                        BlueprintValidationFinding(
+                            code="slide_29_learning_summary_missing",
+                            severity="warning" if legacy_mode else "error",
+                            message="Slide 29 must retain the learning summary.",
+                            location="slide.29",
+                        )
+                    )
+
+            if slide_content.extensions.get("body"):
+                slide_findings.append(
+                    BlueprintValidationFinding(
+                        code="slide_body_preserved",
+                        severity="info",
+                        message="Slide body text was preserved in the structured extensions.",
+                        location=f"slide.{schema_slide.slide_no}",
+                    )
+                )
+
+            slide_confidence = _confidence_from_findings(tuple(slide_findings))
+            act_slides.append(
+                BlueprintSlide(
+                    slide_no=schema_slide.slide_no,
+                    slide_name=schema_slide.slide_name,
+                    act=act_name,
+                    purpose=schema_slide.purpose,
+                    visual_type=schema_slide.visual_type,
+                    layout_type=schema_slide.layout_type,
+                    content_requirements=schema_slide.content_requirements,
+                    inputs=schema_slide.inputs,
+                    outputs=schema_slide.outputs,
+                    so_what_test=schema_slide.so_what_test,
+                    content=slide_content,
+                    confidence=slide_confidence,
+                    validation_findings=tuple(slide_findings),
+                    source_slide_name=source_slide_name,
+                    source_act_name=source_act_name,
+                    extensions=extensions,
+                )
+            )
+            act_findings.extend(slide_findings)
+            findings.extend(
+                finding for finding in slide_findings if finding.severity != "info"
+            )
+            if source_act_name:
+                source_act_names.append(source_act_name)
+        act_confidence = _confidence_from_findings(tuple(act_findings))
+        canonical_acts.append(
+            BlueprintAct(
+                act_no=act_index,
+                act_name=act_name,
+                slides=tuple(act_slides),
+                confidence=act_confidence,
+                validation_findings=tuple(act_findings),
+                source_act_name=source_act_names[0] if source_act_names else act_name,
+                extensions={
+                    "schema_slide_numbers": [slide.slide_no for slide in act_slides],
+                    "source_act_names": list(dict.fromkeys(source_act_names)),
+                },
+            )
+        )
+
+    if len(canonical_acts) != len(schema.acts):
+        findings.append(
+            BlueprintValidationFinding(
+                code="schema_act_count_mismatch",
+                severity="blocking",
+                message="The response did not map to all six canonical acts.",
+                location="raw_response",
+                details={
+                    "expected_acts": len(schema.acts),
+                    "observed_acts": len(canonical_acts),
+                },
+            )
+        )
+
+    observed_slide_count = len(raw_candidates)
+    if observed_slide_count != len(schema.slides):
+        findings.append(
+            BlueprintValidationFinding(
+                code="schema_slide_count_mismatch",
+                severity="warning" if observed_slide_count > 0 else "blocking",
+                message="The response did not map cleanly to the canonical 30-slide schema.",
+                location="raw_response",
+                details={
+                    "expected_slides": len(schema.slides),
+                    "observed_slides": observed_slide_count,
+                },
+            )
+        )
+
+    return tuple(canonical_acts), tuple(findings)
+
+
+def _unique_evidence_references(items: Sequence[EvidenceReference]) -> tuple[EvidenceReference, ...]:
+    unique: list[EvidenceReference] = []
+    seen: set[str] = set()
+    for reference in items:
+        if reference.evidence_id in seen:
+            continue
+        seen.add(reference.evidence_id)
+        unique.append(reference)
+    return tuple(unique)
+
+
+def _confidence_from_findings(findings: tuple[ValidationFinding, ...]) -> float:
+    score = 1.0
+    for finding in findings:
+        if finding.severity == "info":
+            continue
+        if finding.severity == "warning":
+            score -= 0.03
+        elif finding.severity == "error":
+            score -= 0.15
+        elif finding.severity == "blocking":
+            score -= 0.3
+    return max(0.0, round(score, 3))
+
+
+def _load_lineage(data: Mapping[str, Any]) -> BlueprintLineage:
+    lineage_source = data.get("lineage") if isinstance(data.get("lineage"), Mapping) else data
+    canon_bundle_data = lineage_source.get("canon_bundle") or data.get("canon_bundle") or {}
+    raw_response_artifact_data = lineage_source.get("raw_response_artifact") or data.get("raw_response_artifact")
+    structured_artifact_data = lineage_source.get("structured_artifact") or data.get("structured_artifact")
+    if raw_response_artifact_data is None:
+        raise ValueError("blueprint lineage must contain a raw response artifact")
+    raw_response_artifact = ArtifactRecord.from_dict(dict(raw_response_artifact_data))
+    structured_artifact = (
+        ArtifactRecord.from_dict(dict(structured_artifact_data))
+        if structured_artifact_data is not None
+        else None
+    )
+    return BlueprintLineage(
+        canon_bundle=BlueprintCanonBundle(
+            bundle_id=str(canon_bundle_data["bundle_id"]),
+            version=str(canon_bundle_data["version"]),
+            status=str(canon_bundle_data.get("status", "active")),
+            prompt_asset_id=str(canon_bundle_data["prompt_asset_id"]),
+            supporting_asset_ids=tuple(canon_bundle_data.get("supporting_asset_ids") or ()),
+            components=tuple(
+                BlueprintCanonBundleComponent(
+                    asset_id=str(component["asset_id"]),
+                    version=str(component["version"]),
+                    checksum=str(component["checksum"]),
+                    repository_path=str(component["repository_path"]),
+                )
+                for component in canon_bundle_data.get("components") or []
+            ),
+            checksum=str(canon_bundle_data.get("checksum", "")),
+            compatibility_notes=tuple(canon_bundle_data.get("compatibility_notes") or ()),
+        ),
+        prompt_id=str(lineage_source.get("prompt_id", data.get("prompt_id", ""))),
+        prompt_version=int(lineage_source.get("prompt_version", data.get("prompt_version", 1))),
+        prompt_checksum=str(lineage_source.get("prompt_checksum", data.get("prompt_checksum", ""))),
+        provider_id=str(lineage_source.get("provider_id", data.get("provider_id", ""))),
+        model_id=str(lineage_source.get("model_id", data.get("model_id", ""))),
+        requested_provider_id=str(lineage_source.get("requested_provider_id", data.get("requested_provider_id", data.get("provider_id", "")))),
+        requested_model_id=str(lineage_source.get("requested_model_id", data.get("requested_model_id", data.get("model_id", "")))),
+        routing_policy_id=str(lineage_source.get("routing_policy_id", data.get("routing_policy_id", ""))),
+        routing_policy_version=str(lineage_source.get("routing_policy_version", data.get("routing_policy_version", ""))),
+        evidence_pack_ids=tuple(lineage_source.get("evidence_pack_ids") or data.get("evidence_pack_ids") or ()),
+        raw_response_artifact=raw_response_artifact,
+        structured_artifact=structured_artifact,
+        artifact_lineage=tuple(lineage_source.get("artifact_lineage") or data.get("artifact_lineage") or ()),
+        extensions=dict(lineage_source.get("extensions") or data.get("extensions") or {}),
+    )
+
+
+def _load_acts(items: Any) -> tuple[BlueprintAct, ...]:
+    if not items:
+        return ()
+    acts: list[BlueprintAct] = []
+    for index, item in enumerate(items, start=1):
+        if isinstance(item, BlueprintAct):
+            acts.append(item)
+            continue
+        if not isinstance(item, Mapping):
+            raise ValueError("blueprint acts must be objects")
+        slides_data = item.get("slides")
+        if slides_data is None:
+            slides_data = item.get("children") or []
+        slides = _load_slides(slides_data)
+        acts.append(
+            BlueprintAct(
+                act_no=int(item.get("act_no", index)),
+                act_name=str(item.get("act_name", item.get("heading", ""))).strip(),
+                slides=slides,
+                confidence=float(item.get("confidence", 1.0)),
+                validation_findings=_load_findings(item.get("validation_findings") or []),
+                source_act_name=str(item.get("source_act_name", item.get("heading", ""))).strip(),
+                extensions=dict(item.get("extensions") or {}),
+            )
+        )
+    return tuple(acts)
+
+
+def _load_slides(items: Any) -> tuple[BlueprintSlide, ...]:
+    if not items:
+        return ()
+    slides: list[BlueprintSlide] = []
+    for item in items:
+        if isinstance(item, BlueprintSlide):
+            slides.append(item)
+            continue
+        if not isinstance(item, Mapping):
+            raise ValueError("blueprint slides must be objects")
+        if "content" in item:
+            content = _load_slide_content(item.get("content") or {})
+            findings = _load_findings(item.get("validation_findings") or [])
+            slides.append(
+                BlueprintSlide(
+                    slide_no=int(item["slide_no"]),
+                    slide_name=str(item["slide_name"]).strip(),
+                    act=str(item["act"]).strip(),
+                    purpose=str(item.get("purpose", "")).strip(),
+                    visual_type=str(item.get("visual_type", "")).strip(),
+                    layout_type=str(item.get("layout_type", "")).strip(),
+                    content_requirements=tuple(item.get("content_requirements") or ()),
+                    inputs=tuple(item.get("inputs") or ()),
+                    outputs=tuple(item.get("outputs") or ()),
+                    so_what_test=str(item.get("so_what_test", "")).strip(),
+                    content=content,
+                    confidence=float(item.get("confidence", 1.0)),
+                    validation_findings=findings,
+                    source_slide_name=str(item.get("source_slide_name", "")).strip(),
+                    source_act_name=str(item.get("source_act_name", "")).strip(),
+                    extensions=dict(item.get("extensions") or {}),
+                )
+            )
+            continue
+        content, content_findings = _parse_slide_content(
+            _load_section_node(item),
+            legacy_mode=True,
+        )
+        findings = tuple(content_findings) + _load_findings(item.get("validation_findings") or [])
+        slides.append(
+            BlueprintSlide(
+                slide_no=int(item.get("slide_no") or _extract_slide_number(item.get("heading", "")) or 0),
+                slide_name=str(item.get("slide_name", _extract_slide_name(item.get("heading", "")))).strip(),
+                act=str(item.get("act", "")).strip(),
+                purpose=str(item.get("purpose", "")).strip(),
+                visual_type=str(item.get("visual_type", "")).strip(),
+                layout_type=str(item.get("layout_type", "")).strip(),
+                content_requirements=tuple(item.get("content_requirements") or ()),
+                inputs=tuple(item.get("inputs") or ()),
+                outputs=tuple(item.get("outputs") or ()),
+                so_what_test=str(item.get("so_what_test", "")).strip(),
+                content=content,
+                confidence=float(item.get("confidence", 1.0)),
+                validation_findings=findings,
+                source_slide_name=str(item.get("source_slide_name", item.get("heading", ""))).strip(),
+                source_act_name=str(item.get("source_act_name", "")).strip(),
+                extensions=dict(item.get("extensions") or {}),
+            )
+        )
+    return tuple(slides)
+
+
+def _load_slide_content(data: Mapping[str, Any]) -> SlideContent:
+    if isinstance(data, SlideContent):
+        return data
+    if not isinstance(data, Mapping):
+        raise ValueError("slide content must be an object")
+    return SlideContent(
+        thesis=tuple(data.get("thesis") or ()),
+        founder_insight=tuple(data.get("founder_insight") or ()),
+        so_what=tuple(data.get("so_what") or ()),
+        source_notes=tuple(
+            SourceNote(
+                text=str(item.get("text", "")).strip(),
+                evidence_ids=tuple(item.get("evidence_ids") or ()),
+                evidence_references=tuple(
+                    EvidenceReference(
+                        evidence_id=str(reference.get("evidence_id", "")).strip(),
+                        source_note=str(reference.get("source_note", "")).strip(),
+                        slide_no=(
+                            int(reference["slide_no"])
+                            if reference.get("slide_no") is not None
+                            else None
+                        ),
+                        slide_name=str(reference.get("slide_name", "")).strip(),
+                        claim=str(reference.get("claim", "")).strip(),
+                        confidence=float(reference.get("confidence", 1.0)),
+                        extensions=dict(reference.get("extensions") or {}),
+                    )
+                    for reference in item.get("evidence_references") or []
+                ),
+                extensions=dict(item.get("extensions") or {}),
+            )
+            for item in data.get("source_notes") or []
+        ),
+        visual_direction=tuple(data.get("visual_direction") or ()),
+        speaker_notes=tuple(data.get("speaker_notes") or ()),
+        evidence_references=tuple(
+            EvidenceReference(
+                evidence_id=str(item.get("evidence_id", "")).strip(),
+                source_note=str(item.get("source_note", "")).strip(),
+                slide_no=(int(item["slide_no"]) if item.get("slide_no") is not None else None),
+                slide_name=str(item.get("slide_name", "")).strip(),
+                claim=str(item.get("claim", "")).strip(),
+                confidence=float(item.get("confidence", 1.0)),
+                extensions=dict(item.get("extensions") or {}),
+            )
+            for item in data.get("evidence_references") or []
+        ),
+        extensions=dict(data.get("extensions") or {}),
+    )
+
+
+def _load_section_node(item: Mapping[str, Any]) -> BlueprintSection:
+    return BlueprintSection(
+        heading=str(item.get("heading", "")),
+        level=int(item.get("level", 1)),
+        body=_normalise_text_blob(str(item.get("body", ""))),
+        children=_load_sections(item.get("children") or []),
+    )
+
+
+def _load_section_tree(items: list[dict[str, Any]]) -> tuple[BlueprintSection, ...]:
+    return tuple(_load_section_node(item) for item in items)
+
+
+def _extract_slide_number(heading: str) -> int | None:
+    number, _ = _parse_slide_heading(heading)
+    return number
+
+
+def _extract_slide_name(heading: str) -> str:
+    _, name = _parse_slide_heading(heading)
+    return name

@@ -21,6 +21,7 @@ from runtime.command_api import RuntimeCommandAPI
 from runtime.composition import compose_workspace_runtime
 from runtime.provider import ProviderResponse
 from runtime.workspaces import Workspace
+from tests.blueprint_response_factory import render_canonical_blueprint_markdown
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -37,7 +38,8 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.prompts = self.runtime.prompt_registry
         self.store = FileBlueprintStore(self.root / "blueprints")
         self.knowledge_registry = BlueprintKnowledgeRegistry.from_default()
-        self.fixture_response = FIXTURE_PATH.read_text(encoding="utf-8")
+        self.fixture_response = render_canonical_blueprint_markdown(self.knowledge_registry.schema())
+        self.legacy_fixture_response = FIXTURE_PATH.read_text(encoding="utf-8")
         self.engine = FakeBlueprintEngine(
             self.fixture_response,
             provider_id="router-provider",
@@ -122,10 +124,27 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             slides.extend(act.children)
         return slides
 
+    def _orchestrator_for_response(self, response_text: str, *, store_suffix: str) -> BlueprintOrchestrator:
+        return BlueprintOrchestrator(
+            artifact_catalog=self.catalog,
+            prompt_registry=self.prompts,
+            engine=FakeBlueprintEngine(
+                response_text,
+                provider_id="router-provider",
+                model_id="blueprint-model-v1",
+            ),
+            store=FileBlueprintStore(self.root / store_suffix),
+            knowledge_registry=self.knowledge_registry,
+        )
+
+    def _canonical_response(self, **kwargs) -> str:
+        return render_canonical_blueprint_markdown(self.knowledge_registry.schema(), **kwargs)
+
     def test_generates_and_versions_a_blueprint_without_flattening_the_raw_response(self) -> None:
         record = self.orchestrator.generate(self._request(request_id="blueprint-request-001"))
 
         self.assertEqual(record.version, 1)
+        self.assertEqual(record.structured_blueprint.blueprint_version, 1)
         self.assertEqual(record.status, "complete")
         self.assertEqual(record.prompt_version, 1)
         self.assertEqual(record.provider_id, "router-provider")
@@ -152,56 +171,40 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             Path(record.raw_response_artifact.artifact.location).read_text(encoding="utf-8"),
             self.fixture_response,
         )
-        self.assertGreater(len(record.structured_blueprint.sections), 0)
+        self.assertIsNone(record.structured_blueprint.lineage.structured_artifact)
+        self.assertEqual(len(record.structured_blueprint.sections), 6)
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
         self.assertEqual(
             [section.heading for section in record.structured_blueprint.sections],
             [
-                "Act I — Thesis and Commercial Question",
-                "Act II — Market, Category and Competition",
-                "Act III — Audience and Demand Pools",
-                "Act IV — Strategic Platform",
-                "Act V — Campaign and Activation",
+                "Act 1 — The Case for Change",
+                "Act 2 — Market and Competitive Diagnosis",
+                "Act 3 — Audience and Demand Opportunity",
+                "Act 4 — Positioning and Narrative Answer",
+                "Act 5 — The Growth System",
+                "Act 6 — Implementation and Measurement",
             ],
         )
-        slides = self._flatten_slide_headings(record.structured_blueprint.sections)
-        self.assertEqual(len(slides), 30)
-        self.assertGreaterEqual(
-            sum(
-                1
-                for act in record.structured_blueprint.sections
-                for slide in act.children
-                if any(child.heading == "Founder Insight" for child in slide.children)
-            ),
-            10,
-        )
-        self.assertGreaterEqual(
-            sum(
-                1
-                for act in record.structured_blueprint.sections
-                for slide in act.children
-                if any(child.heading == "So What" for child in slide.children)
-            ),
-            10,
-        )
-        self.assertTrue(
-            any(
-                child.heading == "Visual / Layout Direction"
-                for act in record.structured_blueprint.sections
-                for slide in act.children
-                for child in slide.children
-            )
-        )
-        self.assertTrue(
-            any(
-                child.heading == "Source Notes"
-                for act in record.structured_blueprint.sections
-                for slide in act.children
-                for child in slide.children
-            )
-        )
+        self.assertEqual([slide.slide_no for slide in record.structured_blueprint.slides], list(range(1, 31)))
+        self.assertEqual(record.structured_blueprint.slides[11].slide_name, "Audience Segments / Demand Pools")
+        self.assertTrue(record.structured_blueprint.slides[11].founder_insight)
+        self.assertTrue(record.structured_blueprint.slides[11].so_what)
+        self.assertTrue(record.structured_blueprint.slides[11].content.source_notes)
+        self.assertTrue(record.structured_blueprint.slides[26].content.visual_direction)
+        self.assertTrue(record.structured_blueprint.slides[26].content.speaker_notes)
+        self.assertTrue(record.structured_blueprint.slides[27].founder_insight)
+        self.assertTrue(record.structured_blueprint.slides[27].so_what)
+        self.assertTrue(record.structured_blueprint.slides[28].content.source_notes)
+        self.assertTrue(record.structured_blueprint.slides[28].so_what)
+        self.assertTrue(record.structured_blueprint.slides[29].content.source_notes)
+        self.assertEqual(record.structured_blueprint.validation_findings, ())
         self.assertIn("ev_deadbeef", record.structured_blueprint.evidence_ids)
         self.assertEqual(record.change_summary, ())
         self.assertTrue(record.artifact_lineage)
+        self.assertEqual(record.structured_blueprint.canon_bundle.bundle_id, "blueprint-canon-v1")
+        self.assertEqual(record.structured_blueprint.lineage.canon_bundle.bundle_id, "blueprint-canon-v1")
+        self.assertEqual(record.structured_blueprint.lineage.prompt_id, "claude-growth-blueprint")
+        self.assertEqual(record.structured_blueprint.lineage.evidence_pack_ids, self.evidence_ids)
         prompt = self.prompts.active("claude-growth-blueprint")
         population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
         schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
@@ -285,6 +288,104 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.assertTrue(any(item.field == "input_checksum" for item in second.change_summary))
         self.assertFalse(any(item.field == "status" for item in second.change_summary))
         self.assertGreater(len(second.artifact_lineage), len(first.artifact_lineage))
+
+    def test_direct_act_and_slide_response_parses_into_the_canonical_model(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(wrapped=False),
+            store_suffix="blueprints-direct",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-direct"))
+
+        self.assertEqual(record.status, "complete")
+        self.assertEqual(len(record.structured_blueprint.sections), 6)
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
+        self.assertEqual(record.structured_blueprint.slides[0].slide_name, "Cover")
+
+    def test_missing_slide_is_reported_without_rewriting_the_rest_of_the_blueprint(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(missing_slide_numbers=(17,)),
+            store_suffix="blueprints-missing-slide",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-missing-slide"))
+
+        self.assertEqual(record.status, "invalid")
+        self.assertTrue(any(finding.code == "missing_slide" for finding in record.validation_findings))
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
+        self.assertEqual(record.structured_blueprint.slides[16].slide_name, "Positioning Problem")
+
+    def test_duplicate_slide_is_reported_and_the_first_copy_is_preserved(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(duplicate_slide_numbers=(12,)),
+            store_suffix="blueprints-duplicate-slide",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-duplicate-slide"))
+
+        self.assertEqual(record.status, "invalid")
+        self.assertTrue(any(finding.code == "duplicate_slide" for finding in record.validation_findings))
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
+        self.assertTrue(record.structured_blueprint.slides[11].content.source_notes)
+
+    def test_wrong_act_membership_is_reported(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(act_heading_overrides={6: "Act 5 — The Growth System"}),
+            store_suffix="blueprints-wrong-act",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-wrong-act"))
+
+        self.assertEqual(record.status, "invalid")
+        self.assertTrue(any(finding.code == "wrong_act_membership" for finding in record.validation_findings))
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
+
+    def test_malformed_slide_number_falls_back_to_the_canonical_name(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(slide_heading_overrides={12: "Slide 12A — Audience Segments / Demand Pools"}),
+            store_suffix="blueprints-malformed-slide",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-malformed-slide"))
+
+        self.assertEqual(record.status, "complete")
+        self.assertTrue(any(finding.code == "malformed_slide_number" for finding in record.validation_findings))
+        self.assertEqual(record.structured_blueprint.slides[11].slide_name, "Audience Segments / Demand Pools")
+
+    def test_unknown_extension_fields_are_preserved_without_loss(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self._canonical_response(
+                extra_sections_by_slide={
+                    12: [("Appendix Notes", "Preserve this exact text without alteration.")],
+                },
+            ),
+            store_suffix="blueprints-extension-preservation",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-extension-preservation"))
+
+        slide = record.structured_blueprint.slides[11]
+        self.assertIn("Appendix Notes", slide.extensions)
+        self.assertEqual(slide.extensions["Appendix Notes"]["body"], "Preserve this exact text without alteration.")
+        self.assertTrue(slide.founder_insight)
+        self.assertTrue(slide.so_what)
+
+    def test_legacy_fixture_is_adapted_into_the_canonical_structure(self) -> None:
+        orchestrator = self._orchestrator_for_response(
+            self.legacy_fixture_response,
+            store_suffix="blueprints-legacy-adapter",
+        )
+
+        record = orchestrator.generate(self._request(request_id="blueprint-request-legacy-adapter"))
+
+        self.assertEqual(record.status, "complete")
+        self.assertEqual(len(record.structured_blueprint.sections), 6)
+        self.assertEqual(len(record.structured_blueprint.slides), 30)
+        self.assertTrue(any(finding.severity == "warning" for finding in record.validation_findings))
+        self.assertEqual(
+            Path(record.raw_response_artifact.artifact.location).read_text(encoding="utf-8"),
+            self.legacy_fixture_response,
+        )
 
     def test_rejects_cross_workspace_artifacts_without_persisting_foreign_state(self) -> None:
         foreign = ArtifactRecord.from_dict(

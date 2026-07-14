@@ -16,10 +16,10 @@ from runtime.blueprint_knowledge_registry import BlueprintKnowledgeRegistry
 from runtime.command_api import CommandError, RuntimeCommandAPI
 from runtime.composition import compose_local_runtime
 from runtime.wsgi_api import RuntimeWSGIApp
+from tests.blueprint_response_factory import render_canonical_blueprint_markdown
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-BLUEPRINT_FIXTURE = Path(__file__).resolve().parent / "fixtures" / "blueprint" / "rave_raw_response.md"
 
 
 class CommandAPITests(unittest.TestCase):
@@ -52,7 +52,7 @@ class CommandAPITests(unittest.TestCase):
             artifact_catalog=self.runtime.artifact_catalog,
             prompt_registry=self.runtime.prompt_registry,
             engine=FakeBlueprintEngine(
-                BLUEPRINT_FIXTURE.read_text(encoding="utf-8"),
+                render_canonical_blueprint_markdown(self.knowledge_registry.schema()),
                 provider_id="router-provider",
                 model_id="blueprint-model-v1",
             ),
@@ -242,6 +242,19 @@ class CommandAPITests(unittest.TestCase):
         self.assertEqual(result["data"]["status"], "complete")
         self.assertEqual(result["data"]["prompt_version"], 1)
         self.assertEqual(result["data"]["structured_blueprint"]["document_title"], "RAVE Blueprint")
+        self.assertEqual(result["data"]["structured_blueprint"]["blueprint_version"], 1)
+        self.assertEqual(
+            [section["heading"] for section in result["data"]["structured_blueprint"]["sections"]],
+            [
+                "Act 1 — The Case for Change",
+                "Act 2 — Market and Competitive Diagnosis",
+                "Act 3 — Audience and Demand Opportunity",
+                "Act 4 — Positioning and Narrative Answer",
+                "Act 5 — The Growth System",
+                "Act 6 — Implementation and Measurement",
+            ],
+        )
+        self.assertEqual(len(result["data"]["structured_blueprint"]["slides"]), 30)
         prompt = self.runtime.prompt_registry.active("claude-growth-blueprint")
         population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
         schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
@@ -297,10 +310,7 @@ class CommandAPITests(unittest.TestCase):
             prompt.metadata["supporting_instruction_sources"][2]["asset_id"],
             "visual_intelligence_system_v1",
         )
-        self.assertIn(
-            "Act I — Thesis and Commercial Question",
-            [section["heading"] for section in result["data"]["structured_blueprint"]["sections"]],
-        )
+        self.assertTrue(result["data"]["structured_blueprint"]["slides"][11]["content"]["founder_insight"])
 
 
 if __name__ == "__main__":
