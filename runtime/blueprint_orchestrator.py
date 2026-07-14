@@ -925,6 +925,9 @@ class BlueprintOrchestrator:
             "source_modified_at": prompt_asset.source_modified_at,
             "source_checksum": prompt_asset.checksum,
             "purpose": "claude_blueprint_orchestration",
+            # Keep the historical metadata aliases so older prompt consumers can
+            # read the same canonical bundle and source asset details without
+            # losing the newer canon_bundle/source_* fields.
             "prompt_asset": {
                 **prompt_asset.to_dict(),
                 "source_path": str(prompt_asset.path(self.knowledge_registry.root)),
