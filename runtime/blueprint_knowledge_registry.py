@@ -10,8 +10,8 @@ from .research_engine import sha256_hex
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_BLUEPRINT_KNOWLEDGE_ROOT = REPO_ROOT / "knowledge" / "blueprint"
-DEFAULT_BLUEPRINT_MANIFEST_PATH = DEFAULT_BLUEPRINT_KNOWLEDGE_ROOT / "manifest.json"
+DEFAULT_BLUEPRINT_KNOWLEDGE_ROOT = REPO_ROOT
+DEFAULT_BLUEPRINT_MANIFEST_PATH = REPO_ROOT / "knowledge" / "blueprint" / "manifest.json"
 
 
 _SAFE_VERSION_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
@@ -277,7 +277,7 @@ class BlueprintKnowledgeRegistry:
 
     @classmethod
     def from_default(cls) -> "BlueprintKnowledgeRegistry":
-        return cls(DEFAULT_BLUEPRINT_KNOWLEDGE_ROOT)
+        return cls(DEFAULT_BLUEPRINT_KNOWLEDGE_ROOT, manifest_path=DEFAULT_BLUEPRINT_MANIFEST_PATH)
 
     @property
     def manifest(self) -> dict[str, Any]:

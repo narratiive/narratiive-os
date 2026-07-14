@@ -13,7 +13,7 @@
 - Slide 29 must cover Leading Indicators, Performance Indicators, Brand Indicators, Review Cadence and Decision Rules.
 - Audience Upgrade Rule: demand pools are discovered, not categorised.
 - Prefer behavioural definitions such as "Supermarket-Plus Switcher", "Weekend Ritualist" or "Subscription Sceptic".
-- Target quality threshold: 9.5/10 founder-grade.
+- Target quality threshold for future Blueprint generations: 9.5/10 founder-grade output.
 
 ## PURPOSE
 
