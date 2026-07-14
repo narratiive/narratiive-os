@@ -16,6 +16,7 @@ from runtime.blueprint_orchestrator import (
     FileBlueprintStore,
     ClaudeBlueprintEngine,
 )
+from runtime.blueprint_knowledge_registry import BlueprintKnowledgeRegistry
 from runtime.command_api import RuntimeCommandAPI
 from runtime.composition import compose_workspace_runtime
 from runtime.provider import ProviderResponse
@@ -35,6 +36,7 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.catalog = self.runtime.artifact_catalog
         self.prompts = self.runtime.prompt_registry
         self.store = FileBlueprintStore(self.root / "blueprints")
+        self.knowledge_registry = BlueprintKnowledgeRegistry.from_default()
         self.fixture_response = FIXTURE_PATH.read_text(encoding="utf-8")
         self.engine = FakeBlueprintEngine(
             self.fixture_response,
@@ -45,11 +47,8 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             artifact_catalog=self.catalog,
             prompt_registry=self.prompts,
             engine=self.engine,
+            knowledge_registry=self.knowledge_registry,
             store=self.store,
-            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
-            supporting_instruction_source_paths=(
-                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-            ),
         )
 
         self.research = self.catalog.register(
@@ -136,6 +135,18 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.assertEqual(record.routing_policy_id, "static")
         self.assertEqual(record.routing_policy_version, "1")
         self.assertEqual(record.structured_blueprint.document_title, "RAVE Blueprint")
+        self.assertEqual(record.canon_bundle.bundle_id, "blueprint-canon-v1")
+        self.assertEqual(record.canon_bundle.canon_version, "1.0.0")
+        self.assertEqual(record.canon_bundle.prompt_asset_id, "blueprint_population_system")
+        self.assertEqual(
+            [component.asset_id for component in record.canon_bundle.components],
+            [
+                "blueprint_population_system",
+                "blueprint_schema_v3",
+                "visual_framework_library_v1",
+                "visual_intelligence_system_v1",
+            ],
+        )
         self.assertTrue(record.raw_response_artifact.artifact.location.endswith(".md"))
         self.assertEqual(
             Path(record.raw_response_artifact.artifact.location).read_text(encoding="utf-8"),
@@ -192,41 +203,63 @@ class BlueprintOrchestratorTests(unittest.TestCase):
         self.assertEqual(record.change_summary, ())
         self.assertTrue(record.artifact_lineage)
         prompt = self.prompts.active("claude-growth-blueprint")
-        strategy_director_text = (REPO_ROOT / "agents" / "strategy_director.md").read_text(encoding="utf-8")
-        pipeline_text = (REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md").read_text(encoding="utf-8")
+        population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
+        schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
+        visual_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md").read_text(encoding="utf-8")
+        visual_intelligence_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md").read_text(encoding="utf-8")
         self.assertEqual(
             prompt.metadata["source_path"],
-            str(REPO_ROOT / "agents" / "strategy_director.md"),
+            str(REPO_ROOT / "knowledge" / "blueprint" / "population-system.md"),
         )
         self.assertEqual(
             prompt.content,
-            strategy_director_text,
+            population_text,
         )
         self.assertEqual(
             prompt.checksum,
-            hashlib.sha256(strategy_director_text.encode("utf-8")).hexdigest(),
+            hashlib.sha256(population_text.encode("utf-8")).hexdigest(),
         )
-        self.assertEqual(
-            prompt.metadata["output_template_path"],
-            str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
-        )
+        self.assertEqual(prompt.metadata["bundle"]["bundle_id"], "blueprint-canon-v1")
+        self.assertEqual(prompt.metadata["bundle"]["canon_version"], "1.0.0")
+        self.assertEqual(prompt.metadata["bundle"]["prompt_asset_id"], "blueprint_population_system")
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_path"],
-            str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
+            str(REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md"),
         )
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_checksum"],
-            hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
+            hashlib.sha256(schema_text.encode("utf-8")).hexdigest(),
         )
         self.assertEqual(
-            prompt.metadata["supporting_instruction_sources"],
-            [
-                {
-                    "source_path": str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
-                    "source_checksum": hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
-                }
-            ],
+            prompt.metadata["supporting_instruction_sources"][0]["asset_id"],
+            "blueprint_schema_v3",
         )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["source_checksum"],
+            hashlib.sha256(visual_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["asset_id"],
+            "visual_framework_library_v1",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_checksum"],
+            hashlib.sha256(visual_intelligence_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["asset_id"],
+            "visual_intelligence_system_v1",
+        )
+        self.assertEqual(prompt.metadata["prompt_asset"]["source_title"], "Narratiive Blueprint Population System")
+        self.assertEqual(prompt.metadata["prompt_asset"]["drive_document_id"], "1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE")
         self.assertTrue((self.store.root / "workspaces" / "rave" / "clients" / "rave" / "rave_blueprint" / "versions" / "v1.json").exists())
 
     def test_changed_inputs_create_a_new_version_with_machine_readable_summary(self) -> None:
@@ -287,10 +320,7 @@ class BlueprintOrchestratorTests(unittest.TestCase):
                 model_id="blueprint-model-v1",
             ),
             store=FileBlueprintStore(self.root / "blueprints-invalid"),
-            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
-            supporting_instruction_source_paths=(
-                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-            ),
+            knowledge_registry=self.knowledge_registry,
         )
         record = invalid.generate(self._request(request_id="blueprint-request-invalid"))
 
@@ -327,13 +357,9 @@ class BlueprintOrchestratorTests(unittest.TestCase):
             engine=ClaudeBlueprintEngine(
                 provider=RoutedMismatchProvider(),
                 prompt_registry=self.prompts,
-                prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
             ),
             store=FileBlueprintStore(self.root / "blueprints-mismatch"),
-            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
-            supporting_instruction_source_paths=(
-                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-            ),
+            knowledge_registry=self.knowledge_registry,
         )
 
         with self.assertRaises(BlueprintRoutingMismatchError):

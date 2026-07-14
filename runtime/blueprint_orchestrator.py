@@ -10,6 +10,11 @@ from typing import Any, Mapping, Protocol, runtime_checkable
 
 from .artifact_catalog import ArtifactRecord, FileArtifactCatalog
 from .execution_package import ExecutionPackage
+from .blueprint_knowledge_registry import (
+    BlueprintCanonBundle,
+    BlueprintCanonBundleComponent,
+    BlueprintKnowledgeRegistry,
+)
 from .prompt_registry import FilePromptRegistry, PromptVersion
 from .provider import ProviderClient
 from .research_engine import sha256_hex, slugify, utc_now
@@ -17,10 +22,6 @@ from .research_engine import sha256_hex, slugify, utc_now
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_PROMPT_ID = "claude-growth-blueprint"
-DEFAULT_PROMPT_SOURCE = REPO_ROOT / "agents" / "strategy_director.md"
-DEFAULT_PROMPT_SUPPORTING_SOURCES = (
-    REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-)
 DEFAULT_STAGE_ID = "blueprint_generation"
 DEFAULT_AGENT_ID = "blueprint_orchestrator"
 DEFAULT_OUTPUT_TYPE = "structured_blueprint"
@@ -374,6 +375,7 @@ class BlueprintVersionRecord:
     requested_model_id: str
     routing_policy_id: str
     routing_policy_version: str
+    canon_bundle: BlueprintCanonBundle
     structured_blueprint: StructuredBlueprint
     raw_response_artifact: ArtifactRecord
     structured_artifact: ArtifactRecord
@@ -409,6 +411,7 @@ class BlueprintVersionRecord:
             "requested_model_id": self.requested_model_id,
             "routing_policy_id": self.routing_policy_id,
             "routing_policy_version": self.routing_policy_version,
+            "canon_bundle": self.canon_bundle.to_dict(),
             "structured_blueprint": self.structured_blueprint.to_dict(),
             "raw_response_artifact": self.raw_response_artifact.to_dict(),
             "structured_artifact": self.structured_artifact.to_dict(),
@@ -440,6 +443,24 @@ class BlueprintVersionRecord:
             requested_model_id=str(data.get("requested_model_id", data["model_id"])),
             routing_policy_id=str(data.get("routing_policy_id", "")),
             routing_policy_version=str(data.get("routing_policy_version", "")),
+            canon_bundle=BlueprintCanonBundle(
+                bundle_id=str(data["canon_bundle"]["bundle_id"]),
+                version=str(data["canon_bundle"]["version"]),
+                status=str(data["canon_bundle"].get("status", "active")),
+                prompt_asset_id=str(data["canon_bundle"]["prompt_asset_id"]),
+                supporting_asset_ids=tuple(data["canon_bundle"].get("supporting_asset_ids") or ()),
+                components=tuple(
+                    BlueprintCanonBundleComponent(
+                        asset_id=str(component["asset_id"]),
+                        version=str(component["version"]),
+                        checksum=str(component["checksum"]),
+                        repository_path=str(component["repository_path"]),
+                    )
+                    for component in data["canon_bundle"].get("components") or []
+                ),
+                checksum=str(data["canon_bundle"].get("checksum", "")),
+                compatibility_notes=tuple(data["canon_bundle"].get("compatibility_notes") or ()),
+            ),
             structured_blueprint=StructuredBlueprint(
                 blueprint_id=str(structured_blueprint["blueprint_id"]),
                 request_id=str(structured_blueprint["request_id"]),
@@ -527,7 +548,7 @@ class ClaudeBlueprintEngine:
         provider: ProviderClient,
         *,
         prompt_registry: FilePromptRegistry,
-        prompt_source_path: str | Path = DEFAULT_PROMPT_SOURCE,
+        prompt_source_path: str | Path | None = None,
         prompt_id: str = DEFAULT_PROMPT_ID,
         stage_id: str = DEFAULT_STAGE_ID,
         agent_id: str = DEFAULT_AGENT_ID,
@@ -538,7 +559,7 @@ class ClaudeBlueprintEngine:
     ) -> None:
         self.provider = provider
         self.prompt_registry = prompt_registry
-        self.prompt_source_path = Path(prompt_source_path)
+        self.prompt_source_path = Path(prompt_source_path) if prompt_source_path is not None else None
         self.prompt_id = prompt_id
         self.stage_id = stage_id
         self.agent_id = agent_id
@@ -548,6 +569,7 @@ class ClaudeBlueprintEngine:
         self.expected_model_id = expected_model_id
 
     def generate(self, request: BlueprintRequest, prompt: PromptVersion) -> BlueprintEngineResponse:
+        prompt_source_path = self.prompt_source_path or Path(str(prompt.metadata.get("source_path") or ""))
         package = ExecutionPackage(
             schema_version=1,
             job_id=request.request_id,
@@ -555,7 +577,7 @@ class ClaudeBlueprintEngine:
             stage_id=self.stage_id,
             agent_id=self.agent_id,
             agent_version=str(prompt.version),
-            agent_ref=str(self.prompt_source_path),
+            agent_ref=str(prompt_source_path),
             instructions=prompt.content,
             input_artifacts=tuple(
                 {
@@ -647,7 +669,7 @@ class ClaudeBlueprintEngine:
                 "prompt_id": prompt.prompt_id,
                 "version": prompt.version,
                 "checksum": prompt.checksum,
-                "source_path": str(self.prompt_source_path),
+                "source_path": str(self.prompt_source_path or prompt.metadata.get("source_path", "")),
             },
             "engine": {
                 "name": self.name,
@@ -726,19 +748,15 @@ class BlueprintOrchestrator:
         artifact_catalog: FileArtifactCatalog,
         prompt_registry: FilePromptRegistry,
         engine: BlueprintEngine,
+        knowledge_registry: BlueprintKnowledgeRegistry | None = None,
         store: FileBlueprintStore | None = None,
-        prompt_source_path: str | Path = DEFAULT_PROMPT_SOURCE,
-        supporting_instruction_source_paths: tuple[str | Path, ...] = DEFAULT_PROMPT_SUPPORTING_SOURCES,
         prompt_id: str = DEFAULT_PROMPT_ID,
     ) -> None:
         self.artifact_catalog = artifact_catalog
         self.prompt_registry = prompt_registry
         self.engine = engine
+        self.knowledge_registry = knowledge_registry or BlueprintKnowledgeRegistry.from_default()
         self.store = store or FileBlueprintStore(Path(self.artifact_catalog.root).parent / "blueprints")
-        self.prompt_source_path = Path(prompt_source_path)
-        self.supporting_instruction_source_paths = tuple(
-            Path(path) for path in supporting_instruction_source_paths
-        )
         self.prompt_id = prompt_id
 
     def for_runtime(self, runtime: Any) -> "BlueprintOrchestrator":
@@ -746,14 +764,14 @@ class BlueprintOrchestrator:
             artifact_catalog=runtime.artifact_catalog,
             prompt_registry=runtime.prompt_registry,
             engine=self.engine,
+            knowledge_registry=self.knowledge_registry,
             store=FileBlueprintStore(Path(runtime.artifact_catalog.root).parent / "blueprints"),
-            prompt_source_path=self.prompt_source_path,
-            supporting_instruction_source_paths=self.supporting_instruction_source_paths,
             prompt_id=self.prompt_id,
         )
 
     def generate(self, request: BlueprintRequest) -> BlueprintVersionRecord:
         self._validate_request(request)
+        bundle = self.knowledge_registry.active_bundle()
         prompt = self._load_prompt_version()
         response = self.engine.generate(request, prompt)
         structured_blueprint, findings = self._structure_response(request, response)
@@ -774,6 +792,7 @@ class BlueprintOrchestrator:
                 "requested_model_id": response.requested_model_id,
                 "routing_policy_id": response.routing_policy_id,
                 "routing_policy_version": response.routing_policy_version,
+                "canon_bundle": bundle.to_dict(),
                 "request_id": request.request_id,
             },
         )
@@ -794,12 +813,22 @@ class BlueprintOrchestrator:
                 "requested_model_id": response.requested_model_id,
                 "routing_policy_id": response.routing_policy_id,
                 "routing_policy_version": response.routing_policy_version,
+                "canon_bundle": bundle.to_dict(),
                 "request_id": request.request_id,
             },
         )
         previous = self.store.latest(request.workspace_id, request.client_id, request.blueprint_id)
         version = previous.version + 1 if previous else 1
-        change_summary = self._summarise_changes(previous, request, prompt, response, structured_blueprint, raw_artifact, structured_artifact)
+        change_summary = self._summarise_changes(
+            previous,
+            request,
+            bundle,
+            prompt,
+            response,
+            structured_blueprint,
+            raw_artifact,
+            structured_artifact,
+        )
         record = BlueprintVersionRecord(
             blueprint_id=request.blueprint_id,
             workspace_id=request.workspace_id,
@@ -816,6 +845,7 @@ class BlueprintOrchestrator:
             requested_model_id=response.requested_model_id,
             routing_policy_id=response.routing_policy_id,
             routing_policy_version=response.routing_policy_version,
+            canon_bundle=bundle,
             structured_blueprint=structured_blueprint,
             raw_response_artifact=raw_artifact,
             structured_artifact=structured_artifact,
@@ -858,10 +888,14 @@ class BlueprintOrchestrator:
                 )
 
     def _load_prompt_version(self) -> PromptVersion:
-        if not self.prompt_source_path.is_file():
-            raise BlueprintBlockedError(f"Blueprint prompt source not found: {self.prompt_source_path}")
-        content = self.prompt_source_path.read_text(encoding="utf-8")
-        metadata = self._prompt_metadata(content)
+        bundle = self.knowledge_registry.active_bundle()
+        prompt_asset = self.knowledge_registry.prompt_asset(bundle)
+        if not prompt_asset.path(self.knowledge_registry.root).is_file():
+            raise BlueprintBlockedError(
+                f"Blueprint prompt source not found: {prompt_asset.path(self.knowledge_registry.root)}"
+            )
+        content = prompt_asset.read_text(self.knowledge_registry.root)
+        metadata = self._prompt_metadata(prompt_asset, bundle)
         history = self.prompt_registry.history(self.prompt_id)
         if history and history[-1].content == content and history[-1].metadata == metadata:
             prompt = history[-1]
@@ -874,25 +908,33 @@ class BlueprintOrchestrator:
         self.prompt_registry.activate(self.prompt_id, prompt.version)
         return prompt
 
-    def _prompt_metadata(self, content: str) -> dict[str, Any]:
-        supporting_sources = []
-        for source_path in self.supporting_instruction_source_paths:
-            if not source_path.is_file():
-                raise BlueprintBlockedError(
-                    f"Blueprint supporting instruction source not found: {source_path}"
-                )
-            source_content = source_path.read_text(encoding="utf-8")
-            supporting_sources.append(
-                {
-                    "source_path": str(source_path),
-                    "source_checksum": sha256_hex(source_content),
-                }
-            )
+    def _prompt_metadata(self, prompt_asset: Any, bundle: BlueprintCanonBundle) -> dict[str, Any]:
+        supporting_sources = [
+            {
+                **asset.to_dict(),
+                "source_path": str(asset.path(self.knowledge_registry.root)),
+                "source_checksum": asset.checksum,
+            }
+            for asset in self.knowledge_registry.supporting_assets(bundle)
+        ]
         return {
-            "source_path": str(self.prompt_source_path),
-            "source_checksum": sha256_hex(content),
+            "source_path": str(prompt_asset.path(self.knowledge_registry.root)),
+            "source_title": prompt_asset.source_title,
+            "source_document_id": prompt_asset.drive_document_id,
+            "source_url": prompt_asset.drive_url,
+            "source_modified_at": prompt_asset.source_modified_at,
+            "source_checksum": prompt_asset.checksum,
             "purpose": "claude_blueprint_orchestration",
-            "output_template_path": str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
+            # Keep the historical metadata aliases so older prompt consumers can
+            # read the same canonical bundle and source asset details without
+            # losing the newer canon_bundle/source_* fields.
+            "prompt_asset": {
+                **prompt_asset.to_dict(),
+                "source_path": str(prompt_asset.path(self.knowledge_registry.root)),
+                "source_checksum": prompt_asset.checksum,
+            },
+            "bundle": bundle.to_dict(),
+            "canon_bundle": bundle.to_dict(),
             "supporting_instruction_sources": supporting_sources,
         }
 
@@ -905,6 +947,7 @@ class BlueprintOrchestrator:
         document_title = sections[0].heading if sections and sections[0].level == 1 else ""
         display_sections = sections[0].children if document_title and sections[0].children else sections
         evidence_ids = tuple(dict.fromkeys(_evidence_ids(response.raw_response)))
+        schema = self.knowledge_registry.schema()
         findings: list[BlueprintValidationFinding] = []
         if not response.raw_response.strip():
             findings.append(
@@ -922,6 +965,38 @@ class BlueprintOrchestrator:
                     severity="error",
                     message="Blueprint response did not contain any markdown sections.",
                     location="raw_response",
+                )
+            )
+        response_sections = display_sections if display_sections else sections
+        if len(schema.acts) != len(response_sections):
+            findings.append(
+                BlueprintValidationFinding(
+                    code="schema_act_count_mismatch",
+                    severity="warning",
+                    message="Blueprint response did not match the canonical 6-act schema.",
+                    location="raw_response",
+                    details={
+                        "expected_acts": len(schema.acts),
+                        "observed_acts": len(response_sections),
+                    },
+                )
+            )
+        flattened_slides = tuple(
+            slide
+            for act in response_sections
+            for slide in act.children
+        )
+        if len(flattened_slides) != len(schema.slides):
+            findings.append(
+                BlueprintValidationFinding(
+                    code="schema_slide_count_mismatch",
+                    severity="error",
+                    message="Blueprint response did not match the canonical 30-slide schema.",
+                    location="raw_response",
+                    details={
+                        "expected_slides": len(schema.slides),
+                        "observed_slides": len(flattened_slides),
+                    },
                 )
             )
         missing_evidence = [item for item in request.approved_context.evidence_ids if item not in evidence_ids]
@@ -978,8 +1053,6 @@ class BlueprintOrchestrator:
             return "invalid"
         if request.draft_mode and not request.approved:
             return "draft"
-        if findings:
-            return "partial"
         return "complete"
 
     def _artifact_lineage(
@@ -1002,6 +1075,7 @@ class BlueprintOrchestrator:
         self,
         previous: BlueprintVersionRecord | None,
         request: BlueprintRequest,
+        bundle: BlueprintCanonBundle,
         prompt: PromptVersion,
         response: BlueprintEngineResponse,
         structured_blueprint: StructuredBlueprint,
@@ -1013,6 +1087,7 @@ class BlueprintOrchestrator:
         changes: list[BlueprintChangeSummary] = []
         comparisons = (
             ("input_checksum", previous.input_checksum, request.request_checksum(), "Approved context changed."),
+            ("canon_bundle", previous.canon_bundle.to_dict(), bundle.to_dict(), "Canonical bundle changed."),
             ("prompt_version", previous.prompt_version, prompt.version, "Prompt version changed."),
             ("prompt_checksum", previous.prompt_checksum, prompt.checksum, "Prompt content changed."),
             ("provider_id", previous.provider_id, response.provider_id, "Provider changed."),

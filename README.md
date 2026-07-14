@@ -58,3 +58,11 @@ the endpoint and API key (for example `NARRATIIVE_LIVE_ENDPOINT` and
 and are never added to routing policies, events, artifacts or provider metadata.
 The existing `DeterministicProvider` remains available for fixtures and local dry
 runs.
+
+## Blueprint canon registry
+
+The canonical Blueprint source assets live in `knowledge/blueprint/` and are
+locked by `knowledge/blueprint/manifest.json`. The registry validates the imported
+Google Drive source documents by checksum before the Blueprint orchestrator uses
+them, so the production prompt, schema and visual framework stay versioned and
+immutable.

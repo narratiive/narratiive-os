@@ -12,6 +12,7 @@ from runtime.blueprint_orchestrator import (
     FakeBlueprintEngine,
     FileBlueprintStore,
 )
+from runtime.blueprint_knowledge_registry import BlueprintKnowledgeRegistry
 from runtime.command_api import CommandError, RuntimeCommandAPI
 from runtime.composition import compose_local_runtime
 from runtime.wsgi_api import RuntimeWSGIApp
@@ -46,6 +47,7 @@ class CommandAPITests(unittest.TestCase):
         self.runtime = compose_local_runtime(self.root / "state", self.repo)
         self.api = RuntimeCommandAPI(self.runtime)
         self.blueprint_store = FileBlueprintStore(self.root / "blueprints")
+        self.knowledge_registry = BlueprintKnowledgeRegistry.from_default()
         self.blueprint_orchestrator = BlueprintOrchestrator(
             artifact_catalog=self.runtime.artifact_catalog,
             prompt_registry=self.runtime.prompt_registry,
@@ -55,10 +57,7 @@ class CommandAPITests(unittest.TestCase):
                 model_id="blueprint-model-v1",
             ),
             store=self.blueprint_store,
-            prompt_source_path=REPO_ROOT / "agents" / "strategy_director.md",
-            supporting_instruction_source_paths=(
-                REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md",
-            ),
+            knowledge_registry=self.knowledge_registry,
         )
 
     def tearDown(self):
@@ -244,31 +243,59 @@ class CommandAPITests(unittest.TestCase):
         self.assertEqual(result["data"]["prompt_version"], 1)
         self.assertEqual(result["data"]["structured_blueprint"]["document_title"], "RAVE Blueprint")
         prompt = self.runtime.prompt_registry.active("claude-growth-blueprint")
-        strategy_director_text = (REPO_ROOT / "agents" / "strategy_director.md").read_text(encoding="utf-8")
-        pipeline_text = (REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md").read_text(encoding="utf-8")
+        population_text = (REPO_ROOT / "knowledge" / "blueprint" / "population-system.md").read_text(encoding="utf-8")
+        schema_text = (REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md").read_text(encoding="utf-8")
+        visual_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md").read_text(encoding="utf-8")
+        visual_intelligence_text = (REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md").read_text(encoding="utf-8")
         self.assertEqual(
             prompt.metadata["source_path"],
-            str(REPO_ROOT / "agents" / "strategy_director.md"),
+            str(REPO_ROOT / "knowledge" / "blueprint" / "population-system.md"),
         )
         self.assertEqual(
             prompt.content,
-            strategy_director_text,
+            population_text,
         )
         self.assertEqual(
             prompt.checksum,
-            hashlib.sha256(strategy_director_text.encode("utf-8")).hexdigest(),
+            hashlib.sha256(population_text.encode("utf-8")).hexdigest(),
         )
-        self.assertEqual(
-            prompt.metadata["output_template_path"],
-            str(REPO_ROOT / "templates" / "Growth_Blueprint.md"),
-        )
+        self.assertEqual(prompt.metadata["bundle"]["bundle_id"], "blueprint-canon-v1")
+        self.assertEqual(prompt.metadata["bundle"]["canon_version"], "1.0.0")
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_path"],
-            str(REPO_ROOT / "workflows" / "growth_blueprint_pipeline.md"),
+            str(REPO_ROOT / "knowledge" / "blueprint" / "blueprint-schema-v3.md"),
         )
         self.assertEqual(
             prompt.metadata["supporting_instruction_sources"][0]["source_checksum"],
-            hashlib.sha256(pipeline_text.encode("utf-8")).hexdigest(),
+            hashlib.sha256(schema_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][0]["asset_id"],
+            "blueprint_schema_v3",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-framework-library-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["source_checksum"],
+            hashlib.sha256(visual_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][1]["asset_id"],
+            "visual_framework_library_v1",
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_path"],
+            str(REPO_ROOT / "knowledge" / "blueprint" / "visual-intelligence-system-v1.md"),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["source_checksum"],
+            hashlib.sha256(visual_intelligence_text.encode("utf-8")).hexdigest(),
+        )
+        self.assertEqual(
+            prompt.metadata["supporting_instruction_sources"][2]["asset_id"],
+            "visual_intelligence_system_v1",
         )
         self.assertIn(
             "Act I — Thesis and Commercial Question",
