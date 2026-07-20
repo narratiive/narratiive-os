@@ -4,6 +4,11 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Mapping
 
+from .blueprint_orchestrator import (
+    BlueprintBlockedError,
+    BlueprintOrchestrator,
+    BlueprintRequest,
+)
 from .approvals import ApprovalConflict, ApprovalNotFound
 from .composition import RuntimeComponents
 from .definitions import load_workflow_definition
@@ -28,8 +33,13 @@ class CommandError(ValueError):
 class RuntimeCommandAPI:
     """Structured application boundary for Tony, n8n and future interfaces."""
 
-    def __init__(self, runtime: RuntimeComponents) -> None:
+    def __init__(
+        self,
+        runtime: RuntimeComponents,
+        blueprint_orchestrator: BlueprintOrchestrator | None = None,
+    ) -> None:
         self.runtime = runtime
+        self.blueprint_orchestrator = blueprint_orchestrator
 
     def handle(self, request: Mapping[str, Any]) -> dict[str, Any]:
         command = str(request.get("command", "")).strip()
@@ -49,6 +59,9 @@ class RuntimeCommandAPI:
             "approvals.revise": self._revise,
             "approvals.comment": self._comment,
             "approvals.block": self._block,
+            "blueprints.generate": self._blueprint_generate,
+            "blueprints.get": self._blueprint_get,
+            "blueprints.list": self._blueprint_list,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -201,6 +214,37 @@ class RuntimeCommandAPI:
         except (ApprovalConflict, ApprovalNotFound, ValueError) as exc:
             raise CommandError("approval_command_failed", str(exc), 409) from exc
 
+    def _blueprint_generate(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        orchestrator = self._blueprint_orchestrator()
+        payload = self._blueprint_payload(request)
+        try:
+            result = orchestrator.generate(BlueprintRequest.from_dict(payload))
+        except BlueprintBlockedError as exc:
+            raise CommandError("blueprint_blocked", str(exc), 409) from exc
+        except (KeyError, TypeError, ValueError) as exc:
+            raise CommandError("invalid_blueprint_request", str(exc), 400) from exc
+        return result.to_dict()
+
+    def _blueprint_get(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        orchestrator = self._blueprint_orchestrator()
+        workspace_id = self._required(request, "workspace_id")
+        client_id = self._required(request, "client_id")
+        blueprint_id = str(request.get("blueprint_id", "")).strip() or client_id
+        version_value = request.get("version")
+        version = int(version_value) if version_value is not None and str(version_value).strip() else None
+        try:
+            return orchestrator.get(workspace_id, client_id, blueprint_id, version).to_dict()
+        except KeyError as exc:
+            raise CommandError("blueprint_not_found", str(exc), 404) from exc
+
+    def _blueprint_list(self, request: Mapping[str, Any]) -> dict[str, Any]:
+        orchestrator = self._blueprint_orchestrator()
+        workspace_id = self._required(request, "workspace_id")
+        client_id = self._required(request, "client_id")
+        blueprint_id = str(request.get("blueprint_id", "")).strip() or client_id
+        versions = [record.to_dict() for record in orchestrator.list(workspace_id, client_id, blueprint_id)]
+        return {"versions": versions, "count": len(versions)}
+
     def _repository_path(self, relative: str) -> Path:
         root = self.runtime.paths.repository_root.resolve()
         target = (root / relative).resolve()
@@ -217,6 +261,24 @@ class RuntimeCommandAPI:
             raise CommandError("missing_field", f"{field} is required")
         return value
 
+    def _blueprint_orchestrator(self) -> BlueprintOrchestrator:
+        if self.blueprint_orchestrator is None:
+            raise CommandError(
+                "blueprint_engine_unavailable",
+                "blueprint orchestration is not configured",
+                503,
+            )
+        return self.blueprint_orchestrator
+
+    @staticmethod
+    def _blueprint_payload(request: Mapping[str, Any]) -> dict[str, Any]:
+        payload = request.get("request")
+        if payload is None:
+            payload = {key: value for key, value in request.items() if key != "command"}
+        if not isinstance(payload, Mapping):
+            raise CommandError("invalid_blueprint_request", "request must be an object")
+        return dict(payload)
+
 
 class WorkspaceCommandAPI:
     """Workspace router for Tony/n8n with legacy request compatibility."""
@@ -225,9 +287,14 @@ class WorkspaceCommandAPI:
         self,
         legacy_runtime: RuntimeComponents,
         manager: WorkspaceRuntimeManager,
+        blueprint_orchestrator: BlueprintOrchestrator | None = None,
     ) -> None:
-        self.legacy_api = RuntimeCommandAPI(legacy_runtime)
+        self.legacy_api = RuntimeCommandAPI(
+            legacy_runtime,
+            blueprint_orchestrator=blueprint_orchestrator,
+        )
         self.manager = manager
+        self.blueprint_orchestrator = blueprint_orchestrator
 
     def handle(self, request: Mapping[str, Any]) -> dict[str, Any]:
         command = str(request.get("command", "")).strip()
@@ -292,8 +359,19 @@ class WorkspaceCommandAPI:
         scoped_request = dict(request)
         scoped_request["client_id"] = workspace.client_id
         self._reject_cross_workspace_run(scoped_request, workspace_id)
+        runtime = self.manager.runtime(workspace_id)
+        blueprint_orchestrator = self.blueprint_orchestrator
+        if blueprint_orchestrator is not None:
+            blueprint_orchestrator = blueprint_orchestrator.for_runtime(runtime)
+        if str(scoped_request.get("command", "")).strip() == "blueprints.generate":
+            scoped_request = self._scope_blueprint_request(
+                scoped_request,
+                workspace_id=workspace_id,
+                client_id=workspace.client_id,
+            )
         result = RuntimeCommandAPI(
-            self.manager.runtime(workspace_id)
+            runtime,
+            blueprint_orchestrator=blueprint_orchestrator,
         ).handle(scoped_request)
         result["workspace_id"] = workspace_id
         return result
@@ -331,3 +409,36 @@ class WorkspaceCommandAPI:
         if not value:
             raise CommandError("missing_field", f"{field} is required")
         return value
+
+    @staticmethod
+    def _scope_blueprint_request(
+        request: Mapping[str, Any],
+        *,
+        workspace_id: str,
+        client_id: str,
+    ) -> dict[str, Any]:
+        scoped = dict(request)
+        payload = scoped.get("request")
+        if payload is None:
+            payload = {key: value for key, value in scoped.items() if key != "command"}
+        if not isinstance(payload, Mapping):
+            raise CommandError("invalid_blueprint_request", "request must be an object")
+        payload = dict(payload)
+        existing_workspace_id = str(payload.get("workspace_id", "")).strip()
+        existing_client_id = str(payload.get("client_id", "")).strip()
+        if existing_workspace_id and existing_workspace_id != workspace_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                "blueprint request workspace_id belongs to a different workspace",
+                409,
+            )
+        if existing_client_id and existing_client_id != client_id:
+            raise CommandError(
+                "cross_workspace_reference",
+                "blueprint request client_id belongs to a different workspace",
+                409,
+            )
+        payload["workspace_id"] = workspace_id
+        payload["client_id"] = client_id
+        scoped["request"] = payload
+        return scoped

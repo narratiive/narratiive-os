@@ -1,0 +1,101 @@
+{
+  "active_bundle_id": "blueprint-canon-v1",
+  "assets": [
+    {
+      "asset_id": "blueprint_population_system",
+      "checksum": "5c8a2a28d2ee4de02318b9c2e85005dd0cdca13284baad0bfc3417809319b032",
+      "drive_document_id": "1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE",
+      "drive_url": "https://docs.google.com/document/d/1Jna7vhjh5pdMtsSlxsOR8-QeCneaz9MFXcyrTl56HvE/edit",
+      "owner": "Narratiive",
+      "repository_path": "knowledge/blueprint/population-system.md",
+      "source_modified_at": "2026-07-14T09:54:59.983Z",
+      "source_title": "Narratiive Blueprint Population System",
+      "status": "approved",
+      "version": "1.0.0"
+    },
+    {
+      "asset_id": "blueprint_schema_v3",
+      "checksum": "c0180f431361671fc024b26f157746ca760a0add132dc46084e5370bb29839c8",
+      "drive_document_id": "18j_yOeNN6I8fNyBmDKYN8uP9GO--b4cdlgUXH6CiCRQ",
+      "drive_url": "https://docs.google.com/document/d/18j_yOeNN6I8fNyBmDKYN8uP9GO--b4cdlgUXH6CiCRQ/edit",
+      "owner": "Narratiive",
+      "repository_path": "knowledge/blueprint/blueprint-schema-v3.md",
+      "source_modified_at": "2026-07-14T09:55:23.215Z",
+      "source_title": "Narratiive Blueprint Schema v3",
+      "status": "approved",
+      "version": "3.0.0"
+    },
+    {
+      "asset_id": "visual_framework_library_v1",
+      "checksum": "e89ea7a645580d75af51c96ad6905a707e0207e828715fdd46a3b5e90e5dfad1",
+      "drive_document_id": "1W3U_4XJNGdh5ijJ_FFDHj9PAK7pZbAhv8-DgK95okYs",
+      "drive_url": "https://docs.google.com/document/d/1W3U_4XJNGdh5ijJ_FFDHj9PAK7pZbAhv8-DgK95okYs/edit",
+      "owner": "Narratiive",
+      "repository_path": "knowledge/blueprint/visual-framework-library-v1.md",
+      "source_modified_at": "2026-07-14T09:55:50.288Z",
+      "source_title": "Narratiive Visual Framework Library v1",
+      "status": "approved",
+      "version": "1.0.0"
+    },
+    {
+      "asset_id": "visual_intelligence_system_v1",
+      "checksum": "2980693684b75d6055425ca979c724d5560c0b6598278ab0a211fdc2ca21fc16",
+      "drive_document_id": "1dEwxMtXOQJZToviRsYcCSStJfM-P25uUUZrx9Z50Y2A",
+      "drive_url": "https://docs.google.com/document/d/1dEwxMtXOQJZToviRsYcCSStJfM-P25uUUZrx9Z50Y2A/edit",
+      "owner": "Narratiive",
+      "repository_path": "knowledge/blueprint/visual-intelligence-system-v1.md",
+      "source_modified_at": "2026-07-14T10:28:38.755Z",
+      "source_title": "Narratiive Visual Intelligence System v1",
+      "status": "approved",
+      "version": "1.0.0"
+    }
+  ],
+  "bundles": [
+    {
+      "bundle_id": "blueprint-canon-v1",
+      "canon_version": "1.0.0",
+      "checksum": "9eb29736cd8a25991a02ab3eda909aab1e278de0305a2c352b92cced6dfbdc95",
+      "compatibility_notes": [
+        "Immutable production canon imported from Google Drive.",
+        "Treat the source documents as read-only production IP."
+      ],
+      "components": [
+        {
+          "asset_id": "blueprint_population_system",
+          "checksum": "5c8a2a28d2ee4de02318b9c2e85005dd0cdca13284baad0bfc3417809319b032",
+          "repository_path": "knowledge/blueprint/population-system.md",
+          "version": "1.0.0"
+        },
+        {
+          "asset_id": "blueprint_schema_v3",
+          "checksum": "c0180f431361671fc024b26f157746ca760a0add132dc46084e5370bb29839c8",
+          "repository_path": "knowledge/blueprint/blueprint-schema-v3.md",
+          "version": "3.0.0"
+        },
+        {
+          "asset_id": "visual_framework_library_v1",
+          "checksum": "e89ea7a645580d75af51c96ad6905a707e0207e828715fdd46a3b5e90e5dfad1",
+          "repository_path": "knowledge/blueprint/visual-framework-library-v1.md",
+          "version": "1.0.0"
+        },
+        {
+          "asset_id": "visual_intelligence_system_v1",
+          "checksum": "2980693684b75d6055425ca979c724d5560c0b6598278ab0a211fdc2ca21fc16",
+          "repository_path": "knowledge/blueprint/visual-intelligence-system-v1.md",
+          "version": "1.0.0"
+        }
+      ],
+      "prompt_asset_id": "blueprint_population_system",
+      "status": "active",
+      "supporting_asset_ids": [
+        "blueprint_schema_v3",
+        "visual_framework_library_v1",
+        "visual_intelligence_system_v1"
+      ],
+      "version": "1.0.0"
+    }
+  ],
+  "owner": "Narratiive",
+  "registry_id": "blueprint_knowledge_registry",
+  "status": "active"
+}

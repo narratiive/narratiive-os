@@ -43,8 +43,8 @@ class FilePromptRegistry:
 
     def publish(self, prompt_id: str, content: str, metadata: dict[str, Any] | None = None) -> PromptVersion:
         prompt_id = _safe(prompt_id)
-        content = content.strip()
-        if not content:
+        content = str(content)
+        if not content.strip():
             raise ValueError("content must not be empty")
         version = self._next_version(prompt_id)
         checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
