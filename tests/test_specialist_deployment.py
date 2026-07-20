@@ -1,3 +1,6 @@
+import json
+import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -58,6 +61,53 @@ class SpecialistDeploymentTests(unittest.TestCase):
         outside.write_text("{}", encoding="utf-8")
         with self.assertRaises(ValueError):
             SpecialistCatalog(REPOSITORY_ROOT, outside)
+
+    def test_script_and_module_invocations_produce_the_same_deployment(self) -> None:
+        registry_root = Path(self.tmp.name) / "cli-prompts"
+        script_output = Path(self.tmp.name) / "script-deployment.json"
+        module_output = Path(self.tmp.name) / "module-deployment.json"
+        common_arguments = [
+            "--repository-root",
+            str(REPOSITORY_ROOT),
+            "--registry-root",
+            str(registry_root),
+        ]
+
+        script_result = subprocess.run(
+            [
+                sys.executable,
+                str(REPOSITORY_ROOT / "scripts" / "deploy_specialists.py"),
+                *common_arguments,
+                "--output",
+                str(script_output),
+            ],
+            cwd=self.tmp.name,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        module_result = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "scripts.deploy_specialists",
+                *common_arguments,
+                "--output",
+                str(module_output),
+            ],
+            cwd=REPOSITORY_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        self.assertEqual(script_result.returncode, 0, script_result.stderr)
+        self.assertEqual(module_result.returncode, 0, module_result.stderr)
+        self.assertEqual(json.loads(script_result.stdout), json.loads(module_result.stdout))
+        self.assertEqual(
+            json.loads(script_output.read_text(encoding="utf-8")),
+            json.loads(module_output.read_text(encoding="utf-8")),
+        )
 
 
 if __name__ == "__main__":
