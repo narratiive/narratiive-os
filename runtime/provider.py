@@ -125,13 +125,18 @@ class ProviderExecutor:
                 metadata=dict(response.metadata or {}),
             )
             artifact = record.artifact
+        response_metadata = dict(response.metadata or {})
+        execution_metadata: dict[str, Any] = {
+            "provider_metadata": response_metadata,
+            "artifact_checksum": artifact.checksum,
+        }
+        routing = response_metadata.get("routing")
+        if isinstance(routing, Mapping):
+            execution_metadata["routing"] = dict(routing)
         return ExecutionResult(
             outputs=(artifact,),
             next_available_inputs=(response.output_type,),
-            metadata={
-                "provider_metadata": dict(response.metadata or {}),
-                "artifact_checksum": artifact.checksum,
-            },
+            metadata=execution_metadata,
         )
 
     @staticmethod

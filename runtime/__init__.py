@@ -28,6 +28,11 @@ from .dispatch import (
 from .dispatch_service import DispatchService
 from .execution_package import ExecutionPackage, ExecutionPackageBuilder
 from .http_provider import HttpProviderClient, HttpProviderConfig, ProviderTransportError
+from .live_provider import (
+    EnvironmentTextProviderClient,
+    LiveTextProviderConfig,
+    ProviderConfigurationError,
+)
 from .memory import (
     DEFAULT_SPECIALIST_MEMORY_POLICY,
     FileMemoryStore,
@@ -47,6 +52,24 @@ from .provider import (
     ProviderResponse,
     provider_response_from_dict,
     provider_response_from_json,
+)
+from .provider_routing import (
+    AmbiguousRoutingPolicy,
+    CostClass,
+    LatencyClass,
+    ModelCapabilities,
+    ModelRouter,
+    NoAvailableProvider,
+    NoRoutingPolicy,
+    ProviderAvailability,
+    ProviderCapabilityRegistry,
+    ProviderHealthRecord,
+    ProviderHealthRegistry,
+    ProviderModelRecord,
+    RouteTarget,
+    RoutedProviderClient,
+    RoutingDecision,
+    RoutingPolicy,
 )
 from .repositories import (
     FileWorkflowRunRepository,
@@ -163,6 +186,25 @@ __all__ = [
     "HttpProviderClient",
     "HttpProviderConfig",
     "ProviderTransportError",
+    "EnvironmentTextProviderClient",
+    "LiveTextProviderConfig",
+    "ProviderConfigurationError",
+    "AmbiguousRoutingPolicy",
+    "CostClass",
+    "LatencyClass",
+    "ModelCapabilities",
+    "ProviderModelRecord",
+    "ProviderCapabilityRegistry",
+    "ProviderAvailability",
+    "ProviderHealthRecord",
+    "ProviderHealthRegistry",
+    "RouteTarget",
+    "RoutingPolicy",
+    "RoutingDecision",
+    "ModelRouter",
+    "RoutedProviderClient",
+    "NoRoutingPolicy",
+    "NoAvailableProvider",
     "RuntimeComponents",
     "RuntimePaths",
     "compose_local_runtime",
