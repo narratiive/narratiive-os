@@ -42,6 +42,34 @@ approval stores; mismatched client or run references are rejected. Requests with
 a workspace remain on the compatible `legacy` runtime. `workspaces.migrate_legacy`
 copies existing unscoped data into a named workspace without deleting its source.
 
+## Live Growth Blueprint run
+
+Use `scripts/run_live_pipeline.py` to run the same five specialist stages against an
+OpenAI-compatible model endpoint. Always use a new `--run-id`; completed runs are
+loaded rather than regenerated.
+
+For a local Ollama server:
+
+```bash
+export NARRATIIVE_LIVE_ENDPOINT="http://127.0.0.1:11434/v1/chat/completions"
+export NARRATIIVE_LIVE_API_KEY="local-ollama"
+
+python3 scripts/run_live_pipeline.py \
+  --fixture tests/fixtures/rave_pipeline.json \
+  --runtime-root .runtime/live-pipeline \
+  --run-id rave-live-1 \
+  --model qwen3.5:latest
+```
+
+The API-key value is required by the adapter but Ollama does not use it for local
+authentication. It is read only at request time and is not persisted. The live
+runner defaults to a 300-second request timeout because local reasoning models can
+be substantially slower than hosted APIs.
+
+The included RAVE fixture contains synthetic context and is suitable only for proving
+live model execution. A client-ready run requires a real input fixture or workspace
+memory containing the client brief, source material and evidence.
+
 ## Live provider routing
 
 Production workers can wrap provider clients with `ModelRouter` and
