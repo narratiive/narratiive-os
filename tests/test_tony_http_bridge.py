@@ -11,11 +11,21 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         raw = json.dumps(payload).encode("utf-8")
         environ = {
             "REQUEST_METHOD": "POST",
+            "PATH_INFO": "/",
             "CONTENT_LENGTH": str(len(raw)),
             "wsgi.input": io.BytesIO(raw),
             "HTTP_AUTHORIZATION": f"Bearer {token}" if token else "",
         }
         return bridge.handle(environ)
+
+    def test_health_endpoint_is_available_without_gateway_or_token(self):
+        transport = FakeGatewayTransport()
+        bridge = TonyHTTPBridge(TonyOrchestrationAdapter(transport), "bridge-secret")
+        status, response = bridge.handle({"REQUEST_METHOD": "GET", "PATH_INFO": "/health"})
+        self.assertEqual(status.value, 200)
+        self.assertEqual(response["service"], "tony-http-bridge")
+        self.assertEqual(response["status"], "alive")
+        self.assertEqual(transport.calls, [])
 
     def test_forwards_health_command_and_preserves_ids(self):
         transport = FakeGatewayTransport([
