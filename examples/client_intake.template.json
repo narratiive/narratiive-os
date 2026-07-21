@@ -1,0 +1,27 @@
+{
+  "run_id": "client-slug-blueprint-001",
+  "client_id": "client-slug",
+  "available_inputs": ["client_inputs", "source_material"],
+  "memory_records": [
+    {
+      "memory_id": "client-slug-context",
+      "kind": "context",
+      "scope": "client",
+      "content": "Company: [name]\nCategory: [category]\nMarkets: [markets]\nProducts/services: [offer]\nCommercial model: [model]\nCurrent growth problem: [problem]\nBusiness objective: [objective]\nPrimary audience: [audience]\nKnown competitors: [competitors]\nCurrent positioning: [positioning]\nProof points: [proof]\nConstraints: [constraints]\nAvailable evidence and source links: [sources]"
+    },
+    {
+      "memory_id": "client-slug-brief--{run_id}",
+      "kind": "evidence",
+      "scope": "run",
+      "content": "Project brief: [paste the complete client brief, diagnostic response, call transcript summary and source notes here].",
+      "stage_ids": [
+        "research_analyst",
+        "strategy_director",
+        "campaign_world_generator",
+        "creative_director",
+        "quality_reviewer"
+      ]
+    }
+  ],
+  "scoring_input": null
+}
