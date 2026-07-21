@@ -7,6 +7,7 @@ import tempfile
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest import mock
 
 
 MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "service_supervisor.py"
@@ -99,13 +100,13 @@ class ServiceSupervisorTests(unittest.TestCase):
             service_supervisor.ServiceSupervisor().run(99, {})
 
     def test_restart_command_env_requires_json_argument_array(self) -> None:
-        with unittest.mock.patch.dict("os.environ", {"TEST_COMMAND": '["launchctl", "kickstart"]'}):
+        with mock.patch.dict("os.environ", {"TEST_COMMAND": '["launchctl", "kickstart"]'}):
             self.assertEqual(
                 service_supervisor._command_from_env("TEST_COMMAND"),
                 ["launchctl", "kickstart"],
             )
         for invalid in ('"launchctl kickstart"', "[]", '["launchctl", ""]'):
-            with unittest.mock.patch.dict("os.environ", {"TEST_COMMAND": invalid}):
+            with mock.patch.dict("os.environ", {"TEST_COMMAND": invalid}):
                 with self.assertRaises(ValueError):
                     service_supervisor._command_from_env("TEST_COMMAND")
 
