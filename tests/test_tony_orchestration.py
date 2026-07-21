@@ -30,6 +30,43 @@ class TonyOrchestrationTests(unittest.TestCase):
         self.assertEqual(call["correlation_id"], "tony-command-1")
         self.assertIn("awaiting_approval", result.message)
 
+    def test_health_job_and_approval_observability_actions(self):
+        transport = FakeGatewayTransport([
+            {"ok": True, "command": "health", "data": {"status": "ok"}},
+            {"ok": True, "command": "jobs.get", "data": {"status": "completed"}},
+            {
+                "ok": True,
+                "command": "approvals.get",
+                "data": {"current": {"status": "awaiting_approval"}},
+            },
+        ])
+        adapter = TonyOrchestrationAdapter(transport)
+        commands = [
+            TonyCommand("health", "rave", "rave-client", "health-1"),
+            TonyCommand(
+                "job.get",
+                "rave",
+                "rave-client",
+                "job-1",
+                payload={"job_id": "job-123"},
+            ),
+            TonyCommand(
+                "approval.get",
+                "rave",
+                "rave-client",
+                "approval-1",
+                payload={"run_id": "rave-blueprint-1"},
+            ),
+        ]
+        results = [adapter.execute(command) for command in commands]
+        self.assertEqual(
+            [call["payload"]["command"] for call in transport.calls],
+            ["health", "jobs.get", "approvals.get"],
+        )
+        self.assertEqual(results[0].message, "Narratiive OS health: ok.")
+        self.assertEqual(results[1].message, "Job status: completed.")
+        self.assertEqual(results[2].message, "Approval status: awaiting_approval.")
+
     def test_duplicate_commands_reuse_same_idempotency_key(self):
         transport = FakeGatewayTransport()
         adapter = TonyOrchestrationAdapter(transport)
