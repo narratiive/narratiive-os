@@ -43,7 +43,17 @@ class TonyHTTPBridge:
         return [body]
 
     def handle(self, environ):
-        if environ.get("REQUEST_METHOD") != "POST":
+        method = str(environ.get("REQUEST_METHOD", "")).upper()
+        path = str(environ.get("PATH_INFO", "/")) or "/"
+
+        if method == "GET" and path == "/health":
+            return HTTPStatus.OK, {
+                "ok": True,
+                "service": "tony-http-bridge",
+                "status": "alive",
+            }
+
+        if method != "POST":
             return HTTPStatus.METHOD_NOT_ALLOWED, self._error("method_not_allowed", "POST required")
         if self.bridge_token:
             supplied = str(environ.get("HTTP_AUTHORIZATION", ""))
