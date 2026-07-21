@@ -140,6 +140,7 @@ class TonyOrchestrationAdapter:
     """Maps manager-facing Tony actions onto the public command gateway only."""
 
     ACTIONS = {
+        "health": "health",
         "workspace.create": "workspaces.create",
         "workspace.get": "workspaces.get",
         "workspace.list": "workspaces.list",
@@ -147,7 +148,9 @@ class TonyOrchestrationAdapter:
         "run.status": "runs.get",
         "run.list": "runs.list",
         "dispatch": "stages.dispatch",
+        "job.get": "jobs.get",
         "approval.list": "approvals.list",
+        "approval.get": "approvals.get",
         "approve": "approvals.approve",
         "revise": "approvals.revise",
         "comment": "approvals.comment",
@@ -256,11 +259,19 @@ class TonyOrchestrationAdapter:
 
     @staticmethod
     def _manager_message(action: str, data: Mapping[str, Any]) -> str:
+        if action == "health":
+            return f"Narratiive OS health: {data.get('status', 'unknown')}."
         if action == "run.status":
             status = data.get("status") or data.get("workflow_status") or "available"
             return f"Workflow status: {status}."
+        if action == "job.get":
+            return f"Job status: {data.get('status', 'available')}."
         if action == "approval.list":
             return f"Approval queue: {data.get('count', 0)} item(s)."
+        if action == "approval.get":
+            current = data.get("current", {})
+            status = current.get("status", "available") if isinstance(current, Mapping) else "available"
+            return f"Approval status: {status}."
         if action == "blueprint.export":
             status = data.get("status", "submitted")
             url = data.get("presentation_url", "")
