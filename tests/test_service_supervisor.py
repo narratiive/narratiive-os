@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -14,6 +15,7 @@ MODULE_PATH = Path(__file__).resolve().parents[1] / "scripts" / "service_supervi
 SPEC = importlib.util.spec_from_file_location("service_supervisor", MODULE_PATH)
 assert SPEC and SPEC.loader
 service_supervisor = importlib.util.module_from_spec(SPEC)
+sys.modules[SPEC.name] = service_supervisor
 SPEC.loader.exec_module(service_supervisor)
 
 
