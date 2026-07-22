@@ -1,0 +1,206 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://narratiive.com/schemas/shared/growth-object.schema.json",
+  "title": "Narratiive Shared Growth Object",
+  "description": "Shared metadata, lifecycle and lineage contract for every canonical Growth Specification object.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "id",
+    "object_type",
+    "version",
+    "client_id",
+    "client_name",
+    "campaign_id",
+    "campaign_name",
+    "status",
+    "created_at",
+    "updated_at",
+    "created_by",
+    "approved_by",
+    "approved_at",
+    "parent_object_id",
+    "source_object_ids",
+    "child_object_ids",
+    "repository_path",
+    "commit_sha"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]*$"
+    },
+    "object_type": {
+      "type": "string",
+      "enum": [
+        "growth_specification",
+        "growth_blueprint",
+        "campaign_world",
+        "creative_directors_bible",
+        "production_pack",
+        "asset_manifest",
+        "performance_feedback"
+      ]
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "client_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "client_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "campaign_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "campaign_name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "$ref": "#/$defs/lifecycleStatus"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string",
+      "minLength": 1
+    },
+    "approved_by": {
+      "type": ["string", "null"]
+    },
+    "approved_at": {
+      "type": ["string", "null"],
+      "format": "date-time"
+    },
+    "parent_object_id": {
+      "type": ["string", "null"]
+    },
+    "source_object_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "child_object_ids": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
+    "repository_path": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?!/)(?!.*\\.\\.)[^\\\\]+$"
+    },
+    "commit_sha": {
+      "type": ["string", "null"],
+      "pattern": "^[0-9a-f]{40}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["approved", "active", "superseded", "archived"]
+          }
+        },
+        "required": ["status"]
+      },
+      "then": {
+        "properties": {
+          "approved_by": {
+            "type": "string",
+            "minLength": 1
+          },
+          "approved_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "object_type": {
+            "const": "growth_specification"
+          }
+        },
+        "required": ["object_type"]
+      },
+      "then": {
+        "properties": {
+          "parent_object_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "object_type": {
+            "enum": [
+              "growth_blueprint",
+              "campaign_world",
+              "creative_directors_bible",
+              "production_pack",
+              "asset_manifest",
+              "performance_feedback"
+            ]
+          }
+        },
+        "required": ["object_type"]
+      },
+      "then": {
+        "properties": {
+          "parent_object_id": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "lifecycleStatus": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "in_review",
+        "approved",
+        "active",
+        "superseded",
+        "archived"
+      ]
+    },
+    "implementationState": {
+      "type": "string",
+      "enum": [
+        "designed",
+        "authored",
+        "committed",
+        "operational",
+        "validated"
+      ]
+    }
+  }
+}
