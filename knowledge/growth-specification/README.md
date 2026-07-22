@@ -72,7 +72,9 @@ Answers: **What assets exist, where are they, and what state are they in?**
 
 Provides a machine-readable register of planned, generated, reviewed, approved, delivered and superseded assets, including lineage back to strategy and creative direction.
 
-Status: specification required.
+Canonical specification:
+
+`knowledge/asset-manifest/asset-manifest-specification-v1.md`
 
 ### 6. Performance Feedback
 
@@ -198,16 +200,15 @@ Tony must never infer completion from chat history alone. A repository commit, r
 | Campaign World | `knowledge/campaign-world/campaign-world-schema-v1.md` | Committed |
 | Creative Director's Bible | `knowledge/creative-bible/creative-directors-bible-v2.md` | Committed |
 | Production Pack | `knowledge/production-pack/production-pack-specification-v1.md` | Committed |
-| Asset Manifest | Not yet specified | Required |
+| Asset Manifest | `knowledge/asset-manifest/asset-manifest-specification-v1.md` | Committed |
 | Performance Feedback | Not yet specified | Required |
 
 ## Next Canonical Milestones
 
-1. Define the Asset Manifest specification.
-2. Define the Performance Feedback specification.
-3. Add machine-readable JSON Schemas for the parent and child objects.
-4. Add validators for dependency, lifecycle and lineage rules.
-5. Connect Tony's `progress update` intent to repository and runtime state.
+1. Define the Performance Feedback specification.
+2. Add machine-readable JSON Schemas for the parent and child objects.
+3. Add validators for dependency, lifecycle and lineage rules.
+4. Connect Tony's `progress update` intent to repository and runtime state.
 
 ## Governance
 
