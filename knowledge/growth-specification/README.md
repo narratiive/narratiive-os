@@ -82,7 +82,9 @@ Answers: **What happened, what did we learn, and what should change?**
 
 Connects campaign and asset performance to the original strategic choices, captures evidence and learning, and creates approved recommendations for the next iteration of the Growth Specification.
 
-Status: specification required.
+Canonical specification:
+
+`knowledge/performance-feedback/performance-feedback-specification-v1.md`
 
 ## Shared Metadata Contract
 
@@ -201,14 +203,14 @@ Tony must never infer completion from chat history alone. A repository commit, r
 | Creative Director's Bible | `knowledge/creative-bible/creative-directors-bible-v2.md` | Committed |
 | Production Pack | `knowledge/production-pack/production-pack-specification-v1.md` | Committed |
 | Asset Manifest | `knowledge/asset-manifest/asset-manifest-specification-v1.md` | Committed |
-| Performance Feedback | Not yet specified | Required |
+| Performance Feedback | `knowledge/performance-feedback/performance-feedback-specification-v1.md` | Committed |
 
 ## Next Canonical Milestones
 
-1. Define the Performance Feedback specification.
-2. Add machine-readable JSON Schemas for the parent and child objects.
-3. Add validators for dependency, lifecycle and lineage rules.
-4. Connect Tony's `progress update` intent to repository and runtime state.
+1. Add machine-readable JSON Schemas for the parent and child objects.
+2. Add validators for dependency, lifecycle and lineage rules.
+3. Connect Tony's `progress update` intent to repository and runtime state.
+4. Review and map the Growth Blueprint into its canonical repository path.
 
 ## Governance
 
