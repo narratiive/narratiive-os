@@ -62,7 +62,9 @@ Answers: **How will each approved asset be made?**
 
 Defines asset-level briefs, production methods, responsibilities, dependencies, formats, technical requirements, prompts, storyboards, schedules, review gates and handoff instructions.
 
-Status: specification required.
+Canonical specification:
+
+`knowledge/production-pack/production-pack-specification-v1.md`
 
 ### 5. Asset Manifest
 
@@ -195,18 +197,17 @@ Tony must never infer completion from chat history alone. A repository commit, r
 | Growth Blueprint | Existing Narratiive OS blueprint system | Review and canonical path mapping required |
 | Campaign World | `knowledge/campaign-world/campaign-world-schema-v1.md` | Committed |
 | Creative Director's Bible | `knowledge/creative-bible/creative-directors-bible-v2.md` | Committed |
-| Production Pack | Not yet specified | Required |
+| Production Pack | `knowledge/production-pack/production-pack-specification-v1.md` | Committed |
 | Asset Manifest | Not yet specified | Required |
 | Performance Feedback | Not yet specified | Required |
 
 ## Next Canonical Milestones
 
-1. Define the Production Pack specification.
-2. Define the Asset Manifest specification.
-3. Define the Performance Feedback specification.
-4. Add machine-readable JSON Schemas for the parent and child objects.
-5. Add validators for dependency, lifecycle and lineage rules.
-6. Connect Tony's `progress update` intent to repository and runtime state.
+1. Define the Asset Manifest specification.
+2. Define the Performance Feedback specification.
+3. Add machine-readable JSON Schemas for the parent and child objects.
+4. Add validators for dependency, lifecycle and lineage rules.
+5. Connect Tony's `progress update` intent to repository and runtime state.
 
 ## Governance
 
