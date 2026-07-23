@@ -49,7 +49,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         }
         return bridge.handle(environ)
 
-    def command_bridge(self, transport=None):
+    def command_bridge(self, transport=None, diagnostics_runner=None):
         transport = transport or FakeGatewayTransport()
         validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
         service = TonyCommandService(RepositoryProgressEngine(validator))
@@ -57,6 +57,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
             TonyOrchestrationAdapter(transport),
             command_service=service,
             object_loader=lambda: [object_record()],
+            diagnostics_runner=diagnostics_runner,
         ), transport
 
     def test_health_endpoint_is_available_without_gateway_or_token(self):
@@ -67,6 +68,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(response["service"], "tony-http-bridge")
         self.assertEqual(response["status"], "alive")
         self.assertFalse(response["deterministic_commands"])
+        self.assertFalse(response["diagnostics"])
         self.assertEqual(transport.calls, [])
 
     def test_forwards_health_command_and_preserves_ids(self):
@@ -130,6 +132,46 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertIn("Rave Coffee", response["reply"])
         self.assertIn("Stage: growth_blueprint", response["reply"])
         self.assertEqual(transport.calls, [])
+
+    def test_diagnostics_command_reports_each_runtime_layer_without_gateway_dispatch(self):
+        report = {
+            "ok": True,
+            "checks": [
+                {"name": "tony-http-bridge", "healthy": True, "error": ""},
+                {"name": "runtime-gateway", "healthy": True, "error": ""},
+                {"name": "repository-state", "healthy": True, "error": ""},
+            ],
+        }
+        bridge, transport = self.command_bridge(diagnostics_runner=lambda: report)
+        status, response = self.request(bridge, {"text": "/diagnostics"}, path="/telegram")
+        self.assertEqual(status.value, 200)
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["command"], "diagnostics")
+        self.assertIn("Tony diagnostics: healthy.", response["reply"])
+        self.assertIn("OK — repository-state", response["reply"])
+        self.assertEqual(transport.calls, [])
+
+    def test_diagnostics_command_returns_specific_degraded_component(self):
+        report = {
+            "ok": False,
+            "checks": [
+                {"name": "tony-http-bridge", "healthy": True, "error": ""},
+                {"name": "runtime-gateway", "healthy": False, "error": "connection refused"},
+                {"name": "repository-state", "healthy": True, "error": ""},
+            ],
+        }
+        bridge, _ = self.command_bridge(diagnostics_runner=lambda: report)
+        status, response = self.request(bridge, {"text": "/doctor"}, path="/telegram")
+        self.assertEqual(status.value, 200)
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["status"], "degraded")
+        self.assertIn("FAIL — runtime-gateway: connection refused", response["reply"])
+
+    def test_diagnostics_unavailable_has_explicit_error(self):
+        bridge, _ = self.command_bridge()
+        status, response = self.request(bridge, {"text": "/diagnostics"}, path="/telegram")
+        self.assertEqual(status.value, 503)
+        self.assertEqual(response["error"]["code"], "diagnostics_unavailable")
 
     def test_non_slash_payload_keeps_existing_gateway_contract(self):
         transport = FakeGatewayTransport([
