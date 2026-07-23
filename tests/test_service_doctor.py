@@ -1,6 +1,7 @@
-import io
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from urllib.error import URLError
 
 from scripts.service_doctor import ServiceDoctor
@@ -73,6 +74,89 @@ class ServiceDoctorTests(unittest.TestCase):
         exit_code, report = doctor.run("http://gateway/health", "http://bridge/health")
         self.assertEqual(exit_code, 30)
         self.assertEqual(report["services"][0]["error"], "unhealthy response")
+
+    def test_matching_deployment_receipt_is_healthy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "runtime-state" / "deployment.json"
+            state.parent.mkdir()
+            state.write_text(json.dumps({
+                "status": "healthy",
+                "deployed_revision": "abc123",
+                "deployed_at": "2026-07-23T12:00:00Z",
+            }), encoding="utf-8")
+            doctor = ServiceDoctor(
+                opener=lambda endpoint, timeout: FakeResponse(),
+                revision_reader=lambda repository: "abc123",
+            )
+            exit_code, report = doctor.run(
+                "http://gateway/health",
+                "http://bridge/health",
+                repository_root=root,
+            )
+            self.assertEqual(exit_code, 0)
+            self.assertTrue(report["deployment"]["healthy"])
+            self.assertEqual(report["deployment"]["current_revision"], "abc123")
+
+    def test_stale_deployment_receipt_has_distinct_exit_code(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "runtime-state" / "deployment.json"
+            state.parent.mkdir()
+            state.write_text(json.dumps({
+                "status": "healthy",
+                "deployed_revision": "old123",
+                "deployed_at": "2026-07-23T12:00:00Z",
+            }), encoding="utf-8")
+            doctor = ServiceDoctor(
+                opener=lambda endpoint, timeout: FakeResponse(),
+                revision_reader=lambda repository: "new456",
+            )
+            exit_code, report = doctor.run(
+                "http://gateway/health",
+                "http://bridge/health",
+                repository_root=root,
+            )
+            self.assertEqual(exit_code, 40)
+            self.assertFalse(report["ok"])
+            self.assertIn("live deployment is stale", report["deployment"]["error"])
+
+    def test_missing_receipt_combines_with_service_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def opener(endpoint, timeout):
+                if "gateway" in endpoint:
+                    raise URLError("refused")
+                return FakeResponse()
+
+            doctor = ServiceDoctor(opener=opener, revision_reader=lambda repository: "abc123")
+            exit_code, report = doctor.run(
+                "http://gateway/health",
+                "http://bridge/health",
+                repository_root=root,
+            )
+            self.assertEqual(exit_code, 50)
+            self.assertFalse(report["deployment"]["healthy"])
+            self.assertIn("receipt missing", report["deployment"]["error"])
+
+    def test_incomplete_receipt_is_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            state = root / "runtime-state" / "deployment.json"
+            state.parent.mkdir()
+            state.write_text(json.dumps({"status": "healthy"}), encoding="utf-8")
+            doctor = ServiceDoctor(
+                opener=lambda endpoint, timeout: FakeResponse(),
+                revision_reader=lambda repository: "abc123",
+            )
+            exit_code, report = doctor.run(
+                "http://gateway/health",
+                "http://bridge/health",
+                repository_root=root,
+            )
+            self.assertEqual(exit_code, 40)
+            self.assertIn("incomplete", report["deployment"]["error"])
 
 
 if __name__ == "__main__":
