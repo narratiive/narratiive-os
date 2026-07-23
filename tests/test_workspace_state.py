@@ -77,7 +77,7 @@ class WorkspaceStateRepositoryTests(unittest.TestCase):
 
     def test_corrupt_log_is_rejected_instead_of_silently_reset(self):
         repository = self.repository()
-        repository.state_dir.mkdir(parents=True)
+        repository.state_dir.mkdir(parents=True, exist_ok=True)
         repository.events_path.write_text('{"sequence":1}\nnot-json\n', encoding="utf-8")
 
         with self.assertRaises(WorkspaceStateError):
