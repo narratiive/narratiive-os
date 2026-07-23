@@ -4,7 +4,7 @@ import hashlib
 import json
 import os
 import threading
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable, Mapping
@@ -156,7 +156,7 @@ class ExecutionJournal:
                 metadata=dict(metadata or {}),
                 previous_hash=previous_hash,
             )
-            record = ExecutionRecord(**{**record.__dict__, "record_hash": self._hash(record)})
+            record = replace(record, record_hash=self._hash(record))
             self._append_line(record)
             return record
 
