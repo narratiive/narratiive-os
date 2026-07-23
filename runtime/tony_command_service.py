@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from typing import Any, Iterable
 
 from runtime.progress_engine import CampaignProgress, RepositoryProgressEngine
+from runtime.terminology_policy import TerminologyPolicy, TerminologyViolation
 
 
 @dataclass(frozen=True)
@@ -25,8 +26,13 @@ class CommandResponse:
 class TonyCommandService:
     """Expose deterministic Tony commands backed by canonical repository state."""
 
-    def __init__(self, progress_engine: RepositoryProgressEngine) -> None:
+    def __init__(
+        self,
+        progress_engine: RepositoryProgressEngine,
+        terminology_policy: TerminologyPolicy | None = None,
+    ) -> None:
         self.progress_engine = progress_engine
+        self.terminology_policy = terminology_policy or TerminologyPolicy.from_path()
 
     def execute(
         self,
@@ -35,7 +41,7 @@ class TonyCommandService:
     ) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         if not normalized:
-            return self._error("", "empty_command", "No command was provided.")
+            return self._validated(self._error("", "empty_command", "No command was provided."))
 
         parts = normalized.split(" ", 1)
         name = parts[0].lower().lstrip("/")
@@ -43,17 +49,62 @@ class TonyCommandService:
         snapshot = self.progress_engine.build_snapshot(objects)
 
         if name in {"status", "progress", "progress_update"}:
-            return self._status(name, snapshot)
-        if name == "health":
-            return self._health(snapshot)
-        if name == "clients":
-            return self._clients(snapshot)
-        if name == "client":
-            return self._client(argument, snapshot)
-        if name in {"next", "what_next", "continue"}:
-            return self._next(name, snapshot)
+            response = self._status(name, snapshot)
+        elif name == "health":
+            response = self._health(snapshot)
+        elif name == "clients":
+            response = self._clients(snapshot)
+        elif name == "client":
+            response = self._client(argument, snapshot)
+        elif name in {"next", "what_next", "continue"}:
+            response = self._next(name, snapshot)
+        else:
+            response = self._error(name, "unsupported_command", f"Unsupported command: {name}")
 
-        return self._error(name, "unsupported_command", f"Unsupported command: {name}")
+        return self._validated(response)
+
+    def _validated(self, response: CommandResponse) -> CommandResponse:
+        violations = self.terminology_policy.scan_many(self._response_strings(response))
+        if not violations:
+            return response
+
+        return CommandResponse(
+            command=response.command,
+            status="error",
+            message="Tony output was blocked by the canonical terminology policy.",
+            data={
+                "error_code": "terminology_violation",
+                "policy_version": self.terminology_policy.version,
+                "violations": [self._violation_payload(item) for item in violations],
+            },
+        )
+
+    @classmethod
+    def _response_strings(cls, response: CommandResponse) -> Iterable[str]:
+        yield response.command
+        yield response.status
+        yield response.message
+        yield from cls._strings_in(response.data)
+
+    @classmethod
+    def _strings_in(cls, value: Any) -> Iterable[str]:
+        if isinstance(value, str):
+            yield value
+        elif isinstance(value, dict):
+            for key, item in value.items():
+                yield str(key)
+                yield from cls._strings_in(item)
+        elif isinstance(value, (list, tuple, set)):
+            for item in value:
+                yield from cls._strings_in(item)
+
+    @staticmethod
+    def _violation_payload(violation: TerminologyViolation) -> dict[str, Any]:
+        return {
+            "term": violation.term,
+            "replacement": violation.replacement,
+            "rationale": violation.rationale,
+        }
 
     def _status(self, command: str, snapshot: Any) -> CommandResponse:
         campaigns = [campaign.to_dict() for campaign in snapshot.campaigns]
