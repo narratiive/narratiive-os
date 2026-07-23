@@ -85,8 +85,8 @@ class WorkspaceSnapshot:
 class WorkspaceStateRepository:
     """Append-only runtime state with deterministic replay and atomic snapshots.
 
-    The event log is authoritative. The snapshot is a rebuildable read model used
-    for fast Tony command responses after a process restart.
+    The event log is authoritative. New events are replay-validated before they
+    are persisted, so an invalid transition can never poison the durable log.
     """
 
     EVENT_TYPES = {
@@ -131,8 +131,9 @@ class WorkspaceStateRepository:
                 occurred_at=occurred_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
                 payload=dict(payload or {}),
             )
+            prospective = [*events, event]
+            snapshot = self.replay(prospective, workspace_id=workspace_id)
             self._append_line(event)
-            snapshot = self.replay([*events, event])
             self._write_snapshot(snapshot)
             return snapshot
 
@@ -163,8 +164,7 @@ class WorkspaceStateRepository:
         return events
 
     def load(self, workspace_id: str) -> WorkspaceSnapshot:
-        events = [event for event in self.read_events() if event.workspace_id == workspace_id]
-        return self.replay(events, workspace_id=workspace_id)
+        return self.replay(self.read_events(), workspace_id=workspace_id)
 
     def rebuild_snapshot(self, workspace_id: str) -> WorkspaceSnapshot:
         with self._lock:
@@ -242,11 +242,7 @@ class WorkspaceStateRepository:
             decision = str(payload.get("decision", "")).strip()
             if not decision:
                 raise WorkspaceStateError("approval.decided requires payload.decision")
-            snapshot.approvals[approval_id] = {
-                **snapshot.approvals[approval_id],
-                **payload,
-                "status": decision,
-            }
+            snapshot.approvals[approval_id] = {**snapshot.approvals[approval_id], **payload, "status": decision}
             return
         if event.event_type == "action.queued":
             action_id = str(payload.get("action_id", "")).strip()
@@ -261,9 +257,8 @@ class WorkspaceStateRepository:
             matches = [item for item in snapshot.queued_actions if item.get("action_id") == action_id]
             if not action_id or not matches:
                 raise WorkspaceStateError("action.completed references an unknown queued action")
-            action = {**matches[0], **payload, "status": "completed"}
             snapshot.queued_actions = [item for item in snapshot.queued_actions if item.get("action_id") != action_id]
-            snapshot.completed_actions.append(action)
+            snapshot.completed_actions.append({**matches[0], **payload, "status": "completed"})
             return
         raise WorkspaceStateError(f"unsupported workspace event: {event.event_type}")
 
@@ -282,10 +277,7 @@ class WorkspaceStateRepository:
         self.state_dir.mkdir(parents=True, exist_ok=True)
         value = snapshot.to_dict()
         canonical = json.dumps(value, separators=(",", ":"), sort_keys=True).encode("utf-8")
-        envelope = {
-            "state": value,
-            "sha256": hashlib.sha256(canonical).hexdigest(),
-        }
+        envelope = {"state": value, "sha256": hashlib.sha256(canonical).hexdigest()}
         temporary = self.snapshot_path.with_suffix(".tmp")
         try:
             temporary.write_text(json.dumps(envelope, indent=2, sort_keys=True) + "\n", encoding="utf-8")
