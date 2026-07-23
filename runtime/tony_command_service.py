@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Iterable
 
+from runtime.execution_journal import ExecutionJournal, ExecutionJournalError
 from runtime.progress_engine import CampaignProgress, RepositoryProgressEngine
 
 
@@ -25,8 +26,13 @@ class CommandResponse:
 class TonyCommandService:
     """Expose deterministic Tony commands backed by canonical repository state."""
 
-    def __init__(self, progress_engine: RepositoryProgressEngine) -> None:
+    def __init__(
+        self,
+        progress_engine: RepositoryProgressEngine,
+        execution_journal: ExecutionJournal | None = None,
+    ) -> None:
         self.progress_engine = progress_engine
+        self.execution_journal = execution_journal
 
     def execute(
         self,
@@ -40,6 +46,10 @@ class TonyCommandService:
         parts = normalized.split(" ", 1)
         name = parts[0].lower().lstrip("/")
         argument = parts[1].strip() if len(parts) == 2 else ""
+
+        if name in {"history", "explain"}:
+            return self._history(argument) if name == "history" else self._explain(argument)
+
         snapshot = self.progress_engine.build_snapshot(objects)
 
         if name in {"status", "progress", "progress_update"}:
@@ -77,11 +87,19 @@ class TonyCommandService:
     def _health(self, snapshot: Any) -> CommandResponse:
         validation = snapshot.validation.to_dict()
         status = "blocked" if validation["errors"] else "healthy"
+        journal = self._journal_integrity()
+        if journal is not None and not journal.get("ok", False):
+            status = "blocked"
         message = (
             f"Validated {validation['objects_validated']} object(s): "
             f"{len(validation['errors'])} error(s), {len(validation['warnings'])} warning(s)."
         )
-        return CommandResponse("health", status, message, {"validation": validation})
+        return CommandResponse(
+            "health",
+            status,
+            message,
+            {"validation": validation, "execution_journal": journal},
+        )
 
     def _clients(self, snapshot: Any) -> CommandResponse:
         clients: dict[str, dict[str, Any]] = {}
@@ -173,6 +191,69 @@ class TonyCommandService:
             f"Next: {primary['next_action']} for {primary['client_name']} / {primary['campaign_name']}.",
             {"primary": primary, "next_actions": actions},
         )
+
+    def _history(self, query: str) -> CommandResponse:
+        if self.execution_journal is None:
+            return self._error("history", "journal_unavailable", "Execution history is not configured.")
+        try:
+            records = self.execution_journal.read_all()
+        except ExecutionJournalError as exc:
+            return self._error("history", "journal_untrusted", str(exc))
+
+        if query:
+            needle = query.casefold()
+            records = [
+                record
+                for record in records
+                if needle in record.decision_id.casefold()
+                or needle in record.client_id.casefold()
+                or needle in record.action.casefold()
+            ]
+        records = records[-20:]
+        return CommandResponse(
+            "history",
+            "healthy",
+            f"{len(records)} execution record(s) found.",
+            {"records": [record.to_dict() for record in records]},
+        )
+
+    def _explain(self, decision_id: str) -> CommandResponse:
+        if not decision_id:
+            return self._error("explain", "missing_argument", "Decision id is required.")
+        if self.execution_journal is None:
+            return self._error("explain", "journal_unavailable", "Execution history is not configured.")
+        try:
+            records = self.execution_journal.history(decision_id)
+        except ExecutionJournalError as exc:
+            return self._error("explain", "journal_untrusted", str(exc))
+        if not records:
+            return self._error("explain", "decision_not_found", f"No decision matched: {decision_id}")
+
+        latest = records[-1]
+        return CommandResponse(
+            "explain",
+            latest.status,
+            f"{latest.action} was assigned to {latest.actor}: {latest.rationale}",
+            {
+                "decision_id": decision_id,
+                "current_status": latest.status,
+                "action": latest.action,
+                "actor": latest.actor,
+                "rationale": latest.rationale,
+                "repository_revision": latest.repository_revision,
+                "state_hash": latest.state_hash,
+                "artifacts": list(latest.artifacts),
+                "timeline": [record.to_dict() for record in records],
+            },
+        )
+
+    def _journal_integrity(self) -> dict[str, Any] | None:
+        if self.execution_journal is None:
+            return None
+        try:
+            return self.execution_journal.verify()
+        except ExecutionJournalError as exc:
+            return {"ok": False, "error": str(exc)}
 
     @staticmethod
     def _action_payload(campaign: CampaignProgress) -> dict[str, Any]:
