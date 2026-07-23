@@ -1,16 +1,21 @@
 from __future__ import annotations
 
+import json
 import subprocess
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
+    DEPLOYMENT_STATE_PATH,
     DeploymentError,
+    DeploymentResult,
     assert_safe_repository,
     deploy,
     restart_services,
     wait_for_health,
+    write_deployment_state,
 )
 
 
@@ -81,7 +86,28 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         wait_for_health(("http://service/health",), checker, attempts=2, interval_seconds=0)
         self.assertEqual(attempts["count"], 2)
 
-    def test_deploy_fast_forwards_tests_restarts_and_checks_health(self):
+    def test_write_deployment_state_is_machine_readable_and_atomic(self):
+        root = self.repository()
+        result = DeploymentResult(
+            previous_revision="old",
+            deployed_revision="new",
+            restarted_services=("runtime", "bridge"),
+            health_endpoints=("http://runtime/health", "http://bridge/health"),
+        )
+        path = write_deployment_state(
+            root,
+            result,
+            branch="main",
+            now=datetime(2026, 7, 23, 11, 45, tzinfo=timezone.utc),
+        )
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        self.assertEqual(path, root / DEPLOYMENT_STATE_PATH)
+        self.assertEqual(payload["deployed_revision"], "new")
+        self.assertEqual(payload["deployed_at"], "2026-07-23T11:45:00Z")
+        self.assertEqual(payload["status"], "healthy")
+        self.assertFalse(path.with_suffix(".json.tmp").exists())
+
+    def test_deploy_fast_forwards_tests_restarts_checks_health_and_records_receipt(self):
         root = self.repository()
         runner = FakeRunner(current="old", target="new")
         checked: list[str] = []
@@ -100,8 +126,25 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertEqual(set(checked), {"http://runtime/health", "http://bridge/health"})
         self.assertTrue(any(call[:3] == ("git", "merge", "--ff-only") for call in runner.calls))
         self.assertTrue(any(len(call) > 2 and call[1:3] == ("-m", "unittest") for call in runner.calls))
+        receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
+        self.assertEqual(receipt["deployed_revision"], "new")
+        self.assertEqual(receipt["branch"], "main")
 
-    def test_failed_tests_roll_back_before_reporting_failure(self):
+    def test_restart_only_deployment_also_refreshes_receipt(self):
+        root = self.repository()
+        runner = FakeRunner(current="same", target="same")
+        result = deploy(
+            root,
+            runner=runner,
+            checker=lambda endpoint, timeout: None,
+            labels=("runtime",),
+            endpoints=("http://runtime/health",),
+        )
+        self.assertEqual(result.deployed_revision, "same")
+        receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
+        self.assertEqual(receipt["deployed_revision"], "same")
+
+    def test_failed_tests_roll_back_before_reporting_failure_without_false_receipt(self):
         root = self.repository()
         runner = FakeRunner(current="old", target="new")
         runner.fail_tests = True
@@ -117,6 +160,7 @@ class DeployTonyRuntimeTests(unittest.TestCase):
 
         self.assertEqual(runner.current, "old")
         self.assertIn(("git", "reset", "--hard", "old"), runner.calls)
+        self.assertFalse((root / DEPLOYMENT_STATE_PATH).exists())
 
 
 if __name__ == "__main__":
