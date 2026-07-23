@@ -120,6 +120,25 @@ class TonyCommandServiceTests(unittest.TestCase):
         self.assertEqual(payload["status"], "empty")
         self.assertEqual(payload["data"]["next_actions"], [])
 
+    def test_retired_language_in_message_is_blocked(self):
+        response = self.service.execute(
+            "/client opportunity card",
+            [object_record(status="approved", client_name="Opportunity Card")],
+        )
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "terminology_violation")
+        self.assertEqual(response.data["policy_version"], "1.0.0")
+        self.assertEqual(response.data["violations"][0]["term"], "Opportunity Card")
+
+    def test_retired_language_in_nested_data_is_blocked(self):
+        response = self.service.execute(
+            "/status",
+            [object_record(status="approved", campaign_name="Growth Sprint")],
+        )
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "terminology_violation")
+        self.assertEqual(response.message, "Tony output was blocked by the canonical terminology policy.")
+
 
 if __name__ == "__main__":
     unittest.main()
