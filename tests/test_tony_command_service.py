@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 
+from runtime.execution_journal import ExecutionJournal
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
@@ -64,8 +66,9 @@ def reciprocal(records):
 class TonyCommandServiceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
-        cls.service = TonyCommandService(RepositoryProgressEngine(validator))
+        cls.validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        cls.progress_engine = RepositoryProgressEngine(cls.validator)
+        cls.service = TonyCommandService(cls.progress_engine)
 
     def test_status_returns_repository_snapshot(self):
         response = self.service.execute("/status", [object_record(status="approved")])
@@ -108,6 +111,94 @@ class TonyCommandServiceTests(unittest.TestCase):
         response = self.service.execute("/health", [object_record()])
         self.assertEqual(response.status, "healthy")
         self.assertEqual(response.data["validation"]["objects_validated"], 1)
+        self.assertIsNone(response.data["execution_journal"])
+
+    def test_history_requires_configured_journal(self):
+        response = self.service.execute("/history", [])
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "journal_unavailable")
+
+    def test_history_filters_execution_records(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ExecutionJournal(directory)
+            journal.append(
+                decision_id="decision-rave-1",
+                workspace_id="narratiive",
+                client_id="rave",
+                action="generate_campaign_world",
+                rationale="Growth Blueprint is approved",
+                actor="claude",
+                status="selected",
+            )
+            journal.append(
+                decision_id="decision-maeving-1",
+                workspace_id="narratiive",
+                client_id="maeving",
+                action="generate_blueprint",
+                rationale="Research is complete",
+                actor="claude",
+                status="selected",
+            )
+            service = TonyCommandService(self.progress_engine, journal)
+            response = service.execute("/history rave", [])
+            self.assertEqual(response.status, "healthy")
+            self.assertEqual(len(response.data["records"]), 1)
+            self.assertEqual(response.data["records"][0]["decision_id"], "decision-rave-1")
+
+    def test_explain_reconstructs_decision_timeline(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ExecutionJournal(directory)
+            journal.append(
+                decision_id="decision-rave-1",
+                workspace_id="narratiive",
+                client_id="rave",
+                action="generate_campaign_world",
+                rationale="Growth Blueprint is approved",
+                actor="claude",
+                status="selected",
+                repository_revision="abc123",
+            )
+            journal.append(
+                decision_id="decision-rave-1",
+                workspace_id="narratiive",
+                client_id="rave",
+                action="generate_campaign_world",
+                rationale="Growth Blueprint is approved",
+                actor="claude",
+                status="completed",
+                repository_revision="abc123",
+                artifacts=("clients/rave/campaign-world.md",),
+            )
+            service = TonyCommandService(self.progress_engine, journal)
+            response = service.execute("/explain decision-rave-1", [])
+            self.assertEqual(response.status, "completed")
+            self.assertEqual(response.data["actor"], "claude")
+            self.assertEqual(len(response.data["timeline"]), 2)
+            self.assertEqual(response.data["artifacts"], ["clients/rave/campaign-world.md"])
+
+    def test_explain_requires_decision_id(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = TonyCommandService(self.progress_engine, ExecutionJournal(directory))
+            response = service.execute("/explain", [])
+            self.assertEqual(response.status, "error")
+            self.assertEqual(response.data["error_code"], "missing_argument")
+
+    def test_health_verifies_execution_journal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            journal = ExecutionJournal(directory)
+            journal.append(
+                decision_id="decision-rave-1",
+                workspace_id="narratiive",
+                client_id="rave",
+                action="generate_campaign_world",
+                rationale="Growth Blueprint is approved",
+                actor="claude",
+                status="selected",
+            )
+            service = TonyCommandService(self.progress_engine, journal)
+            response = service.execute("/health", [object_record()])
+            self.assertTrue(response.data["execution_journal"]["ok"])
+            self.assertEqual(response.data["execution_journal"]["records"], 1)
 
     def test_unsupported_command_is_rejected(self):
         response = self.service.execute("/invent", [])
