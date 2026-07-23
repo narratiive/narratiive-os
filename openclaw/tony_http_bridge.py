@@ -22,18 +22,19 @@ from runtime.tony_orchestration import (
     TonyGatewayError,
     TonyOrchestrationAdapter,
 )
+from scripts.service_doctor import ServiceDoctor
 
 
 ObjectLoader = Callable[[], Iterable[dict[str, Any]]]
+DiagnosticsRunner = Callable[[], dict[str, Any]]
 
 
 class TonyHTTPBridge:
     """Small authenticated HTTP boundary for OpenClaw, Telegram and n8n.
 
-    Telegram slash commands are deliberately handled by the deterministic
-    repository-backed command service. They never depend on a managerial LLM,
-    so `/status`, `/health`, `/clients`, `/client`, `/next` and `/continue`
-    remain available even when a language-model provider is slow or offline.
+    Telegram slash commands are deliberately handled by deterministic services.
+    They never depend on a managerial LLM, so operational status remains
+    available even when a language-model provider is slow or offline.
     """
 
     def __init__(
@@ -43,11 +44,13 @@ class TonyHTTPBridge:
         *,
         command_service: TonyCommandService | None = None,
         object_loader: ObjectLoader | None = None,
+        diagnostics_runner: DiagnosticsRunner | None = None,
     ) -> None:
         self.adapter = adapter
         self.bridge_token = bridge_token.strip()
         self.command_service = command_service
         self.object_loader = object_loader
+        self.diagnostics_runner = diagnostics_runner
 
     def __call__(self, environ, start_response):
         try:
@@ -74,6 +77,7 @@ class TonyHTTPBridge:
                 "service": "tony-http-bridge",
                 "status": "alive",
                 "deterministic_commands": self.command_service is not None,
+                "diagnostics": self.diagnostics_runner is not None,
             }
 
         if method != "POST":
@@ -130,6 +134,9 @@ class TonyHTTPBridge:
         }
 
     def _handle_telegram_command(self, command: str):
+        name = command.strip().split(" ", 1)[0].lower().lstrip("/")
+        if name in {"diagnostics", "doctor"}:
+            return self._handle_diagnostics()
         if self.command_service is None or self.object_loader is None:
             return HTTPStatus.SERVICE_UNAVAILABLE, self._error(
                 "command_service_unavailable",
@@ -150,6 +157,40 @@ class TonyHTTPBridge:
             "reply": reply,
             "message": reply,
             **payload,
+        }
+
+    def _handle_diagnostics(self):
+        if self.diagnostics_runner is None:
+            return HTTPStatus.SERVICE_UNAVAILABLE, self._error(
+                "diagnostics_unavailable",
+                "Tony diagnostics are not configured",
+            )
+        try:
+            report = self.diagnostics_runner()
+        except Exception:
+            return HTTPStatus.SERVICE_UNAVAILABLE, self._error(
+                "diagnostics_failed",
+                "Tony diagnostics could not complete",
+            )
+        checks = report.get("checks", []) if isinstance(report, dict) else []
+        failed = [check for check in checks if isinstance(check, dict) and not check.get("healthy")]
+        lines = ["Tony diagnostics: healthy." if not failed else "Tony diagnostics: degraded."]
+        for check in checks:
+            if not isinstance(check, dict):
+                continue
+            marker = "OK" if check.get("healthy") else "FAIL"
+            line = f"{marker} — {check.get('name', 'unknown')}"
+            if check.get("error"):
+                line += f": {check['error']}"
+            lines.append(line)
+        reply = "\n".join(lines)[:3500]
+        return HTTPStatus.OK, {
+            "ok": not failed,
+            "command": "diagnostics",
+            "status": "healthy" if not failed else "degraded",
+            "reply": reply,
+            "message": reply,
+            "data": report,
         }
 
     @staticmethod
@@ -216,11 +257,57 @@ def load_growth_objects(root: Path) -> list[dict[str, Any]]:
     return records
 
 
+def build_diagnostics_runner(
+    gateway_health_endpoint: str,
+    command_service: TonyCommandService,
+    object_loader: ObjectLoader,
+) -> DiagnosticsRunner:
+    doctor = ServiceDoctor(timeout_seconds=float(os.getenv("NARRATIIVE_DOCTOR_TIMEOUT_SECONDS", "3")))
+
+    def run() -> dict[str, Any]:
+        gateway = doctor.check("runtime-gateway", gateway_health_endpoint)
+        checks: list[dict[str, Any]] = [
+            {
+                "name": "tony-http-bridge",
+                "healthy": True,
+                "status_code": 200,
+                "error": "",
+            },
+            ServiceDoctor._as_dict(gateway),
+        ]
+        try:
+            objects = list(object_loader())
+            repository = command_service.execute("/health", objects)
+            repository_healthy = repository.status == "healthy"
+            checks.append(
+                {
+                    "name": "repository-state",
+                    "healthy": repository_healthy,
+                    "status_code": None,
+                    "error": "" if repository_healthy else repository.message,
+                    "objects_validated": repository.data.get("validation", {}).get("objects_validated", 0),
+                }
+            )
+        except Exception as exc:
+            checks.append(
+                {
+                    "name": "repository-state",
+                    "healthy": False,
+                    "status_code": None,
+                    "error": f"repository check failed: {exc}",
+                }
+            )
+        return {"ok": all(check["healthy"] for check in checks), "checks": checks}
+
+    return run
+
+
 def build_app() -> TonyHTTPBridge:
     api_key = os.getenv("NARRATIIVE_API_KEY", "").strip()
     if not api_key:
         raise SystemExit("NARRATIIVE_API_KEY is required")
     endpoint = os.getenv("NARRATIIVE_GATEWAY_ENDPOINT", "http://127.0.0.1:8787/")
+    gateway_health_endpoint = os.getenv("NARRATIIVE_GATEWAY_HEALTH_ENDPOINT", "http://127.0.0.1:8787/health")
     bridge_token = os.getenv("TONY_BRIDGE_TOKEN", "")
     gateway_timeout = float(os.getenv("TONY_GATEWAY_TIMEOUT_SECONDS", "25"))
     adapter = TonyOrchestrationAdapter(HttpGatewayTransport(endpoint, api_key, timeout_seconds=gateway_timeout))
@@ -232,11 +319,13 @@ def build_app() -> TonyHTTPBridge:
     objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
     validator = GrowthObjectValidator.from_path(schema_path)
     command_service = TonyCommandService(RepositoryProgressEngine(validator))
+    object_loader = lambda: load_growth_objects(objects_root)
     return TonyHTTPBridge(
         adapter,
         bridge_token,
         command_service=command_service,
-        object_loader=lambda: load_growth_objects(objects_root),
+        object_loader=object_loader,
+        diagnostics_runner=build_diagnostics_runner(gateway_health_endpoint, command_service, object_loader),
     )
 
 
