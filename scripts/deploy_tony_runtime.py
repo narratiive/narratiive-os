@@ -9,6 +9,7 @@ import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -22,6 +23,7 @@ HEALTH_ENDPOINTS = (
     "http://127.0.0.1:8787/health",
     "http://127.0.0.1:8790/health",
 )
+DEPLOYMENT_STATE_PATH = Path("runtime-state") / "deployment.json"
 
 
 class DeploymentError(RuntimeError):
@@ -140,6 +142,35 @@ def wait_for_health(
     raise DeploymentError(f"services did not become healthy: {detail}")
 
 
+def write_deployment_state(
+    root: Path,
+    result: DeploymentResult,
+    *,
+    branch: str,
+    state_path: Path = DEPLOYMENT_STATE_PATH,
+    now: datetime | None = None,
+) -> Path:
+    """Persist an atomic receipt proving which revision passed live health checks."""
+    timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    payload = {
+        "schema_version": 1,
+        "status": "healthy",
+        "branch": branch,
+        "previous_revision": result.previous_revision,
+        "deployed_revision": result.deployed_revision,
+        "deployed_at": timestamp.isoformat().replace("+00:00", "Z"),
+        "restarted_services": list(result.restarted_services),
+        "health_endpoints": list(result.health_endpoints),
+        "rolled_back": result.rolled_back,
+    }
+    destination = root / state_path
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_suffix(destination.suffix + ".tmp")
+    temporary.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    temporary.replace(destination)
+    return destination
+
+
 def deploy(
     root: Path,
     *,
@@ -157,7 +188,9 @@ def deploy(
     if target == previous:
         restarted = restart_services(labels, runner, cwd=root)
         wait_for_health(endpoints, checker)
-        return DeploymentResult(previous, target, restarted, tuple(endpoints))
+        result = DeploymentResult(previous, target, restarted, tuple(endpoints))
+        write_deployment_state(root, result, branch=branch)
+        return result
 
     _git(runner, root, "merge", "--ff-only", f"origin/{branch}")
     deployed = _git(runner, root, "rev-parse", "HEAD")
@@ -189,7 +222,9 @@ def deploy(
             ) from exc
         raise DeploymentError(f"deployment failed; rolled back to {previous}: {exc}") from exc
 
-    return DeploymentResult(previous, deployed, restarted, tuple(endpoints))
+    result = DeploymentResult(previous, deployed, restarted, tuple(endpoints))
+    write_deployment_state(root, result, branch=branch)
+    return result
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -220,11 +255,16 @@ def main() -> int:
                 "current_revision": current,
                 "services": list(RUNTIME_LABELS),
                 "health_endpoints": list(HEALTH_ENDPOINTS),
+                "deployment_state": str(root / DEPLOYMENT_STATE_PATH),
                 "next_command": f"{sys.executable} {Path(__file__).name} --apply",
             }, indent=2, sort_keys=True))
             return 0
         result = deploy(root)
-        print(json.dumps({"status": "deployed", **result.to_dict()}, indent=2, sort_keys=True))
+        print(json.dumps({
+            "status": "deployed",
+            "deployment_state": str(root / DEPLOYMENT_STATE_PATH),
+            **result.to_dict(),
+        }, indent=2, sort_keys=True))
         return 0
     except (DeploymentError, subprocess.CalledProcessError) as exc:
         print(json.dumps({"status": "failed", "error": str(exc)}, indent=2), file=sys.stderr)
