@@ -1,28 +1,39 @@
-name: Runtime tests
+name: Tony Runtime Validation
 
 on:
   pull_request:
     paths:
       - "runtime/**"
       - "tests/**"
+      - "schemas/**"
       - ".github/workflows/runtime-tests.yml"
   push:
     branches: [main]
     paths:
       - "runtime/**"
       - "tests/**"
+      - "schemas/**"
       - ".github/workflows/runtime-tests.yml"
 
 permissions:
   contents: read
 
 jobs:
-  unittest:
+  validate-runtime:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Run unit tests
-        run: python -m unittest discover -s tests -v
+
+      - name: Compile runtime and tests
+        run: python -m compileall -q runtime tests
+
+      - name: Run runtime test suite
+        run: python -m unittest discover -s tests -p "test_*.py" -v
