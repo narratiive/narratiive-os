@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Iterable
@@ -13,6 +14,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from runtime.mission_control import MissionControlBuilder, MissionControlSnapshot
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import CommandResponse, TonyCommandService
@@ -27,6 +29,7 @@ from scripts.service_doctor import ServiceDoctor
 
 ObjectLoader = Callable[[], Iterable[dict[str, Any]]]
 DiagnosticsRunner = Callable[[], dict[str, Any]]
+MissionControlLoader = Callable[[], MissionControlSnapshot]
 
 
 class TonyHTTPBridge:
@@ -72,12 +75,16 @@ class TonyHTTPBridge:
         path = str(environ.get("PATH_INFO", "/")) or "/"
 
         if method == "GET" and path == "/health":
+            mission_control = False
+            if self.command_service is not None:
+                mission_control = self.command_service.mission_control_loader is not None
             return HTTPStatus.OK, {
                 "ok": True,
                 "service": "tony-http-bridge",
                 "status": "alive",
                 "deterministic_commands": self.command_service is not None,
                 "diagnostics": self.diagnostics_runner is not None,
+                "mission_control": mission_control,
             }
 
         if method != "POST":
@@ -212,7 +219,26 @@ class TonyHTTPBridge:
     def _format_telegram_reply(response: CommandResponse) -> str:
         lines = [response.message]
         data = response.data
-        if response.command in {"status", "progress", "progress_update"}:
+        if response.command in {"mission", "mission_control", "brief"}:
+            blockers = data.get("blockers", [])
+            approvals = data.get("approvals_required", [])
+            workstreams = data.get("workstreams", [])
+            if blockers:
+                lines.append("Blockers:")
+                lines.extend(f"- {item}" for item in blockers[:5])
+            if approvals:
+                lines.append("Approvals:")
+                lines.extend(f"- {item}" for item in approvals[:5])
+            actionable = [
+                item for item in workstreams
+                if isinstance(item, dict) and item.get("state") not in {"used", "unknown"}
+            ]
+            if actionable:
+                lines.append("Next work:")
+                for item in actionable[:5]:
+                    suffix = f" — BLOCKED: {item.get('blocker')}" if item.get("blocker") else ""
+                    lines.append(f"- {item.get('title', 'Untitled')}: {item.get('next_action', 'No action')}{suffix}")
+        elif response.command in {"status", "progress", "progress_update"}:
             lines.append(f"Campaigns: {data.get('campaign_count', 0)}")
             lines.append(f"Blocked: {data.get('blocked_count', 0)}")
         elif response.command == "health":
@@ -255,6 +281,39 @@ def load_growth_objects(root: Path) -> list[dict[str, Any]]:
             if isinstance(candidate, dict) and candidate.get("id") and candidate.get("object_type"):
                 records.append(candidate)
     return records
+
+
+def build_mission_control_loader(
+    progress_engine: RepositoryProgressEngine,
+    object_loader: ObjectLoader,
+    gateway_health_endpoint: str,
+) -> MissionControlLoader:
+    """Build the live read-only Mission Control snapshot used by Telegram commands."""
+    builder = MissionControlBuilder()
+    doctor = ServiceDoctor(timeout_seconds=float(os.getenv("NARRATIIVE_DOCTOR_TIMEOUT_SECONDS", "3")))
+
+    def load() -> MissionControlSnapshot:
+        objects = list(object_loader())
+        progress = progress_engine.build_snapshot(objects)
+        gateway = doctor.check("runtime-gateway", gateway_health_endpoint)
+        connection_state = "connected" if gateway.healthy else "degraded"
+        evidence = "HTTP health check passed" if gateway.healthy else gateway.error
+        return builder.build(
+            generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+            progress=progress,
+            connections={
+                "runtime-gateway": {
+                    "state": connection_state,
+                    "evidence": evidence,
+                },
+                "telegram-bridge": {
+                    "state": "connected",
+                    "evidence": "Current request reached Tony HTTP bridge",
+                },
+            },
+        )
+
+    return load
 
 
 def build_diagnostics_runner(
@@ -318,8 +377,17 @@ def build_app() -> TonyHTTPBridge:
     ))
     objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
     validator = GrowthObjectValidator.from_path(schema_path)
-    command_service = TonyCommandService(RepositoryProgressEngine(validator))
+    progress_engine = RepositoryProgressEngine(validator)
     object_loader = lambda: load_growth_objects(objects_root)
+    mission_control_loader = build_mission_control_loader(
+        progress_engine,
+        object_loader,
+        gateway_health_endpoint,
+    )
+    command_service = TonyCommandService(
+        progress_engine,
+        mission_control_loader=mission_control_loader,
+    )
     return TonyHTTPBridge(
         adapter,
         bridge_token,
