@@ -38,7 +38,7 @@ class WorkspaceEvent:
 
     @classmethod
     def from_dict(cls, value: Mapping[str, Any]) -> "WorkspaceEvent":
-        required = ("sequence", "event_id", "event_type", "workspace_id", "client_id", "occurred_at")
+        required = ("sequence", "event_id", "event_type", "workspace_id", "occurred_at")
         missing = [name for name in required if value.get(name) in (None, "")]
         if missing:
             raise WorkspaceStateError(f"workspace event is missing: {', '.join(missing)}")
@@ -50,7 +50,7 @@ class WorkspaceEvent:
             event_id=str(value["event_id"]),
             event_type=str(value["event_type"]),
             workspace_id=str(value["workspace_id"]),
-            client_id=str(value["client_id"]),
+            client_id=str(value.get("client_id", "")),
             occurred_at=str(value["occurred_at"]),
             payload=dict(payload),
         )
