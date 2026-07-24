@@ -27,7 +27,7 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
         ),
         AgentSpec(
             "com.narratiive.tony-http-bridge",
-            (str(python_path), str(launcher), str(env_file), str(python_path), str(repo_root / "openclaw" / "tony_http_bridge.py")),
+            (str(python_path), str(launcher), str(env_file), str(python_path), str(repo_root / "openclaw" / "tony_live_bridge.py")),
             True,
         ),
         AgentSpec(
@@ -65,8 +65,8 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
     env_file = env_file.expanduser().resolve()
     if not (repo_root / "runtime" / "server.py").is_file():
         raise FileNotFoundError("runtime/server.py not found in repository root")
-    if not (repo_root / "openclaw" / "tony_http_bridge.py").is_file():
-        raise FileNotFoundError("Tony HTTP bridge not found")
+    if not (repo_root / "openclaw" / "tony_live_bridge.py").is_file():
+        raise FileNotFoundError("Tony live bridge not found")
     if not python_path.is_file():
         raise FileNotFoundError(f"Python executable not found: {python_path}")
     if not env_file.is_file():
