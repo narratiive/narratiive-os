@@ -9,11 +9,13 @@ from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
     DEPLOYMENT_STATE_PATH,
+    SMOKE_SCRIPT_PATH,
     DeploymentError,
     DeploymentResult,
     assert_safe_repository,
     deploy,
     restart_services,
+    run_smoke_check,
     wait_for_health,
     write_deployment_state,
 )
@@ -26,6 +28,7 @@ class FakeRunner:
         self.target = target
         self.calls: list[tuple[str, ...]] = []
         self.fail_tests = False
+        self.fail_smoke = False
 
     def __call__(self, command, cwd):
         command = tuple(command)
@@ -46,6 +49,10 @@ class FakeRunner:
             output = ""
         elif len(command) > 2 and command[1:3] == ("-m", "unittest") and self.fail_tests:
             raise subprocess.CalledProcessError(1, command)
+        elif command[-1].endswith("smoke_tony_live.py"):
+            if self.fail_smoke:
+                raise subprocess.CalledProcessError(1, command, stderr="command routing failed")
+            output = '{"ok": true, "checks": []}\n'
         else:
             output = ""
         return subprocess.CompletedProcess(command, 0, stdout=output, stderr="")
@@ -86,6 +93,28 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         wait_for_health(("http://service/health",), checker, attempts=2, interval_seconds=0)
         self.assertEqual(attempts["count"], 2)
 
+    def test_run_smoke_check_requires_script_and_valid_success_payload(self):
+        root = self.repository()
+        runner = FakeRunner()
+        with self.assertRaisesRegex(DeploymentError, "smoke check is missing"):
+            run_smoke_check(root, runner)
+
+        script = root / SMOKE_SCRIPT_PATH
+        script.parent.mkdir(parents=True)
+        script.write_text("# test\n", encoding="utf-8")
+        run_smoke_check(root, runner)
+        self.assertTrue(any(call[-1].endswith("smoke_tony_live.py") for call in runner.calls))
+
+    def test_run_smoke_check_rejects_command_failure(self):
+        root = self.repository()
+        script = root / SMOKE_SCRIPT_PATH
+        script.parent.mkdir(parents=True)
+        script.write_text("# test\n", encoding="utf-8")
+        runner = FakeRunner()
+        runner.fail_smoke = True
+        with self.assertRaisesRegex(DeploymentError, "command smoke check failed"):
+            run_smoke_check(root, runner)
+
     def test_write_deployment_state_is_machine_readable_and_atomic(self):
         root = self.repository()
         result = DeploymentResult(
@@ -105,17 +134,20 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertEqual(payload["deployed_revision"], "new")
         self.assertEqual(payload["deployed_at"], "2026-07-23T11:45:00Z")
         self.assertEqual(payload["status"], "healthy")
+        self.assertEqual(payload["smoke_check"], "passed")
         self.assertFalse(path.with_suffix(".json.tmp").exists())
 
-    def test_deploy_fast_forwards_tests_restarts_checks_health_and_records_receipt(self):
+    def test_deploy_fast_forwards_tests_restarts_checks_health_smokes_and_records_receipt(self):
         root = self.repository()
         runner = FakeRunner(current="old", target="new")
         checked: list[str] = []
+        smoked: list[Path] = []
 
         result = deploy(
             root,
             runner=runner,
             checker=lambda endpoint, timeout: checked.append(endpoint),
+            smoke_checker=lambda path, command_runner: smoked.append(path),
             labels=("runtime", "bridge"),
             endpoints=("http://runtime/health", "http://bridge/health"),
         )
@@ -124,23 +156,28 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertEqual(result.deployed_revision, "new")
         self.assertFalse(result.rolled_back)
         self.assertEqual(set(checked), {"http://runtime/health", "http://bridge/health"})
+        self.assertEqual(smoked, [root.resolve()])
         self.assertTrue(any(call[:3] == ("git", "merge", "--ff-only") for call in runner.calls))
         self.assertTrue(any(len(call) > 2 and call[1:3] == ("-m", "unittest") for call in runner.calls))
         receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
         self.assertEqual(receipt["deployed_revision"], "new")
         self.assertEqual(receipt["branch"], "main")
+        self.assertEqual(receipt["smoke_check"], "passed")
 
-    def test_restart_only_deployment_also_refreshes_receipt(self):
+    def test_restart_only_deployment_also_requires_smoke_and_refreshes_receipt(self):
         root = self.repository()
         runner = FakeRunner(current="same", target="same")
+        smoked: list[Path] = []
         result = deploy(
             root,
             runner=runner,
             checker=lambda endpoint, timeout: None,
+            smoke_checker=lambda path, command_runner: smoked.append(path),
             labels=("runtime",),
             endpoints=("http://runtime/health",),
         )
         self.assertEqual(result.deployed_revision, "same")
+        self.assertEqual(smoked, [root.resolve()])
         receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
         self.assertEqual(receipt["deployed_revision"], "same")
 
@@ -154,10 +191,36 @@ class DeployTonyRuntimeTests(unittest.TestCase):
                 root,
                 runner=runner,
                 checker=lambda endpoint, timeout: None,
+                smoke_checker=lambda path, command_runner: None,
                 labels=("runtime",),
                 endpoints=("http://runtime/health",),
             )
 
+        self.assertEqual(runner.current, "old")
+        self.assertIn(("git", "reset", "--hard", "old"), runner.calls)
+        self.assertFalse((root / DEPLOYMENT_STATE_PATH).exists())
+
+    def test_failed_smoke_check_rolls_back_and_revalidates_previous_revision(self):
+        root = self.repository()
+        runner = FakeRunner(current="old", target="new")
+        calls = {"count": 0}
+
+        def smoke_checker(path, command_runner):
+            calls["count"] += 1
+            if calls["count"] == 1:
+                raise DeploymentError("deterministic command failed")
+
+        with self.assertRaisesRegex(DeploymentError, "rolled back to old"):
+            deploy(
+                root,
+                runner=runner,
+                checker=lambda endpoint, timeout: None,
+                smoke_checker=smoke_checker,
+                labels=("runtime",),
+                endpoints=("http://runtime/health",),
+            )
+
+        self.assertEqual(calls["count"], 2)
         self.assertEqual(runner.current, "old")
         self.assertIn(("git", "reset", "--hard", "old"), runner.calls)
         self.assertFalse((root / DEPLOYMENT_STATE_PATH).exists())
