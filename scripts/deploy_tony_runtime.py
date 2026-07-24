@@ -24,6 +24,7 @@ HEALTH_ENDPOINTS = (
     "http://127.0.0.1:8790/health",
 )
 DEPLOYMENT_STATE_PATH = Path("runtime-state") / "deployment.json"
+SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
 
 
 class DeploymentError(RuntimeError):
@@ -36,6 +37,7 @@ class DeploymentResult:
     deployed_revision: str
     restarted_services: tuple[str, ...]
     health_endpoints: tuple[str, ...]
+    smoke_check: str = "passed"
     rolled_back: bool = False
 
     def to_dict(self) -> dict[str, object]:
@@ -44,12 +46,14 @@ class DeploymentResult:
             "deployed_revision": self.deployed_revision,
             "restarted_services": list(self.restarted_services),
             "health_endpoints": list(self.health_endpoints),
+            "smoke_check": self.smoke_check,
             "rolled_back": self.rolled_back,
         }
 
 
 CommandRunner = Callable[[Sequence[str], Path], subprocess.CompletedProcess[str]]
 HealthChecker = Callable[[str, float], None]
+SmokeChecker = Callable[[Path, CommandRunner], None]
 
 
 def run_command(command: Sequence[str], cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -78,6 +82,24 @@ def check_health(endpoint: str, timeout_seconds: float) -> None:
         raise DeploymentError(f"health check returned invalid JSON for {endpoint}") from exc
     if not isinstance(data, dict) or data.get("ok") is False:
         raise DeploymentError(f"health check reported unhealthy for {endpoint}")
+
+
+def run_smoke_check(root: Path, runner: CommandRunner = run_command) -> None:
+    """Verify that the deployed bridge routes deterministic Tony commands correctly."""
+    script = root / SMOKE_SCRIPT_PATH
+    if not script.is_file():
+        raise DeploymentError(f"Tony smoke check is missing: {script}")
+    try:
+        result = runner((sys.executable, str(script)), root)
+    except subprocess.CalledProcessError as exc:
+        detail = str(exc.stderr or exc.stdout or "smoke command failed").strip()[:500]
+        raise DeploymentError(f"Tony command smoke check failed: {detail}") from exc
+    try:
+        payload = json.loads(str(result.stdout or "{}"))
+    except json.JSONDecodeError as exc:
+        raise DeploymentError("Tony command smoke check returned invalid JSON") from exc
+    if not isinstance(payload, dict) or payload.get("ok") is not True:
+        raise DeploymentError("Tony command smoke check reported failure")
 
 
 def _stdout(result: subprocess.CompletedProcess[str]) -> str:
@@ -150,7 +172,7 @@ def write_deployment_state(
     state_path: Path = DEPLOYMENT_STATE_PATH,
     now: datetime | None = None,
 ) -> Path:
-    """Persist an atomic receipt proving which revision passed live health checks."""
+    """Persist an atomic receipt proving which revision passed live validation."""
     timestamp = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
     payload = {
         "schema_version": 1,
@@ -161,6 +183,7 @@ def write_deployment_state(
         "deployed_at": timestamp.isoformat().replace("+00:00", "Z"),
         "restarted_services": list(result.restarted_services),
         "health_endpoints": list(result.health_endpoints),
+        "smoke_check": result.smoke_check,
         "rolled_back": result.rolled_back,
     }
     destination = root / state_path
@@ -176,6 +199,7 @@ def deploy(
     *,
     runner: CommandRunner = run_command,
     checker: HealthChecker = check_health,
+    smoke_checker: SmokeChecker = run_smoke_check,
     labels: Sequence[str] = RUNTIME_LABELS,
     endpoints: Sequence[str] = HEALTH_ENDPOINTS,
 ) -> DeploymentResult:
@@ -188,6 +212,7 @@ def deploy(
     if target == previous:
         restarted = restart_services(labels, runner, cwd=root)
         wait_for_health(endpoints, checker)
+        smoke_checker(root, runner)
         result = DeploymentResult(previous, target, restarted, tuple(endpoints))
         write_deployment_state(root, result, branch=branch)
         return result
@@ -211,14 +236,16 @@ def deploy(
         )
         restarted = restart_services(labels, runner, cwd=root)
         wait_for_health(endpoints, checker)
+        smoke_checker(root, runner)
     except Exception as exc:
         _git(runner, root, "reset", "--hard", previous)
         try:
             restart_services(labels, runner, cwd=root)
             wait_for_health(endpoints, checker)
+            smoke_checker(root, runner)
         except Exception as rollback_exc:
             raise DeploymentError(
-                f"deployment failed and rollback health validation also failed: {rollback_exc}"
+                f"deployment failed and rollback validation also failed: {rollback_exc}"
             ) from exc
         raise DeploymentError(f"deployment failed; rolled back to {previous}: {exc}") from exc
 
@@ -229,7 +256,7 @@ def deploy(
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Safely update, test and restart the local Narratiive OS runtime.",
+        description="Safely update, test, restart and smoke-check the local Narratiive OS runtime.",
     )
     parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument(
@@ -255,6 +282,7 @@ def main() -> int:
                 "current_revision": current,
                 "services": list(RUNTIME_LABELS),
                 "health_endpoints": list(HEALTH_ENDPOINTS),
+                "smoke_check": str(root / SMOKE_SCRIPT_PATH),
                 "deployment_state": str(root / DEPLOYMENT_STATE_PATH),
                 "next_command": f"{sys.executable} {Path(__file__).name} --apply",
             }, indent=2, sort_keys=True))
