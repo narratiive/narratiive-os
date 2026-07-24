@@ -1,10 +1,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from runtime.execution_journal import ExecutionJournal, ExecutionJournalError
+from runtime.mission_control import MissionControlSnapshot
+from runtime.mission_control_service import MissionControlService
 from runtime.progress_engine import CampaignProgress, RepositoryProgressEngine
+
+
+MissionControlLoader = Callable[[], MissionControlSnapshot]
 
 
 @dataclass(frozen=True)
@@ -30,9 +35,12 @@ class TonyCommandService:
         self,
         progress_engine: RepositoryProgressEngine,
         execution_journal: ExecutionJournal | None = None,
+        mission_control_loader: MissionControlLoader | None = None,
     ) -> None:
         self.progress_engine = progress_engine
         self.execution_journal = execution_journal
+        self.mission_control_loader = mission_control_loader
+        self.mission_control_service = MissionControlService()
 
     def execute(
         self,
@@ -49,6 +57,8 @@ class TonyCommandService:
 
         if name in {"history", "explain"}:
             return self._history(argument) if name == "history" else self._explain(argument)
+        if name in {"mission", "mission_control", "brief"}:
+            return self._mission_control(name)
 
         snapshot = self.progress_engine.build_snapshot(objects)
 
@@ -98,7 +108,11 @@ class TonyCommandService:
             "health",
             status,
             message,
-            {"validation": validation, "execution_journal": journal},
+            {
+                "validation": validation,
+                "execution_journal": journal,
+                "mission_control_configured": self.mission_control_loader is not None,
+            },
         )
 
     def _clients(self, snapshot: Any) -> CommandResponse:
@@ -191,6 +205,24 @@ class TonyCommandService:
             f"Next: {primary['next_action']} for {primary['client_name']} / {primary['campaign_name']}.",
             {"primary": primary, "next_actions": actions},
         )
+
+    def _mission_control(self, command: str) -> CommandResponse:
+        if self.mission_control_loader is None:
+            return self._error(
+                command,
+                "mission_control_unavailable",
+                "Mission Control is not configured.",
+            )
+        try:
+            snapshot = self.mission_control_loader()
+            response = self.mission_control_service.respond(snapshot)
+        except Exception as exc:
+            return self._error(
+                command,
+                "mission_control_untrusted",
+                f"Mission Control could not build a trusted snapshot: {exc}",
+            )
+        return CommandResponse(command, response.status, response.message, response.data)
 
     def _history(self, query: str) -> CommandResponse:
         if self.execution_journal is None:
