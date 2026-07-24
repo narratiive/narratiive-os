@@ -14,7 +14,10 @@ def build_app() -> TonyHTTPBridge:
     if app.command_service is None:
         raise RuntimeError("Tony command service is not configured")
 
-    executive_service = TonyExecutiveCommandService(app.command_service)
+    executive_service = TonyExecutiveCommandService(
+        app.command_service,
+        brief_archive=app.brief_archive,
+    )
     app.command_service = TonyCapabilityCommandService(executive_service)
     return app
 

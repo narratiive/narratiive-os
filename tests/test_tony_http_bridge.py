@@ -1,13 +1,25 @@
 import io
 import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from openclaw.tony_http_bridge import TonyHTTPBridge, build_mission_control_loader
+from openclaw.tony_http_bridge import (
+    TonyHTTPBridge,
+    build_app,
+    build_brief_archive,
+    build_github_work_loader,
+    build_mission_control_loader,
+)
+from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
+from runtime.mission_control import MissionControlBuilder
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
 from runtime.tony_orchestration import FakeGatewayTransport, TonyOrchestrationAdapter
+from runtime.workspaces import WorkspaceRuntimeManager
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +86,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertFalse(response["deterministic_commands"])
         self.assertFalse(response["diagnostics"])
         self.assertFalse(response["mission_control"])
+        self.assertFalse(response["github"])
         self.assertEqual(transport.calls, [])
 
     def test_health_endpoint_reports_mission_control_configuration(self):
@@ -219,6 +232,141 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(status.value, 200)
         self.assertTrue(response["ok"])
         self.assertEqual(len(transport.calls), 1)
+
+    def test_github_command_returns_live_work_without_gateway_dispatch(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        pull = GitHubWorkItem(
+            kind="pull_request",
+            number=66,
+            title="GitHub awareness",
+            url="https://github.test/pull/66",
+            state="open",
+            author="codex",
+            created_at="2026-07-24T10:00:00Z",
+            updated_at="2026-07-24T11:00:00Z",
+            head_sha="abc",
+            requested_reviewers=("matt",),
+        )
+        github = GitHubWorkSnapshot(
+            repository="narratiive/narratiive-os",
+            workspace_id="agency",
+            observed_at="2026-07-24T11:00:00Z",
+            baseline_status="unavailable",
+            baseline_artifact_id="",
+            open_pull_requests=(pull,),
+            active_issues=(),
+            blocked=(),
+            matt_approval_required=(pull,),
+            changes_since_previous_brief=(),
+        )
+
+        def loader():
+            return MissionControlBuilder().build(
+                generated_at="2026-07-24T11:00:00Z",
+                progress=progress_engine.build_snapshot([object_record()]),
+                connections={"GitHub": {"state": "connected"}},
+                github_work=github,
+            )
+
+        bridge, transport = self.command_bridge(mission_control_loader=loader)
+        bridge.command_service.github_configured = True
+
+        status, response = self.request(
+            bridge, {"text": "/github"}, path="/telegram"
+        )
+
+        self.assertEqual(status.value, 200)
+        self.assertTrue(response["ok"])
+        self.assertIn("Open pull requests:", response["reply"])
+        self.assertIn("Requires Matt review:", response["reply"])
+        self.assertIn("baseline unavailable", response["reply"])
+        self.assertEqual(transport.calls, [])
+
+    def test_brief_archive_is_available_without_github_configuration(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            archive = build_brief_archive(
+                runtime_root=Path(temporary.name),
+                repository_root=ROOT,
+            )
+
+        self.assertEqual(archive.workspace_id, "legacy")
+
+    def test_github_loader_requires_complete_config_and_existing_workspace(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        runtime_root = Path(temporary.name)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            archive = build_brief_archive(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+            )
+            loader = build_github_work_loader(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+                brief_archive=archive,
+            )
+        self.assertIsNone(loader)
+
+        WorkspaceRuntimeManager(runtime_root, ROOT).create(
+            "agency", "agency-client", "Agency"
+        )
+        environment = {
+            "TONY_GITHUB_REPOSITORY": "narratiive/narratiive-os",
+            "TONY_GITHUB_WORKSPACE_ID": "agency",
+            "TONY_GITHUB_MATT_LOGIN": "matt",
+            "TONY_GITHUB_TOKEN": "read-only",
+        }
+        with mock.patch.dict(os.environ, environment, clear=True):
+            archive = build_brief_archive(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+            )
+            loader = build_github_work_loader(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+                brief_archive=archive,
+            )
+
+        self.assertIsNotNone(loader)
+        self.assertEqual(archive.workspace_id, "agency")
+
+    def test_malformed_github_configuration_does_not_abort_bridge(self):
+        configurations = (
+            {"TONY_GITHUB_REPOSITORY": "not-a-valid-repo-format"},
+            {"TONY_GITHUB_WORKSPACE_ID": "does-not-exist"},
+            {"TONY_GITHUB_TIMEOUT_SECONDS": "not-a-number"},
+            {"TONY_GITHUB_MAX_PAGES": "not-a-number"},
+        )
+        for override in configurations:
+            with self.subTest(override=override):
+                temporary = tempfile.TemporaryDirectory()
+                self.addCleanup(temporary.cleanup)
+                runtime_root = Path(temporary.name)
+                WorkspaceRuntimeManager(runtime_root, ROOT).create(
+                    "agency", "agency-client", "Agency"
+                )
+                environment = {
+                    "NARRATIIVE_API_KEY": "test-api-key",
+                    "NARRATIIVE_RUNTIME_ROOT": str(runtime_root),
+                    "TONY_GITHUB_REPOSITORY": "narratiive/narratiive-os",
+                    "TONY_GITHUB_WORKSPACE_ID": "agency",
+                    "TONY_GITHUB_MATT_LOGIN": "matt",
+                    "TONY_GITHUB_TOKEN": "read-only",
+                    **override,
+                }
+                with mock.patch.dict(os.environ, environment, clear=True):
+                    app = build_app()
+
+                self.assertIsNotNone(app.brief_archive)
+                self.assertFalse(app.command_service.github_configured)
+                status, response = app.handle(
+                    {"REQUEST_METHOD": "GET", "PATH_INFO": "/health"}
+                )
+                self.assertEqual(status.value, 200)
+                self.assertFalse(response["github"])
 
 
 if __name__ == "__main__":

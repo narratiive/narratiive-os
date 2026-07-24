@@ -44,11 +44,16 @@ class MissionControlService:
         disconnected = [
             item for item in connections if item["state"] in {"not_connected", "degraded"}
         ]
+        github = snapshot.github_work
+        github_approvals = (
+            len(github.matt_approval_required) if github is not None else 0
+        )
 
         message = (
             f"Mission Control is {snapshot.status}: "
             f"{len(active)} active workstream(s), {len(blocked)} blocked, "
-            f"{len(snapshot.approvals_required)} approval(s) required."
+            f"{len(snapshot.approvals_required)} operational approval(s), "
+            f"{github_approvals} Matt GitHub review(s) required."
         )
         executive = self._executive_message(
             snapshot,
@@ -66,11 +71,19 @@ class MissionControlService:
                 "connections": connections,
                 "approvals_required": list(snapshot.approvals_required),
                 "blockers": list(snapshot.blockers),
+                "github_work": github.to_dict() if github is not None else None,
                 "summary": {
                     "active_workstreams": len(active),
                     "blocked_workstreams": len(blocked),
                     "connection_issues": len(disconnected),
                     "approvals_required": len(snapshot.approvals_required),
+                    "open_pull_requests": (
+                        len(github.open_pull_requests) if github is not None else 0
+                    ),
+                    "active_issues": (
+                        len(github.active_issues) if github is not None else 0
+                    ),
+                    "matt_github_reviews": github_approvals,
                 },
             },
             executive=executive,
@@ -87,6 +100,15 @@ class MissionControlService:
         if snapshot.approvals_required:
             lines.append("Approvals:")
             lines.extend(f"- {item}" for item in snapshot.approvals_required[:5])
+
+        if snapshot.github_work is not None:
+            github = snapshot.github_work
+            if github.matt_approval_required:
+                lines.append("Matt GitHub reviews:")
+                lines.extend(
+                    f"- #{item.number} {item.title} — {item.url}"
+                    for item in github.matt_approval_required[:5]
+                )
 
         actionable = [
             item
@@ -118,6 +140,10 @@ class MissionControlService:
         for item in snapshot.connections:
             if item.evidence:
                 evidence.append(item.evidence)
+        if snapshot.github_work is not None:
+            evidence.extend(
+                item.evidence for item in snapshot.github_work.all_open_items
+            )
         if not evidence:
             evidence.append(f"mission-control:{snapshot.generated_at}")
 
@@ -138,6 +164,21 @@ class MissionControlService:
             implication = "Approved work cannot advance to its next state until the decision is recorded."
             recommendation = f"Review the first approval: {snapshot.approvals_required[0]}."
             human_effort = "Make the approval decision; Tony should handle the downstream state change."
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.TODAY
+        elif (
+            snapshot.github_work is not None
+            and snapshot.github_work.matt_approval_required
+        ):
+            review = snapshot.github_work.matt_approval_required[0]
+            observation = (
+                "GitHub records "
+                f"{len(snapshot.github_work.matt_approval_required)} pull request(s) "
+                "with an outstanding review request for Matt."
+            )
+            implication = "The requested repository review is waiting for Matt's judgement."
+            recommendation = f"Review GitHub pull request #{review.number}: {review.title}."
+            human_effort = "Review the requested pull request; Tony must not approve or merge it."
             confidence = ExecutiveConfidence.HIGH
             urgency = ExecutiveUrgency.TODAY
         elif disconnected:

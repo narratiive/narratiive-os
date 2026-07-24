@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any, Iterable
 
-from runtime.executive_brief import BriefPeriod, ExecutiveBriefService
+from runtime.executive_brief import (
+    BriefPeriod,
+    ExecutiveBriefArchive,
+    ExecutiveBriefService,
+)
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
@@ -22,14 +26,20 @@ class TonyExecutiveCommandService:
         self,
         command_service: TonyCommandService,
         brief_service: ExecutiveBriefService | None = None,
+        brief_archive: ExecutiveBriefArchive | None = None,
     ) -> None:
         self.command_service = command_service
         self.brief_service = brief_service or ExecutiveBriefService()
+        self.brief_archive = brief_archive
 
     @property
     def mission_control_loader(self):
         """Expose delegated configuration for bridge health and diagnostics."""
         return self.command_service.mission_control_loader
+
+    @property
+    def github_configured(self) -> bool:
+        return bool(getattr(self.command_service, "github_configured", False))
 
     def execute(
         self,
@@ -52,7 +62,13 @@ class TonyExecutiveCommandService:
 
         try:
             snapshot = loader()
+            if self.github_configured and snapshot.github_work is None:
+                raise ValueError(
+                    "GitHub awareness is configured but live GitHub state is unavailable"
+                )
             brief = self.brief_service.build(snapshot, period)
+            if self.brief_archive is not None:
+                self.brief_archive.store(brief)
         except Exception as exc:
             return self._error(
                 name,

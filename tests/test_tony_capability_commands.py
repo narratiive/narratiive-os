@@ -10,6 +10,7 @@ class StubService:
     def __init__(self) -> None:
         self.mission_control_loader = lambda: None
         self.execution_journal = object()
+        self.github_configured = True
         self.calls = []
 
     def execute(self, command, objects):
@@ -26,8 +27,9 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         response = service.execute("/capabilities", [])
 
         self.assertEqual(response.command, "capabilities")
-        self.assertEqual(response.data["total_count"], 9)
+        self.assertEqual(response.data["total_count"], 10)
         self.assertTrue(any(item["command"] == "/mission" for item in response.data["capabilities"]))
+        self.assertTrue(any(item["command"] == "/github" for item in response.data["capabilities"]))
         self.assertEqual(base.calls, [])
 
     def test_help_and_commands_are_aliases(self):
