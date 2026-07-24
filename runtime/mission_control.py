@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Iterable, Mapping
 
+from runtime.github_work import GitHubWorkSnapshot
 from runtime.progress_engine import ProgressSnapshot
 
 
@@ -55,6 +56,7 @@ class MissionControlSnapshot:
     connections: tuple[ConnectionStatus, ...]
     approvals_required: tuple[str, ...]
     blockers: tuple[str, ...]
+    github_work: GitHubWorkSnapshot | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -65,6 +67,9 @@ class MissionControlSnapshot:
             "connections": [item.to_dict() for item in self.connections],
             "approvals_required": list(self.approvals_required),
             "blockers": list(self.blockers),
+            "github_work": (
+                self.github_work.to_dict() if self.github_work is not None else None
+            ),
         }
 
 
@@ -79,10 +84,13 @@ class MissionControlBuilder:
         workstreams: Iterable[WorkstreamStatus] = (),
         connections: Mapping[str, Mapping[str, Any]] | None = None,
         approvals_required: Iterable[str] = (),
+        github_work: GitHubWorkSnapshot | None = None,
     ) -> MissionControlSnapshot:
         workstream_items = tuple(sorted(workstreams, key=lambda item: item.workstream_id))
         connection_items = self._connections(connections or {})
-        blockers = self._blockers(progress, workstream_items, connection_items)
+        blockers = self._blockers(
+            progress, workstream_items, connection_items, github_work
+        )
 
         if blockers:
             status = "blocked"
@@ -101,6 +109,7 @@ class MissionControlBuilder:
             connections=connection_items,
             approvals_required=tuple(sorted(set(approvals_required))),
             blockers=blockers,
+            github_work=github_work,
         )
 
     @staticmethod
@@ -130,6 +139,7 @@ class MissionControlBuilder:
         progress: ProgressSnapshot,
         workstreams: tuple[WorkstreamStatus, ...],
         connections: tuple[ConnectionStatus, ...],
+        github_work: GitHubWorkSnapshot | None = None,
     ) -> tuple[str, ...]:
         blockers: set[str] = set()
 
@@ -143,5 +153,10 @@ class MissionControlBuilder:
         for item in connections:
             if item.state == "degraded":
                 blockers.add(f"connection:{item.name}:degraded")
+
+        if github_work is not None:
+            for item in github_work.blocked:
+                for reason in item.blocker_reasons:
+                    blockers.add(f"github:{item.kind}:{item.number}:{reason}")
 
         return tuple(sorted(blockers))

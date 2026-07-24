@@ -1,5 +1,6 @@
 import unittest
 
+from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
 from runtime.mission_control import (
     ConnectionStatus,
     MissionControlBuilder,
@@ -132,6 +133,45 @@ class MissionControlTests(unittest.TestCase):
                 owner="Tony",
                 next_action="Resolve",
             )
+
+    def test_github_blockers_are_included_with_evidence_identity(self) -> None:
+        issue = GitHubWorkItem(
+            kind="issue",
+            number=66,
+            title="Blocked issue",
+            url="https://github.test/issues/66",
+            state="open",
+            author="matt",
+            created_at="2026-07-24T10:00:00Z",
+            updated_at="2026-07-24T11:00:00Z",
+            labels=("blocked",),
+            blocker_reasons=("label:blocked",),
+        )
+        github = GitHubWorkSnapshot(
+            repository="narratiive/narratiive-os",
+            workspace_id="agency",
+            observed_at="2026-07-24T11:00:00Z",
+            baseline_status="unavailable",
+            baseline_artifact_id="",
+            open_pull_requests=(),
+            active_issues=(issue,),
+            blocked=(issue,),
+            matt_approval_required=(),
+            changes_since_previous_brief=(),
+        )
+
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T11:00:00Z",
+            progress=self.progress(status="healthy"),
+            connections={"GitHub": {"state": "connected"}},
+            github_work=github,
+        )
+
+        self.assertEqual(snapshot.status, "blocked")
+        self.assertEqual(
+            snapshot.blockers,
+            ("github:issue:66:label:blocked",),
+        )
 
 
 if __name__ == "__main__":

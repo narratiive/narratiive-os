@@ -36,10 +36,12 @@ class TonyCommandService:
         progress_engine: RepositoryProgressEngine,
         execution_journal: ExecutionJournal | None = None,
         mission_control_loader: MissionControlLoader | None = None,
+        github_configured: bool = False,
     ) -> None:
         self.progress_engine = progress_engine
         self.execution_journal = execution_journal
         self.mission_control_loader = mission_control_loader
+        self.github_configured = github_configured
         self.mission_control_service = MissionControlService()
 
     def execute(
@@ -57,6 +59,8 @@ class TonyCommandService:
 
         if name in {"history", "explain"}:
             return self._history(argument) if name == "history" else self._explain(argument)
+        if name == "github":
+            return self._github()
         if name in {"mission", "mission_control", "brief"}:
             return self._mission_control(name)
 
@@ -112,6 +116,7 @@ class TonyCommandService:
                 "validation": validation,
                 "execution_journal": journal,
                 "mission_control_configured": self.mission_control_loader is not None,
+                "github_configured": self.github_configured,
             },
         )
 
@@ -223,6 +228,57 @@ class TonyCommandService:
                 f"Mission Control could not build a trusted snapshot: {exc}",
             )
         return CommandResponse(command, response.status, response.message, response.data)
+
+    def _github(self) -> CommandResponse:
+        if self.mission_control_loader is None:
+            return self._error(
+                "github",
+                "github_unavailable",
+                "GitHub awareness is not configured.",
+            )
+        try:
+            snapshot = self.mission_control_loader()
+        except Exception as exc:
+            return self._error(
+                "github",
+                "github_untrusted",
+                f"Tony could not build trusted GitHub state: {exc}",
+            )
+        if snapshot.github_work is None:
+            connection = next(
+                (
+                    item
+                    for item in snapshot.connections
+                    if item.name.casefold() == "github"
+                ),
+                None,
+            )
+            detail = connection.evidence if connection and connection.evidence else ""
+            return self._error(
+                "github",
+                "github_unavailable",
+                "Live GitHub state is unavailable.",
+                {
+                    "connection_state": (
+                        connection.state if connection else "unknown"
+                    ),
+                    "detail": detail,
+                },
+            )
+        github = snapshot.github_work
+        message = (
+            f"GitHub {github.repository}: "
+            f"{len(github.open_pull_requests)} open PR(s), "
+            f"{len(github.active_issues)} active issue(s), "
+            f"{len(github.blocked)} blocked, "
+            f"{len(github.matt_approval_required)} awaiting Matt review."
+        )
+        return CommandResponse(
+            "github",
+            "blocked" if github.blocked else "healthy",
+            message,
+            github.to_dict(),
+        )
 
     def _history(self, query: str) -> CommandResponse:
         if self.execution_journal is None:

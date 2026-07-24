@@ -13,6 +13,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
+        archive = mock.Mock()
+        base_app.brief_archive = archive
 
         with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app):
             app = tony_live_bridge.build_app()
@@ -22,6 +24,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
         executive = app.command_service.command_service
         self.assertIsInstance(executive, TonyExecutiveCommandService)
         self.assertIs(executive.command_service, base_service)
+        self.assertIs(executive.brief_archive, archive)
 
     def test_build_app_preserves_mission_control_health_configuration(self) -> None:
         base_app = mock.Mock()

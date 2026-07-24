@@ -14,6 +14,13 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from runtime.executive_brief import ExecutiveBriefArchive
+from runtime.github_work import (
+    GitHubConfig,
+    GitHubRESTClient,
+    GitHubWorkService,
+    GitHubWorkSnapshot,
+)
 from runtime.mission_control import MissionControlBuilder, MissionControlSnapshot
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
@@ -24,12 +31,14 @@ from runtime.tony_orchestration import (
     TonyGatewayError,
     TonyOrchestrationAdapter,
 )
+from runtime.workspaces import WorkspaceRuntimeManager
 from scripts.service_doctor import ServiceDoctor
 
 
 ObjectLoader = Callable[[], Iterable[dict[str, Any]]]
 DiagnosticsRunner = Callable[[], dict[str, Any]]
 MissionControlLoader = Callable[[], MissionControlSnapshot]
+GitHubWorkLoader = Callable[[], GitHubWorkSnapshot]
 
 
 class TonyHTTPBridge:
@@ -48,12 +57,14 @@ class TonyHTTPBridge:
         command_service: TonyCommandService | None = None,
         object_loader: ObjectLoader | None = None,
         diagnostics_runner: DiagnosticsRunner | None = None,
+        brief_archive: ExecutiveBriefArchive | None = None,
     ) -> None:
         self.adapter = adapter
         self.bridge_token = bridge_token.strip()
         self.command_service = command_service
         self.object_loader = object_loader
         self.diagnostics_runner = diagnostics_runner
+        self.brief_archive = brief_archive
 
     def __call__(self, environ, start_response):
         try:
@@ -85,6 +96,10 @@ class TonyHTTPBridge:
                 "deterministic_commands": self.command_service is not None,
                 "diagnostics": self.diagnostics_runner is not None,
                 "mission_control": mission_control,
+                "github": bool(
+                    self.command_service is not None
+                    and getattr(self.command_service, "github_configured", False)
+                ),
             }
 
         if method != "POST":
@@ -241,6 +256,57 @@ class TonyHTTPBridge:
         elif response.command in {"status", "progress", "progress_update"}:
             lines.append(f"Campaigns: {data.get('campaign_count', 0)}")
             lines.append(f"Blocked: {data.get('blocked_count', 0)}")
+        elif response.command == "github":
+            pulls = data.get("open_pull_requests", [])
+            issues = data.get("active_issues", [])
+            blocked = data.get("blocked", [])
+            reviews = data.get("matt_approval_required", [])
+            changes = data.get("changes_since_previous_brief", [])
+            if pulls:
+                lines.append("Open pull requests:")
+                lines.extend(
+                    f"- #{item.get('number')} {item.get('title')}"
+                    for item in pulls[:10]
+                    if isinstance(item, dict)
+                )
+            if issues:
+                lines.append("Active issues:")
+                lines.extend(
+                    f"- #{item.get('number')} {item.get('title')}"
+                    for item in issues[:10]
+                    if isinstance(item, dict)
+                )
+            if blocked:
+                lines.append("Blocked:")
+                lines.extend(
+                    f"- #{item.get('number')} {item.get('title')}: "
+                    f"{', '.join(item.get('blocker_reasons', []))}"
+                    for item in blocked[:10]
+                    if isinstance(item, dict)
+                )
+            if reviews:
+                lines.append("Requires Matt review:")
+                lines.extend(
+                    f"- #{item.get('number')} {item.get('title')}"
+                    for item in reviews[:10]
+                    if isinstance(item, dict)
+                )
+            if changes:
+                lines.append("Changed since previous brief:")
+                lines.extend(
+                    f"- {item.get('action')}: "
+                    f"#{item.get('item', {}).get('number')} "
+                    f"{item.get('item', {}).get('title')}"
+                    for item in changes[:10]
+                    if isinstance(item, dict)
+                    and isinstance(item.get("item"), dict)
+                )
+            elif data.get("baseline_status") == "unavailable":
+                lines.append("Changed since previous brief: baseline unavailable.")
+            else:
+                lines.append(
+                    "Changed since previous brief: no material changes."
+                )
         elif response.command == "health":
             validation = data.get("validation", {})
             lines.append(f"Objects validated: {validation.get('objects_validated', 0)}")
@@ -287,6 +353,7 @@ def build_mission_control_loader(
     progress_engine: RepositoryProgressEngine,
     object_loader: ObjectLoader,
     gateway_health_endpoint: str,
+    github_work_loader: GitHubWorkLoader | None = None,
 ) -> MissionControlLoader:
     """Build the live read-only Mission Control snapshot used by Telegram commands."""
     builder = MissionControlBuilder()
@@ -298,6 +365,28 @@ def build_mission_control_loader(
         gateway = doctor.check("runtime-gateway", gateway_health_endpoint)
         connection_state = "connected" if gateway.healthy else "degraded"
         evidence = "HTTP health check passed" if gateway.healthy else gateway.error
+        github_work = None
+        if github_work_loader is None:
+            github_connection = {
+                "state": "not_connected",
+                "evidence": "GitHub awareness is not configured",
+            }
+        else:
+            try:
+                github_work = github_work_loader()
+                github_connection = {
+                    "state": "connected",
+                    "evidence": (
+                        f"GitHub API observation for {github_work.repository} "
+                        f"at {github_work.observed_at}"
+                    ),
+                    "last_checked_at": github_work.observed_at,
+                }
+            except Exception as exc:
+                github_connection = {
+                    "state": "degraded",
+                    "evidence": f"GitHub awareness failed closed: {exc}",
+                }
         return builder.build(
             generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             progress=progress,
@@ -310,10 +399,55 @@ def build_mission_control_loader(
                     "state": "connected",
                     "evidence": "Current request reached Tony HTTP bridge",
                 },
+                "GitHub": github_connection,
             },
+            github_work=github_work,
         )
 
     return load
+
+
+def build_github_components(
+    *,
+    runtime_root: Path,
+    repository_root: Path,
+) -> tuple[GitHubWorkLoader | None, ExecutiveBriefArchive | None]:
+    repository = os.getenv("TONY_GITHUB_REPOSITORY", "").strip()
+    workspace_id = os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+    matt_login = os.getenv("TONY_GITHUB_MATT_LOGIN", "").strip()
+    token = os.getenv("TONY_GITHUB_TOKEN", "").strip()
+    if not all((repository, workspace_id, matt_login, token)):
+        return None, None
+
+    config = GitHubConfig(
+        repository=repository,
+        workspace_id=workspace_id,
+        matt_login=matt_login,
+        api_url=os.getenv("TONY_GITHUB_API_URL", "https://api.github.com").strip(),
+        timeout_seconds=float(os.getenv("TONY_GITHUB_TIMEOUT_SECONDS", "10")),
+        max_pages=int(os.getenv("TONY_GITHUB_MAX_PAGES", "20")),
+    )
+    workspace_runtime = WorkspaceRuntimeManager(
+        runtime_root, repository_root
+    ).runtime(workspace_id)
+    archive = ExecutiveBriefArchive(
+        workspace_runtime.artifact_catalog,
+        workspace_runtime.event_log,
+        workspace_id=workspace_id,
+    )
+    service = GitHubWorkService(config, GitHubRESTClient(config))
+
+    def load() -> GitHubWorkSnapshot:
+        prior = archive.latest_github_snapshot(repository=config.repository)
+        if prior is None:
+            return service.build()
+        previous, artifact_id = prior
+        return service.build(
+            previous=previous,
+            baseline_artifact_id=artifact_id,
+        )
+
+    return load, archive
 
 
 def build_diagnostics_runner(
@@ -376,24 +510,34 @@ def build_app() -> TonyHTTPBridge:
         str(REPOSITORY_ROOT / "schemas" / "shared" / "growth-object.schema.json"),
     ))
     objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
+    runtime_root = Path(os.getenv("NARRATIIVE_RUNTIME_ROOT", ".runtime")).resolve()
     validator = GrowthObjectValidator.from_path(schema_path)
     progress_engine = RepositoryProgressEngine(validator)
     object_loader = lambda: load_growth_objects(objects_root)
+    github_work_loader, brief_archive = build_github_components(
+        runtime_root=runtime_root,
+        repository_root=REPOSITORY_ROOT,
+    )
     mission_control_loader = build_mission_control_loader(
         progress_engine,
         object_loader,
         gateway_health_endpoint,
+        github_work_loader,
     )
     command_service = TonyCommandService(
         progress_engine,
         mission_control_loader=mission_control_loader,
+        github_configured=github_work_loader is not None,
     )
     return TonyHTTPBridge(
         adapter,
         bridge_token,
         command_service=command_service,
         object_loader=object_loader,
-        diagnostics_runner=build_diagnostics_runner(gateway_health_endpoint, command_service, object_loader),
+        diagnostics_runner=build_diagnostics_runner(
+            gateway_health_endpoint, command_service, object_loader
+        ),
+        brief_archive=brief_archive,
     )
 
 

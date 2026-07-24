@@ -28,6 +28,27 @@ NARRATIIVE_SUPERVISOR_EVENT_LOG=/Users/you/Library/Logs/Narratiive/supervisor.js
 
 Use the actual user ID returned by `id -u` in the restart commands. Secrets are never copied into plist files. `scripts/run_with_env.py` reads the mode-600 environment file without invoking a shell, then replaces itself with the target process.
 
+To enable Tony's read-only GitHub awareness for one repository, also configure:
+
+```text
+TONY_GITHUB_REPOSITORY=narratiive/narratiive-os
+TONY_GITHUB_WORKSPACE_ID=agency
+TONY_GITHUB_MATT_LOGIN=replace-with-matts-github-login
+TONY_GITHUB_TOKEN=replace-with-read-only-token
+```
+
+The named workspace must already exist under `NARRATIIVE_RUNTIME_ROOT`. Use a
+fine-grained token limited to the configured repository with read access to
+metadata, pull requests, issues and checks. Tony performs only `GET` requests.
+If any setting is absent, the capability is reported as `not_connected`. API
+errors, invalid responses and incomplete pagination are reported as degraded;
+cached observations are never presented as live.
+
+Optional controls are `TONY_GITHUB_API_URL`,
+`TONY_GITHUB_TIMEOUT_SECONDS` and `TONY_GITHUB_MAX_PAGES`. The API URL must use
+HTTPS. Credentials remain in the external mode-`0600` environment file and are
+not written to events, artefacts or command responses.
+
 ## Install
 
 Run from the repository using its virtual-environment Python:

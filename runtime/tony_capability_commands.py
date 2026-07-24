@@ -19,6 +19,10 @@ class TonyCapabilityCommandService:
     def mission_control_loader(self):
         return self.command_service.mission_control_loader
 
+    @property
+    def github_configured(self) -> bool:
+        return bool(getattr(self.command_service, "github_configured", False))
+
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
@@ -41,6 +45,8 @@ class TonyCapabilityCommandService:
             base = base.command_service
         if getattr(base, "mission_control_loader", None) is not None:
             features.add("mission_control")
+        if getattr(base, "github_configured", False):
+            features.add("github")
         if getattr(base, "execution_journal", None) is not None:
             features.add("execution_journal")
         if getattr(self.command_service, "diagnostics_runner", None) is not None:

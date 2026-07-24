@@ -10,6 +10,7 @@ from runtime.tony_executive_commands import TonyExecutiveCommandService
 class StubCommandService:
     def __init__(self, loader=None) -> None:
         self.mission_control_loader = loader
+        self.github_configured = False
         self.calls: list[tuple[str, list[dict[str, object]]]] = []
 
     def execute(self, command, objects):
@@ -117,6 +118,53 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
         self.assertIn("invalid snapshot", response.message)
+
+    def test_successful_brief_is_archived_before_it_is_returned(self):
+        class RecordingArchive:
+            def __init__(self):
+                self.briefs = []
+
+            def store(self, brief):
+                self.briefs.append(brief)
+
+        archive = RecordingArchive()
+        service = TonyExecutiveCommandService(
+            StubCommandService(snapshot),
+            brief_archive=archive,
+        )
+
+        response = service.execute("/morning", [])
+
+        self.assertEqual(response.status, "healthy")
+        self.assertEqual(len(archive.briefs), 1)
+        self.assertEqual(archive.briefs[0].period.value, "morning")
+
+    def test_archive_failure_fails_closed(self):
+        class BrokenArchive:
+            def store(self, brief):
+                raise ValueError("archive integrity failure")
+
+        service = TonyExecutiveCommandService(
+            StubCommandService(snapshot),
+            brief_archive=BrokenArchive(),
+        )
+
+        response = service.execute("/morning", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
+        self.assertIn("archive integrity failure", response.message)
+
+    def test_configured_github_failure_prevents_brief_and_archive(self):
+        base = StubCommandService(snapshot)
+        base.github_configured = True
+        service = TonyExecutiveCommandService(base)
+
+        response = service.execute("/morning", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
+        self.assertIn("GitHub state is unavailable", response.message)
 
 
 if __name__ == "__main__":
