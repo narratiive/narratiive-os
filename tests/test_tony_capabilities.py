@@ -16,7 +16,9 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         self.assertEqual(history["missing_requirements"], ["execution_journal"])
 
     def test_snapshot_is_ready_when_optional_features_are_configured(self):
-        snapshot = TonyCapabilityRegistry().snapshot({"mission_control", "execution_journal", "diagnostics"})
+        snapshot = TonyCapabilityRegistry().snapshot(
+            {"mission_control", "execution_journal", "diagnostics", "github"}
+        )
         self.assertEqual(snapshot["status"], "ready")
         self.assertEqual(snapshot["available_count"], snapshot["total_count"])
 
@@ -24,6 +26,7 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         summary = TonyCapabilityRegistry().telegram_summary({"mission_control"})
         self.assertIn("Tony capabilities:", summary)
         self.assertIn("/mission", summary)
+        self.assertIn("/github", summary)
         self.assertIn("/history [filter]", summary)
         self.assertIn("/client <name>", summary)
 

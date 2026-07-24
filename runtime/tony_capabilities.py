@@ -40,6 +40,12 @@ CAPABILITIES: tuple[TonyCapability, ...] = (
         aliases=("/brief", "/mission_control"),
     ),
     TonyCapability(
+        "/github",
+        "Show live pull requests, active issues, blockers, Matt reviews and changes.",
+        "oversight",
+        requires=("github",),
+    ),
+    TonyCapability(
         "/history [filter]",
         "Show recent autonomous execution records.",
         "audit",

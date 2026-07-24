@@ -1,13 +1,23 @@
 import io
 import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-from openclaw.tony_http_bridge import TonyHTTPBridge, build_mission_control_loader
+from openclaw.tony_http_bridge import (
+    TonyHTTPBridge,
+    build_github_components,
+    build_mission_control_loader,
+)
+from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
+from runtime.mission_control import MissionControlBuilder
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
 from runtime.tony_orchestration import FakeGatewayTransport, TonyOrchestrationAdapter
+from runtime.workspaces import WorkspaceRuntimeManager
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,6 +84,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertFalse(response["deterministic_commands"])
         self.assertFalse(response["diagnostics"])
         self.assertFalse(response["mission_control"])
+        self.assertFalse(response["github"])
         self.assertEqual(transport.calls, [])
 
     def test_health_endpoint_reports_mission_control_configuration(self):
@@ -219,6 +230,86 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(status.value, 200)
         self.assertTrue(response["ok"])
         self.assertEqual(len(transport.calls), 1)
+
+    def test_github_command_returns_live_work_without_gateway_dispatch(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        pull = GitHubWorkItem(
+            kind="pull_request",
+            number=66,
+            title="GitHub awareness",
+            url="https://github.test/pull/66",
+            state="open",
+            author="codex",
+            created_at="2026-07-24T10:00:00Z",
+            updated_at="2026-07-24T11:00:00Z",
+            head_sha="abc",
+            requested_reviewers=("matt",),
+        )
+        github = GitHubWorkSnapshot(
+            repository="narratiive/narratiive-os",
+            workspace_id="agency",
+            observed_at="2026-07-24T11:00:00Z",
+            baseline_status="unavailable",
+            baseline_artifact_id="",
+            open_pull_requests=(pull,),
+            active_issues=(),
+            blocked=(),
+            matt_approval_required=(pull,),
+            changes_since_previous_brief=(),
+        )
+
+        def loader():
+            return MissionControlBuilder().build(
+                generated_at="2026-07-24T11:00:00Z",
+                progress=progress_engine.build_snapshot([object_record()]),
+                connections={"GitHub": {"state": "connected"}},
+                github_work=github,
+            )
+
+        bridge, transport = self.command_bridge(mission_control_loader=loader)
+        bridge.command_service.github_configured = True
+
+        status, response = self.request(
+            bridge, {"text": "/github"}, path="/telegram"
+        )
+
+        self.assertEqual(status.value, 200)
+        self.assertTrue(response["ok"])
+        self.assertIn("Open pull requests:", response["reply"])
+        self.assertIn("Requires Matt review:", response["reply"])
+        self.assertIn("baseline unavailable", response["reply"])
+        self.assertEqual(transport.calls, [])
+
+    def test_github_components_require_complete_config_and_existing_workspace(self):
+        with mock.patch.dict(os.environ, {}, clear=True):
+            loader, archive = build_github_components(
+                runtime_root=Path("/tmp/runtime"),
+                repository_root=ROOT,
+            )
+        self.assertIsNone(loader)
+        self.assertIsNone(archive)
+
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        runtime_root = Path(temporary.name)
+        WorkspaceRuntimeManager(runtime_root, ROOT).create(
+            "agency", "agency-client", "Agency"
+        )
+        environment = {
+            "TONY_GITHUB_REPOSITORY": "narratiive/narratiive-os",
+            "TONY_GITHUB_WORKSPACE_ID": "agency",
+            "TONY_GITHUB_MATT_LOGIN": "matt",
+            "TONY_GITHUB_TOKEN": "read-only",
+        }
+        with mock.patch.dict(os.environ, environment, clear=True):
+            loader, archive = build_github_components(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+            )
+
+        self.assertIsNotNone(loader)
+        self.assertEqual(archive.workspace_id, "agency")
 
 
 if __name__ == "__main__":
