@@ -3,7 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
-from openclaw.tony_http_bridge import TonyHTTPBridge
+from openclaw.tony_http_bridge import TonyHTTPBridge, build_mission_control_loader
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
@@ -49,10 +49,14 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         }
         return bridge.handle(environ)
 
-    def command_bridge(self, transport=None, diagnostics_runner=None):
+    def command_bridge(self, transport=None, diagnostics_runner=None, mission_control_loader=None):
         transport = transport or FakeGatewayTransport()
         validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
-        service = TonyCommandService(RepositoryProgressEngine(validator))
+        progress_engine = RepositoryProgressEngine(validator)
+        service = TonyCommandService(
+            progress_engine,
+            mission_control_loader=mission_control_loader,
+        )
         return TonyHTTPBridge(
             TonyOrchestrationAdapter(transport),
             command_service=service,
@@ -69,7 +73,21 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(response["status"], "alive")
         self.assertFalse(response["deterministic_commands"])
         self.assertFalse(response["diagnostics"])
+        self.assertFalse(response["mission_control"])
         self.assertEqual(transport.calls, [])
+
+    def test_health_endpoint_reports_mission_control_configuration(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        loader = build_mission_control_loader(
+            progress_engine,
+            lambda: [object_record()],
+            "http://127.0.0.1:1/health",
+        )
+        bridge, _ = self.command_bridge(mission_control_loader=loader)
+        status, response = bridge.handle({"REQUEST_METHOD": "GET", "PATH_INFO": "/health"})
+        self.assertEqual(status.value, 200)
+        self.assertTrue(response["mission_control"])
 
     def test_forwards_health_command_and_preserves_ids(self):
         transport = FakeGatewayTransport([
@@ -131,6 +149,22 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertTrue(response["ok"])
         self.assertIn("Rave Coffee", response["reply"])
         self.assertIn("Stage: growth_blueprint", response["reply"])
+        self.assertEqual(transport.calls, [])
+
+    def test_mission_command_returns_live_snapshot_without_gateway_dispatch(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        loader = build_mission_control_loader(
+            progress_engine,
+            lambda: [object_record()],
+            "http://127.0.0.1:1/health",
+        )
+        bridge, transport = self.command_bridge(mission_control_loader=loader)
+        status, response = self.request(bridge, {"text": "/mission"}, path="/telegram")
+        self.assertEqual(status.value, 200)
+        self.assertEqual(response["command"], "mission")
+        self.assertIn("Mission Control is blocked", response["reply"])
+        self.assertIn("connection:runtime-gateway:degraded", response["reply"])
         self.assertEqual(transport.calls, [])
 
     def test_diagnostics_command_reports_each_runtime_layer_without_gateway_dispatch(self):
