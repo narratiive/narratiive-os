@@ -229,7 +229,14 @@ class GitHubConfig:
         if not re.fullmatch(r"[A-Za-z0-9-]+", self.matt_login):
             raise GitHubWorkError("Matt GitHub login is invalid")
         parsed = urllib.parse.urlsplit(self.api_url)
-        if parsed.scheme != "https" or not parsed.netloc:
+        if (
+            parsed.scheme != "https"
+            or not parsed.netloc
+            or parsed.username is not None
+            or parsed.password is not None
+            or parsed.query
+            or parsed.fragment
+        ):
             raise GitHubWorkError("GitHub API URL must use HTTPS")
         if self.timeout_seconds <= 0 or self.max_pages <= 0:
             raise GitHubWorkError("GitHub timeout and max_pages must be positive")

@@ -22,7 +22,7 @@ from runtime.github_work import (
 )
 from runtime.mission_control import MissionControlBuilder
 from runtime.progress_engine import ProgressSnapshot
-from runtime.repositories import JsonlEventLog
+from runtime.repositories import JsonlEventLog, WorkflowEvent
 from runtime.repository_validator import ValidationReport
 
 
@@ -382,12 +382,47 @@ class ExecutiveBriefArchiveTests(unittest.TestCase):
             content='{"github_work":null}',
             extension=".json",
         )
+        events.append(
+            WorkflowEvent.create(
+                event_id="evt-corrupt-brief",
+                run_id=archive.RUN_ID,
+                event_type="executive_brief.generated",
+                payload={
+                    "artifact_id": record.artifact.artifact_id,
+                    "artifact_version": record.version,
+                },
+                workspace_id="agency",
+            )
+        )
         Path(record.artifact.location).write_text("corrupt", encoding="utf-8")
 
         with self.assertRaisesRegex(GitHubWorkError, "checksum mismatch"):
             archive.latest_github_snapshot(
                 repository="narratiive/narratiive-os"
             )
+
+    def test_artifact_without_append_only_event_does_not_advance_baseline(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        root = Path(temporary.name)
+        catalog = FileArtifactCatalog(root / "catalog", workspace_id="agency")
+        events = JsonlEventLog(root / "events", workspace_id="agency")
+        archive = ExecutiveBriefArchive(
+            catalog, events, workspace_id="agency"
+        )
+        catalog.register(
+            run_id=archive.RUN_ID,
+            stage_id=archive.STAGE_ID,
+            artifact_type=archive.ARTIFACT_TYPE,
+            content='{"github_work":{"repository":"narratiive/narratiive-os"}}',
+            extension=".json",
+        )
+
+        self.assertIsNone(
+            archive.latest_github_snapshot(
+                repository="narratiive/narratiive-os"
+            )
+        )
 
     def test_foreign_workspace_brief_is_rejected_before_persistence(self):
         temporary = tempfile.TemporaryDirectory()

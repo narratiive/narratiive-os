@@ -182,7 +182,7 @@ class ExecutiveBriefArchive:
         *,
         repository: str,
     ) -> tuple[GitHubWorkSnapshot, str] | None:
-        latest = self._latest()
+        latest = self._latest_persisted()
         if latest is None:
             return None
         payload = self._read_payload(latest)
@@ -209,7 +209,7 @@ class ExecutiveBriefArchive:
         content = json.dumps(
             brief.to_dict(), separators=(",", ":"), sort_keys=True
         )
-        latest = self._latest()
+        latest = self._latest_persisted()
         checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
         parents = (
             (latest.artifact.artifact_id,)
@@ -254,11 +254,26 @@ class ExecutiveBriefArchive:
         )
         return record
 
-    def _latest(self) -> ArtifactRecord | None:
+    def _latest_persisted(self) -> ArtifactRecord | None:
         history = self.artifact_catalog.history(
             self.RUN_ID, self.STAGE_ID, self.ARTIFACT_TYPE
         )
-        return history[-1] if history else None
+        persisted = {
+            (
+                str(event.payload.get("artifact_id", "")),
+                int(event.payload.get("artifact_version", 0)),
+            )
+            for event in self.event_log.read(self.RUN_ID)
+            if event.event_type == "executive_brief.generated"
+        }
+        return next(
+            (
+                record
+                for record in reversed(history)
+                if (record.artifact.artifact_id, record.version) in persisted
+            ),
+            None,
+        )
 
     @staticmethod
     def _read_payload(record: ArtifactRecord) -> dict[str, Any]:
