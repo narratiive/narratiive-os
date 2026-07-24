@@ -8,7 +8,9 @@ from unittest import mock
 
 from openclaw.tony_http_bridge import (
     TonyHTTPBridge,
-    build_github_components,
+    build_app,
+    build_brief_archive,
+    build_github_work_loader,
     build_mission_control_loader,
 )
 from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
@@ -281,18 +283,33 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertIn("baseline unavailable", response["reply"])
         self.assertEqual(transport.calls, [])
 
-    def test_github_components_require_complete_config_and_existing_workspace(self):
+    def test_brief_archive_is_available_without_github_configuration(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
         with mock.patch.dict(os.environ, {}, clear=True):
-            loader, archive = build_github_components(
-                runtime_root=Path("/tmp/runtime"),
+            archive = build_brief_archive(
+                runtime_root=Path(temporary.name),
                 repository_root=ROOT,
             )
-        self.assertIsNone(loader)
-        self.assertIsNone(archive)
 
+        self.assertEqual(archive.workspace_id, "legacy")
+
+    def test_github_loader_requires_complete_config_and_existing_workspace(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         runtime_root = Path(temporary.name)
+        with mock.patch.dict(os.environ, {}, clear=True):
+            archive = build_brief_archive(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+            )
+            loader = build_github_work_loader(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+                brief_archive=archive,
+            )
+        self.assertIsNone(loader)
+
         WorkspaceRuntimeManager(runtime_root, ROOT).create(
             "agency", "agency-client", "Agency"
         )
@@ -303,13 +320,53 @@ class TonyHTTPBridgeTests(unittest.TestCase):
             "TONY_GITHUB_TOKEN": "read-only",
         }
         with mock.patch.dict(os.environ, environment, clear=True):
-            loader, archive = build_github_components(
+            archive = build_brief_archive(
                 runtime_root=runtime_root,
                 repository_root=ROOT,
+            )
+            loader = build_github_work_loader(
+                runtime_root=runtime_root,
+                repository_root=ROOT,
+                brief_archive=archive,
             )
 
         self.assertIsNotNone(loader)
         self.assertEqual(archive.workspace_id, "agency")
+
+    def test_malformed_github_configuration_does_not_abort_bridge(self):
+        configurations = (
+            {"TONY_GITHUB_REPOSITORY": "not-a-valid-repo-format"},
+            {"TONY_GITHUB_WORKSPACE_ID": "does-not-exist"},
+            {"TONY_GITHUB_TIMEOUT_SECONDS": "not-a-number"},
+            {"TONY_GITHUB_MAX_PAGES": "not-a-number"},
+        )
+        for override in configurations:
+            with self.subTest(override=override):
+                temporary = tempfile.TemporaryDirectory()
+                self.addCleanup(temporary.cleanup)
+                runtime_root = Path(temporary.name)
+                WorkspaceRuntimeManager(runtime_root, ROOT).create(
+                    "agency", "agency-client", "Agency"
+                )
+                environment = {
+                    "NARRATIIVE_API_KEY": "test-api-key",
+                    "NARRATIIVE_RUNTIME_ROOT": str(runtime_root),
+                    "TONY_GITHUB_REPOSITORY": "narratiive/narratiive-os",
+                    "TONY_GITHUB_WORKSPACE_ID": "agency",
+                    "TONY_GITHUB_MATT_LOGIN": "matt",
+                    "TONY_GITHUB_TOKEN": "read-only",
+                    **override,
+                }
+                with mock.patch.dict(os.environ, environment, clear=True):
+                    app = build_app()
+
+                self.assertIsNotNone(app.brief_archive)
+                self.assertFalse(app.command_service.github_configured)
+                status, response = app.handle(
+                    {"REQUEST_METHOD": "GET", "PATH_INFO": "/health"}
+                )
+                self.assertEqual(status.value, 200)
+                self.assertFalse(response["github"])
 
 
 if __name__ == "__main__":

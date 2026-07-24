@@ -21,12 +21,18 @@ Required values normally include:
 ```text
 NARRATIIVE_API_KEY=replace-me
 TONY_BRIDGE_TOKEN=replace-me
+TONY_EXECUTIVE_WORKSPACE_ID=agency
 NARRATIIVE_RUNTIME_RESTART_COMMAND=["launchctl","kickstart","-k","gui/501/com.narratiive.runtime"]
 TONY_BRIDGE_RESTART_COMMAND=["launchctl","kickstart","-k","gui/501/com.narratiive.tony-http-bridge"]
 NARRATIIVE_SUPERVISOR_EVENT_LOG=/Users/you/Library/Logs/Narratiive/supervisor.jsonl
 ```
 
 Use the actual user ID returned by `id -u` in the restart commands. Secrets are never copied into plist files. `scripts/run_with_env.py` reads the mode-600 environment file without invoking a shell, then replaces itself with the target process.
+
+`TONY_EXECUTIVE_WORKSPACE_ID` selects the existing workspace used for immutable
+morning and evening brief artifacts. If it is omitted, briefs use the legacy
+local runtime. This archive remains available whether or not GitHub awareness
+is configured.
 
 To enable Tony's read-only GitHub awareness for one repository, also configure:
 
@@ -43,6 +49,11 @@ metadata, pull requests, issues and checks. Tony performs only `GET` requests.
 If any setting is absent, the capability is reported as `not_connected`. API
 errors, invalid responses and incomplete pagination are reported as degraded;
 cached observations are never presented as live.
+
+The GitHub and executive brief workspace IDs must match. For compatibility,
+`TONY_GITHUB_WORKSPACE_ID` also selects the brief workspace when
+`TONY_EXECUTIVE_WORKSPACE_ID` is omitted. Invalid GitHub configuration leaves
+the rest of Tony available and reports GitHub as `not_connected`.
 
 Optional controls are `TONY_GITHUB_API_URL`,
 `TONY_GITHUB_TIMEOUT_SECONDS` and `TONY_GITHUB_MAX_PAGES`. The API URL must use

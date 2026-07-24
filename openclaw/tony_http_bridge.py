@@ -14,10 +14,12 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from runtime.composition import compose_local_runtime
 from runtime.executive_brief import ExecutiveBriefArchive
 from runtime.github_work import (
     GitHubConfig,
     GitHubRESTClient,
+    GitHubWorkError,
     GitHubWorkService,
     GitHubWorkSnapshot,
 )
@@ -31,7 +33,7 @@ from runtime.tony_orchestration import (
     TonyGatewayError,
     TonyOrchestrationAdapter,
 )
-from runtime.workspaces import WorkspaceRuntimeManager
+from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager
 from scripts.service_doctor import ServiceDoctor
 
 
@@ -407,38 +409,65 @@ def build_mission_control_loader(
     return load
 
 
-def build_github_components(
+def build_brief_archive(
     *,
     runtime_root: Path,
     repository_root: Path,
-) -> tuple[GitHubWorkLoader | None, ExecutiveBriefArchive | None]:
+) -> ExecutiveBriefArchive:
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+    )
+    if workspace_id:
+        try:
+            workspace_runtime = WorkspaceRuntimeManager(
+                runtime_root, repository_root
+            ).runtime(workspace_id)
+        except (ValueError, WorkspaceNotFound):
+            workspace_runtime = compose_local_runtime(runtime_root, repository_root)
+    else:
+        workspace_runtime = compose_local_runtime(runtime_root, repository_root)
+    return ExecutiveBriefArchive(
+        workspace_runtime.artifact_catalog,
+        workspace_runtime.event_log,
+        workspace_id=workspace_runtime.workspace.workspace_id,
+    )
+
+
+def build_github_work_loader(
+    *,
+    runtime_root: Path,
+    repository_root: Path,
+    brief_archive: ExecutiveBriefArchive,
+) -> GitHubWorkLoader | None:
     repository = os.getenv("TONY_GITHUB_REPOSITORY", "").strip()
     workspace_id = os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
     matt_login = os.getenv("TONY_GITHUB_MATT_LOGIN", "").strip()
     token = os.getenv("TONY_GITHUB_TOKEN", "").strip()
     if not all((repository, workspace_id, matt_login, token)):
-        return None, None
+        return None
 
-    config = GitHubConfig(
-        repository=repository,
-        workspace_id=workspace_id,
-        matt_login=matt_login,
-        api_url=os.getenv("TONY_GITHUB_API_URL", "https://api.github.com").strip(),
-        timeout_seconds=float(os.getenv("TONY_GITHUB_TIMEOUT_SECONDS", "10")),
-        max_pages=int(os.getenv("TONY_GITHUB_MAX_PAGES", "20")),
-    )
-    workspace_runtime = WorkspaceRuntimeManager(
-        runtime_root, repository_root
-    ).runtime(workspace_id)
-    archive = ExecutiveBriefArchive(
-        workspace_runtime.artifact_catalog,
-        workspace_runtime.event_log,
-        workspace_id=workspace_id,
-    )
+    try:
+        config = GitHubConfig(
+            repository=repository,
+            workspace_id=workspace_id,
+            matt_login=matt_login,
+            api_url=os.getenv("TONY_GITHUB_API_URL", "https://api.github.com").strip(),
+            timeout_seconds=float(os.getenv("TONY_GITHUB_TIMEOUT_SECONDS", "10")),
+            max_pages=int(os.getenv("TONY_GITHUB_MAX_PAGES", "20")),
+        )
+        WorkspaceRuntimeManager(runtime_root, repository_root).runtime(workspace_id)
+        if brief_archive.workspace_id != workspace_id:
+            raise GitHubWorkError(
+                "GitHub and executive brief workspaces must match"
+            )
+    except (GitHubWorkError, ValueError, WorkspaceNotFound):
+        return None
+
     service = GitHubWorkService(config, GitHubRESTClient(config))
 
     def load() -> GitHubWorkSnapshot:
-        prior = archive.latest_github_snapshot(repository=config.repository)
+        prior = brief_archive.latest_github_snapshot(repository=config.repository)
         if prior is None:
             return service.build()
         previous, artifact_id = prior
@@ -447,7 +476,7 @@ def build_github_components(
             baseline_artifact_id=artifact_id,
         )
 
-    return load, archive
+    return load
 
 
 def build_diagnostics_runner(
@@ -514,9 +543,14 @@ def build_app() -> TonyHTTPBridge:
     validator = GrowthObjectValidator.from_path(schema_path)
     progress_engine = RepositoryProgressEngine(validator)
     object_loader = lambda: load_growth_objects(objects_root)
-    github_work_loader, brief_archive = build_github_components(
+    brief_archive = build_brief_archive(
         runtime_root=runtime_root,
         repository_root=REPOSITORY_ROOT,
+    )
+    github_work_loader = build_github_work_loader(
+        runtime_root=runtime_root,
+        repository_root=REPOSITORY_ROOT,
+        brief_archive=brief_archive,
     )
     mission_control_loader = build_mission_control_loader(
         progress_engine,
