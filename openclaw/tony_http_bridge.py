@@ -13,9 +13,11 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from runtime.mission_control import ConnectionStatus, MissionControlSnapshot, WorkstreamStatus
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import CommandResponse, TonyCommandService
+from runtime.tony_executive_service import TonyExecutiveService
 from runtime.tony_orchestration import (
     HttpGatewayTransport,
     TonyCommand,
@@ -27,6 +29,7 @@ from scripts.service_doctor import ServiceDoctor
 
 ObjectLoader = Callable[[], Iterable[dict[str, Any]]]
 DiagnosticsRunner = Callable[[], dict[str, Any]]
+MissionControlLoader = Callable[[], MissionControlSnapshot | None]
 
 
 class TonyHTTPBridge:
@@ -45,12 +48,16 @@ class TonyHTTPBridge:
         command_service: TonyCommandService | None = None,
         object_loader: ObjectLoader | None = None,
         diagnostics_runner: DiagnosticsRunner | None = None,
+        executive_service: TonyExecutiveService | None = None,
+        mission_control_loader: MissionControlLoader | None = None,
     ) -> None:
         self.adapter = adapter
         self.bridge_token = bridge_token.strip()
         self.command_service = command_service
         self.object_loader = object_loader
         self.diagnostics_runner = diagnostics_runner
+        self.executive_service = executive_service
+        self.mission_control_loader = mission_control_loader
 
     def __call__(self, environ, start_response):
         try:
@@ -78,6 +85,7 @@ class TonyHTTPBridge:
                 "status": "alive",
                 "deterministic_commands": self.command_service is not None,
                 "diagnostics": self.diagnostics_runner is not None,
+                "executive_commands": self.executive_service is not None,
             }
 
         if method != "POST":
@@ -144,14 +152,27 @@ class TonyHTTPBridge:
             )
         try:
             objects = list(self.object_loader())
-            response = self.command_service.execute(command, objects)
+            if self.executive_service is not None:
+                snapshot = self.mission_control_loader() if self.mission_control_loader else None
+                response = self.executive_service.execute(
+                    command,
+                    objects,
+                    mission_control_snapshot=snapshot,
+                )
+                reply = self.executive_service.telegram_reply(
+                    command,
+                    objects,
+                    mission_control_snapshot=snapshot,
+                )
+            else:
+                response = self.command_service.execute(command, objects)
+                reply = self._format_telegram_reply(response)
         except Exception:
             return HTTPStatus.SERVICE_UNAVAILABLE, self._error(
                 "repository_state_unavailable",
                 "Tony could not read repository state",
             )
         payload = response.to_dict()
-        reply = self._format_telegram_reply(response)
         return HTTPStatus.OK, {
             "ok": response.status != "error",
             "reply": reply,
@@ -257,6 +278,30 @@ def load_growth_objects(root: Path) -> list[dict[str, Any]]:
     return records
 
 
+def load_mission_control_snapshot(path: Path) -> MissionControlSnapshot | None:
+    """Load a recorded Mission Control snapshot; never infer missing state."""
+    if not path.exists():
+        return None
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    try:
+        return MissionControlSnapshot(
+            generated_at=str(payload["generated_at"]),
+            status=str(payload["status"]),
+            progress=dict(payload["progress"]),
+            workstreams=tuple(WorkstreamStatus(**item) for item in payload.get("workstreams", [])),
+            connections=tuple(ConnectionStatus(**item) for item in payload.get("connections", [])),
+            approvals_required=tuple(str(item) for item in payload.get("approvals_required", [])),
+            blockers=tuple(str(item) for item in payload.get("blockers", [])),
+        )
+    except (KeyError, TypeError, ValueError):
+        return None
+
+
 def build_diagnostics_runner(
     gateway_health_endpoint: str,
     command_service: TonyCommandService,
@@ -317,8 +362,13 @@ def build_app() -> TonyHTTPBridge:
         str(REPOSITORY_ROOT / "schemas" / "shared" / "growth-object.schema.json"),
     ))
     objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
+    snapshot_path = Path(os.getenv(
+        "TONY_MISSION_CONTROL_SNAPSHOT",
+        str(REPOSITORY_ROOT / "runtime-state" / "mission-control.json"),
+    ))
     validator = GrowthObjectValidator.from_path(schema_path)
     command_service = TonyCommandService(RepositoryProgressEngine(validator))
+    executive_service = TonyExecutiveService(command_service)
     object_loader = lambda: load_growth_objects(objects_root)
     return TonyHTTPBridge(
         adapter,
@@ -326,6 +376,8 @@ def build_app() -> TonyHTTPBridge:
         command_service=command_service,
         object_loader=object_loader,
         diagnostics_runner=build_diagnostics_runner(gateway_health_endpoint, command_service, object_loader),
+        executive_service=executive_service,
+        mission_control_loader=lambda: load_mission_control_snapshot(snapshot_path),
     )
 
 
