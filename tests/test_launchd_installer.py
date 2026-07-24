@@ -1,14 +1,11 @@
 from __future__ import annotations
 
 import importlib.util
-import os
 import plistlib
-import stat
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest import mock
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -40,6 +37,7 @@ class LaunchdInstallerTests(unittest.TestCase):
         )
         self.assertTrue(specs[0].keep_alive)
         self.assertTrue(specs[1].keep_alive)
+        self.assertEqual(specs[1].arguments[-1], "/repo/openclaw/tony_live_bridge.py")
         self.assertFalse(specs[2].keep_alive)
         self.assertEqual(specs[2].start_interval, 60)
 
@@ -60,7 +58,7 @@ class LaunchdInstallerTests(unittest.TestCase):
             (repo / "scripts").mkdir(parents=True)
             for path in (
                 repo / "runtime" / "server.py",
-                repo / "openclaw" / "tony_http_bridge.py",
+                repo / "openclaw" / "tony_live_bridge.py",
                 repo / "scripts" / "service_supervisor.py",
                 repo / "scripts" / "run_with_env.py",
             ):
@@ -84,7 +82,7 @@ class LaunchdInstallerTests(unittest.TestCase):
             (repo / "runtime").mkdir(parents=True)
             (repo / "openclaw").mkdir(parents=True)
             (repo / "runtime" / "server.py").write_text("", encoding="utf-8")
-            (repo / "openclaw" / "tony_http_bridge.py").write_text("", encoding="utf-8")
+            (repo / "openclaw" / "tony_live_bridge.py").write_text("", encoding="utf-8")
             python_path = root / "python3"
             python_path.write_text("", encoding="utf-8")
             env_file = root / "runtime.env"
