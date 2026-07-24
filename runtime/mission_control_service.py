@@ -3,6 +3,12 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from runtime.executive_message import (
+    ExecutiveConfidence,
+    ExecutiveMessage,
+    ExecutiveUrgency,
+    build_executive_message,
+)
 from runtime.mission_control import MissionControlSnapshot
 
 
@@ -13,6 +19,7 @@ class MissionControlResponse:
     status: str
     message: str
     data: dict[str, Any]
+    executive: ExecutiveMessage
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -20,6 +27,7 @@ class MissionControlResponse:
             "status": self.status,
             "message": self.message,
             "data": self.data,
+            "executive": self.executive.to_dict(),
         }
 
 
@@ -42,6 +50,12 @@ class MissionControlService:
             f"{len(active)} active workstream(s), {len(blocked)} blocked, "
             f"{len(snapshot.approvals_required)} approval(s) required."
         )
+        executive = self._executive_message(
+            snapshot,
+            active=active,
+            blocked=blocked,
+            disconnected=disconnected,
+        )
         return MissionControlResponse(
             status=snapshot.status,
             message=message,
@@ -59,11 +73,12 @@ class MissionControlService:
                     "approvals_required": len(snapshot.approvals_required),
                 },
             },
+            executive=executive,
         )
 
     def telegram_reply(self, snapshot: MissionControlSnapshot) -> str:
         response = self.respond(snapshot)
-        lines = [response.message]
+        lines = [response.executive.render_compact()]
 
         if snapshot.blockers:
             lines.append("Blockers:")
@@ -88,3 +103,73 @@ class MissionControlService:
         if len(reply) <= self.TELEGRAM_LIMIT:
             return reply
         return reply[: self.TELEGRAM_LIMIT - 1].rstrip() + "…"
+
+    @staticmethod
+    def _executive_message(
+        snapshot: MissionControlSnapshot,
+        *,
+        active: list[dict[str, Any]],
+        blocked: list[dict[str, Any]],
+        disconnected: list[dict[str, Any]],
+    ) -> ExecutiveMessage:
+        evidence: list[str] = []
+        for item in snapshot.workstreams:
+            evidence.extend(item.evidence)
+        for item in snapshot.connections:
+            if item.evidence:
+                evidence.append(item.evidence)
+        if not evidence:
+            evidence.append(f"mission-control:{snapshot.generated_at}")
+
+        if snapshot.blockers:
+            observation = f"Narratiive OS has {len(snapshot.blockers)} recorded blocker(s)."
+            implication = "Progress is constrained until the highest-priority recorded blocker is removed."
+            recommendation = f"Resolve {snapshot.blockers[0]} before expanding the active backlog."
+            human_effort = (
+                "Review the named blocker only if it requires a credential, live-service action, "
+                "or irreversible decision."
+            )
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.TODAY
+        elif snapshot.approvals_required:
+            observation = (
+                f"Narratiive OS is operational with {len(snapshot.approvals_required)} recorded approval(s) waiting."
+            )
+            implication = "Approved work cannot advance to its next state until the decision is recorded."
+            recommendation = f"Review the first approval: {snapshot.approvals_required[0]}."
+            human_effort = "Make the approval decision; Tony should handle the downstream state change."
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.TODAY
+        elif disconnected:
+            observation = f"Mission Control records {len(disconnected)} connection issue(s)."
+            implication = "Affected capabilities must remain unavailable rather than being represented as functional."
+            recommendation = f"Keep {disconnected[0]['name']} fail-closed and continue work that does not depend on it."
+            human_effort = "No action unless the connection requires credentials or a live account change."
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.ROUTINE
+        elif active:
+            first = active[0]
+            observation = f"Narratiive OS has {len(active)} active workstream(s) and no recorded blocker."
+            implication = "The system can continue progressing through the existing backlog safely."
+            recommendation = f"Continue {first['title']}: {first['next_action']}."
+            human_effort = "No action unless Tony reports a genuine external dependency."
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.ROUTINE
+        else:
+            observation = "Mission Control has no active workstream or recorded blocker."
+            implication = "There is no evidence-backed next task in the current snapshot."
+            recommendation = "Refresh repository state before assigning new work."
+            human_effort = "No action required."
+            confidence = ExecutiveConfidence.MEDIUM
+            urgency = ExecutiveUrgency.ROUTINE
+
+        return build_executive_message(
+            observation=observation,
+            implication=implication,
+            recommendation=recommendation,
+            human_effort=human_effort,
+            evidence=tuple(dict.fromkeys(evidence)),
+            confidence=confidence,
+            urgency=urgency,
+            interruption_eligible=False,
+        )
