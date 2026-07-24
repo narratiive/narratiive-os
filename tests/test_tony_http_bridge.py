@@ -1,12 +1,15 @@
 import io
 import json
+import tempfile
 import unittest
 from pathlib import Path
 
-from openclaw.tony_http_bridge import TonyHTTPBridge
+from openclaw.tony_http_bridge import TonyHTTPBridge, load_mission_control_snapshot
+from runtime.mission_control import ConnectionStatus, MissionControlSnapshot, WorkstreamStatus
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
+from runtime.tony_executive_service import TonyExecutiveService
 from runtime.tony_orchestration import FakeGatewayTransport, TonyOrchestrationAdapter
 
 
@@ -37,6 +40,33 @@ def object_record():
     }
 
 
+def mission_control_snapshot():
+    return MissionControlSnapshot(
+        generated_at="2026-07-24T02:00:00Z",
+        status="partial",
+        progress={"status": "healthy", "campaigns": []},
+        workstreams=(
+            WorkstreamStatus(
+                workstream_id="mission-control",
+                title="Mission Control",
+                state="tested",
+                owner="Tony",
+                next_action="Validate the live bridge.",
+                evidence=("commit:12d64fa",),
+            ),
+        ),
+        connections=(
+            ConnectionStatus(
+                name="notion",
+                state="unknown",
+                evidence="No live check recorded.",
+            ),
+        ),
+        approvals_required=(),
+        blockers=(),
+    )
+
+
 class TonyHTTPBridgeTests(unittest.TestCase):
     def request(self, bridge, payload, token="", path="/"):
         raw = json.dumps(payload).encode("utf-8")
@@ -49,15 +79,18 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         }
         return bridge.handle(environ)
 
-    def command_bridge(self, transport=None, diagnostics_runner=None):
+    def command_bridge(self, transport=None, diagnostics_runner=None, snapshot_loader=None):
         transport = transport or FakeGatewayTransport()
         validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
         service = TonyCommandService(RepositoryProgressEngine(validator))
+        executive_service = TonyExecutiveService(service) if snapshot_loader is not None else None
         return TonyHTTPBridge(
             TonyOrchestrationAdapter(transport),
             command_service=service,
             object_loader=lambda: [object_record()],
             diagnostics_runner=diagnostics_runner,
+            executive_service=executive_service,
+            mission_control_loader=snapshot_loader,
         ), transport
 
     def test_health_endpoint_is_available_without_gateway_or_token(self):
@@ -69,6 +102,7 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(response["status"], "alive")
         self.assertFalse(response["deterministic_commands"])
         self.assertFalse(response["diagnostics"])
+        self.assertFalse(response["executive_commands"])
         self.assertEqual(transport.calls, [])
 
     def test_forwards_health_command_and_preserves_ids(self):
@@ -132,6 +166,35 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertIn("Rave Coffee", response["reply"])
         self.assertIn("Stage: growth_blueprint", response["reply"])
         self.assertEqual(transport.calls, [])
+
+    def test_mission_control_command_uses_recorded_snapshot_without_gateway(self):
+        bridge, transport = self.command_bridge(snapshot_loader=mission_control_snapshot)
+        status, response = self.request(bridge, {"text": "/overview"}, path="/telegram")
+        self.assertEqual(status.value, 200)
+        self.assertTrue(response["ok"])
+        self.assertEqual(response["command"], "mission_control")
+        self.assertIn("Mission Control is partial", response["reply"])
+        self.assertEqual(transport.calls, [])
+
+    def test_mission_control_command_fails_closed_without_snapshot(self):
+        bridge, transport = self.command_bridge(snapshot_loader=lambda: None)
+        status, response = self.request(bridge, {"text": "/mission_control"}, path="/telegram")
+        self.assertEqual(status.value, 200)
+        self.assertFalse(response["ok"])
+        self.assertEqual(response["data"]["error_code"], "mission_control_unavailable")
+        self.assertEqual(transport.calls, [])
+
+    def test_snapshot_loader_rejects_invalid_and_loads_recorded_state(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "mission-control.json"
+            self.assertIsNone(load_mission_control_snapshot(path))
+            path.write_text("not-json", encoding="utf-8")
+            self.assertIsNone(load_mission_control_snapshot(path))
+            path.write_text(json.dumps(mission_control_snapshot().to_dict()), encoding="utf-8")
+            loaded = load_mission_control_snapshot(path)
+            self.assertIsNotNone(loaded)
+            self.assertEqual(loaded.status, "partial")
+            self.assertEqual(loaded.workstreams[0].workstream_id, "mission-control")
 
     def test_diagnostics_command_reports_each_runtime_layer_without_gateway_dispatch(self):
         report = {
