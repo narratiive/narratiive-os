@@ -1,0 +1,55 @@
+{
+  "policy_id": "narratiive_terminology",
+  "version": "1.0.0",
+  "status": "active",
+  "owner": "Narratiive",
+  "governance": {
+    "source_of_truth": "This repository",
+    "change_rule": "Terminology changes require an explicit versioned repository update.",
+    "conflict_rule": "Repository policy overrides wording inherited from prior chats or superseded documents."
+  },
+  "approved_terms": [
+    {
+      "term": "Narratiive OS",
+      "use": "The operating system and repository-backed business infrastructure."
+    },
+    {
+      "term": "Tony",
+      "use": "The Chief-of-Staff interface and orchestration layer."
+    },
+    {
+      "term": "Growth Blueprint",
+      "use": "The canonical strategic output defined by the Blueprint registry."
+    },
+    {
+      "term": "Campaign World",
+      "use": "The approved post-Blueprint creative platform output."
+    },
+    {
+      "term": "Creative Bible",
+      "use": "The executional creative system derived from an approved Campaign World."
+    }
+  ],
+  "unsettled_terms": [
+    {
+      "concept": "Personalised prospecting asset",
+      "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."
+    },
+    {
+      "concept": "Paid commercial engagement",
+      "rule": "Do not invent or revive an engagement label; use descriptive language until an approved name is versioned here."
+    }
+  ],
+  "retired_terms": [
+    {
+      "term": "Opportunity Card",
+      "replacement": null,
+      "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."
+    },
+    {
+      "term": "Growth Sprint",
+      "replacement": null,
+      "rationale": "The phrase has been superseded and is not an approved commercial engagement name."
+    }
+  ]
+}
