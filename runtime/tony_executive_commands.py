@@ -1,17 +1,23 @@
 from __future__ import annotations
 
-from typing import Any, Iterable
+from datetime import datetime
+from typing import Any, Callable, Iterable
 
 from runtime.executive_brief import (
     BriefPeriod,
     ExecutiveBriefArchive,
     ExecutiveBriefService,
 )
+from runtime.friday_executive_review import (
+    FridayExecutiveReviewService,
+    ReviewRecord,
+    ReviewRecordType,
+)
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
 class TonyExecutiveCommandService:
-    """Add evidence-backed daily brief commands without duplicating Tony operations."""
+    """Add evidence-backed executive commands without duplicating Tony operations."""
 
     _PERIODS = {
         "morning": BriefPeriod.MORNING,
@@ -21,16 +27,23 @@ class TonyExecutiveCommandService:
         "evening_review": BriefPeriod.EVENING,
         "end_of_day": BriefPeriod.EVENING,
     }
+    _FRIDAY_COMMANDS = {"friday", "friday_review", "weekly_review", "executive_review"}
 
     def __init__(
         self,
         command_service: TonyCommandService,
         brief_service: ExecutiveBriefService | None = None,
         brief_archive: ExecutiveBriefArchive | None = None,
+        friday_review_service: FridayExecutiveReviewService | None = None,
+        clock: Callable[[], datetime] | None = None,
+        workspace_id: str = "narratiive",
     ) -> None:
         self.command_service = command_service
         self.brief_service = brief_service or ExecutiveBriefService()
         self.brief_archive = brief_archive
+        self.friday_review_service = friday_review_service or FridayExecutiveReviewService()
+        self.clock = clock or datetime.now
+        self.workspace_id = workspace_id
 
     @property
     def mission_control_loader(self):
@@ -48,6 +61,9 @@ class TonyExecutiveCommandService:
     ) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
+        if name in self._FRIDAY_COMMANDS:
+            return self._execute_friday_review(name, objects)
+
         period = self._PERIODS.get(name)
         if period is None:
             return self.command_service.execute(command, objects)
@@ -82,6 +98,47 @@ class TonyExecutiveCommandService:
             status=brief.status,
             message=brief.render_compact(),
             data=brief.to_dict(),
+        )
+
+    def _execute_friday_review(
+        self,
+        command: str,
+        objects: Iterable[dict[str, Any]],
+    ) -> CommandResponse:
+        try:
+            records = tuple(self._review_record(item) for item in objects)
+            review = self.friday_review_service.build(
+                records,
+                workspace_id=self.workspace_id,
+                period_end=self.clock(),
+            )
+        except Exception as exc:
+            return self._error(
+                command,
+                "friday_review_untrusted",
+                f"Tony could not build a trusted Friday review: {exc}",
+            )
+
+        return CommandResponse(
+            command="friday_review",
+            status="healthy",
+            message=review.render_compact(),
+            data=review.to_dict(),
+        )
+
+    @staticmethod
+    def _review_record(item: dict[str, Any]) -> ReviewRecord:
+        evidence = item.get("evidence", ())
+        if isinstance(evidence, str):
+            evidence = (evidence,)
+        return ReviewRecord(
+            record_id=str(item["record_id"]),
+            occurred_at=str(item["occurred_at"]),
+            record_type=ReviewRecordType(str(item["record_type"])),
+            summary=str(item["summary"]),
+            evidence=tuple(str(value) for value in evidence),
+            workspace_id=str(item["workspace_id"]),
+            theme=str(item["theme"]) if item.get("theme") else None,
         )
 
     @staticmethod
