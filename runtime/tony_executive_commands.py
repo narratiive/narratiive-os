@@ -26,6 +26,11 @@ class TonyExecutiveCommandService:
         self.command_service = command_service
         self.brief_service = brief_service or ExecutiveBriefService()
 
+    @property
+    def mission_control_loader(self):
+        """Expose the canonical loader for bridge health and diagnostics."""
+        return self.command_service.mission_control_loader
+
     def execute(
         self,
         command: str,
@@ -37,7 +42,7 @@ class TonyExecutiveCommandService:
         if period is None:
             return self.command_service.execute(command, objects)
 
-        loader = self.command_service.mission_control_loader
+        loader = self.mission_control_loader
         if loader is None:
             return self._error(
                 name,
