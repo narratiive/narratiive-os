@@ -6,6 +6,7 @@ from wsgiref.simple_server import make_server
 from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_app
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
+from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
 def build_app() -> TonyHTTPBridge:
@@ -15,7 +16,8 @@ def build_app() -> TonyHTTPBridge:
         raise RuntimeError("Tony command service is not configured")
 
     executive_service = TonyExecutiveCommandService(app.command_service)
-    app.command_service = TonyCapabilityCommandService(executive_service)
+    capability_service = TonyCapabilityCommandService(executive_service)
+    app.command_service = TonyTerminologyCommandService(capability_service)
     return app
 
 
