@@ -16,6 +16,7 @@ from runtime.executive_brief import (
 )
 from runtime.github_work import (
     GitHubConfig,
+    GitHubIssueWorkflowClient,
     GitHubRESTClient,
     GitHubWorkError,
     GitHubWorkService,
@@ -289,6 +290,81 @@ class GitHubRESTClientTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(GitHubWorkError, "page limit"):
             client.list_open_issues()
+
+
+class GitHubIssueWorkflowClientTests(unittest.TestCase):
+    def config(self):
+        return GitHubConfig(
+            repository="narratiive/narratiive-os",
+            workspace_id="agency",
+            matt_login="matt",
+        )
+
+    def test_separates_read_and_issue_write_tokens_and_allows_only_issue_writes(self):
+        calls = []
+        marker = "<!-- tony-engineering-task:v1 task_id=eng-1 digest=abc -->"
+
+        def opener(request, timeout):
+            calls.append(request)
+            if request.method == "GET":
+                return FakeResponse(
+                    [
+                        {
+                            "number": 71,
+                            "body": marker,
+                            "html_url": "https://github.test/issues/71",
+                        }
+                    ]
+                )
+            payload = json.loads(request.data)
+            if request.full_url.endswith("/comments"):
+                return FakeResponse({"id": 1, "body": payload["body"]})
+            return FakeResponse(
+                {
+                    "number": 71,
+                    "title": payload["title"],
+                    "body": payload["body"],
+                    "html_url": "https://github.test/issues/71",
+                }
+            )
+
+        client = GitHubIssueWorkflowClient(
+            self.config(),
+            read_token_loader=lambda: "read-token",
+            write_token_loader=lambda: "issue-write-token",
+            opener=opener,
+        )
+
+        matches = client.find_issues_by_marker(marker)
+        created = client.create_issue("Task", marker)
+        comment = client.add_issue_comment(71, "Blocked")
+
+        self.assertEqual([item["number"] for item in matches], [71])
+        self.assertEqual(created["number"], 71)
+        self.assertEqual(comment["body"], "Blocked")
+        self.assertEqual([request.method for request in calls], ["GET", "POST", "POST"])
+        self.assertEqual(
+            [request.headers["Authorization"] for request in calls],
+            [
+                "Bearer read-token",
+                "Bearer issue-write-token",
+                "Bearer issue-write-token",
+            ],
+        )
+
+    def test_missing_write_token_and_invalid_issue_number_fail_before_network(self):
+        calls = []
+        client = GitHubIssueWorkflowClient(
+            self.config(),
+            read_token_loader=lambda: "read-token",
+            write_token_loader=lambda: "",
+            opener=lambda *args, **kwargs: calls.append(args),
+        )
+        with self.assertRaisesRegex(GitHubWorkError, "write token"):
+            client.create_issue("Task", "Body")
+        with self.assertRaisesRegex(GitHubWorkError, "positive"):
+            client.add_issue_comment(0, "Body")
+        self.assertEqual(calls, [])
 
 
 class ExecutiveBriefArchiveTests(unittest.TestCase):

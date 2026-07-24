@@ -1,5 +1,6 @@
 import unittest
 
+from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.mission_control import MissionControlBuilder, WorkstreamStatus
 from runtime.mission_control_service import MissionControlService
 from runtime.progress_engine import ProgressSnapshot
@@ -137,6 +138,37 @@ class MissionControlServiceTests(unittest.TestCase):
         reply = self.service.telegram_reply(snapshot)
         self.assertLessEqual(len(reply), self.service.TELEGRAM_LIMIT)
         self.assertTrue(reply.endswith("…"))
+
+    def test_merge_ready_engineering_handoff_requests_only_matts_decision(self):
+        handoff = EngineeringHandoffSnapshot(
+            task_id="eng-71",
+            task_digest="digest",
+            workspace_id="agency",
+            repository="narratiive/narratiive-os",
+            issue_number=71,
+            issue_url="https://github.test/issues/71",
+            state="merge_ready",
+            observed_at="2026-07-24T21:00:00Z",
+            pull_request_number=72,
+            pull_request_url="https://github.test/pulls/72",
+            head_sha="abc1234",
+            merge_ready=True,
+        )
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T21:00:00Z",
+            progress=self.progress(),
+            engineering_handoffs=(handoff,),
+        )
+        response = self.service.respond(snapshot)
+        self.assertIn(
+            "ready for Matt's merge decision",
+            response.executive.observation,
+        )
+        self.assertIn("must not merge", response.executive.recommendation)
+        self.assertEqual(
+            response.data["summary"]["engineering_merge_ready"],
+            1,
+        )
 
 
 if __name__ == "__main__":

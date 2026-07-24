@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from typing import Any, Iterable, Mapping
 
+from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.github_work import GitHubWorkSnapshot
 from runtime.progress_engine import ProgressSnapshot
 
@@ -57,6 +58,7 @@ class MissionControlSnapshot:
     approvals_required: tuple[str, ...]
     blockers: tuple[str, ...]
     github_work: GitHubWorkSnapshot | None = None
+    engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -70,6 +72,9 @@ class MissionControlSnapshot:
             "github_work": (
                 self.github_work.to_dict() if self.github_work is not None else None
             ),
+            "engineering_handoffs": [
+                item.to_dict() for item in self.engineering_handoffs
+            ],
         }
 
 
@@ -85,11 +90,19 @@ class MissionControlBuilder:
         connections: Mapping[str, Mapping[str, Any]] | None = None,
         approvals_required: Iterable[str] = (),
         github_work: GitHubWorkSnapshot | None = None,
+        engineering_handoffs: Iterable[EngineeringHandoffSnapshot] = (),
     ) -> MissionControlSnapshot:
         workstream_items = tuple(sorted(workstreams, key=lambda item: item.workstream_id))
         connection_items = self._connections(connections or {})
+        handoff_items = tuple(
+            sorted(engineering_handoffs, key=lambda item: item.task_id)
+        )
         blockers = self._blockers(
-            progress, workstream_items, connection_items, github_work
+            progress,
+            workstream_items,
+            connection_items,
+            github_work,
+            handoff_items,
         )
 
         if blockers:
@@ -110,6 +123,7 @@ class MissionControlBuilder:
             approvals_required=tuple(sorted(set(approvals_required))),
             blockers=blockers,
             github_work=github_work,
+            engineering_handoffs=handoff_items,
         )
 
     @staticmethod
@@ -140,6 +154,7 @@ class MissionControlBuilder:
         workstreams: tuple[WorkstreamStatus, ...],
         connections: tuple[ConnectionStatus, ...],
         github_work: GitHubWorkSnapshot | None = None,
+        engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = (),
     ) -> tuple[str, ...]:
         blockers: set[str] = set()
 
@@ -158,5 +173,9 @@ class MissionControlBuilder:
             for item in github_work.blocked:
                 for reason in item.blocker_reasons:
                     blockers.add(f"github:{item.kind}:{item.number}:{reason}")
+
+        for handoff in engineering_handoffs:
+            for reason in handoff.blockers:
+                blockers.add(f"engineering:{handoff.task_id}:{reason}")
 
         return tuple(sorted(blockers))

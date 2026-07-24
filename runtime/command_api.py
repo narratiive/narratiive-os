@@ -13,6 +13,11 @@ from .approvals import ApprovalConflict, ApprovalNotFound
 from .composition import RuntimeComponents
 from .definitions import load_workflow_definition
 from .dispatch import JobNotFound
+from .engineering_handoff import (
+    EngineeringHandoffError,
+    EngineeringTask,
+    EngineeringTaskService,
+)
 from .repositories import RunNotFound
 from .revision_graph import RevisionIssue
 from .serialization import workflow_to_dict
@@ -62,6 +67,10 @@ class RuntimeCommandAPI:
             "blueprints.generate": self._blueprint_generate,
             "blueprints.get": self._blueprint_get,
             "blueprints.list": self._blueprint_list,
+            "engineering_tasks.approve": self._engineering_task_approve,
+            "engineering_tasks.create_issue": self._engineering_task_create_issue,
+            "engineering_tasks.get": self._engineering_task_get,
+            "engineering_tasks.refresh": self._engineering_task_refresh,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -245,6 +254,61 @@ class RuntimeCommandAPI:
         versions = [record.to_dict() for record in orchestrator.list(workspace_id, client_id, blueprint_id)]
         return {"versions": versions, "count": len(versions)}
 
+    def _engineering_task_approve(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        value = request.get("task")
+        if not isinstance(value, Mapping):
+            raise CommandError(
+                "invalid_engineering_task",
+                "task must be an object",
+            )
+        try:
+            task = EngineeringTask.from_dict(value)
+            return self._engineering_tasks().approve(
+                task,
+                command_id=self._required(request, "command_id"),
+                reviewer_id=self._required(request, "reviewer_id"),
+                rationale=self._required(request, "rationale"),
+            ).to_dict()
+        except EngineeringHandoffError as exc:
+            raise CommandError("engineering_task_blocked", str(exc), 409) from exc
+
+    def _engineering_task_create_issue(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_tasks().create_issue(
+                self._required(request, "task_id"),
+                command_id=self._required(request, "command_id"),
+            ).to_dict()
+        except EngineeringHandoffError as exc:
+            raise CommandError("engineering_task_blocked", str(exc), 409) from exc
+
+    def _engineering_task_get(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_tasks().get(
+                self._required(request, "task_id")
+            )
+        except EngineeringHandoffError as exc:
+            raise CommandError("engineering_task_blocked", str(exc), 409) from exc
+
+    def _engineering_task_refresh(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_tasks().refresh(
+                self._required(request, "task_id")
+            ).to_dict()
+        except EngineeringHandoffError as exc:
+            raise CommandError("engineering_task_blocked", str(exc), 409) from exc
+
     def _repository_path(self, relative: str) -> Path:
         root = self.runtime.paths.repository_root.resolve()
         target = (root / relative).resolve()
@@ -269,6 +333,16 @@ class RuntimeCommandAPI:
                 503,
             )
         return self.blueprint_orchestrator
+
+    def _engineering_tasks(self) -> EngineeringTaskService:
+        service = self.runtime.engineering_task_service
+        if service is None:
+            raise CommandError(
+                "engineering_tasks_unavailable",
+                "engineering task GitHub workflow is not configured",
+                503,
+            )
+        return service
 
     @staticmethod
     def _blueprint_payload(request: Mapping[str, Any]) -> dict[str, Any]:
