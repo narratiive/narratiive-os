@@ -26,6 +26,11 @@ class TonyExecutiveCommandService:
         self.command_service = command_service
         self.brief_service = brief_service or ExecutiveBriefService()
 
+    @property
+    def mission_control_loader(self):
+        """Expose delegated configuration for bridge health and diagnostics."""
+        return self.command_service.mission_control_loader
+
     def execute(
         self,
         command: str,
