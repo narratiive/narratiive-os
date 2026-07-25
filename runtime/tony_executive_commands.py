@@ -16,6 +16,9 @@ from runtime.friday_executive_review import (
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
+ReviewRecordLoader = Callable[[], Iterable[dict[str, Any]]]
+
+
 class TonyExecutiveCommandService:
     """Add evidence-backed executive commands without duplicating Tony operations."""
 
@@ -35,6 +38,7 @@ class TonyExecutiveCommandService:
         brief_service: ExecutiveBriefService | None = None,
         brief_archive: ExecutiveBriefArchive | None = None,
         friday_review_service: FridayExecutiveReviewService | None = None,
+        friday_record_loader: ReviewRecordLoader | None = None,
         clock: Callable[[], datetime] | None = None,
         workspace_id: str = "narratiive",
     ) -> None:
@@ -42,6 +46,7 @@ class TonyExecutiveCommandService:
         self.brief_service = brief_service or ExecutiveBriefService()
         self.brief_archive = brief_archive
         self.friday_review_service = friday_review_service or FridayExecutiveReviewService()
+        self.friday_record_loader = friday_record_loader
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
 
@@ -62,7 +67,7 @@ class TonyExecutiveCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name in self._FRIDAY_COMMANDS:
-            return self._execute_friday_review(name, objects)
+            return self._execute_friday_review(name)
 
         period = self._PERIODS.get(name)
         if period is None:
@@ -100,13 +105,17 @@ class TonyExecutiveCommandService:
             data=brief.to_dict(),
         )
 
-    def _execute_friday_review(
-        self,
-        command: str,
-        objects: Iterable[dict[str, Any]],
-    ) -> CommandResponse:
+    def _execute_friday_review(self, command: str) -> CommandResponse:
+        if self.friday_record_loader is None:
+            return self._error(
+                command,
+                "friday_review_unavailable",
+                "Friday review evidence is not configured.",
+            )
         try:
-            records = tuple(self._review_record(item) for item in objects)
+            records = tuple(
+                self._review_record(item) for item in self.friday_record_loader()
+            )
             review = self.friday_review_service.build(
                 records,
                 workspace_id=self.workspace_id,
