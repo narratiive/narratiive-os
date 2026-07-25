@@ -165,6 +165,10 @@ class TonyOrchestrationAdapter:
         "engineering_task.create_issue": "engineering_tasks.create_issue",
         "engineering_task.get": "engineering_tasks.get",
         "engineering_task.refresh": "engineering_tasks.refresh",
+        "engineering_task.dispatch": "engineering_tasks.dispatch",
+        "engineering_task.execution": "engineering_tasks.execution.get",
+        "engineering_task.recover": "engineering_tasks.recover",
+        "engineering_task.cancel": "engineering_tasks.cancel",
     }
 
     def __init__(self, transport: GatewayTransport) -> None:
@@ -293,4 +297,18 @@ class TonyOrchestrationAdapter:
             if isinstance(notification, Mapping):
                 return str(notification.get("message", "Engineering task state changed."))
             return "Engineering task has no decision, blocker or merge-readiness update."
+        if action == "engineering_task.dispatch":
+            return (
+                "Engineering implementation state: "
+                f"{data.get('state', 'unknown')}."
+            )
+        if action in {
+            "engineering_task.execution",
+            "engineering_task.recover",
+            "engineering_task.cancel",
+        }:
+            return (
+                "Engineering implementation state: "
+                f"{data.get('state', 'unknown')}."
+            )
         return f"Narratiive OS completed '{action}'."
