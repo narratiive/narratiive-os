@@ -10,8 +10,14 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         snapshot = TonyCapabilityRegistry().snapshot({"mission_control"})
         self.assertEqual(snapshot["status"], "partial")
         mission = next(item for item in snapshot["capabilities"] if item["command"] == "/mission")
+        morning = next(item for item in snapshot["capabilities"] if item["command"] == "/morning")
+        evening = next(item for item in snapshot["capabilities"] if item["command"] == "/evening")
+        friday = next(item for item in snapshot["capabilities"] if item["command"] == "/friday")
         history = next(item for item in snapshot["capabilities"] if item["command"] == "/history [filter]")
         self.assertTrue(mission["available"])
+        self.assertTrue(morning["available"])
+        self.assertTrue(evening["available"])
+        self.assertTrue(friday["available"])
         self.assertFalse(history["available"])
         self.assertEqual(history["missing_requirements"], ["execution_journal"])
 
@@ -22,10 +28,23 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         self.assertEqual(snapshot["status"], "ready")
         self.assertEqual(snapshot["available_count"], snapshot["total_count"])
 
+    def test_executive_capabilities_publish_canonical_aliases(self):
+        snapshot = TonyCapabilityRegistry().snapshot({"mission_control"})
+        entries = {item["command"]: item for item in snapshot["capabilities"]}
+        self.assertEqual(entries["/morning"]["aliases"], ["/morning_brief", "/standup"])
+        self.assertEqual(entries["/evening"]["aliases"], ["/evening_review", "/end_of_day"])
+        self.assertEqual(
+            entries["/friday"]["aliases"],
+            ["/friday_review", "/weekly_review", "/executive_review"],
+        )
+
     def test_telegram_summary_exposes_commands_and_availability(self):
         summary = TonyCapabilityRegistry().telegram_summary({"mission_control"})
         self.assertIn("Tony capabilities:", summary)
         self.assertIn("/mission", summary)
+        self.assertIn("/morning", summary)
+        self.assertIn("/evening", summary)
+        self.assertIn("/friday", summary)
         self.assertIn("/github", summary)
         self.assertIn("/history [filter]", summary)
         self.assertIn("/client <name>", summary)
