@@ -67,7 +67,7 @@ class TonyExecutiveCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name in self._FRIDAY_COMMANDS:
-            return self._execute_friday_review()
+            return self._execute_friday_review(objects)
 
         period = self._PERIODS.get(name)
         if period is None:
@@ -105,8 +105,23 @@ class TonyExecutiveCommandService:
             data=brief.to_dict(),
         )
 
-    def _execute_friday_review(self) -> CommandResponse:
-        if self.friday_record_loader is None:
+    def _execute_friday_review(
+        self,
+        objects: Iterable[dict[str, Any]],
+    ) -> CommandResponse:
+        injected_records = tuple(objects)
+        if injected_records:
+            raw_records: Iterable[dict[str, Any]] = injected_records
+        elif self.friday_record_loader is not None:
+            try:
+                raw_records = self.friday_record_loader()
+            except Exception as exc:
+                return self._error(
+                    "friday_review",
+                    "friday_review_untrusted",
+                    f"Tony could not load trusted Friday evidence: {exc}",
+                )
+        else:
             return self._error(
                 "friday_review",
                 "friday_review_unavailable",
@@ -114,9 +129,7 @@ class TonyExecutiveCommandService:
             )
 
         try:
-            records = tuple(
-                self._review_record(item) for item in self.friday_record_loader()
-            )
+            records = tuple(self._review_record(item) for item in raw_records)
             review = self.friday_review_service.build(
                 records,
                 workspace_id=self.workspace_id,
