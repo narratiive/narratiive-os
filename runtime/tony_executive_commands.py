@@ -67,7 +67,7 @@ class TonyExecutiveCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name in self._FRIDAY_COMMANDS:
-            return self._execute_friday_review(name)
+            return self._execute_friday_review(objects)
 
         period = self._PERIODS.get(name)
         if period is None:
@@ -105,17 +105,16 @@ class TonyExecutiveCommandService:
             data=brief.to_dict(),
         )
 
-    def _execute_friday_review(self, command: str) -> CommandResponse:
-        if self.friday_record_loader is None:
-            return self._error(
-                command,
-                "friday_review_unavailable",
-                "Friday review evidence is not configured.",
-            )
+    def _execute_friday_review(
+        self, objects: Iterable[dict[str, Any]]
+    ) -> CommandResponse:
         try:
-            records = tuple(
-                self._review_record(item) for item in self.friday_record_loader()
+            source = (
+                self.friday_record_loader()
+                if self.friday_record_loader is not None
+                else objects
             )
+            records = tuple(self._review_record(item) for item in source)
             review = self.friday_review_service.build(
                 records,
                 workspace_id=self.workspace_id,
@@ -123,7 +122,7 @@ class TonyExecutiveCommandService:
             )
         except Exception as exc:
             return self._error(
-                command,
+                "friday_review",
                 "friday_review_untrusted",
                 f"Tony could not build a trusted Friday review: {exc}",
             )
