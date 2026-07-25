@@ -13,10 +13,12 @@ from runtime.friday_executive_review import (
     ReviewRecord,
     ReviewRecordType,
 )
+from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
 ReviewRecordLoader = Callable[[], Iterable[dict[str, Any]]]
+TerminologyPolicyLoader = Callable[[], TerminologyPolicy]
 _FRIDAY_RECORD_FIELDS = {
     "record_id",
     "occurred_at",
@@ -47,6 +49,7 @@ class TonyExecutiveCommandService:
         brief_archive: ExecutiveBriefArchive | None = None,
         friday_review_service: FridayExecutiveReviewService | None = None,
         friday_record_loader: ReviewRecordLoader | None = None,
+        terminology_policy_loader: TerminologyPolicyLoader | None = None,
         clock: Callable[[], datetime] | None = None,
         workspace_id: str = "narratiive",
     ) -> None:
@@ -55,6 +58,9 @@ class TonyExecutiveCommandService:
         self.brief_archive = brief_archive
         self.friday_review_service = friday_review_service or FridayExecutiveReviewService()
         self.friday_record_loader = friday_record_loader
+        self.terminology_policy_loader = (
+            terminology_policy_loader or TerminologyPolicy.from_path
+        )
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
 
@@ -90,12 +96,21 @@ class TonyExecutiveCommandService:
             )
 
         try:
+            policy = self.terminology_policy_loader()
             snapshot = loader()
             if self.github_configured and snapshot.github_work is None:
                 raise ValueError(
                     "GitHub awareness is configured but live GitHub state is unavailable"
                 )
             brief = self.brief_service.build(snapshot, period)
+            message = brief.render_compact()
+            violations = policy.scan(message)
+            if violations:
+                terms = ", ".join(sorted({item.term for item in violations}))
+                raise ValueError(
+                    f"executive brief uses retired terminology under policy "
+                    f"{policy.version}: {terms}"
+                )
             if self.brief_archive is not None:
                 self.brief_archive.store(brief)
         except Exception as exc:
@@ -106,11 +121,13 @@ class TonyExecutiveCommandService:
             )
 
         canonical_command = "morning" if period is BriefPeriod.MORNING else "evening"
+        data = brief.to_dict()
+        data["terminology_policy_version"] = policy.version
         return CommandResponse(
             command=canonical_command,
             status=brief.status,
-            message=brief.render_compact(),
-            data=brief.to_dict(),
+            message=message,
+            data=data,
         )
 
     def _execute_friday_review(
