@@ -46,16 +46,56 @@ class OperationalAcceptanceTests(unittest.TestCase):
         self.assertTrue(good.ok)
         self.assertFalse(bad.ok)
 
+    def test_tony_roundtrip_posts_authenticated_health_command(self) -> None:
+        captured = {}
+
+        def opener(request, **_kwargs):
+            captured["method"] = request.get_method()
+            captured["authorization"] = request.headers.get("Authorization")
+            captured["payload"] = json.loads(request.data.decode("utf-8"))
+            return FakeResponse({"ok": True, "command": "health"})
+
+        result = operational_acceptance.check_tony_roundtrip(
+            "http://bridge/",
+            "bridge-secret",
+            "system",
+            "system",
+            opener=opener,
+        )
+        self.assertTrue(result.ok)
+        self.assertEqual(captured["method"], "POST")
+        self.assertEqual(captured["authorization"], "Bearer bridge-secret")
+        self.assertEqual(captured["payload"]["action"], "health")
+        self.assertNotIn("bridge-secret", result.detail)
+
+    def test_tony_roundtrip_requires_bridge_token(self) -> None:
+        result = operational_acceptance.check_tony_roundtrip(
+            "http://bridge/", "", "system", "system", opener=lambda *_args, **_kwargs: None
+        )
+        self.assertFalse(result.ok)
+        self.assertIn("not configured", result.detail)
+
     def test_secret_file_requires_mode_600(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "runtime.env"
-            path.write_text("TOKEN=secret\n", encoding="utf-8")
+            path.write_text("TONY_BRIDGE_TOKEN=secret\n", encoding="utf-8")
             path.chmod(0o600)
             self.assertTrue(operational_acceptance.check_secret_file(path).ok)
             path.chmod(0o644)
             result = operational_acceptance.check_secret_file(path)
             self.assertFalse(result.ok)
             self.assertIn("unsafe permissions", result.detail)
+
+    def test_reads_exported_and_quoted_environment_values(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime.env"
+            path.write_text(
+                "# comment\nexport TONY_BRIDGE_TOKEN='bridge-secret'\nNARRATIIVE_API_KEY=api-secret\n",
+                encoding="utf-8",
+            )
+            values = operational_acceptance.read_env_file(path)
+        self.assertEqual(values["TONY_BRIDGE_TOKEN"], "bridge-secret")
+        self.assertEqual(values["NARRATIIVE_API_KEY"], "api-secret")
 
     def test_launch_agent_check_uses_user_domain_on_macos(self) -> None:
         calls = []
@@ -73,15 +113,22 @@ class OperationalAcceptanceTests(unittest.TestCase):
     def test_run_checks_returns_nonzero_when_any_required_check_fails(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             secret = Path(directory) / "runtime.env"
-            secret.write_text("TOKEN=secret\n", encoding="utf-8")
+            secret.write_text("TONY_BRIDGE_TOKEN=secret\n", encoding="utf-8")
             secret.chmod(0o600)
-            responses = iter([FakeResponse({"ok": True}), FakeResponse({"ok": False})])
+            responses = iter(
+                [
+                    FakeResponse({"ok": True}),
+                    FakeResponse({"ok": False}),
+                    FakeResponse({"ok": True, "command": "health"}),
+                ]
+            )
             with mock.patch.object(operational_acceptance.platform, "system", return_value="Linux"):
                 exit_code, report = operational_acceptance.run_checks(
                     "http://runtime/health",
                     "http://bridge/health",
                     secret,
                     opener=lambda *_args, **_kwargs: next(responses),
+                    bridge_token="secret",
                 )
         self.assertEqual(exit_code, 1)
         self.assertEqual(report["status"], "not_ready")
@@ -89,18 +136,26 @@ class OperationalAcceptanceTests(unittest.TestCase):
     def test_run_checks_reports_ready_when_all_checks_pass(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             secret = Path(directory) / "runtime.env"
-            secret.write_text("TOKEN=secret\n", encoding="utf-8")
+            secret.write_text("TONY_BRIDGE_TOKEN=secret\n", encoding="utf-8")
             secret.chmod(0o600)
+
+            def opener(request, **_kwargs):
+                if hasattr(request, "get_method") and request.get_method() == "POST":
+                    return FakeResponse({"ok": True, "command": "health"})
+                return FakeResponse({"ok": True, "status": "alive"})
+
             with mock.patch.object(operational_acceptance.platform, "system", return_value="Linux"):
                 exit_code, report = operational_acceptance.run_checks(
                     "http://runtime/health",
                     "http://bridge/health",
                     secret,
-                    opener=lambda *_args, **_kwargs: FakeResponse({"ok": True, "status": "alive"}),
+                    opener=opener,
+                    bridge_token="secret",
                 )
         self.assertEqual(exit_code, 0)
         self.assertTrue(report["ok"])
         self.assertEqual(report["status"], "ready")
+        self.assertTrue(next(item for item in report["checks"] if item["name"] == "tony-roundtrip")["ok"])
 
 
 if __name__ == "__main__":
