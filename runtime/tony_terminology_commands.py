@@ -7,7 +7,9 @@ from runtime.tony_command_service import CommandResponse
 
 
 class TonyTerminologyCommandService:
-    """Fail closed when Tony output contains repository-retired language."""
+    """Expose canonical vocabulary and fail closed on repository-retired language."""
+
+    VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
     def __init__(self, command_service, policy: TerminologyPolicy | None = None) -> None:
         self.command_service = command_service
@@ -18,6 +20,11 @@ class TonyTerminologyCommandService:
         return self.command_service.mission_control_loader
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
+        normalized = " ".join(command.strip().split())
+        name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
+        if name in self.VOCABULARY_COMMANDS:
+            return self._vocabulary()
+
         response = self.command_service.execute(command, objects)
         violations = self.policy.scan_many(self._strings(response.message, response.data))
         if not violations:
@@ -31,6 +38,40 @@ class TonyTerminologyCommandService:
                 "error_code": "terminology_violation",
                 "policy_version": self.policy.version,
                 "retired_terms": terms,
+            },
+        )
+
+    def _vocabulary(self) -> CommandResponse:
+        approved = tuple(
+            f"{entry['term']} — {entry['use']}"
+            for entry in self.policy.approved_terms
+        )
+        unsettled = tuple(
+            f"{entry['concept']} — {entry['rule']}"
+            for entry in self.policy.unsettled_terms
+        )
+        retired = tuple(entry["term"] for entry in self.policy.retired_terms)
+
+        lines = [f"Narratiive vocabulary v{self.policy.version}"]
+        if approved:
+            lines.append("Approved:")
+            lines.extend(f"- {item}" for item in approved)
+        if unsettled:
+            lines.append("Unsettled:")
+            lines.extend(f"- {item}" for item in unsettled)
+        if retired:
+            lines.append("Retired:")
+            lines.extend(f"- {item}" for item in retired)
+
+        return CommandResponse(
+            command="vocabulary",
+            status="ok",
+            message="\n".join(lines),
+            data={
+                "policy_version": self.policy.version,
+                "approved_terms": list(self.policy.approved_terms),
+                "unsettled_terms": list(self.policy.unsettled_terms),
+                "retired_terms": list(self.policy.retired_terms),
             },
         )
 
