@@ -1,5 +1,6 @@
 import unittest
 
+from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
 from runtime.mission_control import (
     ConnectionStatus,
@@ -171,6 +172,32 @@ class MissionControlTests(unittest.TestCase):
         self.assertEqual(
             snapshot.blockers,
             ("github:issue:66:label:blocked",),
+        )
+
+    def test_engineering_handoff_blockers_are_included_with_task_identity(self) -> None:
+        handoff = EngineeringHandoffSnapshot(
+            task_id="eng-71",
+            task_digest="digest",
+            workspace_id="agency",
+            repository="narratiive/narratiive-os",
+            issue_number=71,
+            issue_url="https://github.test/issues/71",
+            state="blocked",
+            observed_at="2026-07-24T21:00:00Z",
+            blockers=("failed_check:runtime-tests",),
+        )
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T21:00:00Z",
+            progress=self.progress(status="healthy"),
+            engineering_handoffs=(handoff,),
+        )
+        self.assertEqual(
+            snapshot.blockers,
+            ("engineering:eng-71:failed_check:runtime-tests",),
+        )
+        self.assertEqual(
+            snapshot.to_dict()["engineering_handoffs"][0]["task_id"],
+            "eng-71",
         )
 
 

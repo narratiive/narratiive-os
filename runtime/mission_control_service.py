@@ -72,6 +72,9 @@ class MissionControlService:
                 "approvals_required": list(snapshot.approvals_required),
                 "blockers": list(snapshot.blockers),
                 "github_work": github.to_dict() if github is not None else None,
+                "engineering_handoffs": [
+                    item.to_dict() for item in snapshot.engineering_handoffs
+                ],
                 "summary": {
                     "active_workstreams": len(active),
                     "blocked_workstreams": len(blocked),
@@ -84,6 +87,11 @@ class MissionControlService:
                         len(github.active_issues) if github is not None else 0
                     ),
                     "matt_github_reviews": github_approvals,
+                    "engineering_handoffs": len(snapshot.engineering_handoffs),
+                    "engineering_merge_ready": sum(
+                        1 for item in snapshot.engineering_handoffs
+                        if item.merge_ready
+                    ),
                 },
             },
             executive=executive,
@@ -109,6 +117,17 @@ class MissionControlService:
                     f"- #{item.number} {item.title} — {item.url}"
                     for item in github.matt_approval_required[:5]
                 )
+
+        engineering_updates = [
+            item.notification
+            for item in snapshot.engineering_handoffs
+            if item.notification is not None
+        ]
+        if engineering_updates:
+            lines.append("Engineering decisions:")
+            lines.extend(
+                f"- {item.message}" for item in engineering_updates[:5]
+            )
 
         actionable = [
             item
@@ -144,6 +163,10 @@ class MissionControlService:
             evidence.extend(
                 item.evidence for item in snapshot.github_work.all_open_items
             )
+        for handoff in snapshot.engineering_handoffs:
+            evidence.append(handoff.issue_url)
+            if handoff.pull_request_url:
+                evidence.append(handoff.pull_request_url)
         if not evidence:
             evidence.append(f"mission-control:{snapshot.generated_at}")
 
@@ -164,6 +187,23 @@ class MissionControlService:
             implication = "Approved work cannot advance to its next state until the decision is recorded."
             recommendation = f"Review the first approval: {snapshot.approvals_required[0]}."
             human_effort = "Make the approval decision; Tony should handle the downstream state change."
+            confidence = ExecutiveConfidence.HIGH
+            urgency = ExecutiveUrgency.TODAY
+        elif any(item.merge_ready for item in snapshot.engineering_handoffs):
+            handoff = next(
+                item for item in snapshot.engineering_handoffs if item.merge_ready
+            )
+            observation = (
+                f"Engineering task {handoff.task_id} is ready for Matt's merge decision."
+            )
+            implication = (
+                "The linked pull request has current approvals, required checks, "
+                "and an explicitly mergeable head."
+            )
+            recommendation = (
+                f"Review pull request #{handoff.pull_request_number}; Tony must not merge it."
+            )
+            human_effort = "Make the final merge decision in GitHub."
             confidence = ExecutiveConfidence.HIGH
             urgency = ExecutiveUrgency.TODAY
         elif (

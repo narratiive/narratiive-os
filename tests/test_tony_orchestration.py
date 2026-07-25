@@ -156,6 +156,72 @@ class TonyOrchestrationTests(unittest.TestCase):
         self.assertNotIn("approvals.approve", commands)
         self.assertNotIn("blueprints.export", commands)
 
+    def test_engineering_task_actions_use_the_authenticated_idempotent_gateway(self):
+        transport = FakeGatewayTransport(
+            [
+                {
+                    "ok": True,
+                    "command": "engineering_tasks.approve",
+                    "data": {"task_digest": "digest-1"},
+                },
+                {
+                    "ok": True,
+                    "command": "engineering_tasks.create_issue",
+                    "data": {"issue_number": 71},
+                },
+                {
+                    "ok": True,
+                    "command": "engineering_tasks.refresh",
+                    "data": {
+                        "notification": {
+                            "message": "Engineering task eng-71 is merge-ready."
+                        }
+                    },
+                },
+            ]
+        )
+        adapter = TonyOrchestrationAdapter(transport)
+        actions = [
+            TonyCommand(
+                "engineering_task.approve",
+                "agency",
+                "agency-client",
+                "eng-approve-71",
+                reviewer_id="matt",
+                rationale="Approved",
+                payload={"task": {"task_id": "eng-71"}},
+            ),
+            TonyCommand(
+                "engineering_task.create_issue",
+                "agency",
+                "agency-client",
+                "eng-create-71",
+                payload={"task_id": "eng-71"},
+            ),
+            TonyCommand(
+                "engineering_task.refresh",
+                "agency",
+                "agency-client",
+                "eng-refresh-71",
+                payload={"task_id": "eng-71"},
+            ),
+        ]
+        responses = [adapter.execute(item) for item in actions]
+
+        self.assertEqual(
+            [call["payload"]["command"] for call in transport.calls],
+            [
+                "engineering_tasks.approve",
+                "engineering_tasks.create_issue",
+                "engineering_tasks.refresh",
+            ],
+        )
+        self.assertEqual(
+            [call["idempotency_key"] for call in transport.calls],
+            ["eng-approve-71", "eng-create-71", "eng-refresh-71"],
+        )
+        self.assertIn("merge-ready", responses[-1].message)
+
     def test_gateway_errors_are_actionable_without_stack_traces(self):
         transport = FakeGatewayTransport([
             {

@@ -42,6 +42,14 @@ approval stores; mismatched client or run references are rejected. Requests with
 a workspace remain on the compatible `legacy` runtime. `workspaces.migrate_legacy`
 copies existing unscoped data into a named workspace without deleting its source.
 
+Approved engineering handoffs use the same authenticated, idempotent command
+gateway through `engineering_tasks.approve`, `engineering_tasks.create_issue`,
+`engineering_tasks.get`, and `engineering_tasks.refresh`. Approved task content
+is immutable, workspace-scoped and checksum-addressed; Issue creation and
+material transition comments are hash-journaled. Tony treats missing checks,
+stale reviews and unknown GitHub state as blockers and never writes code,
+pull requests, reviews or merges.
+
 ## Live Growth Blueprint run
 
 Use `scripts/run_live_pipeline.py` to run the same five specialist stages against an

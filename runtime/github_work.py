@@ -386,6 +386,240 @@ class GitHubRESTClient:
         return ""
 
 
+class GitHubIssueWorkflowClient:
+    """Endpoint-allowlisted GitHub adapter for one Issue handoff workflow.
+
+    Reads use the existing GitHub awareness token. The only writes exposed are
+    Issue creation and comments on a caller-bound Issue number.
+    """
+
+    def __init__(
+        self,
+        config: GitHubConfig,
+        *,
+        read_token_loader: Callable[[], str] | None = None,
+        write_token_loader: Callable[[], str] | None = None,
+        opener: Callable[..., Any] = urllib.request.urlopen,
+    ) -> None:
+        self.config = config
+        self._read_token_loader = read_token_loader or (
+            lambda: os.getenv("TONY_GITHUB_TOKEN", "").strip()
+        )
+        self._write_token_loader = write_token_loader or (
+            lambda: os.getenv("TONY_GITHUB_ISSUE_TOKEN", "").strip()
+        )
+        self._opener = opener
+
+    def find_issues_by_marker(self, marker: str) -> list[Mapping[str, Any]]:
+        if not marker.strip():
+            raise GitHubWorkError("engineering task marker is required")
+        return [
+            issue
+            for issue in self._get_pages(
+                f"/repos/{self.config.repository}/issues",
+                {"state": "all", "sort": "created", "direction": "desc"},
+            )
+            if "pull_request" not in issue and marker in str(issue.get("body", ""))
+        ]
+
+    def create_issue(self, title: str, body: str) -> Mapping[str, Any]:
+        title = _required_text(title, "issue title")
+        body = _required_text(body, "issue body")
+        value, _ = self._request(
+            "POST",
+            self._url(f"/repos/{self.config.repository}/issues", {}),
+            token=self._write_token(),
+            payload={"title": title, "body": body},
+        )
+        if not isinstance(value, Mapping):
+            raise GitHubWorkError("GitHub create Issue response must be an object")
+        return value
+
+    def get_issue(self, number: int) -> Mapping[str, Any]:
+        return self._get_object(f"/repos/{self.config.repository}/issues/{self._number(number)}")
+
+    def list_issue_timeline(self, number: int) -> list[Mapping[str, Any]]:
+        return self._get_pages(
+            f"/repos/{self.config.repository}/issues/{self._number(number)}/timeline",
+            {},
+            accept="application/vnd.github+json",
+        )
+
+    def get_pull_request(self, number: int) -> Mapping[str, Any]:
+        return self._get_object(f"/repos/{self.config.repository}/pulls/{self._number(number)}")
+
+    def list_check_runs(self, head_sha: str) -> list[Mapping[str, Any]]:
+        sha = str(head_sha).strip()
+        if not re.fullmatch(r"[A-Fa-f0-9]{7,64}|[A-Za-z0-9_.-]{1,100}", sha):
+            raise GitHubWorkError("GitHub head SHA is invalid")
+        return self._get_pages(
+            f"/repos/{self.config.repository}/commits/{sha}/check-runs",
+            {"filter": "latest"},
+            root_key="check_runs",
+        )
+
+    def list_pull_request_reviews(self, number: int) -> list[Mapping[str, Any]]:
+        return self._get_pages(
+            f"/repos/{self.config.repository}/pulls/{self._number(number)}/reviews",
+            {},
+        )
+
+    def list_issue_comments(self, number: int) -> list[Mapping[str, Any]]:
+        return self._get_pages(
+            f"/repos/{self.config.repository}/issues/{self._number(number)}/comments",
+            {},
+        )
+
+    def add_issue_comment(self, number: int, body: str) -> Mapping[str, Any]:
+        value, _ = self._request(
+            "POST",
+            self._url(
+                f"/repos/{self.config.repository}/issues/{self._number(number)}/comments",
+                {},
+            ),
+            token=self._write_token(),
+            payload={"body": _required_text(body, "issue comment body")},
+        )
+        if not isinstance(value, Mapping):
+            raise GitHubWorkError("GitHub Issue comment response must be an object")
+        return value
+
+    def _get_object(self, path: str) -> Mapping[str, Any]:
+        value, next_url = self._request(
+            "GET",
+            self._url(path, {}),
+            token=self._read_token(),
+        )
+        if next_url or not isinstance(value, Mapping):
+            raise GitHubWorkError("GitHub object response has an invalid shape")
+        return value
+
+    def _get_pages(
+        self,
+        path: str,
+        query: Mapping[str, str],
+        *,
+        root_key: str | None = None,
+        accept: str = "application/vnd.github+json",
+    ) -> list[Mapping[str, Any]]:
+        values: list[Mapping[str, Any]] = []
+        url = self._url(path, {**query, "per_page": "100"})
+        for _ in range(self.config.max_pages):
+            payload, next_url = self._request(
+                "GET",
+                url,
+                token=self._read_token(),
+                accept=accept,
+            )
+            page = (
+                payload.get(root_key)
+                if root_key and isinstance(payload, Mapping)
+                else payload
+            )
+            if not isinstance(page, list) or not all(
+                isinstance(item, Mapping) for item in page
+            ):
+                raise GitHubWorkError("GitHub paginated response has an invalid shape")
+            values.extend(page)
+            if not next_url:
+                return values
+            self._validate_next_url(next_url)
+            url = next_url
+        raise GitHubWorkError("GitHub pagination exceeded the configured page limit")
+
+    def _request(
+        self,
+        method: str,
+        url: str,
+        *,
+        token: str,
+        payload: Mapping[str, Any] | None = None,
+        accept: str = "application/vnd.github+json",
+    ) -> tuple[Any, str]:
+        if method not in {"GET", "POST"}:
+            raise GitHubWorkError("GitHub Issue workflow only permits GET and POST")
+        data = (
+            json.dumps(dict(payload), separators=(",", ":"), sort_keys=True).encode(
+                "utf-8"
+            )
+            if payload is not None
+            else None
+        )
+        request = urllib.request.Request(
+            url,
+            data=data,
+            method=method,
+            headers={
+                "Accept": accept,
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-GitHub-Api-Version": "2022-11-28",
+                "User-Agent": "Narratiive-OS-Tony",
+            },
+        )
+        try:
+            with self._opener(
+                request, timeout=self.config.timeout_seconds
+            ) as response:
+                raw = response.read().decode("utf-8")
+                link = str(response.headers.get("Link", ""))
+        except urllib.error.HTTPError as exc:
+            if exc.code in {401, 403, 429}:
+                raise GitHubWorkError(
+                    f"GitHub request was refused with HTTP {exc.code}"
+                ) from exc
+            raise GitHubWorkError(
+                f"GitHub request failed with HTTP {exc.code}"
+            ) from exc
+        except (urllib.error.URLError, TimeoutError, OSError) as exc:
+            raise GitHubWorkError(f"GitHub request failed: {exc}") from exc
+        try:
+            value = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise GitHubWorkError("GitHub returned invalid JSON") from exc
+        return value, GitHubRESTClient._next_link(link)
+
+    def _read_token(self) -> str:
+        token = self._read_token_loader().strip()
+        if not token:
+            raise GitHubWorkError("GitHub read token is not configured")
+        return token
+
+    def _write_token(self) -> str:
+        token = self._write_token_loader().strip()
+        if not token:
+            raise GitHubWorkError("GitHub Issue write token is not configured")
+        return token
+
+    def _url(self, path: str, query: Mapping[str, str]) -> str:
+        expected_prefix = f"/repos/{self.config.repository}/"
+        if not path.startswith(expected_prefix):
+            raise GitHubWorkError("GitHub Issue workflow path left the configured repository")
+        encoded = urllib.parse.urlencode(query)
+        return f"{self.config.api_url.rstrip('/')}{path}" + (
+            f"?{encoded}" if encoded else ""
+        )
+
+    def _validate_next_url(self, url: str) -> None:
+        expected = urllib.parse.urlsplit(self.config.api_url)
+        actual = urllib.parse.urlsplit(url)
+        if actual.scheme != expected.scheme or actual.netloc != expected.netloc:
+            raise GitHubWorkError("GitHub pagination attempted to leave the API host")
+        expected_path = (
+            f"{expected.path.rstrip('/')}/repos/{self.config.repository}/"
+        )
+        if not actual.path.startswith(expected_path):
+            raise GitHubWorkError(
+                "GitHub pagination left the configured repository"
+            )
+
+    @staticmethod
+    def _number(number: int) -> int:
+        if int(number) <= 0:
+            raise GitHubWorkError("GitHub work item number must be positive")
+        return int(number)
+
+
 class GitHubWorkService:
     """Build deterministic executive GitHub state from live read-only responses."""
 

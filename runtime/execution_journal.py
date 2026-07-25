@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
 import threading
+from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -99,6 +101,7 @@ class ExecutionJournal:
     def __init__(self, state_dir: str | Path) -> None:
         self.state_dir = Path(state_dir)
         self.path = self.state_dir / "execution-journal.jsonl"
+        self.lock_path = self.state_dir / "execution-journal.lock"
         self._lock = threading.RLock()
 
     def append(
@@ -135,32 +138,38 @@ class ExecutionJournal:
             raise ExecutionJournalError("artifacts must not contain empty values")
 
         with self._lock:
-            records = self.read_all()
-            if any(record.record_id == record_id for record in records if record_id):
-                raise ExecutionJournalError(f"duplicate execution record id: {record_id}")
-            previous_hash = records[-1].record_hash if records else ""
-            record = ExecutionRecord(
-                sequence=len(records) + 1,
-                record_id=record_id or f"exec-{uuid4().hex}",
-                decision_id=decision_id,
-                workspace_id=workspace_id,
-                client_id=client_id,
-                action=action,
-                rationale=rationale,
-                actor=actor,
-                status=status,
-                occurred_at=occurred_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-                repository_revision=repository_revision,
-                state_hash=state_hash,
-                artifacts=artifact_values,
-                metadata=dict(metadata or {}),
-                previous_hash=previous_hash,
-            )
-            record = replace(record, record_hash=self._hash(record))
-            self._append_line(record)
-            return record
+            with self._file_lock(exclusive=True):
+                records = self._read_all_unlocked()
+                if any(record.record_id == record_id for record in records if record_id):
+                    raise ExecutionJournalError(f"duplicate execution record id: {record_id}")
+                previous_hash = records[-1].record_hash if records else ""
+                record = ExecutionRecord(
+                    sequence=len(records) + 1,
+                    record_id=record_id or f"exec-{uuid4().hex}",
+                    decision_id=decision_id,
+                    workspace_id=workspace_id,
+                    client_id=client_id,
+                    action=action,
+                    rationale=rationale,
+                    actor=actor,
+                    status=status,
+                    occurred_at=occurred_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+                    repository_revision=repository_revision,
+                    state_hash=state_hash,
+                    artifacts=artifact_values,
+                    metadata=dict(metadata or {}),
+                    previous_hash=previous_hash,
+                )
+                record = replace(record, record_hash=self._hash(record))
+                self._append_line(record)
+                return record
 
     def read_all(self) -> list[ExecutionRecord]:
+        with self._lock:
+            with self._file_lock(exclusive=False):
+                return self._read_all_unlocked()
+
+    def _read_all_unlocked(self) -> list[ExecutionRecord]:
         if not self.path.exists():
             return []
         records: list[ExecutionRecord] = []
@@ -190,6 +199,32 @@ class ExecutionJournal:
         except OSError as exc:
             raise ExecutionJournalError(f"could not read execution journal: {exc}") from exc
         return records
+
+    @contextmanager
+    def _file_lock(self, *, exclusive: bool):
+        try:
+            self.state_dir.mkdir(parents=True, exist_ok=True)
+            descriptor = os.open(
+                self.lock_path,
+                os.O_CREAT | os.O_RDWR,
+                0o600,
+            )
+        except OSError as exc:
+            raise ExecutionJournalError(
+                f"could not open execution journal lock: {exc}"
+            ) from exc
+        try:
+            with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
+                fcntl.flock(
+                    handle.fileno(),
+                    fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH,
+                )
+                yield
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError as exc:
+            raise ExecutionJournalError(
+                f"execution journal lock failed closed: {exc}"
+            ) from exc
 
     def history(self, decision_id: str) -> list[ExecutionRecord]:
         return [record for record in self.read_all() if record.decision_id == decision_id]

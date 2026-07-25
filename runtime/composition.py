@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -8,7 +9,10 @@ from .approvals import ApprovalService
 from .artifact_catalog import FileArtifactCatalog
 from .dispatch import FileDispatchQueue
 from .dispatch_service import DispatchService
+from .engineering_handoff import EngineeringTaskService
 from .execution_package import ExecutionPackageBuilder
+from .execution_journal import ExecutionJournal
+from .github_work import GitHubConfig, GitHubIssueWorkflowClient, GitHubWorkError
 from .http_provider import HttpProviderClient, HttpProviderConfig
 from .memory import FileMemoryStore, SpecialistMemorySelector
 from .provider import ArtifactWriter, ProviderClient, ProviderExecutor
@@ -61,6 +65,10 @@ class RuntimePaths:
     def prompts(self) -> Path:
         return self.root / "prompts"
 
+    @property
+    def execution_journal(self) -> Path:
+        return self.root / "execution-journal"
+
 
 @dataclass(slots=True)
 class RuntimeComponents:
@@ -75,6 +83,8 @@ class RuntimeComponents:
     artifact_catalog: FileArtifactCatalog
     revision_service: RevisionService
     approval_service: ApprovalService
+    execution_journal: ExecutionJournal
+    engineering_task_service: EngineeringTaskService | None
     workspace: Workspace
     prompt_registry: FilePromptRegistry
     workspace_repository: FileWorkspaceRepository | None = None
@@ -212,6 +222,12 @@ def _compose_runtime(
         paths.artifact_catalog,
         workspace_id=workspace.workspace_id,
     )
+    execution_journal = ExecutionJournal(paths.execution_journal)
+    engineering_task_service = _engineering_task_service(
+        workspace=workspace,
+        artifact_catalog=artifact_catalog,
+        execution_journal=execution_journal,
+    )
 
     revision_service = RevisionService(
         run_repository,
@@ -234,10 +250,69 @@ def _compose_runtime(
             event_log,
             revision_service,
         ),
+        execution_journal=execution_journal,
+        engineering_task_service=engineering_task_service,
         workspace=workspace,
         prompt_registry=FilePromptRegistry(
             paths.prompts,
             workspace_id=workspace.workspace_id,
         ),
         workspace_repository=workspace_repository,
+    )
+
+
+def _engineering_task_service(
+    *,
+    workspace: Workspace,
+    artifact_catalog: FileArtifactCatalog,
+    execution_journal: ExecutionJournal,
+) -> EngineeringTaskService | None:
+    repository = os.getenv("TONY_GITHUB_REPOSITORY", "").strip()
+    configured_workspace = os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+    read_token = os.getenv("TONY_GITHUB_TOKEN", "").strip()
+    write_token = os.getenv("TONY_GITHUB_ISSUE_TOKEN", "").strip()
+    matt_login = os.getenv("TONY_GITHUB_MATT_LOGIN", "").strip()
+    if not all(
+        (repository, configured_workspace, read_token, write_token, matt_login)
+    ):
+        return None
+    if configured_workspace != workspace.workspace_id:
+        return None
+    try:
+        config = GitHubConfig(
+            repository=repository,
+            workspace_id=workspace.workspace_id,
+            matt_login=matt_login,
+            api_url=os.getenv(
+                "TONY_GITHUB_API_URL", "https://api.github.com"
+            ).strip(),
+            timeout_seconds=float(
+                os.getenv("TONY_GITHUB_TIMEOUT_SECONDS", "10")
+            ),
+            max_pages=int(os.getenv("TONY_GITHUB_MAX_PAGES", "20")),
+        )
+    except (GitHubWorkError, ValueError):
+        return None
+    checks = tuple(
+        item.strip()
+        for item in os.getenv("TONY_GITHUB_REQUIRED_CHECKS", "").split(",")
+        if item.strip()
+    )
+    reviewers = tuple(
+        item.strip()
+        for item in os.getenv(
+            "TONY_GITHUB_REQUIRED_REVIEWERS", matt_login
+        ).split(",")
+        if item.strip()
+    )
+    return EngineeringTaskService(
+        workspace_id=workspace.workspace_id,
+        client_id=workspace.client_id,
+        repository=repository,
+        artifact_catalog=artifact_catalog,
+        execution_journal=execution_journal,
+        github=GitHubIssueWorkflowClient(config),
+        required_checks=checks,
+        required_reviewers=reviewers,
+        allowed_approvers=(matt_login,),
     )

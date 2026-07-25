@@ -60,6 +60,28 @@ Optional controls are `TONY_GITHUB_API_URL`,
 HTTPS. Credentials remain in the external mode-`0600` environment file and are
 not written to events, artefacts or command responses.
 
+To enable the approved Engineering Task pipeline, keep the read token above and
+add a separate fine-grained token:
+
+```text
+TONY_GITHUB_ISSUE_TOKEN=replace-with-issues-write-only-token
+TONY_GITHUB_REQUIRED_CHECKS=runtime-tests
+TONY_GITHUB_REQUIRED_REVIEWERS=replace-with-matts-github-login
+```
+
+The Issue token must be restricted to the configured repository with only
+Metadata read and Issues read/write. It must not have Contents, Pull Requests,
+Actions, Workflows, Deployments or Administration write access. GitHub grants
+Issues permission at repository scope rather than per Issue, so Tony enforces
+the narrower task-to-Issue binding in the application and exposes only Issue
+creation and bound-Issue comments.
+
+`TONY_GITHUB_MATT_LOGIN` is also the engineering-task approver allowlist.
+Unapproved tasks, a different reviewer, modified approved content, missing
+required-check configuration, stale reviews and unknown mergeability all fail
+closed. Tony never creates branches or pull requests, approves reviews, closes
+Issues or invokes a merge endpoint.
+
 ## Install
 
 Run from the repository using its virtual-environment Python:

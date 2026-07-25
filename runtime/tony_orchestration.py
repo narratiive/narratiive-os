@@ -161,6 +161,10 @@ class TonyOrchestrationAdapter:
         "blueprint.export": "blueprints.export",
         "export.get": "blueprint-exports.get",
         "export.list": "blueprint-exports.list",
+        "engineering_task.approve": "engineering_tasks.approve",
+        "engineering_task.create_issue": "engineering_tasks.create_issue",
+        "engineering_task.get": "engineering_tasks.get",
+        "engineering_task.refresh": "engineering_tasks.refresh",
     }
 
     def __init__(self, transport: GatewayTransport) -> None:
@@ -278,4 +282,15 @@ class TonyOrchestrationAdapter:
             return f"Blueprint export {status}." + (f" {url}" if url else "")
         if action in {"approve", "revise", "comment", "block"}:
             return f"Approval action '{action}' recorded."
+        if action == "engineering_task.approve":
+            return "Engineering task approval recorded."
+        if action == "engineering_task.create_issue":
+            return f"Engineering task Issue #{data.get('issue_number', '')} is bound."
+        if action == "engineering_task.get":
+            return "Engineering task state is available."
+        if action == "engineering_task.refresh":
+            notification = data.get("notification")
+            if isinstance(notification, Mapping):
+                return str(notification.get("message", "Engineering task state changed."))
+            return "Engineering task has no decision, blocker or merge-readiness update."
         return f"Narratiive OS completed '{action}'."
