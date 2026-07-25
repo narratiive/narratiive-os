@@ -17,6 +17,14 @@ from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
 ReviewRecordLoader = Callable[[], Iterable[dict[str, Any]]]
+_FRIDAY_RECORD_FIELDS = {
+    "record_id",
+    "occurred_at",
+    "record_type",
+    "summary",
+    "evidence",
+    "workspace_id",
+}
 
 
 class TonyExecutiveCommandService:
@@ -110,17 +118,21 @@ class TonyExecutiveCommandService:
         objects: Iterable[dict[str, Any]],
     ) -> CommandResponse:
         injected_records = tuple(objects)
-        if injected_records:
-            raw_records: Iterable[dict[str, Any]] = injected_records
-        elif self.friday_record_loader is not None:
+
+        # The configured evidence store is authoritative in the live runtime.
+        # Generic growth objects travel through the same command boundary and must
+        # never override or be mistaken for dedicated executive-review evidence.
+        if self.friday_record_loader is not None:
             try:
-                raw_records = self.friday_record_loader()
+                raw_records: Iterable[dict[str, Any]] = self.friday_record_loader()
             except Exception as exc:
                 return self._error(
                     "friday_review",
                     "friday_review_untrusted",
                     f"Tony could not load trusted Friday evidence: {exc}",
                 )
+        elif injected_records and self._looks_like_review_evidence(injected_records):
+            raw_records = injected_records
         else:
             return self._error(
                 "friday_review",
@@ -147,6 +159,14 @@ class TonyExecutiveCommandService:
             status="healthy",
             message=review.render_compact(),
             data=review.to_dict(),
+        )
+
+    @staticmethod
+    def _looks_like_review_evidence(items: tuple[dict[str, Any], ...]) -> bool:
+        """Distinguish explicit review-test input from unrelated runtime objects."""
+        return any(
+            isinstance(item, dict) and bool(_FRIDAY_RECORD_FIELDS.intersection(item))
+            for item in items
         )
 
     @staticmethod
