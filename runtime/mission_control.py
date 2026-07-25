@@ -106,6 +106,7 @@ class MissionControlBuilder:
         run_items = tuple(
             sorted(engineering_runs, key=lambda item: item.task_id)
         )
+        approval_items = self._approvals(approvals_required, github_work)
         blockers = self._blockers(
             progress,
             workstream_items,
@@ -130,7 +131,7 @@ class MissionControlBuilder:
             progress=progress.to_dict(),
             workstreams=workstream_items,
             connections=connection_items,
-            approvals_required=tuple(sorted(set(approvals_required))),
+            approvals_required=approval_items,
             blockers=blockers,
             github_work=github_work,
             engineering_handoffs=handoff_items,
@@ -154,6 +155,17 @@ class MissionControlBuilder:
                 )
             )
         return tuple(items)
+
+    @staticmethod
+    def _approvals(
+        values: Iterable[str],
+        github_work: GitHubWorkSnapshot | None,
+    ) -> tuple[str, ...]:
+        approvals = {str(value).strip() for value in values if str(value).strip()}
+        if github_work is not None:
+            for item in github_work.matt_approval_required:
+                approvals.add(f"github:{item.kind}:{item.number}:{item.url}")
+        return tuple(sorted(approvals))
 
     @staticmethod
     def _optional_text(value: Any) -> str | None:
