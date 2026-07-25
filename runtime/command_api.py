@@ -18,6 +18,10 @@ from .engineering_handoff import (
     EngineeringTask,
     EngineeringTaskService,
 )
+from .engineering_orchestrator import (
+    EngineeringOrchestrationError,
+    EngineeringOrchestrationService,
+)
 from .repositories import RunNotFound
 from .revision_graph import RevisionIssue
 from .serialization import workflow_to_dict
@@ -71,6 +75,10 @@ class RuntimeCommandAPI:
             "engineering_tasks.create_issue": self._engineering_task_create_issue,
             "engineering_tasks.get": self._engineering_task_get,
             "engineering_tasks.refresh": self._engineering_task_refresh,
+            "engineering_tasks.dispatch": self._engineering_task_dispatch,
+            "engineering_tasks.execution.get": self._engineering_execution_get,
+            "engineering_tasks.recover": self._engineering_execution_recover,
+            "engineering_tasks.cancel": self._engineering_execution_cancel,
         }
         handler = handlers.get(command)
         if handler is None:
@@ -309,6 +317,61 @@ class RuntimeCommandAPI:
         except EngineeringHandoffError as exc:
             raise CommandError("engineering_task_blocked", str(exc), 409) from exc
 
+    def _engineering_task_dispatch(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_orchestrator().dispatch(
+                self._required(request, "task_id"),
+                command_id=self._required(request, "command_id"),
+            ).to_dict()
+        except EngineeringOrchestrationError as exc:
+            raise CommandError(
+                "engineering_execution_blocked", str(exc), 409
+            ) from exc
+
+    def _engineering_execution_get(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_orchestrator().get(
+                self._required(request, "task_id")
+            ).to_dict()
+        except EngineeringOrchestrationError as exc:
+            raise CommandError(
+                "engineering_execution_blocked", str(exc), 409
+            ) from exc
+
+    def _engineering_execution_recover(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_orchestrator().recover(
+                self._required(request, "task_id")
+            ).to_dict()
+        except EngineeringOrchestrationError as exc:
+            raise CommandError(
+                "engineering_execution_blocked", str(exc), 409
+            ) from exc
+
+    def _engineering_execution_cancel(
+        self,
+        request: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        try:
+            return self._engineering_orchestrator().cancel(
+                self._required(request, "task_id"),
+                command_id=self._required(request, "command_id"),
+                actor="Tony",
+            ).to_dict()
+        except EngineeringOrchestrationError as exc:
+            raise CommandError(
+                "engineering_execution_blocked", str(exc), 409
+            ) from exc
+
     def _repository_path(self, relative: str) -> Path:
         root = self.runtime.paths.repository_root.resolve()
         target = (root / relative).resolve()
@@ -340,6 +403,16 @@ class RuntimeCommandAPI:
             raise CommandError(
                 "engineering_tasks_unavailable",
                 "engineering task GitHub workflow is not configured",
+                503,
+            )
+        return service
+
+    def _engineering_orchestrator(self) -> EngineeringOrchestrationService:
+        service = self.runtime.engineering_orchestration_service
+        if service is None:
+            raise CommandError(
+                "engineering_execution_unavailable",
+                "engineering Codex execution is not configured",
                 503,
             )
         return service

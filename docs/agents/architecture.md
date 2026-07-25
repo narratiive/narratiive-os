@@ -237,6 +237,17 @@ through `TonyOrchestrationAdapter` and the public runtime gateway.
 `openclaw/tony_live_bridge.py` composes executive brief and capability services
 onto the same bridge.
 
+Approved, Issue-bound engineering tasks may additionally enter the local
+Engineering Orchestrator when a versioned execution policy is configured.
+`EngineeringOrchestrationService` derives durable run state from the
+hash-chained `ExecutionJournal`; `CodexImplementationAdapter` runs one
+non-interactive Codex process in an isolated worktree; and
+`GitWorktreeManager` independently verifies repository identity, base ancestry,
+allowed changed paths, the local commit, clean status and fixed-profile test
+results. Execution packages, prompts, output, logs, diff summaries and
+verification results are immutable catalogue artifacts. This capability has no
+GitHub publication, review, approval or merge method.
+
 ## Operational services
 
 The repository supports three per-user macOS LaunchAgents:
