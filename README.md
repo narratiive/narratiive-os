@@ -47,8 +47,16 @@ gateway through `engineering_tasks.approve`, `engineering_tasks.create_issue`,
 `engineering_tasks.get`, and `engineering_tasks.refresh`. Approved task content
 is immutable, workspace-scoped and checksum-addressed; Issue creation and
 material transition comments are hash-journaled. Tony treats missing checks,
-stale reviews and unknown GitHub state as blockers and never writes code,
-pull requests, reviews or merges.
+stale reviews and unknown GitHub state as blockers.
+
+When a versioned engineering execution policy is configured, Tony can dispatch
+the approved, Issue-bound task to Codex in an isolated local Git worktree.
+Execution uses fixed timeouts, bounded retries, a fixed verification profile and
+schema-constrained output. Tony independently checks the repository, base
+ancestry, branch, local commit, changed paths, clean worktree and verification
+results before recording immutable evidence. This increment does not push
+branches or create, update, review, approve, mark ready, close or merge GitHub
+objects.
 
 ## Live Growth Blueprint run
 

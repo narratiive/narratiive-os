@@ -16,6 +16,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from runtime.composition import compose_local_runtime
 from runtime.engineering_handoff import EngineeringHandoffSnapshot
+from runtime.engineering_orchestrator import EngineeringRunSnapshot
 from runtime.executive_brief import ExecutiveBriefArchive
 from runtime.github_work import (
     GitHubConfig,
@@ -43,6 +44,7 @@ DiagnosticsRunner = Callable[[], dict[str, Any]]
 MissionControlLoader = Callable[[], MissionControlSnapshot]
 GitHubWorkLoader = Callable[[], GitHubWorkSnapshot]
 EngineeringHandoffLoader = Callable[[], tuple[EngineeringHandoffSnapshot, ...]]
+EngineeringRunLoader = Callable[[], tuple[EngineeringRunSnapshot, ...]]
 
 
 class TonyHTTPBridge:
@@ -359,6 +361,7 @@ def build_mission_control_loader(
     gateway_health_endpoint: str,
     github_work_loader: GitHubWorkLoader | None = None,
     engineering_handoff_loader: EngineeringHandoffLoader | None = None,
+    engineering_run_loader: EngineeringRunLoader | None = None,
 ) -> MissionControlLoader:
     """Build the live read-only Mission Control snapshot used by Telegram commands."""
     builder = MissionControlBuilder()
@@ -372,6 +375,7 @@ def build_mission_control_loader(
         evidence = "HTTP health check passed" if gateway.healthy else gateway.error
         github_work = None
         engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
+        engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
         if github_work_loader is None:
             github_connection = {
                 "state": "not_connected",
@@ -402,6 +406,15 @@ def build_mission_control_loader(
                     "state": "degraded",
                     "evidence": f"Engineering handoff audit failed closed: {exc}",
                 }
+        if engineering_run_loader is not None:
+            try:
+                engineering_runs = engineering_run_loader()
+            except Exception as exc:
+                github_work = None
+                github_connection = {
+                    "state": "degraded",
+                    "evidence": f"Engineering execution audit failed closed: {exc}",
+                }
         return builder.build(
             generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             progress=progress,
@@ -418,6 +431,7 @@ def build_mission_control_loader(
             },
             github_work=github_work,
             engineering_handoffs=engineering_handoffs,
+            engineering_runs=engineering_runs,
         )
 
     return load
@@ -513,6 +527,26 @@ def build_engineering_handoff_loader(
     return service.list_snapshots
 
 
+def build_engineering_run_loader(
+    *,
+    runtime_root: Path,
+    repository_root: Path,
+) -> EngineeringRunLoader | None:
+    workspace_id = os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+    if not workspace_id:
+        return None
+    try:
+        runtime = WorkspaceRuntimeManager(
+            runtime_root, repository_root
+        ).runtime(workspace_id)
+    except (ValueError, WorkspaceNotFound):
+        return None
+    service = runtime.engineering_orchestration_service
+    if service is None:
+        return None
+    return service.list_runs
+
+
 def build_diagnostics_runner(
     gateway_health_endpoint: str,
     command_service: TonyCommandService,
@@ -590,12 +624,17 @@ def build_app() -> TonyHTTPBridge:
         runtime_root=runtime_root,
         repository_root=REPOSITORY_ROOT,
     )
+    engineering_run_loader = build_engineering_run_loader(
+        runtime_root=runtime_root,
+        repository_root=REPOSITORY_ROOT,
+    )
     mission_control_loader = build_mission_control_loader(
         progress_engine,
         object_loader,
         gateway_health_endpoint,
         github_work_loader,
         engineering_handoff_loader,
+        engineering_run_loader,
     )
     command_service = TonyCommandService(
         progress_engine,

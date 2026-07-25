@@ -82,6 +82,26 @@ required-check configuration, stale reviews and unknown mergeability all fail
 closed. Tony never creates branches or pull requests, approves reviews, closes
 Issues or invokes a merge endpoint.
 
+Optional local Codex dispatch is enabled only when all of the following policy
+settings are present:
+
+```text
+TONY_ENGINEERING_EXECUTION_POLICY_VERSION=1
+TONY_ENGINEERING_ALLOWED_PATHS=runtime/**,tests/**,schemas/**
+TONY_ENGINEERING_VERIFICATION_PROFILE=runtime-tests
+TONY_ENGINEERING_BASE_REF=main
+TONY_ENGINEERING_TIMEOUT_SECONDS=1800
+TONY_ENGINEERING_MAX_ATTEMPTS=2
+TONY_CODEX_EXECUTABLE=codex
+```
+
+Only the built-in `runtime-tests` verification profile is accepted. Tony does
+not execute command strings, prompts, paths or environment values supplied
+through the public command payload. Codex runs without GitHub credentials or
+sandbox network access in an isolated worktree under the workspace runtime
+root. Successful execution produces a verified local commit and immutable
+evidence only; branch push and Pull Request creation remain manual.
+
 ## Install
 
 Run from the repository using its virtual-environment Python:

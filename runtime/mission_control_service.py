@@ -75,6 +75,9 @@ class MissionControlService:
                 "engineering_handoffs": [
                     item.to_dict() for item in snapshot.engineering_handoffs
                 ],
+                "engineering_runs": [
+                    item.to_dict() for item in snapshot.engineering_runs
+                ],
                 "summary": {
                     "active_workstreams": len(active),
                     "blocked_workstreams": len(blocked),
@@ -91,6 +94,11 @@ class MissionControlService:
                     "engineering_merge_ready": sum(
                         1 for item in snapshot.engineering_handoffs
                         if item.merge_ready
+                    ),
+                    "engineering_runs": len(snapshot.engineering_runs),
+                    "engineering_runs_blocked": sum(
+                        1 for item in snapshot.engineering_runs
+                        if item.blockers
                     ),
                 },
             },
@@ -167,6 +175,8 @@ class MissionControlService:
             evidence.append(handoff.issue_url)
             if handoff.pull_request_url:
                 evidence.append(handoff.pull_request_url)
+        for run in snapshot.engineering_runs:
+            evidence.append(run.issue_url)
         if not evidence:
             evidence.append(f"mission-control:{snapshot.generated_at}")
 

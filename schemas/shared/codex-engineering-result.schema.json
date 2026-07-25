@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://narratiive.dev/schemas/codex-engineering-result.schema.json",
+  "title": "CodexEngineeringResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "task_id",
+    "run_id",
+    "status",
+    "base_commit",
+    "commit",
+    "changed_files",
+    "tests",
+    "summary",
+    "blockers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "task_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,99}$"
+    },
+    "run_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,199}$"
+    },
+    "status": {
+      "enum": ["completed", "blocked", "failed"]
+    },
+    "base_commit": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{7,64}$"
+    },
+    "commit": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{7,64}$"
+    },
+    "changed_files": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1
+    },
+    "blockers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    }
+  }
+}

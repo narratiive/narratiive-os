@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Mapping
@@ -10,6 +11,13 @@ from .artifact_catalog import FileArtifactCatalog
 from .dispatch import FileDispatchQueue
 from .dispatch_service import DispatchService
 from .engineering_handoff import EngineeringTaskService
+from .engineering_orchestrator import EngineeringOrchestrationService
+from .codex_adapter import (
+    CodexImplementationAdapter,
+    EngineeringExecutionPolicy,
+    GitWorktreeManager,
+    VerificationCommand,
+)
 from .execution_package import ExecutionPackageBuilder
 from .execution_journal import ExecutionJournal
 from .github_work import GitHubConfig, GitHubIssueWorkflowClient, GitHubWorkError
@@ -85,6 +93,7 @@ class RuntimeComponents:
     approval_service: ApprovalService
     execution_journal: ExecutionJournal
     engineering_task_service: EngineeringTaskService | None
+    engineering_orchestration_service: EngineeringOrchestrationService | None
     workspace: Workspace
     prompt_registry: FilePromptRegistry
     workspace_repository: FileWorkspaceRepository | None = None
@@ -228,6 +237,13 @@ def _compose_runtime(
         artifact_catalog=artifact_catalog,
         execution_journal=execution_journal,
     )
+    engineering_orchestration_service = _engineering_orchestration_service(
+        paths=paths,
+        workspace=workspace,
+        task_service=engineering_task_service,
+        artifact_catalog=artifact_catalog,
+        execution_journal=execution_journal,
+    )
 
     revision_service = RevisionService(
         run_repository,
@@ -252,6 +268,7 @@ def _compose_runtime(
         ),
         execution_journal=execution_journal,
         engineering_task_service=engineering_task_service,
+        engineering_orchestration_service=engineering_orchestration_service,
         workspace=workspace,
         prompt_registry=FilePromptRegistry(
             paths.prompts,
@@ -315,4 +332,106 @@ def _engineering_task_service(
         required_checks=checks,
         required_reviewers=reviewers,
         allowed_approvers=(matt_login,),
+    )
+
+
+def _engineering_orchestration_service(
+    *,
+    paths: RuntimePaths,
+    workspace: Workspace,
+    task_service: EngineeringTaskService | None,
+    artifact_catalog: FileArtifactCatalog,
+    execution_journal: ExecutionJournal,
+) -> EngineeringOrchestrationService | None:
+    if task_service is None:
+        return None
+    policy_version = os.getenv(
+        "TONY_ENGINEERING_EXECUTION_POLICY_VERSION", ""
+    ).strip()
+    allowed_paths = tuple(
+        item.strip()
+        for item in os.getenv("TONY_ENGINEERING_ALLOWED_PATHS", "").split(",")
+        if item.strip()
+    )
+    profile = os.getenv(
+        "TONY_ENGINEERING_VERIFICATION_PROFILE", ""
+    ).strip()
+    if not policy_version or not allowed_paths or profile != "runtime-tests":
+        return None
+    repository = os.getenv("TONY_GITHUB_REPOSITORY", "").strip()
+    try:
+        policy = EngineeringExecutionPolicy(
+            version=policy_version,
+            repository=repository,
+            workspace_id=workspace.workspace_id,
+            client_id=workspace.client_id,
+            base_ref=os.getenv(
+                "TONY_ENGINEERING_BASE_REF", "main"
+            ).strip(),
+            allowed_paths=allowed_paths,
+            verification_profile=profile,
+            verification_commands=(
+                VerificationCommand(
+                    "compile",
+                    (
+                        sys.executable,
+                        "-m",
+                        "compileall",
+                        "-q",
+                        "runtime",
+                        "tests",
+                    ),
+                ),
+                VerificationCommand(
+                    "unit-tests",
+                    (
+                        sys.executable,
+                        "-m",
+                        "unittest",
+                        "discover",
+                        "-s",
+                        "tests",
+                        "-p",
+                        "test_*.py",
+                        "-v",
+                    ),
+                ),
+            ),
+            timeout_seconds=int(
+                os.getenv("TONY_ENGINEERING_TIMEOUT_SECONDS", "1800")
+            ),
+            max_attempts=int(
+                os.getenv("TONY_ENGINEERING_MAX_ATTEMPTS", "2")
+            ),
+            codex_executable=os.getenv(
+                "TONY_CODEX_EXECUTABLE", "codex"
+            ).strip(),
+        )
+    except (TypeError, ValueError):
+        return None
+    worktrees = GitWorktreeManager(
+        paths.repository_root,
+        paths.root / "engineering-worktrees",
+    )
+    adapter = CodexImplementationAdapter(
+        policy=policy,
+        worktrees=worktrees,
+        schema_path=(
+            paths.repository_root
+            / "schemas"
+            / "shared"
+            / "codex-engineering-result.schema.json"
+        ),
+        state_dir=paths.root,
+    )
+    return EngineeringOrchestrationService(
+        workspace_id=workspace.workspace_id,
+        client_id=workspace.client_id,
+        repository=repository,
+        task_service=task_service,
+        execution_journal=execution_journal,
+        artifact_catalog=artifact_catalog,
+        policy=policy,
+        adapter=adapter,
+        worktrees=worktrees,
     )
