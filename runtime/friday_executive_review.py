@@ -27,6 +27,19 @@ class ReviewRecord:
     workspace_id: str
     theme: str | None = None
 
+    def __post_init__(self) -> None:
+        for field in ("record_id", "occurred_at", "summary", "workspace_id"):
+            if not str(getattr(self, field)).strip():
+                raise ValueError(f"review record requires {field}")
+        if not isinstance(self.record_type, ReviewRecordType):
+            raise ValueError("review record requires a valid record_type")
+        if not self.evidence or any(not str(item).strip() for item in self.evidence):
+            raise ValueError("review record requires non-empty evidence")
+        try:
+            datetime.fromisoformat(self.occurred_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("review record occurred_at must be ISO-8601") from exc
+
 
 @dataclass(frozen=True)
 class PatternFinding:
@@ -112,6 +125,8 @@ class FridayExecutiveReviewService:
         period_end: datetime,
         timezone: str = "Europe/London",
     ) -> FridayExecutiveReview:
+        if not workspace_id.strip():
+            raise ValueError("Friday review requires workspace_id")
         zone = ZoneInfo(timezone)
         end = self._aware(period_end, zone)
         start = end - timedelta(days=7)
@@ -151,14 +166,23 @@ class FridayExecutiveReviewService:
         end: datetime,
         zone: ZoneInfo,
     ) -> tuple[ReviewRecord, ...]:
-        unique: dict[str, ReviewRecord] = {}
+        unique: dict[str, tuple[datetime, ReviewRecord]] = {}
         for record in records:
             if record.workspace_id != workspace_id or record.record_id in unique:
                 continue
-            occurred = datetime.fromisoformat(record.occurred_at.replace("Z", "+00:00")).astimezone(zone)
+            occurred = datetime.fromisoformat(record.occurred_at.replace("Z", "+00:00"))
+            if occurred.tzinfo is None:
+                occurred = occurred.replace(tzinfo=zone)
+            else:
+                occurred = occurred.astimezone(zone)
             if start <= occurred < end:
-                unique[record.record_id] = record
-        return tuple(sorted(unique.values(), key=lambda item: (item.occurred_at, item.record_id)))
+                unique[record.record_id] = (occurred, record)
+        return tuple(
+            item[1]
+            for item in sorted(
+                unique.values(), key=lambda item: (item[0], item[1].record_id)
+            )
+        )
 
     def _patterns(self, records: tuple[ReviewRecord, ...]) -> tuple[PatternFinding, ...]:
         themes: dict[str, list[ReviewRecord]] = {}
@@ -173,15 +197,20 @@ class FridayExecutiveReviewService:
                     theme=theme,
                     count=len(matches),
                     confidence=confidence,
-                    evidence=tuple(evidence for item in matches for evidence in item.evidence),
+                    evidence=tuple(
+                        dict.fromkeys(
+                            evidence
+                            for item in matches
+                            for evidence in item.evidence
+                        )
+                    ),
                 )
             )
         return tuple(findings)
 
     @staticmethod
     def _line(record: ReviewRecord) -> str:
-        evidence = f" — {record.evidence[0]}" if record.evidence else ""
-        return f"{record.summary}{evidence}"
+        return f"{record.summary} — {record.evidence[0]}"
 
     @staticmethod
     def _recommend(grouped: dict[ReviewRecordType, list[str]], patterns: tuple[PatternFinding, ...]) -> str:
