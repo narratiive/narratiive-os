@@ -13,11 +13,13 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         morning = next(item for item in snapshot["capabilities"] if item["command"] == "/morning")
         evening = next(item for item in snapshot["capabilities"] if item["command"] == "/evening")
         friday = next(item for item in snapshot["capabilities"] if item["command"] == "/friday")
+        vocabulary = next(item for item in snapshot["capabilities"] if item["command"] == "/vocabulary")
         history = next(item for item in snapshot["capabilities"] if item["command"] == "/history [filter]")
         self.assertTrue(mission["available"])
         self.assertTrue(morning["available"])
         self.assertTrue(evening["available"])
         self.assertTrue(friday["available"])
+        self.assertTrue(vocabulary["available"])
         self.assertFalse(history["available"])
         self.assertEqual(history["missing_requirements"], ["execution_journal"])
 
@@ -37,6 +39,7 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
             entries["/friday"]["aliases"],
             ["/friday_review", "/weekly_review", "/executive_review"],
         )
+        self.assertEqual(entries["/vocabulary"]["aliases"], ["/terminology", "/canon"])
 
     def test_telegram_summary_exposes_commands_and_availability(self):
         summary = TonyCapabilityRegistry().telegram_summary({"mission_control"})
@@ -45,6 +48,7 @@ class TonyCapabilityRegistryTests(unittest.TestCase):
         self.assertIn("/morning", summary)
         self.assertIn("/evening", summary)
         self.assertIn("/friday", summary)
+        self.assertIn("/vocabulary", summary)
         self.assertIn("/github", summary)
         self.assertIn("/history [filter]", summary)
         self.assertIn("/client <name>", summary)
