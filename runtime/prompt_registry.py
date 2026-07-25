@@ -9,6 +9,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from runtime.terminology_policy import TerminologyPolicy
+
+
+class PromptTerminologyError(ValueError):
+    """Raised when a prompt contains repository-retired Narratiive language."""
+
+    def __init__(self, terms: list[str], policy_version: str) -> None:
+        self.terms = tuple(terms)
+        self.policy_version = policy_version
+        joined = ", ".join(terms)
+        super().__init__(
+            f"prompt contains retired terminology under policy {policy_version}: {joined}"
+        )
+
 
 @dataclass(frozen=True, slots=True)
 class PromptVersion:
@@ -31,11 +45,18 @@ class PromptVersion:
 
 
 class FilePromptRegistry:
-    """Versioned prompt store with explicit activation and rollback."""
+    """Versioned prompt store with explicit activation, rollback and terminology governance."""
 
-    def __init__(self, root: str | Path, *, workspace_id: str = "legacy") -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        workspace_id: str = "legacy",
+        terminology_policy: TerminologyPolicy | None = None,
+    ) -> None:
         self.root = Path(root)
         self.workspace_id = _safe(workspace_id)
+        self.terminology_policy = terminology_policy or TerminologyPolicy.from_path()
         self.versions_root = self.root / "versions"
         self.active_root = self.root / "active"
         self.versions_root.mkdir(parents=True, exist_ok=True)
@@ -46,14 +67,17 @@ class FilePromptRegistry:
         content = str(content)
         if not content.strip():
             raise ValueError("content must not be empty")
+        self._validate_content(content)
         version = self._next_version(prompt_id)
         checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        governed_metadata = dict(metadata or {})
+        governed_metadata["terminology_policy_version"] = self.terminology_policy.version
         prompt = PromptVersion(
             prompt_id=prompt_id,
             version=version,
             content=content,
             checksum=checksum,
-            metadata=dict(metadata or {}),
+            metadata=governed_metadata,
             workspace_id=self.workspace_id,
         )
         path = self._version_path(prompt_id, version)
@@ -62,7 +86,12 @@ class FilePromptRegistry:
 
     def activate(self, prompt_id: str, version: int) -> PromptVersion:
         prompt = self.get(prompt_id, version)
-        marker = {"prompt_id": prompt.prompt_id, "version": prompt.version, "checksum": prompt.checksum}
+        marker = {
+            "prompt_id": prompt.prompt_id,
+            "version": prompt.version,
+            "checksum": prompt.checksum,
+            "terminology_policy_version": self.terminology_policy.version,
+        }
         self._atomic_write(self.active_root / f"{prompt.prompt_id}.json", json.dumps(marker, sort_keys=True) + "\n")
         return prompt
 
@@ -94,6 +123,7 @@ class FilePromptRegistry:
         prompt = PromptVersion(**data)
         if prompt.workspace_id != self.workspace_id:
             raise ValueError("prompt belongs to a different workspace")
+        self._validate_content(prompt.content)
         return prompt
 
     def history(self, prompt_id: str) -> list[PromptVersion]:
@@ -105,6 +135,13 @@ class FilePromptRegistry:
                 raise ValueError("prompt belongs to a different workspace")
             versions.append(prompt)
         return sorted(versions, key=lambda item: item.version)
+
+    def _validate_content(self, content: str) -> None:
+        violations = self.terminology_policy.scan(content)
+        if not violations:
+            return
+        terms = sorted({violation.term for violation in violations}, key=str.casefold)
+        raise PromptTerminologyError(terms, self.terminology_policy.version)
 
     def _next_version(self, prompt_id: str) -> int:
         history = self.history(prompt_id)
