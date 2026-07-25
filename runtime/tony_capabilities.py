@@ -60,6 +60,12 @@ CAPABILITIES: tuple[TonyCapability, ...] = (
         aliases=("/friday_review", "/weekly_review", "/executive_review"),
     ),
     TonyCapability(
+        "/vocabulary",
+        "Show the versioned approved, unsettled and retired Narratiive terminology.",
+        "governance",
+        aliases=("/terminology", "/canon"),
+    ),
+    TonyCapability(
         "/github",
         "Show live pull requests, active issues, blockers, Matt reviews and changes.",
         "oversight",
