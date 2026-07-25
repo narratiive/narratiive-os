@@ -44,6 +44,27 @@ class AmbiguousCodexCompletion(CodexAdapterError):
     pass
 
 
+SAFE_EXECUTION_ENVIRONMENT_KEYS = frozenset(
+    {
+        "CODEX_HOME",
+        "HOME",
+        "LANG",
+        "LC_ALL",
+        "PATH",
+        "SSL_CERT_FILE",
+        "TMPDIR",
+    }
+)
+
+
+def safe_execution_environment(values: Mapping[str, str]) -> dict[str, str]:
+    return {
+        key: str(value)
+        for key, value in values.items()
+        if key in SAFE_EXECUTION_ENVIRONMENT_KEYS and value
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class VerificationCommand:
     name: str
@@ -123,15 +144,45 @@ class EngineeringExecutionPolicy:
             or "\\" in relative_path
         ):
             return False
-        value = path.as_posix()
-        for pattern in self.allowed_paths:
-            if pattern.endswith("/**") and (
-                value == pattern[:-3] or value.startswith(pattern[:-2])
-            ):
-                return True
-            if fnmatch.fnmatchcase(value, pattern):
-                return True
-        return False
+        return any(
+            self._path_parts_match(path.parts, PurePosixPath(pattern).parts)
+            for pattern in self.allowed_paths
+        )
+
+    @staticmethod
+    def _path_parts_match(
+        path_parts: tuple[str, ...],
+        pattern_parts: tuple[str, ...],
+    ) -> bool:
+        def expand_double_stars(states: set[int]) -> set[int]:
+            expanded = set(states)
+            pending = list(states)
+            while pending:
+                index = pending.pop()
+                if (
+                    index < len(pattern_parts)
+                    and pattern_parts[index] == "**"
+                    and index + 1 not in expanded
+                ):
+                    expanded.add(index + 1)
+                    pending.append(index + 1)
+            return expanded
+
+        states = expand_double_stars({0})
+        for part in path_parts:
+            next_states: set[int] = set()
+            for index in states:
+                if index == len(pattern_parts):
+                    continue
+                pattern = pattern_parts[index]
+                if pattern == "**":
+                    next_states.add(index)
+                elif fnmatch.fnmatchcase(part, pattern):
+                    next_states.add(index + 1)
+            states = expand_double_stars(next_states)
+            if not states:
+                return False
+        return len(pattern_parts) in expand_double_stars(states)
 
 
 @dataclass(frozen=True, slots=True)
@@ -295,12 +346,7 @@ class GitWorktreeManager:
         self.worktree_root = Path(worktree_root).resolve()
         self.runner = runner or SubprocessGitRunner()
         values = verification_environment or os.environ
-        allowed = {"LANG", "LC_ALL", "PATH", "SSL_CERT_FILE", "TMPDIR"}
-        self.verification_environment = {
-            key: str(value)
-            for key, value in values.items()
-            if key in allowed and value
-        }
+        self.verification_environment = safe_execution_environment(values)
 
     def assert_repository(self, expected_repository: str) -> None:
         if not (self.repository_root / ".git").exists():
@@ -640,17 +686,4 @@ class CodexImplementationAdapter:
 
     @staticmethod
     def _safe_environment(values: Mapping[str, str]) -> dict[str, str]:
-        allowed = {
-            "CODEX_HOME",
-            "HOME",
-            "LANG",
-            "LC_ALL",
-            "PATH",
-            "SSL_CERT_FILE",
-            "TMPDIR",
-        }
-        return {
-            key: str(value)
-            for key, value in values.items()
-            if key in allowed and value
-        }
+        return safe_execution_environment(values)

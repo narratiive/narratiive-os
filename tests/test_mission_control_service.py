@@ -106,9 +106,27 @@ class MissionControlServiceTests(unittest.TestCase):
         response = self.service.respond(snapshot)
         self.assertEqual(response.status, "partial")
         self.assertEqual(response.data["summary"]["connection_issues"], 1)
+        self.assertEqual(
+            response.data["summary"]["connections_not_connected"],
+            1,
+        )
+        self.assertEqual(response.data["summary"]["connections_degraded"], 0)
         self.assertEqual(response.data["blockers"], [])
         self.assertIn("fail-closed", response.executive.recommendation)
         self.assertEqual(response.executive.evidence[0].reference, "check:drive")
+
+    def test_degraded_connection_is_labelled_separately_from_not_connected(self):
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T00:30:00Z",
+            progress=self.progress(),
+            connections={"GitHub": {"state": "degraded", "evidence": "HTTP 403"}},
+        )
+
+        summary = self.service.respond(snapshot).data["summary"]
+
+        self.assertEqual(summary["connection_issues"], 1)
+        self.assertEqual(summary["connections_not_connected"], 0)
+        self.assertEqual(summary["connections_degraded"], 1)
 
     def test_empty_snapshot_uses_recorded_snapshot_reference_not_invented_evidence(self):
         snapshot = self.builder.build(

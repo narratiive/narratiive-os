@@ -235,7 +235,11 @@ class EngineeringOrchestrationTests(unittest.TestCase):
                     (
                         sys.executable,
                         "-c",
-                        "import os; print(os.getenv('GH_TOKEN', 'absent'))",
+                        (
+                            "import os; "
+                            "print('|'.join(os.getenv(key, 'absent') for key in "
+                            "('HOME', 'CODEX_HOME', 'GH_TOKEN')))"
+                        ),
                     ),
                 ),
             ),
@@ -280,6 +284,8 @@ class EngineeringOrchestrationTests(unittest.TestCase):
             self.root / "worktrees",
             verification_environment={
                 "PATH": os.environ.get("PATH", ""),
+                "HOME": str(self.root),
+                "CODEX_HOME": str(self.root / "codex-home"),
                 "GH_TOKEN": "must-not-leak",
             },
         )
@@ -297,6 +303,7 @@ class EngineeringOrchestrationTests(unittest.TestCase):
             environment={
                 "PATH": os.environ.get("PATH", ""),
                 "HOME": str(self.root),
+                "CODEX_HOME": str(self.root / "codex-home"),
                 "GH_TOKEN": "must-not-leak",
                 "GITHUB_TOKEN": "must-not-leak",
                 "UNRELATED_SECRET": "must-not-leak",
@@ -313,6 +320,15 @@ class EngineeringOrchestrationTests(unittest.TestCase):
             adapter=adapter,
             worktrees=worktrees,
         )
+
+    def command_api(self, orchestrator):
+        runtime = compose_local_runtime(
+            self.root / "command-runtime",
+            self.repository,
+        )
+        runtime.engineering_task_service = self.tasks
+        runtime.engineering_orchestration_service = orchestrator
+        return RuntimeCommandAPI(runtime)
 
     def test_happy_path_records_verified_local_evidence_without_github_write(self):
         self.bind()
@@ -338,6 +354,11 @@ class EngineeringOrchestrationTests(unittest.TestCase):
         )
         call = runner.calls[0]
         self.assertIn("sandbox_workspace_write.network_access=false", call["command"])
+        self.assertEqual(call["environment"]["HOME"], str(self.root))
+        self.assertEqual(
+            call["environment"]["CODEX_HOME"],
+            str(self.root / "codex-home"),
+        )
         self.assertNotIn("GH_TOKEN", call["environment"])
         self.assertNotIn("GITHUB_TOKEN", call["environment"])
         self.assertNotIn("UNRELATED_SECRET", call["environment"])
@@ -351,6 +372,9 @@ class EngineeringOrchestrationTests(unittest.TestCase):
         verification_content = Path(
             verification.artifact.location
         ).read_text(encoding="utf-8")
+        self.assertIn(str(self.root), verification_content)
+        self.assertIn(str(self.root / "codex-home"), verification_content)
+        self.assertIn("absent", verification_content)
         self.assertNotIn("must-not-leak", verification_content)
         self.assertFalse(hasattr(self.service(), "merge"))
         self.assertFalse(hasattr(self.service(), "push"))
@@ -388,6 +412,25 @@ class EngineeringOrchestrationTests(unittest.TestCase):
                 "policy identity",
             ):
                 self.service(policy=wrong)
+
+    def test_allowed_path_globs_do_not_cross_directories_without_double_star(self):
+        values = self.policy.to_dict()
+        values["allowed_paths"] = (
+            "runtime/*.py",
+            "schemas/**/result.json",
+            "README.*",
+        )
+        values["verification_commands"] = self.policy.verification_commands
+        policy = EngineeringExecutionPolicy(**values)
+
+        self.assertTrue(policy.path_allowed("runtime/direct.py"))
+        self.assertFalse(policy.path_allowed("runtime/nested/hidden.py"))
+        self.assertTrue(policy.path_allowed("schemas/result.json"))
+        self.assertTrue(policy.path_allowed("schemas/shared/result.json"))
+        self.assertTrue(policy.path_allowed("README.md"))
+        self.assertFalse(policy.path_allowed("../runtime/direct.py"))
+        self.assertFalse(policy.path_allowed("/runtime/direct.py"))
+        self.assertFalse(policy.path_allowed(r"runtime\nested.py"))
 
     def test_duplicate_dispatch_replays_one_completed_run(self):
         self.bind()
@@ -517,6 +560,49 @@ class EngineeringOrchestrationTests(unittest.TestCase):
         self.assertEqual(result.state, "implementation_blocked")
         self.assertIn("receipt is missing", result.error)
 
+    def test_cancel_is_durable_idempotent_and_preserves_evidence(self):
+        self.bind()
+        service = self.service(FakeCodexRunner("crash"))
+        with self.assertRaises(SystemExit):
+            service.dispatch("eng-81", command_id="dispatch-before-cancel")
+        before = service.get("eng-81")
+
+        cancelled = service.cancel(
+            "eng-81",
+            command_id="cancel-81",
+            actor="Tony",
+        )
+        replayed = service.cancel(
+            "eng-81",
+            command_id="cancel-81-replay",
+            actor="Tony",
+        )
+
+        self.assertEqual(cancelled.state, "cancelled")
+        self.assertEqual(replayed, cancelled)
+        self.assertEqual(cancelled.artifact_ids, before.artifact_ids)
+        self.assertEqual(service.recover("eng-81"), cancelled)
+        with self.assertRaisesRegex(
+            EngineeringOrchestrationError,
+            "cannot dispatch from cancelled",
+        ):
+            service.dispatch("eng-81", command_id="dispatch-after-cancel")
+
+    def test_cancel_rejects_completed_implementation(self):
+        self.bind()
+        service = self.service(FakeCodexRunner())
+        service.dispatch("eng-81", command_id="dispatch-before-complete-cancel")
+
+        with self.assertRaisesRegex(
+            EngineeringOrchestrationError,
+            "completed engineering implementation cannot be cancelled",
+        ):
+            service.cancel(
+                "eng-81",
+                command_id="cancel-complete-81",
+                actor="Tony",
+            )
+
     def test_forbidden_changed_path_is_blocked(self):
         self.bind()
         result = self.service(FakeCodexRunner("forbidden")).dispatch(
@@ -557,13 +643,7 @@ class EngineeringOrchestrationTests(unittest.TestCase):
     def test_authenticated_command_boundary_dispatches_only_by_task_identity(self):
         self.bind()
         orchestrator = self.service(FakeCodexRunner())
-        runtime = compose_local_runtime(
-            self.root / "command-runtime",
-            self.repository,
-        )
-        runtime.engineering_task_service = self.tasks
-        runtime.engineering_orchestration_service = orchestrator
-        response = RuntimeCommandAPI(runtime).handle(
+        response = self.command_api(orchestrator).handle(
             {
                 "command": "engineering_tasks.dispatch",
                 "task_id": "eng-81",
@@ -581,6 +661,80 @@ class EngineeringOrchestrationTests(unittest.TestCase):
                 command_id="unsafe",
                 prompt="arbitrary",
             )
+
+    def test_command_boundary_get_and_recover_interrupted_execution(self):
+        self.bind()
+        crashing = self.service(FakeCodexRunner("crash"))
+        with self.assertRaises(SystemExit):
+            crashing.dispatch("eng-81", command_id="dispatch-command-crash")
+        restarted_runner = FakeCodexRunner()
+        api = self.command_api(
+            self.service(
+                restarted_runner,
+                journal=ExecutionJournal(self.journal.state_dir),
+                catalog=FileArtifactCatalog(
+                    self.catalog.root,
+                    workspace_id="agency",
+                ),
+            )
+        )
+
+        current = api.handle(
+            {
+                "command": "engineering_tasks.execution.get",
+                "task_id": "eng-81",
+            }
+        )
+        recovered = api.handle(
+            {
+                "command": "engineering_tasks.recover",
+                "task_id": "eng-81",
+            }
+        )
+
+        self.assertEqual(current["data"]["state"], "implementation_running")
+        self.assertEqual(recovered["data"]["state"], "implementation_complete")
+        self.assertEqual(restarted_runner.calls, [])
+
+    def test_command_boundary_cancel_preserves_fail_closed_state(self):
+        self.bind()
+        orchestrator = self.service(FakeCodexRunner("crash"))
+        with self.assertRaises(SystemExit):
+            orchestrator.dispatch("eng-81", command_id="dispatch-command-cancel")
+        api = self.command_api(orchestrator)
+
+        cancelled = api.handle(
+            {
+                "command": "engineering_tasks.cancel",
+                "task_id": "eng-81",
+                "command_id": "cancel-command-81",
+            }
+        )
+        current = api.handle(
+            {
+                "command": "engineering_tasks.execution.get",
+                "task_id": "eng-81",
+            }
+        )
+
+        self.assertEqual(cancelled["data"]["state"], "cancelled")
+        self.assertEqual(current["data"], cancelled["data"])
+
+    def test_handoff_and_execution_use_one_task_lock_namespace(self):
+        self.bind()
+        self.service(FakeCodexRunner()).dispatch(
+            "eng-81",
+            command_id="dispatch-shared-lock",
+        )
+
+        lock_root = self.journal.state_dir / "engineering-task-locks"
+        self.assertEqual(
+            [item.name for item in lock_root.iterdir()],
+            ["eng-81.lock"],
+        )
+        self.assertFalse(
+            (self.journal.state_dir / "engineering-orchestration-locks").exists()
+        )
 
     def test_mission_control_projects_run_without_routine_notification(self):
         self.bind()
