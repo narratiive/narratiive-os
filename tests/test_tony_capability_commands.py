@@ -27,9 +27,10 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         response = service.execute("/capabilities", [])
 
         self.assertEqual(response.command, "capabilities")
-        self.assertEqual(response.data["total_count"], 10)
+        self.assertEqual(response.data["total_count"], 13)
         self.assertTrue(any(item["command"] == "/mission" for item in response.data["capabilities"]))
         self.assertTrue(any(item["command"] == "/github" for item in response.data["capabilities"]))
+        self.assertTrue(any(item["command"] == "/friday" for item in response.data["capabilities"]))
         self.assertEqual(base.calls, [])
 
     def test_help_and_commands_are_aliases(self):

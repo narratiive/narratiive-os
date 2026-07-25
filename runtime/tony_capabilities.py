@@ -40,6 +40,26 @@ CAPABILITIES: tuple[TonyCapability, ...] = (
         aliases=("/brief", "/mission_control"),
     ),
     TonyCapability(
+        "/morning",
+        "Show an evidence-backed morning executive brief from Mission Control.",
+        "executive",
+        requires=("mission_control",),
+        aliases=("/morning_brief", "/standup"),
+    ),
+    TonyCapability(
+        "/evening",
+        "Show an evidence-backed end-of-day executive review from Mission Control.",
+        "executive",
+        requires=("mission_control",),
+        aliases=("/evening_review", "/end_of_day"),
+    ),
+    TonyCapability(
+        "/friday",
+        "Review the previous seven days of recorded work, blockers and repeated themes.",
+        "executive",
+        aliases=("/friday_review", "/weekly_review", "/executive_review"),
+    ),
+    TonyCapability(
         "/github",
         "Show live pull requests, active issues, blockers, Matt reviews and changes.",
         "oversight",
