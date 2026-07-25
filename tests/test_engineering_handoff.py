@@ -100,6 +100,21 @@ class FakeEngineeringGitHub:
         return comment
 
 
+class CoordinatedExecutionJournal(ExecutionJournal):
+    def __init__(self, state_dir, barrier):
+        super().__init__(state_dir)
+        self.barrier = barrier
+
+    def append(self, **values):
+        if values.get("action") == "engineering_task.observed":
+            self.barrier.wait(timeout=5)
+        return super().append(**values)
+
+    def _append_line(self, record):
+        time.sleep(0.02)
+        super()._append_line(record)
+
+
 def linked_pull_event(number=72, repository="narratiive/narratiive-os"):
     return {
         "event": "cross-referenced",
@@ -302,6 +317,53 @@ class EngineeringTaskServiceTests(unittest.TestCase):
         self.assertEqual(errors, [])
         self.assertEqual(self.github.create_calls, 1)
         self.assertEqual([item.issue_number for item in results], [71, 71])
+
+    def test_concurrent_refreshes_preserve_one_valid_audit_chain(self):
+        self.create()
+        initial_records = len(self.journal.read_all())
+        barrier = threading.Barrier(6)
+        services = [
+            EngineeringTaskService(
+                workspace_id="agency",
+                client_id="agency-client",
+                repository="narratiive/narratiive-os",
+                artifact_catalog=self.catalog,
+                execution_journal=CoordinatedExecutionJournal(
+                    self.journal.state_dir,
+                    barrier,
+                ),
+                github=self.github,
+                required_checks=("runtime-tests",),
+                required_reviewers=("matt",),
+                allowed_approvers=("matt",),
+            )
+            for _ in range(barrier.parties)
+        ]
+        errors = []
+
+        def refresh(service):
+            try:
+                service.refresh("eng-71")
+            except Exception as exc:
+                errors.append(exc)
+
+        threads = [
+            threading.Thread(target=refresh, args=(service,))
+            for service in services
+        ]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+
+        self.assertEqual(errors, [])
+        records = ExecutionJournal(self.journal.state_dir).read_all()
+        self.assertEqual(len(records), initial_records + barrier.parties)
+        self.assertEqual(
+            [record.sequence for record in records],
+            list(range(1, len(records) + 1)),
+        )
+        self.assertTrue(ExecutionJournal(self.journal.state_dir).verify()["ok"])
 
     def test_duplicate_marker_fails_closed_and_is_audited(self):
         self.approve()
