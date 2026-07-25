@@ -50,7 +50,7 @@ class FridayReviewLiveEvidenceTests(unittest.TestCase):
         self.assertEqual(response.command, "friday_review")
         self.assertIn("Mission Control command path validated", response.message)
 
-    def test_loader_accepts_only_explicit_review_records(self):
+    def test_loader_accepts_complete_explicit_review_records(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             valid = {
@@ -62,14 +62,51 @@ class FridayReviewLiveEvidenceTests(unittest.TestCase):
                 "workspace_id": "narratiive",
             }
             (root / "records.json").write_text(
-                json.dumps([valid, {"id": "growth-object", "object_type": "campaign"}]),
+                json.dumps([valid]),
                 encoding="utf-8",
             )
-            (root / "broken.json").write_text("{not-json", encoding="utf-8")
 
             records = load_friday_review_records(root)
 
         self.assertEqual(records, [valid])
+
+    def test_loader_fails_closed_when_store_is_missing_or_empty(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "contains no JSON records"):
+                load_friday_review_records(root)
+            with self.assertRaisesRegex(FileNotFoundError, "unavailable"):
+                load_friday_review_records(root / "missing")
+
+    def test_loader_fails_closed_on_malformed_or_unrelated_json(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "broken.json").write_text("{not-json", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "unreadable"):
+                load_friday_review_records(root)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "growth-object.json").write_text(
+                json.dumps({"id": "growth-object", "object_type": "campaign"}),
+                encoding="utf-8",
+            )
+            with self.assertRaisesRegex(ValueError, "record is invalid"):
+                load_friday_review_records(root)
+
+    def test_live_service_reports_untrusted_when_configured_store_fails(self):
+        service = TonyExecutiveCommandService(
+            StubCommandService(),
+            friday_record_loader=lambda: (_ for _ in ()).throw(
+                ValueError("evidence store invalid")
+            ),
+        )
+
+        response = service.execute("/friday", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "friday_review_untrusted")
+        self.assertIn("evidence store invalid", response.message)
 
 
 if __name__ == "__main__":
