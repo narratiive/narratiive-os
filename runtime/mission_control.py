@@ -61,6 +61,7 @@ class MissionControlSnapshot:
     github_work: GitHubWorkSnapshot | None = None
     engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
     engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
+    recommended_focus: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -80,6 +81,7 @@ class MissionControlSnapshot:
             "engineering_runs": [
                 item.to_dict() for item in self.engineering_runs
             ],
+            "recommended_focus": list(self.recommended_focus),
         }
 
 
@@ -115,6 +117,11 @@ class MissionControlBuilder:
             handoff_items,
             run_items,
         )
+        recommended_focus = self._recommended_focus(
+            blockers,
+            approval_items,
+            workstream_items,
+        )
 
         if blockers:
             status = "blocked"
@@ -136,6 +143,7 @@ class MissionControlBuilder:
             github_work=github_work,
             engineering_handoffs=handoff_items,
             engineering_runs=run_items,
+            recommended_focus=recommended_focus,
         )
 
     @staticmethod
@@ -166,6 +174,37 @@ class MissionControlBuilder:
             for item in github_work.matt_approval_required:
                 approvals.add(f"github:{item.kind}:{item.number}:{item.url}")
         return tuple(sorted(approvals))
+
+    @staticmethod
+    def _recommended_focus(
+        blockers: tuple[str, ...],
+        approvals: tuple[str, ...],
+        workstreams: tuple[WorkstreamStatus, ...],
+        *,
+        limit: int = 3,
+    ) -> tuple[str, ...]:
+        """Return a bounded executive focus list from canonical snapshot state."""
+        if limit < 1:
+            return ()
+
+        focus: list[str] = []
+        seen: set[str] = set()
+
+        def add(value: str) -> None:
+            item = value.strip()
+            if item and item not in seen and len(focus) < limit:
+                seen.add(item)
+                focus.append(item)
+
+        for blocker in blockers:
+            add(f"resolve:{blocker}")
+        for approval in approvals:
+            add(f"decide:{approval}")
+        for workstream in workstreams:
+            if workstream.state != "blocked":
+                add(f"advance:{workstream.workstream_id}:{workstream.next_action.strip()}")
+
+        return tuple(focus)
 
     @staticmethod
     def _optional_text(value: Any) -> str | None:
