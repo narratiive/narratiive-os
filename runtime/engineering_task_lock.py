@@ -29,11 +29,14 @@ def engineering_task_lock(
             os.O_CREAT | os.O_RDWR,
             0o600,
         )
-        with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-            try:
-                yield
-            finally:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
     except OSError as exc:
         raise error_type(f"{error_prefix} lock failed closed") from exc
+    with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+        except OSError as exc:
+            raise error_type(f"{error_prefix} lock failed closed") from exc
+        try:
+            yield
+        finally:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)

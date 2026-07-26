@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import signal
@@ -22,6 +23,7 @@ from runtime.codex_adapter import (
     VerificationCommand,
 )
 from runtime.engineering_handoff import EngineeringTask, EngineeringTaskService
+from runtime.engineering_task_lock import engineering_task_lock
 from runtime.engineering_orchestrator import (
     EngineeringOrchestrationError,
     EngineeringOrchestrationService,
@@ -734,6 +736,25 @@ class EngineeringOrchestrationTests(unittest.TestCase):
         )
         self.assertFalse(
             (self.journal.state_dir / "engineering-orchestration-locks").exists()
+        )
+
+    def test_task_lock_releases_and_preserves_caller_oserror(self):
+        with patch(
+            "runtime.engineering_task_lock.fcntl.flock",
+            wraps=fcntl.flock,
+        ) as flock:
+            with self.assertRaisesRegex(OSError, "caller filesystem failure"):
+                with engineering_task_lock(
+                    self.journal.state_dir,
+                    "eng-81",
+                    error_type=EngineeringOrchestrationError,
+                    error_prefix="engineering orchestration",
+                ):
+                    raise OSError("caller filesystem failure")
+
+        self.assertEqual(
+            [call.args[1] for call in flock.call_args_list],
+            [fcntl.LOCK_EX, fcntl.LOCK_UN],
         )
 
     def test_mission_control_projects_run_without_routine_notification(self):
