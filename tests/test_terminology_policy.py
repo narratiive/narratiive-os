@@ -52,6 +52,57 @@ class TerminologyPolicyTests(unittest.TestCase):
                 "retired_terms": [{"term": "Old Name", "rationale": "Retired"}],
             })
 
+    def test_rejects_term_that_is_both_approved_and_retired(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot appear in both approved_terms and retired_terms",
+        ):
+            TerminologyPolicy({
+                "version": "1",
+                "status": "active",
+                "approved_terms": [
+                    {"term": "Growth Sprint", "use": "Current offer"},
+                ],
+                "retired_terms": [
+                    {"term": " growth   sprint ", "rationale": "Superseded"},
+                ],
+            })
+
+    def test_rejects_term_that_is_both_unsettled_and_retired(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot appear in both unsettled_terms and retired_terms",
+        ):
+            TerminologyPolicy({
+                "version": "1",
+                "status": "active",
+                "unsettled_terms": [
+                    {"concept": "Opportunity Card", "rule": "Do not name yet"},
+                ],
+                "retired_terms": [
+                    {"term": "opportunity card", "rationale": "Retired"},
+                ],
+            })
+
+    def test_rejects_term_that_is_both_approved_and_unsettled(self) -> None:
+        with self.assertRaisesRegex(
+            ValueError,
+            "cannot appear in both approved_terms and unsettled_terms",
+        ):
+            TerminologyPolicy({
+                "version": "1",
+                "status": "active",
+                "approved_terms": [
+                    {"term": "Paid Engagement", "use": "Approved offer"},
+                ],
+                "unsettled_terms": [
+                    {"concept": "paid engagement", "rule": "Use descriptive language"},
+                ],
+                "retired_terms": [
+                    {"term": "Old Name", "rationale": "Retired"},
+                ],
+            })
+
 
 if __name__ == "__main__":
     unittest.main()
