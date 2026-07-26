@@ -62,6 +62,7 @@ class MissionControlSnapshot:
     engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
     engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
     recommended_focus: tuple[str, ...] = ()
+    recent_wins: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -82,6 +83,7 @@ class MissionControlSnapshot:
                 item.to_dict() for item in self.engineering_runs
             ],
             "recommended_focus": list(self.recommended_focus),
+            "recent_wins": list(self.recent_wins),
         }
 
 
@@ -99,6 +101,7 @@ class MissionControlBuilder:
         github_work: GitHubWorkSnapshot | None = None,
         engineering_handoffs: Iterable[EngineeringHandoffSnapshot] = (),
         engineering_runs: Iterable[EngineeringRunSnapshot] = (),
+        recent_wins: Iterable[str] = (),
     ) -> MissionControlSnapshot:
         workstream_items = tuple(sorted(workstreams, key=lambda item: item.workstream_id))
         connection_items = self._connections(connections or {})
@@ -122,6 +125,7 @@ class MissionControlBuilder:
             approval_items,
             workstream_items,
         )
+        win_items = self._recent_wins(recent_wins)
 
         if blockers:
             status = "blocked"
@@ -144,6 +148,7 @@ class MissionControlBuilder:
             engineering_handoffs=handoff_items,
             engineering_runs=run_items,
             recommended_focus=recommended_focus,
+            recent_wins=win_items,
         )
 
     @staticmethod
@@ -174,6 +179,14 @@ class MissionControlBuilder:
             for item in github_work.matt_approval_required:
                 approvals.add(f"github:{item.kind}:{item.number}:{item.url}")
         return tuple(sorted(approvals))
+
+    @staticmethod
+    def _recent_wins(values: Iterable[str], *, limit: int = 5) -> tuple[str, ...]:
+        """Return explicit, evidence-ready wins without inferring completion."""
+        if limit < 1:
+            return ()
+        wins = {str(value).strip() for value in values if str(value).strip()}
+        return tuple(sorted(wins)[:limit])
 
     @staticmethod
     def _recommended_focus(
