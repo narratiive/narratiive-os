@@ -11,6 +11,8 @@ from runtime.progress_engine import ProgressSnapshot
 
 VALID_CONNECTION_STATES = {"connected", "not_connected", "unknown", "degraded"}
 VALID_WORK_STATES = {"known", "functional", "tested", "used", "blocked", "unknown"}
+VALID_FOCUS_CATEGORIES = {"blocker", "approval", "risk", "opportunity", "workstream"}
+VALID_CONFIDENCE_LEVELS = {"high", "medium", "low"}
 
 
 @dataclass(frozen=True)
@@ -50,6 +52,32 @@ class WorkstreamStatus:
 
 
 @dataclass(frozen=True)
+class ExecutiveFocusItem:
+    action: str
+    category: str
+    evidence: tuple[str, ...]
+    confidence: str = "high"
+
+    def __post_init__(self) -> None:
+        if self.category not in VALID_FOCUS_CATEGORIES:
+            raise ValueError(f"Unsupported focus category: {self.category}")
+        if self.confidence not in VALID_CONFIDENCE_LEVELS:
+            raise ValueError(f"Unsupported focus confidence: {self.confidence}")
+        if not self.action.strip():
+            raise ValueError("Focus items require an action")
+        if not self.evidence or any(not item.strip() for item in self.evidence):
+            raise ValueError("Focus items require non-empty evidence")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "action": self.action,
+            "category": self.category,
+            "evidence": list(self.evidence),
+            "confidence": self.confidence,
+        }
+
+
+@dataclass(frozen=True)
 class MissionControlSnapshot:
     generated_at: str
     status: str
@@ -62,6 +90,7 @@ class MissionControlSnapshot:
     engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
     engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
     recommended_focus: tuple[str, ...] = ()
+    recommended_focus_details: tuple[ExecutiveFocusItem, ...] = ()
     recent_wins: tuple[str, ...] = ()
     risks: tuple[str, ...] = ()
     opportunities: tuple[str, ...] = ()
@@ -85,6 +114,9 @@ class MissionControlSnapshot:
                 item.to_dict() for item in self.engineering_runs
             ],
             "recommended_focus": list(self.recommended_focus),
+            "recommended_focus_details": [
+                item.to_dict() for item in self.recommended_focus_details
+            ],
             "recent_wins": list(self.recent_wins),
             "risks": list(self.risks),
             "opportunities": list(self.opportunities),
@@ -128,13 +160,14 @@ class MissionControlBuilder:
         )
         risk_items = self._explicit_items(risks)
         opportunity_items = self._explicit_items(opportunities)
-        recommended_focus = self._recommended_focus(
+        focus_details = self._recommended_focus_details(
             blockers,
             approval_items,
             risk_items,
             opportunity_items,
             workstream_items,
         )
+        recommended_focus = tuple(item.action for item in focus_details)
         win_items = self._recent_wins(recent_wins)
 
         if blockers:
@@ -158,6 +191,7 @@ class MissionControlBuilder:
             engineering_handoffs=handoff_items,
             engineering_runs=run_items,
             recommended_focus=recommended_focus,
+            recommended_focus_details=focus_details,
             recent_wins=win_items,
             risks=risk_items,
             opportunities=opportunity_items,
@@ -206,6 +240,87 @@ class MissionControlBuilder:
         return tuple(sorted(items)[:limit])
 
     @staticmethod
+    def _recommended_focus_details(
+        blockers: tuple[str, ...],
+        approvals: tuple[str, ...],
+        risks: tuple[str, ...],
+        opportunities: tuple[str, ...],
+        workstreams: tuple[WorkstreamStatus, ...],
+        *,
+        limit: int = 3,
+    ) -> tuple[ExecutiveFocusItem, ...]:
+        """Return bounded focus items with canonical evidence and confidence."""
+        if limit < 1:
+            return ()
+
+        focus: list[ExecutiveFocusItem] = []
+        seen: set[str] = set()
+
+        def add(
+            action: str,
+            *,
+            category: str,
+            evidence: Iterable[str],
+            confidence: str = "high",
+        ) -> None:
+            item = action.strip()
+            evidence_items = tuple(
+                dict.fromkeys(value.strip() for value in evidence if value.strip())
+            )
+            if (
+                item
+                and item not in seen
+                and len(focus) < limit
+                and evidence_items
+            ):
+                seen.add(item)
+                focus.append(
+                    ExecutiveFocusItem(
+                        action=item,
+                        category=category,
+                        evidence=evidence_items,
+                        confidence=confidence,
+                    )
+                )
+
+        for index, blocker in enumerate(blockers):
+            add(
+                f"resolve:{blocker}",
+                category="blocker",
+                evidence=(f"blockers/{index}",),
+            )
+        for index, approval in enumerate(approvals):
+            add(
+                f"decide:{approval}",
+                category="approval",
+                evidence=(f"approvals_required/{index}",),
+            )
+        for index, risk in enumerate(risks):
+            add(
+                f"mitigate:{risk}",
+                category="risk",
+                evidence=(f"risks/{index}",),
+            )
+        for index, opportunity in enumerate(opportunities):
+            add(
+                f"pursue:{opportunity}",
+                category="opportunity",
+                evidence=(f"opportunities/{index}",),
+            )
+        for index, workstream in enumerate(workstreams):
+            if workstream.state != "blocked":
+                add(
+                    f"advance:{workstream.workstream_id}:{workstream.next_action.strip()}",
+                    category="workstream",
+                    evidence=(
+                        f"workstreams/{index}",
+                        *workstream.evidence,
+                    ),
+                )
+
+        return tuple(focus)
+
+    @staticmethod
     def _recommended_focus(
         blockers: tuple[str, ...],
         approvals: tuple[str, ...],
@@ -215,32 +330,18 @@ class MissionControlBuilder:
         *,
         limit: int = 3,
     ) -> tuple[str, ...]:
-        """Return a bounded executive focus list from canonical snapshot state."""
-        if limit < 1:
-            return ()
-
-        focus: list[str] = []
-        seen: set[str] = set()
-
-        def add(value: str) -> None:
-            item = value.strip()
-            if item and item not in seen and len(focus) < limit:
-                seen.add(item)
-                focus.append(item)
-
-        for blocker in blockers:
-            add(f"resolve:{blocker}")
-        for approval in approvals:
-            add(f"decide:{approval}")
-        for risk in risks:
-            add(f"mitigate:{risk}")
-        for opportunity in opportunities:
-            add(f"pursue:{opportunity}")
-        for workstream in workstreams:
-            if workstream.state != "blocked":
-                add(f"advance:{workstream.workstream_id}:{workstream.next_action.strip()}")
-
-        return tuple(focus)
+        """Backward-compatible string projection of the canonical focus details."""
+        return tuple(
+            item.action
+            for item in MissionControlBuilder._recommended_focus_details(
+                blockers,
+                approvals,
+                risks,
+                opportunities,
+                workstreams,
+                limit=limit,
+            )
+        )
 
     @staticmethod
     def _optional_text(value: Any) -> str | None:
