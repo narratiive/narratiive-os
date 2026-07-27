@@ -15,6 +15,10 @@ class InterruptionContext:
     The context is deliberately transport-agnostic. It identifies the workspace
     and recipient, carries the material evidence identities being considered,
     and includes the recorded delivery history needed by the active policy.
+
+    Identity fields are canonicalised at construction so equivalent evidence
+    always produces the same policy input regardless of source ordering or
+    incidental surrounding whitespace.
     """
 
     workspace_id: str
@@ -24,12 +28,28 @@ class InterruptionContext:
     last_sent_at: datetime | None = None
 
     def __post_init__(self) -> None:
-        if not self.workspace_id.strip():
+        workspace_id = self.workspace_id.strip()
+        recipient_id = self.recipient_id.strip()
+        if not workspace_id:
             raise ValueError("workspace_id is required")
-        if not self.recipient_id.strip():
+        if not recipient_id:
             raise ValueError("recipient_id is required")
-        if any(not item.strip() for item in self.material_ids):
-            raise ValueError("material_ids must not contain blank values")
+
+        canonical_material_ids: list[str] = []
+        for item in self.material_ids:
+            canonical = " ".join(item.split())
+            if not canonical:
+                raise ValueError("material_ids must not contain blank values")
+            canonical_material_ids.append(canonical)
+
+        object.__setattr__(self, "workspace_id", workspace_id)
+        object.__setattr__(self, "recipient_id", recipient_id)
+        object.__setattr__(
+            self,
+            "material_ids",
+            tuple(sorted(set(canonical_material_ids))),
+        )
+
         if self.last_sent_at is not None:
             now_is_aware = self.now.tzinfo is not None and self.now.utcoffset() is not None
             last_is_aware = (
