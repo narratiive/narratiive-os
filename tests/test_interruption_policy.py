@@ -13,10 +13,12 @@ def _context(
     material_ids: tuple[str, ...] = ("blocker:1",),
     now: datetime | None = None,
     last_sent_at: datetime | None = None,
+    workspace_id: str = "narratiive",
+    recipient_id: str = "matt",
 ) -> InterruptionContext:
     return InterruptionContext(
-        workspace_id="narratiive",
-        recipient_id="matt",
+        workspace_id=workspace_id,
+        recipient_id=recipient_id,
         material_ids=material_ids,
         now=now or datetime(2026, 7, 27, 17, 0, tzinfo=timezone.utc),
         last_sent_at=last_sent_at,
@@ -87,6 +89,32 @@ def test_rejects_incompatible_datetime_awareness() -> None:
 def test_rejects_blank_material_identity() -> None:
     with pytest.raises(ValueError, match="material_ids"):
         _context(material_ids=("blocker:1", " "))
+
+
+def test_canonicalises_identity_fields_and_material_evidence() -> None:
+    context = _context(
+        workspace_id=" narratiive ",
+        recipient_id=" matt ",
+        material_ids=(
+            " approval:PR-95 ",
+            "blocker:runtime   validation",
+            "approval:PR-95",
+        ),
+    )
+
+    assert context.workspace_id == "narratiive"
+    assert context.recipient_id == "matt"
+    assert context.material_ids == (
+        "approval:PR-95",
+        "blocker:runtime validation",
+    )
+
+
+def test_equivalent_material_sets_produce_identical_policy_inputs() -> None:
+    first = _context(material_ids=("blocker:2", "approval:1", "blocker:2"))
+    second = _context(material_ids=(" approval:1 ", "blocker:2"))
+
+    assert first.material_ids == second.material_ids
 
 
 def test_rejects_negative_cooldown() -> None:
