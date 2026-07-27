@@ -63,6 +63,8 @@ class MissionControlSnapshot:
     engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
     recommended_focus: tuple[str, ...] = ()
     recent_wins: tuple[str, ...] = ()
+    risks: tuple[str, ...] = ()
+    opportunities: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -84,6 +86,8 @@ class MissionControlSnapshot:
             ],
             "recommended_focus": list(self.recommended_focus),
             "recent_wins": list(self.recent_wins),
+            "risks": list(self.risks),
+            "opportunities": list(self.opportunities),
         }
 
 
@@ -102,6 +106,8 @@ class MissionControlBuilder:
         engineering_handoffs: Iterable[EngineeringHandoffSnapshot] = (),
         engineering_runs: Iterable[EngineeringRunSnapshot] = (),
         recent_wins: Iterable[str] = (),
+        risks: Iterable[str] = (),
+        opportunities: Iterable[str] = (),
     ) -> MissionControlSnapshot:
         workstream_items = tuple(sorted(workstreams, key=lambda item: item.workstream_id))
         connection_items = self._connections(connections or {})
@@ -120,9 +126,13 @@ class MissionControlBuilder:
             handoff_items,
             run_items,
         )
+        risk_items = self._explicit_items(risks)
+        opportunity_items = self._explicit_items(opportunities)
         recommended_focus = self._recommended_focus(
             blockers,
             approval_items,
+            risk_items,
+            opportunity_items,
             workstream_items,
         )
         win_items = self._recent_wins(recent_wins)
@@ -149,6 +159,8 @@ class MissionControlBuilder:
             engineering_runs=run_items,
             recommended_focus=recommended_focus,
             recent_wins=win_items,
+            risks=risk_items,
+            opportunities=opportunity_items,
         )
 
     @staticmethod
@@ -183,15 +195,22 @@ class MissionControlBuilder:
     @staticmethod
     def _recent_wins(values: Iterable[str], *, limit: int = 5) -> tuple[str, ...]:
         """Return explicit, evidence-ready wins without inferring completion."""
+        return MissionControlBuilder._explicit_items(values, limit=limit)
+
+    @staticmethod
+    def _explicit_items(values: Iterable[str], *, limit: int = 5) -> tuple[str, ...]:
+        """Normalise bounded executive inputs without inferring missing state."""
         if limit < 1:
             return ()
-        wins = {str(value).strip() for value in values if str(value).strip()}
-        return tuple(sorted(wins)[:limit])
+        items = {str(value).strip() for value in values if str(value).strip()}
+        return tuple(sorted(items)[:limit])
 
     @staticmethod
     def _recommended_focus(
         blockers: tuple[str, ...],
         approvals: tuple[str, ...],
+        risks: tuple[str, ...],
+        opportunities: tuple[str, ...],
         workstreams: tuple[WorkstreamStatus, ...],
         *,
         limit: int = 3,
@@ -213,6 +232,10 @@ class MissionControlBuilder:
             add(f"resolve:{blocker}")
         for approval in approvals:
             add(f"decide:{approval}")
+        for risk in risks:
+            add(f"mitigate:{risk}")
+        for opportunity in opportunities:
+            add(f"pursue:{opportunity}")
         for workstream in workstreams:
             if workstream.state != "blocked":
                 add(f"advance:{workstream.workstream_id}:{workstream.next_action.strip()}")
