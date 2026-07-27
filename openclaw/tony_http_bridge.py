@@ -26,6 +26,10 @@ from runtime.github_work import (
     GitHubWorkSnapshot,
 )
 from runtime.mission_control import MissionControlBuilder, MissionControlSnapshot
+from runtime.proactive_executive_delivery import (
+    LatestDeliveryStatusStore,
+    describe_delivery_status,
+)
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import CommandResponse, TonyCommandService
@@ -45,6 +49,7 @@ MissionControlLoader = Callable[[], MissionControlSnapshot]
 GitHubWorkLoader = Callable[[], GitHubWorkSnapshot]
 EngineeringHandoffLoader = Callable[[], tuple[EngineeringHandoffSnapshot, ...]]
 EngineeringRunLoader = Callable[[], tuple[EngineeringRunSnapshot, ...]]
+ProactiveDeliveryStatusLoader = Callable[[], dict[str, Any] | None]
 
 
 class TonyHTTPBridge:
@@ -362,6 +367,7 @@ def build_mission_control_loader(
     github_work_loader: GitHubWorkLoader | None = None,
     engineering_handoff_loader: EngineeringHandoffLoader | None = None,
     engineering_run_loader: EngineeringRunLoader | None = None,
+    proactive_delivery_status_loader: ProactiveDeliveryStatusLoader | None = None,
 ) -> MissionControlLoader:
     """Build the live read-only Mission Control snapshot used by Telegram commands."""
     builder = MissionControlBuilder()
@@ -415,6 +421,20 @@ def build_mission_control_loader(
                     "state": "degraded",
                     "evidence": f"Engineering execution audit failed closed: {exc}",
                 }
+        if proactive_delivery_status_loader is None:
+            proactive_delivery_connection = {
+                "state": "not_connected",
+                "evidence": "Proactive delivery is not configured",
+            }
+        else:
+            try:
+                proactive_delivery_connection = proactive_delivery_status_loader()
+            except Exception as exc:
+                proactive_delivery_connection = {
+                    "state": "degraded",
+                    "evidence": f"Proactive delivery status unavailable: {exc}",
+                }
+
         return builder.build(
             generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
             progress=progress,
@@ -428,6 +448,7 @@ def build_mission_control_loader(
                     "evidence": "Current request reached Tony HTTP bridge",
                 },
                 "GitHub": github_connection,
+                "proactive-delivery": proactive_delivery_connection,
             },
             github_work=github_work,
             engineering_handoffs=engineering_handoffs,
@@ -460,6 +481,34 @@ def build_brief_archive(
         workspace_runtime.event_log,
         workspace_id=workspace_runtime.workspace.workspace_id,
     )
+
+
+def build_proactive_delivery_status_loader(
+    *,
+    runtime_root: Path,
+    repository_root: Path,
+) -> ProactiveDeliveryStatusLoader | None:
+    """Expose Tony's last proactive delivery/escalation attempt to Mission Control."""
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+    )
+    if not workspace_id:
+        return None
+    try:
+        workspace_runtime = WorkspaceRuntimeManager(
+            runtime_root, repository_root
+        ).runtime(workspace_id)
+    except (ValueError, WorkspaceNotFound):
+        return None
+    store = LatestDeliveryStatusStore(
+        workspace_runtime.paths.root / "proactive-delivery" / "latest-status.json"
+    )
+
+    def load() -> dict[str, Any] | None:
+        return describe_delivery_status(store.read())
+
+    return load
 
 
 def build_github_work_loader(
@@ -628,6 +677,10 @@ def build_app() -> TonyHTTPBridge:
         runtime_root=runtime_root,
         repository_root=REPOSITORY_ROOT,
     )
+    proactive_delivery_status_loader = build_proactive_delivery_status_loader(
+        runtime_root=runtime_root,
+        repository_root=REPOSITORY_ROOT,
+    )
     mission_control_loader = build_mission_control_loader(
         progress_engine,
         object_loader,
@@ -635,6 +688,7 @@ def build_app() -> TonyHTTPBridge:
         github_work_loader,
         engineering_handoff_loader,
         engineering_run_loader,
+        proactive_delivery_status_loader,
     )
     command_service = TonyCommandService(
         progress_engine,

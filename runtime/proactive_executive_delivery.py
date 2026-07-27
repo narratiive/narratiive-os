@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+import fcntl
+import hashlib
+import json
+import os
+import tempfile
 from dataclasses import dataclass
 from datetime import date, datetime
+from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
 
+from runtime.mission_control import MissionControlSnapshot
 from runtime.tony_command_service import CommandResponse
 
 
@@ -11,6 +18,7 @@ BriefCommand = Callable[[str, Iterable[dict[str, Any]]], CommandResponse]
 MessageSender = Callable[[str, str], None]
 EventRecorder = Callable[[dict[str, Any]], None]
 Clock = Callable[[], datetime]
+MissionControlLoader = Callable[[], MissionControlSnapshot]
 
 
 class DeliveryKeyStore(Protocol):
@@ -52,6 +60,61 @@ class InMemoryDeliveryKeyStore:
         self._keys.add(key)
 
 
+@dataclass(frozen=True, slots=True)
+class DispatchOutcome:
+    """The result of one bounded-retry send attempt, before any evidence is built."""
+
+    status: str  # "sent" | "failed"
+    attempts: int
+    error: str | None = None
+
+
+class IdempotentDispatcher:
+    """The bounded-retry, key-deduplicated send mechanics shared by every
+    proactive delivery flow.
+
+    This is deliberately the smallest possible extraction: once a caller has
+    decided *what* to send and *which key* identifies "already sent," this
+    class owns the part that was previously duplicated between
+    ``ProactiveExecutiveDeliveryService`` and ``MaterialEscalationService`` —
+    checking the idempotency key, retrying a transient send failure up to a
+    bounded attempt limit, and marking the key used only once a send actually
+    succeeds. It has no knowledge of briefs, escalations, channels, rendering,
+    interruption policy, or evidence recording; those all remain the caller's
+    responsibility so this PR does not change any observable behaviour.
+    """
+
+    def __init__(self, *, key_store: DeliveryKeyStore) -> None:
+        self.key_store = key_store
+
+    def is_duplicate(self, key: str) -> bool:
+        return self.key_store.contains(key)
+
+    def send_with_retry(
+        self,
+        send: Callable[[], None],
+        *,
+        max_attempts: int,
+    ) -> DispatchOutcome:
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                send()
+            except Exception as exc:  # transport boundary; exact provider errors vary
+                last_error = exc
+                continue
+            return DispatchOutcome(status="sent", attempts=attempt)
+
+        return DispatchOutcome(
+            status="failed",
+            attempts=max_attempts,
+            error=str(last_error) if last_error else "unknown delivery failure",
+        )
+
+    def mark_used(self, key: str) -> None:
+        self.key_store.add(key)
+
+
 class ProactiveExecutiveDeliveryService:
     """Deliver trusted executive briefs once, with bounded retries and evidence."""
 
@@ -75,6 +138,7 @@ class ProactiveExecutiveDeliveryService:
         self.record_event = record_event
         self.clock = clock or datetime.now
         self.max_attempts = max_attempts
+        self.dispatcher = IdempotentDispatcher(key_store=key_store)
 
     def deliver(
         self,
@@ -99,7 +163,7 @@ class ProactiveExecutiveDeliveryService:
             command=canonical_command,
             delivery_date=scheduled_date,
         )
-        if self.key_store.contains(delivery_key):
+        if self.dispatcher.is_duplicate(delivery_key):
             result = ProactiveDeliveryResult(
                 delivery_key=delivery_key,
                 status="duplicate_suppressed",
@@ -125,19 +189,16 @@ class ProactiveExecutiveDeliveryService:
             self._record("executive_brief.delivery_failed", result)
             return result
 
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                self.send_message(chat_id, response.message)
-            except Exception as exc:  # transport boundary; exact provider errors vary
-                last_error = exc
-                continue
-
-            self.key_store.add(delivery_key)
+        outcome = self.dispatcher.send_with_retry(
+            lambda: self.send_message(chat_id, response.message),
+            max_attempts=self.max_attempts,
+        )
+        if outcome.status == "sent":
+            self.dispatcher.mark_used(delivery_key)
             result = ProactiveDeliveryResult(
                 delivery_key=delivery_key,
                 status="delivered",
-                attempts=attempt,
+                attempts=outcome.attempts,
                 command=canonical_command,
                 workspace_id=workspace_id,
                 chat_id=chat_id,
@@ -148,11 +209,11 @@ class ProactiveExecutiveDeliveryService:
         result = ProactiveDeliveryResult(
             delivery_key=delivery_key,
             status="delivery_failed",
-            attempts=self.max_attempts,
+            attempts=outcome.attempts,
             command=canonical_command,
             workspace_id=workspace_id,
             chat_id=chat_id,
-            error=str(last_error) if last_error else "unknown delivery failure",
+            error=outcome.error,
         )
         self._record("executive_brief.delivery_failed", result)
         return result
@@ -166,6 +227,445 @@ class ProactiveExecutiveDeliveryService:
         return f"{workspace_id.strip()}:{command.strip()}:{delivery_date.isoformat()}"
 
     def _record(self, event_type: str, result: ProactiveDeliveryResult) -> None:
+        self.record_event(
+            {
+                "event_type": event_type,
+                "recorded_at": self.clock().isoformat(),
+                **result.to_dict(),
+            }
+        )
+
+
+class ProactiveDeliveryStorageError(RuntimeError):
+    """Raised when durable proactive-delivery evidence is missing or corrupt."""
+
+
+class ProactiveDeliveryLockError(RuntimeError):
+    """Raised when the per-workspace proactive delivery lock is unusable.
+
+    This is distinct from contention (``ProactiveDeliveryLockContended``): it
+    means the lock file itself could not be opened or locked for a reason
+    other than another process holding it — for example an unwritable
+    directory, or the path pointing at something other than a regular file.
+    This is a genuine environment problem and should be surfaced as an
+    actionable blocker, not treated as a benign overlapping invocation.
+    """
+
+
+class ProactiveDeliveryLockContended(RuntimeError):
+    """Raised when another process already holds the per-workspace lock.
+
+    This is the expected, benign outcome of two manual/scheduler/n8n
+    invocations for the same workspace overlapping. The caller should treat
+    this as "someone else is already running this," not as a delivery
+    failure.
+    """
+
+
+class WorkspaceDeliveryLock:
+    """A workspace-scoped, inter-process, non-blocking exclusion lock.
+
+    Guarantees that only one process for a given workspace can be inside a
+    duplicate-check -> send -> mark-used/evidence sequence at a time, across
+    manual, scheduler and n8n invocations. This closes the race the
+    ``IdempotentDispatcher`` mechanics alone cannot: each individual
+    ``FileDeliveryKeyStore`` write is atomic, but "read the key, send the
+    message, write the key" is not a single atomic operation, so two
+    processes that both start before either finishes could both observe the
+    key as absent and both send.
+
+    Uses an advisory OS file lock (``fcntl.flock``) rather than a PID or
+    timestamp file, so there is no stale-lock cleanup problem to get wrong:
+    the kernel releases the lock automatically when the holding process
+    exits or the file descriptor is closed for any reason, including a
+    crash. Contention is detected immediately (``LOCK_NB``) rather than
+    blocking, so a contending invocation fails fast instead of queuing
+    behind a possibly slow send.
+
+    Locks are scoped by the lock file's path, which callers derive from the
+    workspace's own runtime root — so separate workspaces use separate lock
+    files and never contend with each other.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._handle: Any | None = None
+
+    def __enter__(self) -> "WorkspaceDeliveryLock":
+        try:
+            handle = open(self.path, "a+")
+        except OSError as exc:
+            raise ProactiveDeliveryLockError(
+                f"proactive delivery lock file is unusable: {self.path}: {exc}"
+            ) from exc
+
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            raise ProactiveDeliveryLockContended(
+                "another proactive delivery process is already running for "
+                f"this workspace: {self.path}"
+            )
+        except OSError as exc:
+            handle.close()
+            raise ProactiveDeliveryLockError(
+                f"proactive delivery lock could not be acquired: {self.path}: {exc}"
+            ) from exc
+
+        # Best-effort diagnostic content for operators inspecting the lock
+        # file directly; exclusion itself does not depend on this content.
+        try:
+            handle.seek(0)
+            handle.truncate()
+            handle.write(f"{os.getpid()}\n")
+            handle.flush()
+        except OSError:
+            pass
+
+        self._handle = handle
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._handle is None:
+            return
+        try:
+            fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._handle.close()
+            self._handle = None
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix=f".{path.name}.", suffix=".tmp", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(content)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+class FileDeliveryKeyStore:
+    """Durable delivery-key set that survives process restarts.
+
+    The scheduled trigger runs as a short-lived process on every invocation, so
+    the in-memory store from the deterministic coordinator is not sufficient in
+    production: duplicate suppression must persist across runs. Malformed state
+    fails closed rather than silently behaving as an empty store, which could
+    otherwise cause a duplicate send.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def contains(self, key: str) -> bool:
+        return key in self._read()
+
+    def add(self, key: str) -> None:
+        keys = self._read()
+        if key in keys:
+            return
+        keys.add(key)
+        _atomic_write(
+            self.path,
+            json.dumps({"keys": sorted(keys)}, indent=2, sort_keys=True) + "\n",
+        )
+
+    def _read(self) -> set[str]:
+        if not self.path.is_file():
+            return set()
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ProactiveDeliveryStorageError(
+                f"delivery key store is corrupt: {self.path}"
+            ) from exc
+        if not isinstance(payload, dict) or not isinstance(payload.get("keys"), list):
+            raise ProactiveDeliveryStorageError(
+                f"delivery key store has an unexpected shape: {self.path}"
+            )
+        return {str(item) for item in payload["keys"]}
+
+
+@dataclass(frozen=True, slots=True)
+class DeliveryStatusRecord:
+    """The most recent proactive-delivery outcome, for Mission Control visibility."""
+
+    kind: str
+    command: str
+    status: str
+    recorded_at: str
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "command": self.command,
+            "status": self.status,
+            "recorded_at": self.recorded_at,
+            "error": self.error,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "DeliveryStatusRecord":
+        return cls(
+            kind=str(data["kind"]),
+            command=str(data.get("command", "")),
+            status=str(data["status"]),
+            recorded_at=str(data["recorded_at"]),
+            error=(str(data["error"]) if data.get("error") not in (None, "") else None),
+        )
+
+
+FAILING_DELIVERY_STATUSES = {
+    "generation_failed",
+    "delivery_failed",
+    "configuration_blocked",
+}
+
+
+def describe_delivery_status(record: DeliveryStatusRecord | None) -> dict[str, Any]:
+    """Render a Mission Control connection entry from the latest delivery record."""
+
+    if record is None:
+        return {
+            "state": "not_connected",
+            "evidence": "No proactive delivery has been attempted yet.",
+        }
+    state = "degraded" if record.status in FAILING_DELIVERY_STATUSES else "connected"
+    evidence = (
+        f"{record.kind}:{record.command} -> {record.status}"
+        if record.command
+        else f"{record.kind} -> {record.status}"
+    )
+    if record.error:
+        evidence += f" ({record.error})"
+    return {"state": state, "evidence": evidence, "last_checked_at": record.recorded_at}
+
+
+class LatestDeliveryStatusStore:
+    """Derived current-state snapshot of the most recent proactive delivery attempt.
+
+    This is not an audit history; it is a small atomic-write current-state file
+    in the same style as other repository snapshots. The append-only event log
+    remains the immutable evidence trail.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def record(self, status: DeliveryStatusRecord) -> None:
+        _atomic_write(
+            self.path,
+            json.dumps(status.to_dict(), indent=2, sort_keys=True) + "\n",
+        )
+
+    def read(self) -> DeliveryStatusRecord | None:
+        if not self.path.is_file():
+            return None
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ProactiveDeliveryStorageError(
+                f"proactive delivery status is corrupt: {self.path}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise ProactiveDeliveryStorageError(
+                f"proactive delivery status has an unexpected shape: {self.path}"
+            )
+        try:
+            return DeliveryStatusRecord.from_dict(data)
+        except KeyError as exc:
+            raise ProactiveDeliveryStorageError(
+                f"proactive delivery status is missing a field: {exc}"
+            ) from exc
+
+
+class FileLastEscalationStore:
+    """Durable per-workspace last-escalation timestamps for interruption thresholds."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+    def read(self, workspace_id: str) -> datetime | None:
+        value = self._read_all().get(workspace_id)
+        if value is None:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError as exc:
+            raise ProactiveDeliveryStorageError(
+                f"invalid last-escalation timestamp: {value}"
+            ) from exc
+
+    def write(self, workspace_id: str, when: datetime) -> None:
+        entries = self._read_all()
+        entries[workspace_id] = when.isoformat()
+        _atomic_write(
+            self.path,
+            json.dumps(entries, indent=2, sort_keys=True) + "\n",
+        )
+
+    def _read_all(self) -> dict[str, str]:
+        if not self.path.is_file():
+            return {}
+        try:
+            data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ProactiveDeliveryStorageError(
+                f"last-escalation store is corrupt: {self.path}"
+            ) from exc
+        if not isinstance(data, dict):
+            raise ProactiveDeliveryStorageError(
+                f"last-escalation store has an unexpected shape: {self.path}"
+            )
+        return {str(key): str(value) for key, value in data.items()}
+
+
+@dataclass(frozen=True)
+class EscalationResult:
+    workspace_id: str
+    chat_id: str
+    status: str
+    attempts: int
+    material_count: int
+    digest_key: str
+    error: str | None = None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "workspace_id": self.workspace_id,
+            "chat_id": self.chat_id,
+            "status": self.status,
+            "attempts": self.attempts,
+            "material_count": self.material_count,
+            "digest_key": self.digest_key,
+            "error": self.error,
+        }
+
+
+class MaterialEscalationService:
+    """Escalate new Mission Control blockers/approvals to Matt.
+
+    Escalation is content-deduplicated (the same set of blockers/approvals is
+    never re-sent) and rate-limited by a minimum interruption interval, so a
+    burst of new material events collapses into one bounded, evidence-backed
+    message rather than paging Matt once per item.
+    """
+
+    def __init__(
+        self,
+        *,
+        mission_control_loader: MissionControlLoader,
+        send_message: MessageSender,
+        key_store: DeliveryKeyStore,
+        last_sent_store: FileLastEscalationStore,
+        record_event: EventRecorder,
+        clock: Clock | None = None,
+        max_attempts: int = 3,
+        min_interval_seconds: int = 1800,
+    ) -> None:
+        if max_attempts < 1:
+            raise ValueError("max_attempts must be at least 1")
+        if min_interval_seconds < 0:
+            raise ValueError("min_interval_seconds must not be negative")
+        self.mission_control_loader = mission_control_loader
+        self.send_message = send_message
+        self.key_store = key_store
+        self.last_sent_store = last_sent_store
+        self.record_event = record_event
+        self.clock = clock or datetime.now
+        self.max_attempts = max_attempts
+        self.min_interval_seconds = min_interval_seconds
+        self.dispatcher = IdempotentDispatcher(key_store=key_store)
+
+    def escalate(self, *, workspace_id: str, chat_id: str) -> EscalationResult:
+        if not workspace_id.strip():
+            raise ValueError("workspace_id is required")
+        if not chat_id.strip():
+            raise ValueError("chat_id is required")
+
+        try:
+            snapshot = self.mission_control_loader()
+        except Exception as exc:
+            result = EscalationResult(
+                workspace_id, chat_id, "generation_failed", 0, 0, "", error=str(exc)
+            )
+            self._record("executive_escalation.generation_failed", result)
+            return result
+
+        materials = sorted(set(snapshot.blockers) | set(snapshot.approvals_required))
+        if not materials:
+            result = EscalationResult(workspace_id, chat_id, "no_new_material", 0, 0, "")
+            self._record("executive_escalation.no_new_material", result)
+            return result
+
+        digest_key = self.build_digest_key(workspace_id=workspace_id, materials=materials)
+        if self.dispatcher.is_duplicate(digest_key):
+            result = EscalationResult(
+                workspace_id, chat_id, "duplicate_suppressed", 0, len(materials), digest_key
+            )
+            self._record("executive_escalation.suppressed", result)
+            return result
+
+        now = self.clock()
+        last_sent = self.last_sent_store.read(workspace_id)
+        if last_sent is not None and (now - last_sent).total_seconds() < self.min_interval_seconds:
+            result = EscalationResult(
+                workspace_id, chat_id, "rate_limited", 0, len(materials), digest_key
+            )
+            self._record("executive_escalation.rate_limited", result)
+            return result
+
+        message = self._render(materials)
+        outcome = self.dispatcher.send_with_retry(
+            lambda: self.send_message(chat_id, message),
+            max_attempts=self.max_attempts,
+        )
+        if outcome.status == "sent":
+            self.dispatcher.mark_used(digest_key)
+            self.last_sent_store.write(workspace_id, now)
+            result = EscalationResult(
+                workspace_id, chat_id, "escalated", outcome.attempts, len(materials), digest_key
+            )
+            self._record("executive_escalation.sent", result)
+            return result
+
+        result = EscalationResult(
+            workspace_id,
+            chat_id,
+            "delivery_failed",
+            outcome.attempts,
+            len(materials),
+            digest_key,
+            error=outcome.error,
+        )
+        self._record("executive_escalation.delivery_failed", result)
+        return result
+
+    @staticmethod
+    def build_digest_key(*, workspace_id: str, materials: Iterable[str]) -> str:
+        digest = hashlib.sha256("\n".join(materials).encode("utf-8")).hexdigest()
+        return f"{workspace_id.strip()}:material:{digest}"
+
+    @staticmethod
+    def _render(materials: list[str]) -> str:
+        lines = ["Material escalation — Matt review needed:"]
+        lines.extend(f"- {item}" for item in materials[:10])
+        if len(materials) > 10:
+            lines.append(f"...and {len(materials) - 10} more.")
+        return "\n".join(lines)[:3500]
+
+    def _record(self, event_type: str, result: EscalationResult) -> None:
         self.record_event(
             {
                 "event_type": event_type,

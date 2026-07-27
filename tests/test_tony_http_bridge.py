@@ -12,9 +12,14 @@ from openclaw.tony_http_bridge import (
     build_brief_archive,
     build_github_work_loader,
     build_mission_control_loader,
+    build_proactive_delivery_status_loader,
 )
 from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
 from runtime.mission_control import MissionControlBuilder
+from runtime.proactive_executive_delivery import (
+    DeliveryStatusRecord,
+    LatestDeliveryStatusStore,
+)
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import TonyCommandService
@@ -179,6 +184,100 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertIn("Mission Control is blocked", response["reply"])
         self.assertIn("connection:runtime-gateway:degraded", response["reply"])
         self.assertEqual(transport.calls, [])
+
+    def test_mission_snapshot_reports_proactive_delivery_not_connected_by_default(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        loader = build_mission_control_loader(
+            progress_engine,
+            lambda: [object_record()],
+            "http://127.0.0.1:1/health",
+        )
+        snapshot = loader()
+        proactive = next(c for c in snapshot.connections if c.name == "proactive-delivery")
+        self.assertEqual(proactive.state, "not_connected")
+
+    def test_mission_snapshot_surfaces_proactive_delivery_status_loader(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+        loader = build_mission_control_loader(
+            progress_engine,
+            lambda: [object_record()],
+            "http://127.0.0.1:1/health",
+            None,
+            None,
+            None,
+            lambda: {"state": "connected", "evidence": "brief:morning -> delivered"},
+        )
+        snapshot = loader()
+        proactive = next(c for c in snapshot.connections if c.name == "proactive-delivery")
+        self.assertEqual(proactive.state, "connected")
+        self.assertEqual(proactive.evidence, "brief:morning -> delivered")
+
+    def test_mission_snapshot_fails_closed_when_proactive_delivery_loader_breaks(self):
+        validator = GrowthObjectValidator.from_path(SCHEMA_PATH)
+        progress_engine = RepositoryProgressEngine(validator)
+
+        def broken_loader():
+            raise ValueError("status file is corrupt")
+
+        loader = build_mission_control_loader(
+            progress_engine,
+            lambda: [object_record()],
+            "http://127.0.0.1:1/health",
+            None,
+            None,
+            None,
+            broken_loader,
+        )
+        snapshot = loader()
+        proactive = next(c for c in snapshot.connections if c.name == "proactive-delivery")
+        self.assertEqual(proactive.state, "degraded")
+        self.assertIn("status file is corrupt", proactive.evidence)
+        self.assertIn(
+            "connection:proactive-delivery:degraded", snapshot.blockers
+        )
+
+    def test_build_proactive_delivery_status_loader_reflects_latest_recorded_status(self):
+        with tempfile.TemporaryDirectory() as directory:
+            runtime_root = Path(directory)
+            WorkspaceRuntimeManager(runtime_root, ROOT).create(
+                "proactive-workspace", "proactive-client", "Proactive Workspace"
+            )
+            with mock.patch.dict(
+                os.environ, {"TONY_EXECUTIVE_WORKSPACE_ID": "proactive-workspace"}
+            ):
+                loader = build_proactive_delivery_status_loader(
+                    runtime_root=runtime_root, repository_root=ROOT
+                )
+                self.assertIsNotNone(loader)
+                self.assertEqual(loader()["state"], "not_connected")
+
+                workspace_runtime = WorkspaceRuntimeManager(runtime_root, ROOT).runtime(
+                    "proactive-workspace"
+                )
+                store = LatestDeliveryStatusStore(
+                    workspace_runtime.paths.root / "proactive-delivery" / "latest-status.json"
+                )
+                store.record(
+                    DeliveryStatusRecord(
+                        kind="brief",
+                        command="morning",
+                        status="delivered",
+                        recorded_at="2026-07-27T08:00:00+00:00",
+                    )
+                )
+                self.assertEqual(loader()["state"], "connected")
+
+    def test_build_proactive_delivery_status_loader_is_none_without_workspace_configuration(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop("TONY_EXECUTIVE_WORKSPACE_ID", None)
+                os.environ.pop("TONY_GITHUB_WORKSPACE_ID", None)
+                loader = build_proactive_delivery_status_loader(
+                    runtime_root=Path(directory), repository_root=ROOT
+                )
+                self.assertIsNone(loader)
 
     def test_diagnostics_command_reports_each_runtime_layer_without_gateway_dispatch(self):
         report = {
