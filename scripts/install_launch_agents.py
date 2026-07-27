@@ -15,10 +15,13 @@ class AgentSpec:
     arguments: tuple[str, ...]
     keep_alive: bool
     start_interval: int | None = None
+    start_calendar_interval: dict[str, int] | None = None
+    run_at_load: bool = True
 
 
 def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[AgentSpec, ...]:
     launcher = repo_root / "scripts" / "run_with_env.py"
+    proactive_brief = repo_root / "scripts" / "run_proactive_brief.py"
     return (
         AgentSpec(
             "com.narratiive.runtime",
@@ -34,7 +37,41 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
             "com.narratiive.service-supervisor",
             (str(python_path), str(launcher), str(env_file), str(python_path), str(repo_root / "scripts" / "service_supervisor.py")),
             False,
-            60,
+            start_interval=60,
+        ),
+        AgentSpec(
+            "com.narratiive.proactive-morning",
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(proactive_brief),
+                "--mode",
+                "both",
+                "--command",
+                "morning",
+            ),
+            False,
+            start_calendar_interval={"Hour": 8, "Minute": 0},
+            run_at_load=False,
+        ),
+        AgentSpec(
+            "com.narratiive.proactive-evening",
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(proactive_brief),
+                "--mode",
+                "both",
+                "--command",
+                "evening",
+            ),
+            False,
+            start_calendar_interval={"Hour": 18, "Minute": 0},
+            run_at_load=False,
         ),
     )
 
@@ -44,7 +81,7 @@ def render_plist(spec: AgentSpec, repo_root: Path, log_dir: Path) -> bytes:
         "Label": spec.label,
         "ProgramArguments": list(spec.arguments),
         "WorkingDirectory": str(repo_root),
-        "RunAtLoad": True,
+        "RunAtLoad": spec.run_at_load,
         "KeepAlive": spec.keep_alive,
         "ProcessType": "Background",
         "StandardOutPath": str(log_dir / f"{spec.label}.out.log"),
@@ -52,6 +89,8 @@ def render_plist(spec: AgentSpec, repo_root: Path, log_dir: Path) -> bytes:
     }
     if spec.start_interval is not None:
         payload["StartInterval"] = spec.start_interval
+    if spec.start_calendar_interval is not None:
+        payload["StartCalendarInterval"] = spec.start_calendar_interval
     return plistlib.dumps(payload, fmt=plistlib.FMT_XML, sort_keys=True)
 
 
@@ -67,6 +106,8 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
         raise FileNotFoundError("runtime/server.py not found in repository root")
     if not (repo_root / "openclaw" / "tony_live_bridge.py").is_file():
         raise FileNotFoundError("Tony live bridge not found")
+    if not (repo_root / "scripts" / "run_proactive_brief.py").is_file():
+        raise FileNotFoundError("proactive brief runner not found")
     if not python_path.is_file():
         raise FileNotFoundError(f"Python executable not found: {python_path}")
     if not env_file.is_file():
@@ -96,6 +137,8 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
     uid = os.getuid()
     removed: list[Path] = []
     for label in (
+        "com.narratiive.proactive-evening",
+        "com.narratiive.proactive-morning",
         "com.narratiive.service-supervisor",
         "com.narratiive.tony-http-bridge",
         "com.narratiive.runtime",
