@@ -19,6 +19,10 @@ class TonyTerminologyCommandService:
     def mission_control_loader(self):
         return self.command_service.mission_control_loader
 
+    @property
+    def github_configured(self) -> bool:
+        return bool(getattr(self.command_service, "github_configured", False))
+
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
