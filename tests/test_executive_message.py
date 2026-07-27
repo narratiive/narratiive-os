@@ -38,18 +38,22 @@ class ExecutiveMessageTests(unittest.TestCase):
             },
         )
 
-    def test_compact_render_uses_business_language_only(self):
+    def test_compact_render_is_decision_first_and_business_facing(self):
         message = build_executive_message(
             observation="The Blueprint is ready for review.",
             implication="Client delivery is one decision away.",
             recommendation="Review and approve the Blueprint.",
             human_effort="15 minutes",
             evidence=["artifact:rave:blueprint:v3"],
+            urgency=ExecutiveUrgency.TODAY,
         )
 
         rendered = message.render_compact()
+        self.assertTrue(rendered.startswith("Tony's read:"))
         self.assertIn("Why it matters:", rendered)
-        self.assertIn("Recommendation:", rendered)
+        self.assertIn("Best next move:", rendered)
+        self.assertIn("Your part:", rendered)
+        self.assertIn("Confidence: high · Urgency: today", rendered)
         self.assertNotIn("Traceback", rendered)
         self.assertNotIn("provider", rendered.lower())
 
