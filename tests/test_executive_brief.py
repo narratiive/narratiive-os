@@ -3,20 +3,20 @@ import unittest
 from runtime.executive_brief import BriefPeriod, ExecutiveBriefService
 from runtime.mission_control import MissionControlBuilder, WorkstreamStatus
 from runtime.progress_engine import ProgressSnapshot
-from runtime.repository_validator import ValidationReport
+from runtime.repository_validator import ValidationFinding, ValidationReport
 
 
 class ExecutiveBriefServiceTests(unittest.TestCase):
     @staticmethod
-    def progress(status="healthy"):
+    def progress(status="healthy", warnings=()):
         return ProgressSnapshot(
             status=status,
             campaigns=(),
             validation=ValidationReport(
-                status="pass",
+                status="warn" if warnings else "pass",
                 objects_validated=0,
                 errors=(),
-                warnings=(),
+                warnings=warnings,
             ),
         )
 
@@ -42,8 +42,9 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertTrue(brief.priorities[2].startswith("Known work"))
         self.assertEqual(brief.completed, ())
         self.assertEqual(brief.open_items, ())
+        self.assertEqual(len(brief.tony_handling), 2)
 
-    def test_evening_brief_separates_completed_and_open_work(self):
+    def test_evening_brief_separates_completed_remaining_and_carry_forward(self):
         snapshot = self.builder.build(
             generated_at="2026-07-24T19:00:00Z",
             progress=self.progress(),
@@ -56,6 +57,7 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertEqual(brief.priorities, ())
         self.assertEqual(brief.completed, ("Tested work: tested — commit:abc",))
         self.assertEqual(brief.open_items, ("Open work (Tony) — Run acceptance",))
+        self.assertEqual(brief.carry_forward, ("Open work (Tony) — Run acceptance",))
 
     def test_brief_preserves_recorded_blockers_and_approvals(self):
         snapshot = self.builder.build(
@@ -71,7 +73,24 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertEqual(brief.approvals, ("approve release",))
         self.assertEqual(brief.executive.urgency.value, "today")
 
-    def test_compact_render_contains_only_period_relevant_sections(self):
+    def test_compact_morning_render_uses_managerial_sections(self):
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T08:00:00Z",
+            progress=self.progress(),
+            workstreams=(
+                WorkstreamStatus("active", "Active work", "functional", "Tony", "Run acceptance"),
+            ),
+            recent_wins=("Bridge health verified",),
+        )
+        output = self.service.build(snapshot, BriefPeriod.MORNING).render_compact()
+        self.assertIn("Morning brief", output)
+        self.assertIn("Today's focus:", output)
+        self.assertIn("What changed:", output)
+        self.assertIn("Tony is handling:", output)
+        self.assertNotIn("Observation:", output)
+        self.assertNotIn("GitHub:", output)
+
+    def test_compact_evening_render_contains_only_period_relevant_sections(self):
         snapshot = self.builder.build(
             generated_at="2026-07-24T19:00:00Z",
             progress=self.progress(),
@@ -82,9 +101,33 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         output = self.service.build(snapshot, BriefPeriod.EVENING).render_compact()
         self.assertIn("End-of-day review", output)
         self.assertIn("Completed:", output)
-        self.assertNotIn("Priorities:", output)
+        self.assertNotIn("Today's focus:", output)
+        self.assertNotIn("Tony is handling:", output)
 
-    def test_empty_state_does_not_invent_work(self):
+    def test_system_watchouts_are_separate_from_operational_content(self):
+        warning = ValidationFinding(
+            code="stale-index",
+            message="Index is stale",
+            location="repository",
+        )
+        snapshot = self.builder.build(
+            generated_at="2026-07-24T08:00:00Z",
+            progress=self.progress(warnings=(warning,)),
+            connections={
+                "notion": {
+                    "state": "not_connected",
+                    "evidence": "credential not configured",
+                }
+            },
+        )
+        brief = self.service.build(snapshot, BriefPeriod.MORNING)
+        self.assertIn("notion: not_connected — credential not configured", brief.system_watchouts)
+        self.assertIn("Repository: stale-index", brief.system_watchouts)
+        output = brief.render_compact()
+        self.assertIn("Watch-outs:", output)
+        self.assertNotIn("Tony's recommendation:", output)
+
+    def test_empty_state_does_not_invent_work_or_strategy(self):
         snapshot = self.builder.build(
             generated_at="2026-07-24T08:00:00Z",
             progress=self.progress(status="empty"),
@@ -93,6 +136,9 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertEqual(brief.priorities, ())
         self.assertEqual(brief.completed, ())
         self.assertIn("no active workstream", brief.executive.observation.lower())
+        output = brief.render_compact()
+        self.assertIn("No evidence-backed operational work is currently recorded.", output)
+        self.assertNotIn("Tony's recommendation:", output)
 
     def test_compact_render_is_bounded(self):
         snapshot = self.builder.build(
