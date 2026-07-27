@@ -13,7 +13,7 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
             status=status,
             campaigns=(),
             validation=ValidationReport(
-                status="warn" if warnings else "pass",
+                status="pass",
                 objects_validated=0,
                 errors=(),
                 warnings=warnings,
@@ -106,9 +106,10 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
 
     def test_system_watchouts_are_separate_from_operational_content(self):
         warning = ValidationFinding(
+            severity="warning",
             code="stale-index",
             message="Index is stale",
-            location="repository",
+            path="repository",
         )
         snapshot = self.builder.build(
             generated_at="2026-07-24T08:00:00Z",
