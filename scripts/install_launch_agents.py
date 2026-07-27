@@ -30,7 +30,7 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
         ),
         AgentSpec(
             "com.narratiive.tony-http-bridge",
-            (str(python_path), str(launcher), str(env_file), str(python_path), str(repo_root / "openclaw" / "tony_live_bridge.py")),
+            (str(python_path), str(launcher), str(env_file), str(python_path), "-m", "openclaw.tony_live_bridge"),
             True,
         ),
         AgentSpec(
