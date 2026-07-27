@@ -33,6 +33,10 @@ class ExecutiveBrief:
     approvals: tuple[str, ...]
     executive: ExecutiveMessage
     github_work: GitHubWorkSnapshot | None = None
+    changed: tuple[str, ...] = ()
+    tony_handling: tuple[str, ...] = ()
+    carry_forward: tuple[str, ...] = ()
+    system_watchouts: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -44,6 +48,10 @@ class ExecutiveBrief:
             "open_items": list(self.open_items),
             "blockers": list(self.blockers),
             "approvals": list(self.approvals),
+            "changed": list(self.changed),
+            "tony_handling": list(self.tony_handling),
+            "carry_forward": list(self.carry_forward),
+            "system_watchouts": list(self.system_watchouts),
             "executive": self.executive.to_dict(),
             "github_work": (
                 self.github_work.to_dict() if self.github_work is not None else None
@@ -52,43 +60,47 @@ class ExecutiveBrief:
 
     def render_compact(self, limit: int = 3500) -> str:
         heading = "Morning brief" if self.period is BriefPeriod.MORNING else "End-of-day review"
-        lines = [f"{heading} — {self.status}", self.executive.render_compact()]
+        lines = [f"{heading} — {self.status}"]
 
         if self.period is BriefPeriod.MORNING:
-            self._append(lines, "Priorities", self.priorities)
+            self._append(lines, "Today's focus", self.priorities)
+            self._append(lines, "What changed", self.changed)
+            self._append(lines, "Tony is handling", self.tony_handling)
+            self._append(lines, "Approvals needed", self.approvals)
+            self._append(lines, "Blockers", self.blockers)
+            self._append(lines, "Watch-outs", self.system_watchouts)
         else:
             self._append(lines, "Completed", self.completed)
-            self._append(lines, "Still open", self.open_items)
+            self._append(lines, "Progressed", self.changed)
+            self._append(lines, "Remaining", self.open_items)
+            self._append(lines, "Carry into tomorrow", self.carry_forward)
+            self._append(lines, "Decisions", self.approvals)
+            self._append(lines, "Blockers", self.blockers)
+            self._append(lines, "Watch-outs", self.system_watchouts)
 
-        self._append(lines, "Blockers", self.blockers)
-        self._append(lines, "Approvals", self.approvals)
-        if self.github_work is not None:
-            github = self.github_work
-            lines.append(
-                "GitHub: "
-                f"{len(github.open_pull_requests)} open PR(s), "
-                f"{len(github.active_issues)} active issue(s), "
-                f"{len(github.blocked)} blocked, "
-                f"{len(github.matt_approval_required)} Matt review(s)."
-            )
-            if github.changes_since_previous_brief:
-                self._append(
-                    lines,
-                    "Changed since previous brief",
-                    tuple(
-                        f"{change.action}: #{change.item.number} {change.item.title}"
-                        for change in github.changes_since_previous_brief
-                    ),
-                )
-            elif github.baseline_status == "unavailable":
-                lines.append("Changed since previous brief: baseline unavailable.")
-            else:
-                lines.append("Changed since previous brief: no material changes.")
+        if self._has_operational_content():
+            lines.append(f"Tony's recommendation: {self.executive.recommendation}")
+        elif len(lines) == 1:
+            lines.append("No evidence-backed operational work is currently recorded.")
 
         output = "\n".join(lines)
         if len(output) <= limit:
             return output
         return output[: limit - 1].rstrip() + "…"
+
+    def _has_operational_content(self) -> bool:
+        return any(
+            (
+                self.priorities,
+                self.completed,
+                self.open_items,
+                self.blockers,
+                self.approvals,
+                self.changed,
+                self.tony_handling,
+                self.carry_forward,
+            )
+        )
 
     @staticmethod
     def _append(lines: list[str], heading: str, values: tuple[str, ...]) -> None:
@@ -110,18 +122,28 @@ class ExecutiveBriefService:
     def build(self, snapshot: MissionControlSnapshot, period: BriefPeriod) -> ExecutiveBrief:
         executive = self._mission_control.respond(snapshot).executive
         ordered = sorted(snapshot.workstreams, key=self._priority_key)
+        active = tuple(
+            item for item in ordered if item.state not in {"tested", "used", "unknown"}
+        )
 
-        priorities = tuple(self._work_line(item) for item in ordered[: self.PRIORITY_LIMIT])
+        priorities = tuple(self._work_line(item) for item in active[: self.PRIORITY_LIMIT])
         completed = tuple(
             self._completion_line(item)
             for item in snapshot.workstreams
             if item.state in {"tested", "used"}
         )[: self.ITEM_LIMIT]
-        open_items = tuple(
+        open_items = tuple(self._work_line(item) for item in active)[: self.ITEM_LIMIT]
+        tony_handling = tuple(
             self._work_line(item)
-            for item in ordered
-            if item.state not in {"tested", "used"}
+            for item in active
+            if item.owner.strip().casefold() == "tony"
         )[: self.ITEM_LIMIT]
+        changed = self._changes(snapshot)
+        carry_forward = tuple(
+            self._work_line(item)
+            for item in active
+            if item.state in {"blocked", "known", "functional"}
+        )[: self.PRIORITY_LIMIT]
 
         return ExecutiveBrief(
             period=period,
@@ -134,7 +156,41 @@ class ExecutiveBriefService:
             approvals=tuple(snapshot.approvals_required[: self.ITEM_LIMIT]),
             executive=executive,
             github_work=snapshot.github_work,
+            changed=changed,
+            tony_handling=tony_handling if period is BriefPeriod.MORNING else (),
+            carry_forward=carry_forward if period is BriefPeriod.EVENING else (),
+            system_watchouts=self._system_watchouts(snapshot),
         )
+
+    @classmethod
+    def _changes(cls, snapshot: MissionControlSnapshot) -> tuple[str, ...]:
+        changes: list[str] = list(snapshot.recent_wins)
+        if snapshot.github_work is not None:
+            changes.extend(
+                f"{change.action}: #{change.item.number} {change.item.title}"
+                for change in snapshot.github_work.changes_since_previous_brief
+            )
+        return tuple(dict.fromkeys(changes))[: cls.ITEM_LIMIT]
+
+    @classmethod
+    def _system_watchouts(cls, snapshot: MissionControlSnapshot) -> tuple[str, ...]:
+        watchouts: list[str] = []
+        for item in snapshot.connections:
+            if item.state in {"not_connected", "degraded", "unknown"}:
+                detail = f" — {item.evidence}" if item.evidence else ""
+                watchouts.append(f"{item.name}: {item.state}{detail}")
+        validation = snapshot.progress.get("validation", {})
+        if isinstance(validation, dict):
+            warnings = validation.get("warnings", ())
+            if isinstance(warnings, (list, tuple)):
+                for warning in warnings:
+                    if isinstance(warning, dict):
+                        code = str(warning.get("code", "repository warning"))
+                    else:
+                        code = str(warning)
+                    if code.strip():
+                        watchouts.append(f"Repository: {code.strip()}")
+        return tuple(dict.fromkeys(watchouts))[: cls.ITEM_LIMIT]
 
     @staticmethod
     def _priority_key(item: WorkstreamStatus) -> tuple[int, str]:
