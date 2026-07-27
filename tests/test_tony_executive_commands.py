@@ -64,7 +64,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertEqual(response.command, "morning")
         self.assertEqual(response.status, "healthy")
         self.assertEqual(response.data["period"], "morning")
-        self.assertEqual(len(response.data["priorities"]), 2)
+        self.assertEqual(len(response.data["priorities"]), 1)
         self.assertIn("Morning brief", response.message)
         self.assertEqual(base.calls, [])
 

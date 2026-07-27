@@ -90,7 +90,7 @@ class MissionControlServiceTests(unittest.TestCase):
         )
         reply = self.service.telegram_reply(snapshot)
         self.assertIn("Why it matters:", reply)
-        self.assertIn("Recommendation:", reply)
+        self.assertIn("Best next move:", reply)
         self.assertIn("Blockers:", reply)
         self.assertIn("workstream:telegram:live_runtime_stale", reply)
         self.assertIn("Approvals:", reply)
