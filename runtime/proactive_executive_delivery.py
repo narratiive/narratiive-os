@@ -59,6 +59,61 @@ class InMemoryDeliveryKeyStore:
         self._keys.add(key)
 
 
+@dataclass(frozen=True, slots=True)
+class DispatchOutcome:
+    """The result of one bounded-retry send attempt, before any evidence is built."""
+
+    status: str  # "sent" | "failed"
+    attempts: int
+    error: str | None = None
+
+
+class IdempotentDispatcher:
+    """The bounded-retry, key-deduplicated send mechanics shared by every
+    proactive delivery flow.
+
+    This is deliberately the smallest possible extraction: once a caller has
+    decided *what* to send and *which key* identifies "already sent," this
+    class owns the part that was previously duplicated between
+    ``ProactiveExecutiveDeliveryService`` and ``MaterialEscalationService`` —
+    checking the idempotency key, retrying a transient send failure up to a
+    bounded attempt limit, and marking the key used only once a send actually
+    succeeds. It has no knowledge of briefs, escalations, channels, rendering,
+    interruption policy, or evidence recording; those all remain the caller's
+    responsibility so this PR does not change any observable behaviour.
+    """
+
+    def __init__(self, *, key_store: DeliveryKeyStore) -> None:
+        self.key_store = key_store
+
+    def is_duplicate(self, key: str) -> bool:
+        return self.key_store.contains(key)
+
+    def send_with_retry(
+        self,
+        send: Callable[[], None],
+        *,
+        max_attempts: int,
+    ) -> DispatchOutcome:
+        last_error: Exception | None = None
+        for attempt in range(1, max_attempts + 1):
+            try:
+                send()
+            except Exception as exc:  # transport boundary; exact provider errors vary
+                last_error = exc
+                continue
+            return DispatchOutcome(status="sent", attempts=attempt)
+
+        return DispatchOutcome(
+            status="failed",
+            attempts=max_attempts,
+            error=str(last_error) if last_error else "unknown delivery failure",
+        )
+
+    def mark_used(self, key: str) -> None:
+        self.key_store.add(key)
+
+
 class ProactiveExecutiveDeliveryService:
     """Deliver trusted executive briefs once, with bounded retries and evidence."""
 
@@ -82,6 +137,7 @@ class ProactiveExecutiveDeliveryService:
         self.record_event = record_event
         self.clock = clock or datetime.now
         self.max_attempts = max_attempts
+        self.dispatcher = IdempotentDispatcher(key_store=key_store)
 
     def deliver(
         self,
@@ -106,7 +162,7 @@ class ProactiveExecutiveDeliveryService:
             command=canonical_command,
             delivery_date=scheduled_date,
         )
-        if self.key_store.contains(delivery_key):
+        if self.dispatcher.is_duplicate(delivery_key):
             result = ProactiveDeliveryResult(
                 delivery_key=delivery_key,
                 status="duplicate_suppressed",
@@ -132,19 +188,16 @@ class ProactiveExecutiveDeliveryService:
             self._record("executive_brief.delivery_failed", result)
             return result
 
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                self.send_message(chat_id, response.message)
-            except Exception as exc:  # transport boundary; exact provider errors vary
-                last_error = exc
-                continue
-
-            self.key_store.add(delivery_key)
+        outcome = self.dispatcher.send_with_retry(
+            lambda: self.send_message(chat_id, response.message),
+            max_attempts=self.max_attempts,
+        )
+        if outcome.status == "sent":
+            self.dispatcher.mark_used(delivery_key)
             result = ProactiveDeliveryResult(
                 delivery_key=delivery_key,
                 status="delivered",
-                attempts=attempt,
+                attempts=outcome.attempts,
                 command=canonical_command,
                 workspace_id=workspace_id,
                 chat_id=chat_id,
@@ -155,11 +208,11 @@ class ProactiveExecutiveDeliveryService:
         result = ProactiveDeliveryResult(
             delivery_key=delivery_key,
             status="delivery_failed",
-            attempts=self.max_attempts,
+            attempts=outcome.attempts,
             command=canonical_command,
             workspace_id=workspace_id,
             chat_id=chat_id,
-            error=str(last_error) if last_error else "unknown delivery failure",
+            error=outcome.error,
         )
         self._record("executive_brief.delivery_failed", result)
         return result
@@ -435,6 +488,7 @@ class MaterialEscalationService:
         self.clock = clock or datetime.now
         self.max_attempts = max_attempts
         self.min_interval_seconds = min_interval_seconds
+        self.dispatcher = IdempotentDispatcher(key_store=key_store)
 
     def escalate(self, *, workspace_id: str, chat_id: str) -> EscalationResult:
         if not workspace_id.strip():
@@ -458,7 +512,7 @@ class MaterialEscalationService:
             return result
 
         digest_key = self.build_digest_key(workspace_id=workspace_id, materials=materials)
-        if self.key_store.contains(digest_key):
+        if self.dispatcher.is_duplicate(digest_key):
             result = EscalationResult(
                 workspace_id, chat_id, "duplicate_suppressed", 0, len(materials), digest_key
             )
@@ -475,18 +529,15 @@ class MaterialEscalationService:
             return result
 
         message = self._render(materials)
-        last_error: Exception | None = None
-        for attempt in range(1, self.max_attempts + 1):
-            try:
-                self.send_message(chat_id, message)
-            except Exception as exc:  # transport boundary; exact provider errors vary
-                last_error = exc
-                continue
-
-            self.key_store.add(digest_key)
+        outcome = self.dispatcher.send_with_retry(
+            lambda: self.send_message(chat_id, message),
+            max_attempts=self.max_attempts,
+        )
+        if outcome.status == "sent":
+            self.dispatcher.mark_used(digest_key)
             self.last_sent_store.write(workspace_id, now)
             result = EscalationResult(
-                workspace_id, chat_id, "escalated", attempt, len(materials), digest_key
+                workspace_id, chat_id, "escalated", outcome.attempts, len(materials), digest_key
             )
             self._record("executive_escalation.sent", result)
             return result
@@ -495,10 +546,10 @@ class MaterialEscalationService:
             workspace_id,
             chat_id,
             "delivery_failed",
-            self.max_attempts,
+            outcome.attempts,
             len(materials),
             digest_key,
-            error=str(last_error) if last_error else "unknown delivery failure",
+            error=outcome.error,
         )
         self._record("executive_escalation.delivery_failed", result)
         return result

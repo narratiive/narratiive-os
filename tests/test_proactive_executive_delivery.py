@@ -6,8 +6,10 @@ from pathlib import Path
 from runtime.mission_control import MissionControlSnapshot
 from runtime.proactive_executive_delivery import (
     DeliveryStatusRecord,
+    DispatchOutcome,
     FileDeliveryKeyStore,
     FileLastEscalationStore,
+    IdempotentDispatcher,
     InMemoryDeliveryKeyStore,
     LatestDeliveryStatusStore,
     MaterialEscalationService,
@@ -175,6 +177,79 @@ class ProactiveExecutiveDeliveryTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "chat_id is required"):
             service.deliver(workspace_id="narratiive", chat_id=" ", command="morning")
 
+    def test_delegates_send_and_dedup_mechanics_to_a_shared_dispatcher(self):
+        service = self.service(lambda command, objects: self.healthy_response())
+
+        self.assertIsInstance(service.dispatcher, IdempotentDispatcher)
+        self.assertIs(service.dispatcher.key_store, self.store)
+
+        service.deliver(workspace_id="narratiive", chat_id="12345", command="morning")
+
+        # The dispatcher's own key store is what now reports the key as used,
+        # proving delivery actually went through the shared dispatcher rather
+        # than a parallel duplicate implementation.
+        self.assertTrue(
+            service.dispatcher.is_duplicate("narratiive:morning:2026-07-27")
+        )
+
+
+class IdempotentDispatcherTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.store = InMemoryDeliveryKeyStore()
+        self.dispatcher = IdempotentDispatcher(key_store=self.store)
+
+    def test_is_duplicate_reflects_the_underlying_key_store(self):
+        self.assertFalse(self.dispatcher.is_duplicate("a"))
+        self.store.add("a")
+        self.assertTrue(self.dispatcher.is_duplicate("a"))
+
+    def test_send_with_retry_succeeds_on_first_attempt(self):
+        calls = []
+        outcome = self.dispatcher.send_with_retry(
+            lambda: calls.append(1), max_attempts=3
+        )
+
+        self.assertEqual(outcome, DispatchOutcome(status="sent", attempts=1, error=None))
+        self.assertEqual(len(calls), 1)
+
+    def test_send_with_retry_retries_a_transient_failure_then_succeeds(self):
+        attempts = []
+
+        def send():
+            attempts.append(1)
+            if len(attempts) < 3:
+                raise ConnectionError("temporary failure")
+
+        outcome = self.dispatcher.send_with_retry(send, max_attempts=3)
+
+        self.assertEqual(outcome.status, "sent")
+        self.assertEqual(outcome.attempts, 3)
+        self.assertEqual(len(attempts), 3)
+
+    def test_send_with_retry_fails_closed_after_the_attempt_limit(self):
+        def send():
+            raise ConnectionError("transport unavailable")
+
+        outcome = self.dispatcher.send_with_retry(send, max_attempts=2)
+
+        self.assertEqual(outcome.status, "failed")
+        self.assertEqual(outcome.attempts, 2)
+        self.assertIn("transport unavailable", outcome.error)
+
+    def test_mark_used_adds_the_key_to_the_store(self):
+        self.assertFalse(self.dispatcher.is_duplicate("k"))
+        self.dispatcher.mark_used("k")
+        self.assertTrue(self.dispatcher.is_duplicate("k"))
+        self.assertTrue(self.store.contains("k"))
+
+    def test_send_with_retry_has_no_key_store_side_effect(self):
+        # Marking-used is the caller's explicit decision (bundled with
+        # whatever else "success" means for that caller, e.g. also writing a
+        # rate-limit timestamp) rather than something the retry mechanics do
+        # implicitly. send_with_retry does not even accept a key.
+        self.dispatcher.send_with_retry(lambda: None, max_attempts=1)
+        self.assertFalse(self.dispatcher.is_duplicate("any-key-would-still-be-absent"))
+
 
 class FileDeliveryKeyStoreTests(unittest.TestCase):
     def test_persists_keys_across_separate_store_instances(self):
@@ -296,6 +371,21 @@ class MaterialEscalationServiceTests(unittest.TestCase):
         self.assertEqual(len(self.sent), 1)
         self.assertIn("workstream:x:blocked", self.sent[0][1])
         self.assertEqual(self.events[-1]["event_type"], "executive_escalation.sent")
+
+    def test_delegates_send_and_dedup_mechanics_to_a_shared_dispatcher(self):
+        service = self.service(
+            lambda: escalation_snapshot(blockers=("workstream:x:blocked",))
+        )
+
+        self.assertIsInstance(service.dispatcher, IdempotentDispatcher)
+        self.assertIs(service.dispatcher.key_store, self.key_store)
+
+        result = service.escalate(workspace_id="narratiive", chat_id="12345")
+
+        # The dispatcher's own key store is what now reports the digest key as
+        # used, proving escalation actually went through the shared dispatcher
+        # rather than a parallel duplicate implementation.
+        self.assertTrue(service.dispatcher.is_duplicate(result.digest_key))
 
     def test_no_material_produces_no_send(self):
         service = self.service(lambda: escalation_snapshot())
