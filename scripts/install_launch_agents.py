@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import plistlib
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -17,6 +19,12 @@ class AgentSpec:
     start_interval: int | None = None
     start_calendar_interval: dict[str, int] | None = None
     run_at_load: bool = True
+
+
+LEGACY_AGENT_LABELS = (
+    "com.narratiive.tony-lead-bridge",
+    "com.narratiive.tony-bridge",
+)
 
 
 def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[AgentSpec, ...]:
@@ -98,6 +106,56 @@ def _run(command: list[str]) -> None:
     subprocess.run(command, check=True)
 
 
+def _remove_legacy_agents(home: Path, uid: int, activate: bool) -> list[Path]:
+    agents_dir = home / "Library" / "LaunchAgents"
+    removed: list[Path] = []
+    for label in LEGACY_AGENT_LABELS:
+        target = agents_dir / f"{label}.plist"
+        if activate:
+            subprocess.run(
+                ["launchctl", "bootout", f"gui/{uid}/{label}"],
+                check=False,
+                capture_output=True,
+            )
+            if target.exists():
+                subprocess.run(
+                    ["launchctl", "bootout", f"gui/{uid}", str(target)],
+                    check=False,
+                    capture_output=True,
+                )
+        if target.exists():
+            target.unlink()
+            removed.append(target)
+    return removed
+
+
+def _write_deployment_receipt(repo_root: Path) -> Path:
+    revision = subprocess.run(
+        ("git", "rev-parse", "HEAD"),
+        cwd=repo_root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+    state_dir = repo_root / "runtime-state"
+    state_dir.mkdir(parents=True, exist_ok=True)
+    receipt = state_dir / "deployment.json"
+    temporary = receipt.with_suffix(".json.tmp")
+    temporary.write_text(
+        json.dumps(
+            {
+                "deployed_revision": revision,
+                "deployed_at": datetime.now(timezone.utc).isoformat(),
+                "status": "healthy",
+            },
+            sort_keys=True,
+        ),
+        encoding="utf-8",
+    )
+    temporary.replace(receipt)
+    return receipt
+
+
 def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, activate: bool) -> list[Path]:
     repo_root = repo_root.expanduser().resolve()
     python_path = python_path.expanduser().resolve()
@@ -121,6 +179,7 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
     log_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     uid = os.getuid()
+    _remove_legacy_agents(home, uid, activate)
     for spec in build_specs(repo_root, python_path, env_file):
         target = agents_dir / f"{spec.label}.plist"
         target.write_bytes(render_plist(spec, repo_root, log_dir))
@@ -129,6 +188,7 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
             domain = f"gui/{uid}"
             subprocess.run(["launchctl", "bootout", domain, str(target)], check=False, capture_output=True)
             _run(["launchctl", "bootstrap", domain, str(target)])
+    _write_deployment_receipt(repo_root)
     return written
 
 
@@ -142,10 +202,17 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
         "com.narratiive.service-supervisor",
         "com.narratiive.tony-http-bridge",
         "com.narratiive.runtime",
+        *LEGACY_AGENT_LABELS,
     ):
         target = agents_dir / f"{label}.plist"
-        if deactivate and target.exists():
-            subprocess.run(["launchctl", "bootout", f"gui/{uid}", str(target)], check=False, capture_output=True)
+        if deactivate:
+            subprocess.run(
+                ["launchctl", "bootout", f"gui/{uid}/{label}"],
+                check=False,
+                capture_output=True,
+            )
+            if target.exists():
+                subprocess.run(["launchctl", "bootout", f"gui/{uid}", str(target)], check=False, capture_output=True)
         if target.exists():
             target.unlink()
             removed.append(target)
