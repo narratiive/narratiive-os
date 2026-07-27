@@ -1,11 +1,13 @@
 from datetime import datetime, timedelta, timezone
-
-import pytest
+from unittest import TestCase
 
 from runtime.interruption_policy import (
     FixedCooldownInterruptionPolicy,
     InterruptionContext,
 )
+
+
+_ASSERTIONS = TestCase()
 
 
 def _context(
@@ -79,7 +81,7 @@ def test_zero_cooldown_sends_immediately() -> None:
 
 
 def test_rejects_incompatible_datetime_awareness() -> None:
-    with pytest.raises(ValueError, match="compatible timezone awareness"):
+    with _ASSERTIONS.assertRaisesRegex(ValueError, "compatible timezone awareness"):
         _context(
             now=datetime(2026, 7, 27, 17, 0, tzinfo=timezone.utc),
             last_sent_at=datetime(2026, 7, 27, 16, 30),
@@ -87,7 +89,7 @@ def test_rejects_incompatible_datetime_awareness() -> None:
 
 
 def test_rejects_blank_material_identity() -> None:
-    with pytest.raises(ValueError, match="material_ids"):
+    with _ASSERTIONS.assertRaisesRegex(ValueError, "material_ids"):
         _context(material_ids=("blocker:1", " "))
 
 
@@ -118,5 +120,5 @@ def test_equivalent_material_sets_produce_identical_policy_inputs() -> None:
 
 
 def test_rejects_negative_cooldown() -> None:
-    with pytest.raises(ValueError, match="must not be negative"):
+    with _ASSERTIONS.assertRaisesRegex(ValueError, "must not be negative"):
         FixedCooldownInterruptionPolicy(min_interval_seconds=-1)
