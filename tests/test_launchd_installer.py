@@ -39,7 +39,7 @@ class LaunchdInstallerTests(unittest.TestCase):
         )
         self.assertTrue(specs[0].keep_alive)
         self.assertTrue(specs[1].keep_alive)
-        self.assertEqual(specs[1].arguments[-1], "/repo/openclaw/tony_live_bridge.py")
+        self.assertEqual(specs[1].arguments[-2:], ("-m", "openclaw.tony_live_bridge"))
         self.assertFalse(specs[2].keep_alive)
         self.assertEqual(specs[2].start_interval, 60)
         self.assertEqual(specs[3].start_calendar_interval, {"Hour": 8, "Minute": 0})
