@@ -139,6 +139,22 @@ exits non-zero, records an immutable `configuration_blocked` event, and marks
 the `proactive-delivery` Mission Control connection `degraded` so a failure is
 an actionable blocker rather than a silent no-op.
 
+Two overlapping invocations for the same workspace (a manual run overlapping
+a scheduled one, or two schedulers misconfigured to both fire) cannot both
+pass duplicate suppression and send: each invocation takes an exclusive,
+non-blocking OS file lock at
+`<workspace runtime root>/proactive-delivery/proactive.lock` for the
+duration of its duplicate-check-to-evidence sequence. A contending
+invocation exits `0` with status `already_running` and sends nothing; it
+does not wait for the first to finish. The lock is released automatically
+on normal completion, on an unhandled exception, and on process crash (the
+kernel releases an `flock` held by a process that exits), so there is no
+stale-lock file to clean up. Separate workspaces use separate lock files and
+never contend with each other. If the lock file itself cannot be opened
+(for example an unwritable directory), the script fails closed with status
+`lock_unavailable` and marks the Mission Control connection `degraded`,
+distinct from ordinary benign contention.
+
 Run it directly for a manual or externally triggered send:
 
 ```bash

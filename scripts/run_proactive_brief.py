@@ -35,7 +35,10 @@ from runtime.proactive_executive_delivery import (  # noqa: E402
     FileLastEscalationStore,
     LatestDeliveryStatusStore,
     MaterialEscalationService,
+    ProactiveDeliveryLockContended,
+    ProactiveDeliveryLockError,
     ProactiveExecutiveDeliveryService,
+    WorkspaceDeliveryLock,
 )
 from runtime.progress_engine import RepositoryProgressEngine  # noqa: E402
 from runtime.repositories import WorkflowEvent  # noqa: E402
@@ -45,7 +48,19 @@ from runtime.tony_executive_commands import TonyExecutiveCommandService  # noqa:
 from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager  # noqa: E402
 
 
-FAILING_STATUSES = {"generation_failed", "delivery_failed", "configuration_blocked"}
+FAILING_STATUSES = {
+    "generation_failed",
+    "delivery_failed",
+    "configuration_blocked",
+    # A broken lock file environment (unwritable directory, path is not a
+    # regular file, ...) is a genuine operational problem, unlike ordinary
+    # lock contention below, and should surface as an actionable blocker.
+    "lock_unavailable",
+}
+# Another process for this workspace was already running the same sequence;
+# it exited without sending, exactly as intended. This is benign — treated
+# the same as duplicate_suppressed rather than as a failure.
+ALREADY_RUNNING_STATUS = "already_running"
 RUN_ID = "tony-proactive-delivery"
 
 
@@ -170,6 +185,14 @@ def _combined(*recorders: Callable[[dict[str, Any]], None]) -> Callable[[dict[st
     return record
 
 
+def _lock_path(workspace_runtime: RuntimeComponents) -> Path:
+    # One lock file per workspace, shared by brief and escalation delivery:
+    # only one proactive process for the workspace may be inside a
+    # duplicate-check -> send -> mark/evidence sequence at a time, regardless
+    # of which kind of proactive message it is sending.
+    return workspace_runtime.paths.root / "proactive-delivery" / "proactive.lock"
+
+
 def run_brief(*, command: str, simulate_transport_failure: bool) -> dict[str, Any]:
     runtime_root = Path(os.getenv("NARRATIIVE_RUNTIME_ROOT", ".runtime")).resolve()
     workspace_id = _workspace_id_from_env()
@@ -217,12 +240,36 @@ def run_brief(*, command: str, simulate_transport_failure: bool) -> dict[str, An
         record_event=recorder,
         max_attempts=int(os.getenv("TONY_PROACTIVE_MAX_ATTEMPTS", "3")),
     )
-    result = service.deliver(
-        workspace_id=workspace_id,
-        chat_id=telegram.config.default_chat_id,
-        command=command,
-    )
-    return result.to_dict()
+    try:
+        with WorkspaceDeliveryLock(_lock_path(workspace_runtime)):
+            result = service.deliver(
+                workspace_id=workspace_id,
+                chat_id=telegram.config.default_chat_id,
+                command=command,
+            )
+        return result.to_dict()
+    except ProactiveDeliveryLockContended as exc:
+        _event_recorder(workspace_runtime)(
+            {
+                "event_type": "executive_brief.delivery_already_running",
+                "command": command,
+                "status": ALREADY_RUNNING_STATUS,
+                "error": str(exc),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"status": ALREADY_RUNNING_STATUS, "command": command, "error": str(exc)}
+    except ProactiveDeliveryLockError as exc:
+        recorder(
+            {
+                "event_type": "executive_brief.delivery_blocked",
+                "command": command,
+                "status": "lock_unavailable",
+                "error": str(exc),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"status": "lock_unavailable", "command": command, "error": str(exc)}
 
 
 def run_escalation(*, simulate_transport_failure: bool) -> dict[str, Any]:
@@ -279,10 +326,34 @@ def run_escalation(*, simulate_transport_failure: bool) -> dict[str, Any]:
             os.getenv("TONY_PROACTIVE_ESCALATION_MIN_INTERVAL_SECONDS", "1800")
         ),
     )
-    result = service.escalate(
-        workspace_id=workspace_id, chat_id=telegram.config.default_chat_id
-    )
-    return result.to_dict()
+    try:
+        with WorkspaceDeliveryLock(_lock_path(workspace_runtime)):
+            result = service.escalate(
+                workspace_id=workspace_id, chat_id=telegram.config.default_chat_id
+            )
+        return result.to_dict()
+    except ProactiveDeliveryLockContended as exc:
+        _event_recorder(workspace_runtime)(
+            {
+                "event_type": "executive_escalation.delivery_already_running",
+                "command": "escalation",
+                "status": ALREADY_RUNNING_STATUS,
+                "error": str(exc),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"status": ALREADY_RUNNING_STATUS, "error": str(exc)}
+    except ProactiveDeliveryLockError as exc:
+        recorder(
+            {
+                "event_type": "executive_escalation.delivery_blocked",
+                "command": "escalation",
+                "status": "lock_unavailable",
+                "error": str(exc),
+                "recorded_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
+        return {"status": "lock_unavailable", "error": str(exc)}
 
 
 def main(argv: list[str] | None = None) -> int:

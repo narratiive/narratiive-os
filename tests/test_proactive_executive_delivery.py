@@ -1,3 +1,4 @@
+import os
 import tempfile
 import unittest
 from datetime import date, datetime
@@ -13,8 +14,11 @@ from runtime.proactive_executive_delivery import (
     InMemoryDeliveryKeyStore,
     LatestDeliveryStatusStore,
     MaterialEscalationService,
+    ProactiveDeliveryLockContended,
+    ProactiveDeliveryLockError,
     ProactiveDeliveryStorageError,
     ProactiveExecutiveDeliveryService,
+    WorkspaceDeliveryLock,
     describe_delivery_status,
 )
 from runtime.tony_command_service import CommandResponse
@@ -249,6 +253,60 @@ class IdempotentDispatcherTests(unittest.TestCase):
         # implicitly. send_with_retry does not even accept a key.
         self.dispatcher.send_with_retry(lambda: None, max_attempts=1)
         self.assertFalse(self.dispatcher.is_duplicate("any-key-would-still-be-absent"))
+
+
+class WorkspaceDeliveryLockTests(unittest.TestCase):
+    def test_lock_is_released_on_normal_completion_and_can_be_reacquired(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "proactive.lock"
+            with WorkspaceDeliveryLock(path):
+                pass
+            with WorkspaceDeliveryLock(path):
+                pass
+
+    def test_a_second_independent_handle_is_rejected_as_contended(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "proactive.lock"
+            holder = WorkspaceDeliveryLock(path)
+            holder.__enter__()
+            try:
+                with self.assertRaises(ProactiveDeliveryLockContended):
+                    WorkspaceDeliveryLock(path).__enter__()
+            finally:
+                holder.__exit__(None, None, None)
+
+    def test_lock_is_released_after_an_exception_and_can_be_reacquired(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "proactive.lock"
+            with self.assertRaises(ValueError):
+                with WorkspaceDeliveryLock(path):
+                    raise ValueError("boom")
+
+            # A prior holder crashing must not leave a stale lock behind.
+            with WorkspaceDeliveryLock(path):
+                pass
+
+    def test_separate_workspace_lock_paths_do_not_contend(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path_a = Path(directory) / "workspace-a" / "proactive.lock"
+            path_b = Path(directory) / "workspace-b" / "proactive.lock"
+            with WorkspaceDeliveryLock(path_a):
+                with WorkspaceDeliveryLock(path_b):
+                    pass  # both held simultaneously without contention
+
+    def test_malformed_lock_path_fails_closed_distinctly_from_contention(self):
+        with tempfile.TemporaryDirectory() as directory:
+            # A directory can never be opened as the lock's regular file.
+            bad_path = Path(directory) / "not-a-regular-file"
+            bad_path.mkdir()
+            with self.assertRaises(ProactiveDeliveryLockError):
+                WorkspaceDeliveryLock(bad_path).__enter__()
+
+    def test_held_lock_records_the_holding_pid_for_operator_diagnostics(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "proactive.lock"
+            with WorkspaceDeliveryLock(path):
+                self.assertEqual(path.read_text(encoding="utf-8").strip(), str(os.getpid()))
 
 
 class FileDeliveryKeyStoreTests(unittest.TestCase):

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -237,6 +238,103 @@ class ProactiveExecutiveDeliveryService:
 
 class ProactiveDeliveryStorageError(RuntimeError):
     """Raised when durable proactive-delivery evidence is missing or corrupt."""
+
+
+class ProactiveDeliveryLockError(RuntimeError):
+    """Raised when the per-workspace proactive delivery lock is unusable.
+
+    This is distinct from contention (``ProactiveDeliveryLockContended``): it
+    means the lock file itself could not be opened or locked for a reason
+    other than another process holding it — for example an unwritable
+    directory, or the path pointing at something other than a regular file.
+    This is a genuine environment problem and should be surfaced as an
+    actionable blocker, not treated as a benign overlapping invocation.
+    """
+
+
+class ProactiveDeliveryLockContended(RuntimeError):
+    """Raised when another process already holds the per-workspace lock.
+
+    This is the expected, benign outcome of two manual/scheduler/n8n
+    invocations for the same workspace overlapping. The caller should treat
+    this as "someone else is already running this," not as a delivery
+    failure.
+    """
+
+
+class WorkspaceDeliveryLock:
+    """A workspace-scoped, inter-process, non-blocking exclusion lock.
+
+    Guarantees that only one process for a given workspace can be inside a
+    duplicate-check -> send -> mark-used/evidence sequence at a time, across
+    manual, scheduler and n8n invocations. This closes the race the
+    ``IdempotentDispatcher`` mechanics alone cannot: each individual
+    ``FileDeliveryKeyStore`` write is atomic, but "read the key, send the
+    message, write the key" is not a single atomic operation, so two
+    processes that both start before either finishes could both observe the
+    key as absent and both send.
+
+    Uses an advisory OS file lock (``fcntl.flock``) rather than a PID or
+    timestamp file, so there is no stale-lock cleanup problem to get wrong:
+    the kernel releases the lock automatically when the holding process
+    exits or the file descriptor is closed for any reason, including a
+    crash. Contention is detected immediately (``LOCK_NB``) rather than
+    blocking, so a contending invocation fails fast instead of queuing
+    behind a possibly slow send.
+
+    Locks are scoped by the lock file's path, which callers derive from the
+    workspace's own runtime root — so separate workspaces use separate lock
+    files and never contend with each other.
+    """
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._handle: Any | None = None
+
+    def __enter__(self) -> "WorkspaceDeliveryLock":
+        try:
+            handle = open(self.path, "a+")
+        except OSError as exc:
+            raise ProactiveDeliveryLockError(
+                f"proactive delivery lock file is unusable: {self.path}: {exc}"
+            ) from exc
+
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            handle.close()
+            raise ProactiveDeliveryLockContended(
+                "another proactive delivery process is already running for "
+                f"this workspace: {self.path}"
+            )
+        except OSError as exc:
+            handle.close()
+            raise ProactiveDeliveryLockError(
+                f"proactive delivery lock could not be acquired: {self.path}: {exc}"
+            ) from exc
+
+        # Best-effort diagnostic content for operators inspecting the lock
+        # file directly; exclusion itself does not depend on this content.
+        try:
+            handle.seek(0)
+            handle.truncate()
+            handle.write(f"{os.getpid()}\n")
+            handle.flush()
+        except OSError:
+            pass
+
+        self._handle = handle
+        return self
+
+    def __exit__(self, exc_type, exc, tb) -> None:
+        if self._handle is None:
+            return
+        try:
+            fcntl.flock(self._handle.fileno(), fcntl.LOCK_UN)
+        finally:
+            self._handle.close()
+            self._handle = None
 
 
 def _atomic_write(path: Path, content: str) -> None:
