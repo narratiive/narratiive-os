@@ -102,6 +102,70 @@ sandbox network access in an isolated worktree under the workspace runtime
 root. Successful execution produces a verified local commit and immutable
 evidence only; branch push and Pull Request creation remain manual.
 
+## Proactive executive delivery (no Telegram command required)
+
+`scripts/run_proactive_brief.py` reuses the existing `/morning` and `/evening`
+executive brief service and Mission Control projection to send one proactive
+message to Matt through the Telegram Bot API, without Matt issuing a command
+first. It also checks Mission Control for new blockers or approvals that
+require Matt and escalates them as one deduplicated, rate-limited message.
+This does not add a new dashboard, state engine or source of truth: generation
+still goes through `TonyExecutiveCommandService` and the same brief archive
+and Mission Control loaders the Telegram bridge already uses.
+
+Configure outbound delivery in the same secure environment file:
+
+```text
+TONY_TELEGRAM_BOT_TOKEN=replace-with-a-bot-token-scoped-to-this-bot-only
+TONY_TELEGRAM_CHAT_ID=replace-with-matts-telegram-chat-id
+```
+
+Optional controls:
+
+```text
+TONY_TELEGRAM_API_BASE=https://api.telegram.org
+TONY_TELEGRAM_TIMEOUT_SECONDS=10
+TONY_PROACTIVE_MAX_ATTEMPTS=3
+TONY_PROACTIVE_ESCALATION_MIN_INTERVAL_SECONDS=1800
+```
+
+`TONY_EXECUTIVE_WORKSPACE_ID` (already required for the brief archive) selects
+the workspace whose durable delivery-key store, escalation store and Mission
+Control connection status the script reads and writes. A repeated invocation
+for the same workspace, command and calendar date does not resend; a repeated
+escalation for the same set of blockers/approvals does not resend either.
+Missing bot token, chat id or workspace configuration fails closed: the script
+exits non-zero, records an immutable `configuration_blocked` event, and marks
+the `proactive-delivery` Mission Control connection `degraded` so a failure is
+an actionable blocker rather than a silent no-op.
+
+Run it directly for a manual or externally triggered send:
+
+```bash
+.venv/bin/python scripts/run_proactive_brief.py --mode brief --command morning
+.venv/bin/python scripts/run_proactive_brief.py --mode escalation
+```
+
+`--mode both` (the default) runs the brief and the escalation check in one
+invocation, which is the intended shape for a scheduled trigger. To schedule
+it with launchd, add a fourth per-user LaunchAgent with a fixed
+`StartCalendarInterval` (for example `{"Hour": 8, "Minute": 0}` and
+`{"Hour": 18, "Minute": 0}` as two array entries for morning and evening)
+running:
+
+```text
+scripts/run_with_env.py <env-file> <python> scripts/run_proactive_brief.py --mode both --command morning
+```
+
+This is deliberately not wired into `scripts/install_launch_agents.py` yet:
+the existing installer's three agents are covered by
+`tests/test_launchd_installer.py` and installing a fourth agent changes what
+runs unattended on Matt's machine, which should be a separate, explicit
+decision once the delivery cadence is confirmed. Use
+`--simulate-transport-failure` only for smoke validation; it forces a
+transient send failure so the bounded-retry and fail-closed path can be
+observed without waiting for a real outage.
+
 ## Install
 
 Run from the repository using its virtual-environment Python:
