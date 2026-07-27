@@ -41,9 +41,11 @@ class MissionControlService:
         connections = [item.to_dict() for item in snapshot.connections]
         active = [item for item in workstreams if item["state"] not in {"used", "unknown"}]
         blocked = [item for item in workstreams if item["state"] == "blocked"]
-        disconnected = [
-            item for item in connections if item["state"] in {"not_connected", "degraded"}
+        not_connected = [
+            item for item in connections if item["state"] == "not_connected"
         ]
+        degraded = [item for item in connections if item["state"] == "degraded"]
+        connection_issues = [*not_connected, *degraded]
         github = snapshot.github_work
         github_approvals = (
             len(github.matt_approval_required) if github is not None else 0
@@ -59,7 +61,7 @@ class MissionControlService:
             snapshot,
             active=active,
             blocked=blocked,
-            disconnected=disconnected,
+            connection_issues=connection_issues,
         )
         return MissionControlResponse(
             status=snapshot.status,
@@ -81,7 +83,9 @@ class MissionControlService:
                 "summary": {
                     "active_workstreams": len(active),
                     "blocked_workstreams": len(blocked),
-                    "connection_issues": len(disconnected),
+                    "connection_issues": len(connection_issues),
+                    "connections_not_connected": len(not_connected),
+                    "connections_degraded": len(degraded),
                     "approvals_required": len(snapshot.approvals_required),
                     "open_pull_requests": (
                         len(github.open_pull_requests) if github is not None else 0
@@ -159,7 +163,7 @@ class MissionControlService:
         *,
         active: list[dict[str, Any]],
         blocked: list[dict[str, Any]],
-        disconnected: list[dict[str, Any]],
+        connection_issues: list[dict[str, Any]],
     ) -> ExecutiveMessage:
         evidence: list[str] = []
         for item in snapshot.workstreams:
@@ -231,10 +235,10 @@ class MissionControlService:
             human_effort = "Review the requested pull request; Tony must not approve or merge it."
             confidence = ExecutiveConfidence.HIGH
             urgency = ExecutiveUrgency.TODAY
-        elif disconnected:
-            observation = f"Mission Control records {len(disconnected)} connection issue(s)."
+        elif connection_issues:
+            observation = f"Mission Control records {len(connection_issues)} connection issue(s)."
             implication = "Affected capabilities must remain unavailable rather than being represented as functional."
-            recommendation = f"Keep {disconnected[0]['name']} fail-closed and continue work that does not depend on it."
+            recommendation = f"Keep {connection_issues[0]['name']} fail-closed and continue work that does not depend on it."
             human_effort = "No action unless the connection requires credentials or a live account change."
             confidence = ExecutiveConfidence.HIGH
             urgency = ExecutiveUrgency.ROUTINE

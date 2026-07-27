@@ -2,17 +2,14 @@ from __future__ import annotations
 
 import hashlib
 import json
-import os
 import re
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping, Protocol
 
-import fcntl
-
 from .artifact_catalog import FileArtifactCatalog
+from .engineering_task_lock import engineering_task_lock
 from .execution_journal import ExecutionJournal, ExecutionJournalError
 
 
@@ -1111,32 +1108,13 @@ class EngineeringTaskService:
                 "engineering task audit journal failed integrity verification"
             ) from exc
 
-    @contextmanager
     def _task_lock(self, task_id: str):
-        safe_task_id = _required_text(task_id, "task_id")
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", safe_task_id):
-            raise EngineeringHandoffError("engineering task task_id is invalid")
-        lock_root = self.journal.state_dir / "engineering-task-locks"
-        try:
-            lock_root.mkdir(parents=True, exist_ok=True)
-            descriptor = os.open(
-                lock_root / f"{safe_task_id}.lock",
-                os.O_CREAT | os.O_RDWR,
-                0o600,
-            )
-        except OSError as exc:
-            raise EngineeringHandoffError(
-                "engineering task lock could not be opened"
-            ) from exc
-        try:
-            with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                yield
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        except OSError as exc:
-            raise EngineeringHandoffError(
-                "engineering task lock failed closed"
-            ) from exc
+        return engineering_task_lock(
+            self.journal.state_dir,
+            task_id,
+            error_type=EngineeringHandoffError,
+            error_prefix="engineering task",
+        )
 
     def _snapshot(
         self,

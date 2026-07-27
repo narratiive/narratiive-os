@@ -1,11 +1,7 @@
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
-import os
-import re
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from pathlib import Path
 from typing import Any, Mapping
@@ -27,6 +23,7 @@ from .engineering_handoff import (
     EngineeringTask,
     EngineeringTaskService,
 )
+from .engineering_task_lock import engineering_task_lock
 from .execution_journal import ExecutionJournal, ExecutionJournalError
 
 
@@ -935,27 +932,13 @@ class EngineeringOrchestrationService:
                 "engineering orchestration audit journal failed integrity verification"
             ) from exc
 
-    @contextmanager
     def _task_lock(self, task_id: str):
-        safe = self._required(task_id, "task_id")
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]{0,99}", safe):
-            raise EngineeringOrchestrationError("engineering task_id is invalid")
-        root = self.journal.state_dir / "engineering-orchestration-locks"
-        try:
-            root.mkdir(parents=True, exist_ok=True)
-            descriptor = os.open(
-                root / f"{safe}.lock",
-                os.O_CREAT | os.O_RDWR,
-                0o600,
-            )
-            with os.fdopen(descriptor, "a+", encoding="utf-8") as handle:
-                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                yield
-                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-        except OSError as exc:
-            raise EngineeringOrchestrationError(
-                "engineering orchestration lock failed closed"
-            ) from exc
+        return engineering_task_lock(
+            self.journal.state_dir,
+            task_id,
+            error_type=EngineeringOrchestrationError,
+            error_prefix="engineering orchestration",
+        )
 
     @staticmethod
     def _required(value: Any, field: str) -> str:
