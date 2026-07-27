@@ -188,7 +188,8 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
             domain = f"gui/{uid}"
             subprocess.run(["launchctl", "bootout", domain, str(target)], check=False, capture_output=True)
             _run(["launchctl", "bootstrap", domain, str(target)])
-    _write_deployment_receipt(repo_root)
+    if activate:
+        _write_deployment_receipt(repo_root)
     return written
 
 
