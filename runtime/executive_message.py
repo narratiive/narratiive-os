@@ -67,14 +67,14 @@ class ExecutiveMessage:
         }
 
     def render_compact(self) -> str:
-        """Render business language suitable for Telegram without technical internals."""
+        """Render a decision-first Telegram message without technical internals."""
 
         lines = [
-            self.observation,
+            f"Tony's read: {self.observation}",
             f"Why it matters: {self.implication}",
-            f"Recommendation: {self.recommendation}",
-            f"Your effort: {self.human_effort}",
-            f"Confidence: {self.confidence.value}",
+            f"Best next move: {self.recommendation}",
+            f"Your part: {self.human_effort}",
+            f"Confidence: {self.confidence.value} · Urgency: {self.urgency.value}",
         ]
         return "\n".join(lines)
 
