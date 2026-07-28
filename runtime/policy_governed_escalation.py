@@ -4,6 +4,14 @@ import hashlib
 from datetime import datetime
 from typing import Any, Callable, Iterable
 
+from runtime.executive_delivery import (
+    CallableTextChannelAdapter,
+    ChannelAdapter,
+    DeliveryTarget,
+    ExecutiveMessageContent,
+    ExecutiveMessageRenderer,
+    TelegramTextRenderer,
+)
 from runtime.interruption_policy import InterruptionContext, InterruptionPolicy
 from runtime.mission_control import MissionControlSnapshot
 from runtime.proactive_executive_delivery import (
@@ -23,28 +31,43 @@ MissionControlLoader = Callable[[], MissionControlSnapshot]
 class PolicyGovernedMaterialEscalationService:
     """Escalate Mission Control material only when interruption policy permits it.
 
-    This is a drop-in policy-governed replacement for the original material
-    escalation service. Duplicate suppression remains ahead of interruption
-    policy evaluation, while successful delivery remains the only operation
-    that advances delivery history.
+    Duplicate suppression remains ahead of interruption-policy evaluation. The
+    service now passes channel-neutral content to a renderer and channel adapter,
+    while the legacy two-string sender remains supported for current composition.
+    Successful delivery remains the only operation that advances delivery history.
     """
 
     def __init__(
         self,
         *,
         mission_control_loader: MissionControlLoader,
-        send_message: MessageSender,
         key_store: DeliveryKeyStore,
         last_sent_store: FileLastEscalationStore,
         interruption_policy: InterruptionPolicy,
         record_event: EventRecorder,
+        send_message: MessageSender | None = None,
+        channel_adapter: ChannelAdapter | None = None,
+        renderer: ExecutiveMessageRenderer | None = None,
+        channel: str = "telegram",
         clock: Clock | None = None,
         max_attempts: int = 3,
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
+        if send_message is None and channel_adapter is None:
+            raise ValueError("send_message or channel_adapter is required")
+        if send_message is not None and channel_adapter is not None:
+            raise ValueError("provide send_message or channel_adapter, not both")
+        canonical_channel = channel.strip().lower()
+        if not canonical_channel:
+            raise ValueError("channel is required")
         self.mission_control_loader = mission_control_loader
-        self.send_message = send_message
+        self.channel = canonical_channel
+        self.channel_adapter = channel_adapter or CallableTextChannelAdapter(
+            channel=canonical_channel,
+            send_text=send_message,
+        )
+        self.renderer = renderer or TelegramTextRenderer()
         self.last_sent_store = last_sent_store
         self.interruption_policy = interruption_policy
         self.record_event = record_event
@@ -76,10 +99,14 @@ class PolicyGovernedMaterialEscalationService:
             return result
 
         materials = sorted(set(snapshot.blockers) | set(snapshot.approvals_required))
-        digest_key = self.build_digest_key(
-            workspace_id=canonical_workspace_id,
-            materials=materials,
-        ) if materials else ""
+        digest_key = (
+            self.build_digest_key(
+                workspace_id=canonical_workspace_id,
+                materials=materials,
+            )
+            if materials
+            else ""
+        )
 
         if digest_key and self.dispatcher.is_duplicate(digest_key):
             result = EscalationResult(
@@ -133,9 +160,16 @@ class PolicyGovernedMaterialEscalationService:
             )
             return result
 
-        message = self._render(materials)
+        content = ExecutiveMessageContent(
+            kind="material_escalation",
+            title="Material escalation — Matt review needed:",
+            items=tuple(materials),
+            metadata={"workspace_id": canonical_workspace_id},
+        )
+        target = DeliveryTarget(channel=self.channel, address=canonical_chat_id)
+        message = self.renderer.render(content)
         outcome = self.dispatcher.send_with_retry(
-            lambda: self.send_message(canonical_chat_id, message),
+            lambda: self.channel_adapter.send(target, message),
             max_attempts=self.max_attempts,
         )
         if outcome.status == "sent":
@@ -176,14 +210,6 @@ class PolicyGovernedMaterialEscalationService:
     def build_digest_key(*, workspace_id: str, materials: Iterable[str]) -> str:
         digest = hashlib.sha256("\n".join(materials).encode("utf-8")).hexdigest()
         return f"{workspace_id.strip()}:material:{digest}"
-
-    @staticmethod
-    def _render(materials: list[str]) -> str:
-        lines = ["Material escalation — Matt review needed:"]
-        lines.extend(f"- {item}" for item in materials[:10])
-        if len(materials) > 10:
-            lines.append(f"...and {len(materials) - 10} more.")
-        return "\n".join(lines)[:3500]
 
     def _record(
         self,
