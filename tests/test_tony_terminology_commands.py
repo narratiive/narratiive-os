@@ -21,6 +21,7 @@ class TonyTerminologyCommandTests(unittest.TestCase):
     def setUp(self) -> None:
         self.policy = TerminologyPolicy({
             "version": "1.0.0",
+            "version_note": "Initial canonical terminology policy.",
             "status": "active",
             "approved_terms": [
                 {"term": "Growth Blueprint", "use": "Canonical strategic output"}
@@ -56,6 +57,8 @@ class TonyTerminologyCommandTests(unittest.TestCase):
         self.assertEqual(result.command, "vocabulary")
         self.assertEqual(result.status, "ok")
         self.assertEqual(result.data["policy_version"], "1.0.0")
+        self.assertEqual(result.data["version_note"], "Initial canonical terminology policy.")
+        self.assertIn("Version note: Initial canonical terminology policy.", result.message)
         self.assertIn("Growth Blueprint", result.message)
         self.assertIn("Paid engagement", result.message)
         self.assertIn("Growth Sprint", result.message)
