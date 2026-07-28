@@ -8,6 +8,7 @@ from runtime.executive_brief import (
     ExecutiveBriefArchive,
     ExecutiveBriefService,
 )
+from runtime.executive_integration import IntegratedExecutiveBriefService
 from runtime.friday_executive_review import (
     FridayExecutiveReviewService,
     ReviewRecord,
@@ -54,7 +55,7 @@ class TonyExecutiveCommandService:
         workspace_id: str = "narratiive",
     ) -> None:
         self.command_service = command_service
-        self.brief_service = brief_service or ExecutiveBriefService()
+        self.brief_service = brief_service or IntegratedExecutiveBriefService()
         self.brief_archive = brief_archive
         self.friday_review_service = friday_review_service or FridayExecutiveReviewService()
         self.friday_record_loader = friday_record_loader
