@@ -50,6 +50,7 @@ def policy() -> TerminologyPolicy:
         {
             "status": "active",
             "version": "2026.07-test",
+            "version_note": "Test fixture for executive terminology enforcement.",
             "approved_terms": [
                 {"term": "Growth Blueprint", "use": "Canonical product name."}
             ],
