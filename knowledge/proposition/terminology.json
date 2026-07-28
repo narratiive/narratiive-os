@@ -1,6 +1,7 @@
 {
   "policy_id": "narratiive_terminology",
   "version": "1.0.0",
+  "version_note": "Initial canonical terminology policy establishing approved, unsettled, and retired Narratiive vocabulary.",
   "status": "active",
   "owner": "Narratiive",
   "governance": {
