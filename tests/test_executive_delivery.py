@@ -4,6 +4,7 @@ from unittest import TestCase
 
 from runtime.executive_delivery import (
     CallableTextChannelAdapter,
+    DeliveryReceipt,
     DeliveryTarget,
     ExecutiveMessageContent,
     RenderedMessage,
@@ -40,6 +41,23 @@ class ExecutiveDeliveryTests(TestCase):
         self.assertIn("...and 1 more.", message.text)
         self.assertNotIn("- three", message.text)
 
+    def test_delivery_receipt_is_canonical(self) -> None:
+        receipt = DeliveryReceipt(
+            channel=" Telegram ",
+            address=" 12345 ",
+            provider_message_id=" message-7 ",
+        )
+
+        self.assertEqual(receipt.channel, "telegram")
+        self.assertEqual(receipt.address, "12345")
+        self.assertEqual(receipt.provider_message_id, "message-7")
+
+    def test_delivery_receipt_fails_closed_without_identity(self) -> None:
+        with self.assertRaisesRegex(ValueError, "channel is required"):
+            DeliveryReceipt(channel=" ", address="12345")
+        with self.assertRaisesRegex(ValueError, "address is required"):
+            DeliveryReceipt(channel="telegram", address=" ")
+
     def test_callable_adapter_preserves_existing_sender_shape(self) -> None:
         sent: list[tuple[str, str]] = []
         adapter = CallableTextChannelAdapter(
@@ -55,6 +73,10 @@ class ExecutiveDeliveryTests(TestCase):
         self.assertEqual(sent, [("12345", "Hello")])
         self.assertEqual(receipt.channel, "telegram")
         self.assertEqual(receipt.address, "12345")
+
+    def test_callable_adapter_requires_callable_sender(self) -> None:
+        with self.assertRaisesRegex(TypeError, "send_text must be callable"):
+            CallableTextChannelAdapter(channel="telegram", send_text=None)
 
     def test_callable_adapter_fails_closed_for_wrong_channel(self) -> None:
         adapter = CallableTextChannelAdapter(channel="telegram", send_text=lambda *_: None)

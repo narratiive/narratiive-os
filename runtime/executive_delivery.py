@@ -66,9 +66,25 @@ class RenderedMessage:
 
 @dataclass(frozen=True, slots=True)
 class DeliveryReceipt:
+    """Canonical evidence that a channel adapter accepted a delivery."""
+
     channel: str
     address: str
     provider_message_id: str | None = None
+
+    def __post_init__(self) -> None:
+        channel = self.channel.strip().lower()
+        address = self.address.strip()
+        provider_message_id = (
+            self.provider_message_id.strip() if self.provider_message_id is not None else None
+        )
+        if not channel:
+            raise ValueError("channel is required")
+        if not address:
+            raise ValueError("address is required")
+        object.__setattr__(self, "channel", channel)
+        object.__setattr__(self, "address", address)
+        object.__setattr__(self, "provider_message_id", provider_message_id or None)
 
 
 class ExecutiveMessageRenderer(Protocol):
@@ -105,6 +121,8 @@ class CallableTextChannelAdapter:
         canonical_channel = channel.strip().lower()
         if not canonical_channel:
             raise ValueError("channel is required")
+        if not callable(send_text):
+            raise TypeError("send_text must be callable")
         self.channel = canonical_channel
         self.send_text = send_text
 
