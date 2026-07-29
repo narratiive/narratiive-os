@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Callable, Iterable
 
-from runtime.executive_brief import (
-    BriefPeriod,
-    ExecutiveBriefArchive,
-    ExecutiveBriefService,
+from runtime.agency_executive_brief import (
+    AgencyBriefPeriod,
+    AgencyExecutiveBriefService,
 )
+from runtime.agency_state_projection import AgencyStateProjector
+from runtime.executive_brief import ExecutiveBriefArchive, ExecutiveBriefService
 from runtime.executive_integration import IntegratedExecutiveBriefService
 from runtime.friday_executive_review import (
     FridayExecutiveReviewService,
@@ -31,15 +32,15 @@ _FRIDAY_RECORD_FIELDS = {
 
 
 class TonyExecutiveCommandService:
-    """Add evidence-backed executive commands without duplicating Tony operations."""
+    """Add evidence-backed executive commands without exposing platform noise."""
 
     _PERIODS = {
-        "morning": BriefPeriod.MORNING,
-        "morning_brief": BriefPeriod.MORNING,
-        "standup": BriefPeriod.MORNING,
-        "evening": BriefPeriod.EVENING,
-        "evening_review": BriefPeriod.EVENING,
-        "end_of_day": BriefPeriod.EVENING,
+        "morning": AgencyBriefPeriod.MORNING,
+        "morning_brief": AgencyBriefPeriod.MORNING,
+        "standup": AgencyBriefPeriod.MORNING,
+        "evening": AgencyBriefPeriod.EVENING,
+        "evening_review": AgencyBriefPeriod.EVENING,
+        "end_of_day": AgencyBriefPeriod.EVENING,
     }
     _FRIDAY_COMMANDS = {"friday", "friday_review", "weekly_review", "executive_review"}
 
@@ -53,15 +54,17 @@ class TonyExecutiveCommandService:
         terminology_policy_loader: TerminologyPolicyLoader | None = None,
         clock: Callable[[], datetime] | None = None,
         workspace_id: str = "narratiive",
+        agency_projector: AgencyStateProjector | None = None,
+        agency_brief_service: AgencyExecutiveBriefService | None = None,
     ) -> None:
         self.command_service = command_service
         self.brief_service = brief_service or IntegratedExecutiveBriefService()
         self.brief_archive = brief_archive
+        self.agency_projector = agency_projector or AgencyStateProjector()
+        self.agency_brief_service = agency_brief_service or AgencyExecutiveBriefService()
         self.friday_review_service = friday_review_service or FridayExecutiveReviewService()
         self.friday_record_loader = friday_record_loader
-        self.terminology_policy_loader = (
-            terminology_policy_loader or TerminologyPolicy.from_path
-        )
+        self.terminology_policy_loader = terminology_policy_loader or TerminologyPolicy.from_path
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
 
@@ -90,30 +93,26 @@ class TonyExecutiveCommandService:
 
         loader = self.command_service.mission_control_loader
         if loader is None:
-            return self._error(
-                name,
-                "mission_control_unavailable",
-                "Mission Control is not configured.",
-            )
+            return self._error(name, "mission_control_unavailable", "Mission Control is not configured.")
 
         try:
             policy = self.terminology_policy_loader()
             snapshot = loader()
-            if self.github_configured and snapshot.github_work is None:
-                raise ValueError(
-                    "GitHub awareness is configured but live GitHub state is unavailable"
-                )
-            brief = self.brief_service.build(snapshot, period)
+            state = self.agency_projector.project(snapshot)
+            brief = self.agency_brief_service.build(state, period)
             message = brief.render_compact()
             violations = policy.scan(message)
             if violations:
                 terms = ", ".join(sorted({item.term for item in violations}))
                 raise ValueError(
-                    f"executive brief uses retired terminology under policy "
-                    f"{policy.version}: {terms}"
+                    f"executive brief uses retired terminology under policy {policy.version}: {terms}"
                 )
+
+            # Preserve the existing evidence archive and GitHub change baseline quietly.
             if self.brief_archive is not None:
-                self.brief_archive.store(brief)
+                legacy_period = self._legacy_period(period)
+                archive_brief = self.brief_service.build(snapshot, legacy_period)
+                self.brief_archive.store(archive_brief)
         except Exception as exc:
             return self._error(
                 name,
@@ -121,8 +120,9 @@ class TonyExecutiveCommandService:
                 f"Tony could not build a trusted daily brief: {exc}",
             )
 
-        canonical_command = "morning" if period is BriefPeriod.MORNING else "evening"
+        canonical_command = "morning" if period is AgencyBriefPeriod.MORNING else "evening"
         data = brief.to_dict()
+        data["agency_state"] = state.to_dict()
         data["terminology_policy_version"] = policy.version
         return CommandResponse(
             command=canonical_command,
@@ -131,15 +131,17 @@ class TonyExecutiveCommandService:
             data=data,
         )
 
+    @staticmethod
+    def _legacy_period(period: AgencyBriefPeriod):
+        from runtime.executive_brief import BriefPeriod
+
+        return BriefPeriod.MORNING if period is AgencyBriefPeriod.MORNING else BriefPeriod.EVENING
+
     def _execute_friday_review(
         self,
         objects: Iterable[dict[str, Any]],
     ) -> CommandResponse:
         injected_records = tuple(objects)
-
-        # The configured evidence store is authoritative in the live runtime.
-        # Generic growth objects travel through the same command boundary and must
-        # never override or be mistaken for dedicated executive-review evidence.
         if self.friday_record_loader is not None:
             try:
                 raw_records: Iterable[dict[str, Any]] = self.friday_record_loader()
@@ -181,7 +183,6 @@ class TonyExecutiveCommandService:
 
     @staticmethod
     def _looks_like_review_evidence(items: tuple[dict[str, Any], ...]) -> bool:
-        """Distinguish explicit review-test input from unrelated runtime objects."""
         return any(
             isinstance(item, dict) and bool(_FRIDAY_RECORD_FIELDS.intersection(item))
             for item in items
