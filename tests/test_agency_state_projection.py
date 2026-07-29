@@ -75,6 +75,31 @@ class AgencyStateProjectionTests(unittest.TestCase):
         self.assertIn(AgencyArea.DELIVERY, visible_areas)
         self.assertNotIn(AgencyArea.ENGINEERING, visible_areas)
 
+    def test_mission_control_maintenance_stays_in_background(self):
+        snapshot = MissionControlSnapshot(
+            generated_at="2026-07-29T08:00:00Z",
+            status="healthy",
+            progress={"status": "healthy"},
+            workstreams=(
+                WorkstreamStatus(
+                    "mission-control-maintenance",
+                    "Mission Control",
+                    "functional",
+                    "Tony",
+                    "Use the recorded snapshot",
+                ),
+            ),
+            connections=(),
+            approvals_required=(),
+            blockers=(),
+        )
+
+        state = AgencyStateProjector().project(snapshot)
+        item = next(item for item in state.items if item.item_id == "mission-control-maintenance")
+
+        self.assertEqual(item.area, AgencyArea.ENGINEERING)
+        self.assertFalse(item.executive_visible)
+
     def test_technical_issue_surfaces_only_with_business_consequence(self):
         snapshot = MissionControlSnapshot(
             generated_at="2026-07-29T08:00:00Z",
