@@ -14,7 +14,7 @@ class AgencyStateProjector:
         (AgencyArea.FINANCE, ("revenue", "invoice", "cash", "finance", "payment", "margin", "budget")),
         (AgencyArea.AUTOMATION, ("automation", "workflow", "n8n", "make", "telegram", "notion", "email")),
         (AgencyArea.INFRASTRUCTURE, ("runtime", "bridge", "server", "webhook", "credential", "connection", "infrastructure")),
-        (AgencyArea.ENGINEERING, ("github", "pull request", "repository", "merge", "validation", "test", "code", "engineering")),
+        (AgencyArea.ENGINEERING, ("mission control", "github", "pull request", "repository", "merge", "validation", "test", "code", "engineering")),
     )
 
     _BUSINESS_CONSEQUENCE_WORDS = (
@@ -87,10 +87,12 @@ class AgencyStateProjector:
     @classmethod
     def _classify(cls, text: str) -> AgencyArea:
         normalised = text.casefold()
-        for area, keywords in cls._AREA_KEYWORDS:
-            if any(keyword in normalised for keyword in keywords):
-                return area
-        return AgencyArea.OPERATIONS
+        scored = (
+            (sum(normalised.count(keyword) for keyword in keywords), priority, area)
+            for priority, (area, keywords) in enumerate(cls._AREA_KEYWORDS)
+        )
+        score, _, area = max(scored, key=lambda candidate: (candidate[0], -candidate[1]))
+        return area if score else AgencyArea.OPERATIONS
 
     @classmethod
     def _has_business_consequence(cls, text: str) -> bool:
