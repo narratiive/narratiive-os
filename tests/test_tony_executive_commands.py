@@ -62,7 +62,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         response = service.execute("/morning", [])
 
         self.assertEqual(response.command, "morning")
-        self.assertEqual(response.status, "operational")
+        self.assertEqual(response.status, "healthy")
         self.assertEqual(response.data["period"], "morning")
         self.assertIn("Morning agency brief", response.message)
         self.assertIn("Commercial:", response.message)
@@ -134,7 +134,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
 
         response = service.execute("/morning", [])
 
-        self.assertEqual(response.status, "operational")
+        self.assertEqual(response.status, "healthy")
         self.assertEqual(len(archive.briefs), 1)
         self.assertEqual(archive.briefs[0].period.value, "morning")
 
@@ -160,7 +160,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
 
         response = service.execute("/morning", [])
 
-        self.assertEqual(response.status, "operational")
+        self.assertEqual(response.status, "healthy")
         self.assertIn("Founder outreach", response.message)
         self.assertNotIn("GitHub state is unavailable", response.message)
 
