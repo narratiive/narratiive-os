@@ -67,13 +67,18 @@ class ExecutiveMessage:
         }
 
     def render_compact(self) -> str:
-        """Render a decision-first Telegram message without technical internals."""
+        """Render a decision-first Telegram message with recorded evidence pointers."""
 
+        evidence = "; ".join(
+            f"{item.label}: {item.reference}" if item.label else item.reference
+            for item in self.evidence
+        )
         lines = [
             f"Tony's read: {self.observation}",
             f"Why it matters: {self.implication}",
             f"Best next move: {self.recommendation}",
             f"Your part: {self.human_effort}",
+            f"Evidence: {evidence}",
             f"Confidence: {self.confidence.value} · Urgency: {self.urgency.value}",
         ]
         return "\n".join(lines)
