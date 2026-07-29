@@ -125,7 +125,9 @@ class TonyHTTPBridgeTests(unittest.TestCase):
         self.assertEqual(status.value, 200)
         self.assertTrue(response["ok"])
         self.assertEqual(response["command_id"], "health-1")
-        self.assertEqual(response["reply"], "Narratiive OS health: ok.")
+        self.assertIn("Tony's read: Narratiive OS is reporting ok health.", response["reply"])
+        self.assertIn("Why it matters:", response["reply"])
+        self.assertIn("Evidence:", response["reply"])
         self.assertEqual(transport.calls[0]["payload"]["command"], "health")
         self.assertEqual(transport.calls[0]["idempotency_key"], "health-1")
 
