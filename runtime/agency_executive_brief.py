@@ -82,7 +82,7 @@ class AgencyExecutiveBriefService:
         period: AgencyBriefPeriod = AgencyBriefPeriod.MORNING,
     ) -> AgencyExecutiveBrief:
         visible = state.executive_items
-        status = "blocked" if state.agency_blockers else "healthy"
+        status = "blocked" if state.agency_blockers else "operational"
         hidden_count = len(state.hidden_platform_items)
         platform_note = None
         if hidden_count:
