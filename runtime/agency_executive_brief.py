@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 
 from runtime.agency_state import AgencyArea, AgencyItem, AgencyState
 
 
+class AgencyBriefPeriod(str, Enum):
+    MORNING = "morning"
+    EVENING = "evening"
+
+
 @dataclass(frozen=True, slots=True)
 class AgencyExecutiveBrief:
+    period: AgencyBriefPeriod
     generated_at: str
     status: str
     commercial: tuple[str, ...]
@@ -20,8 +27,26 @@ class AgencyExecutiveBrief:
     internal_platform_note: str | None
     recommendation: str
 
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "period": self.period.value,
+            "generated_at": self.generated_at,
+            "status": self.status,
+            "commercial": list(self.commercial),
+            "clients": list(self.clients),
+            "delivery": list(self.delivery),
+            "finance": list(self.finance),
+            "operations": list(self.operations),
+            "automation": list(self.automation),
+            "matt_actions": list(self.matt_actions),
+            "agency_blockers": list(self.agency_blockers),
+            "internal_platform_note": self.internal_platform_note,
+            "recommendation": self.recommendation,
+        }
+
     def render_compact(self, limit: int = 3500) -> str:
-        lines = [f"Agency brief — {self.status}"]
+        heading = "Morning agency brief" if self.period is AgencyBriefPeriod.MORNING else "End-of-day agency review"
+        lines = [f"{heading} — {self.status}"]
         self._append(lines, "Commercial", self.commercial)
         self._append(lines, "Clients", self.clients)
         self._append(lines, "Delivery", self.delivery)
@@ -51,18 +76,21 @@ class AgencyExecutiveBriefService:
 
     ITEM_LIMIT = 4
 
-    def build(self, state: AgencyState) -> AgencyExecutiveBrief:
+    def build(
+        self,
+        state: AgencyState,
+        period: AgencyBriefPeriod = AgencyBriefPeriod.MORNING,
+    ) -> AgencyExecutiveBrief:
         visible = state.executive_items
         status = "blocked" if state.agency_blockers else "operational"
         hidden_count = len(state.hidden_platform_items)
         platform_note = None
         if hidden_count:
-            platform_note = (
-                f"{hidden_count} engineering or infrastructure item"
-                f"{'s are' if hidden_count != 1 else ' is'} being handled in the background."
-            )
+            noun = "item is" if hidden_count == 1 else "items are"
+            platform_note = f"{hidden_count} engineering or infrastructure {noun} being handled in the background."
 
         return AgencyExecutiveBrief(
+            period=period,
             generated_at=state.generated_at,
             status=status,
             commercial=self._lines(visible, AgencyArea.COMMERCIAL),
@@ -78,11 +106,7 @@ class AgencyExecutiveBriefService:
         )
 
     @classmethod
-    def _lines(
-        cls,
-        items: tuple[AgencyItem, ...],
-        area: AgencyArea,
-    ) -> tuple[str, ...]:
+    def _lines(cls, items: tuple[AgencyItem, ...], area: AgencyArea) -> tuple[str, ...]:
         return tuple(cls._line(item) for item in items if item.area is area)[: cls.ITEM_LIMIT]
 
     @staticmethod
@@ -91,8 +115,11 @@ class AgencyExecutiveBriefService:
 
     @staticmethod
     def _recommendation(state: AgencyState) -> str:
-        if state.matt_actions:
-            return state.matt_actions[0].next_action
+        business_matt_actions = tuple(
+            item for item in state.matt_actions if item.area not in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
+        )
+        if business_matt_actions:
+            return business_matt_actions[0].next_action
         if state.agency_blockers:
             return state.agency_blockers[0].next_action
         for area in (
