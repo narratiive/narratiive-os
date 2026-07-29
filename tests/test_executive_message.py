@@ -44,7 +44,7 @@ class ExecutiveMessageTests(unittest.TestCase):
             implication="Client delivery is one decision away.",
             recommendation="Review and approve the Blueprint.",
             human_effort="15 minutes",
-            evidence=["artifact:rave:blueprint:v3"],
+            evidence=[{"reference": "artifact:rave:blueprint:v3", "label": "Blueprint v3"}],
             urgency=ExecutiveUrgency.TODAY,
         )
 
@@ -53,6 +53,7 @@ class ExecutiveMessageTests(unittest.TestCase):
         self.assertIn("Why it matters:", rendered)
         self.assertIn("Best next move:", rendered)
         self.assertIn("Your part:", rendered)
+        self.assertIn("Evidence: Blueprint v3: artifact:rave:blueprint:v3", rendered)
         self.assertIn("Confidence: high · Urgency: today", rendered)
         self.assertNotIn("Traceback", rendered)
         self.assertNotIn("provider", rendered.lower())
