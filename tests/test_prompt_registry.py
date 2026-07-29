@@ -60,6 +60,7 @@ class PromptRegistryTests(unittest.TestCase):
             {
                 "status": "active",
                 "version": "1.0.0",
+                "version_note": "Initial prompt-registry test policy.",
                 "approved_terms": [],
                 "unsettled_terms": [],
                 "retired_terms": [
@@ -80,6 +81,7 @@ class PromptRegistryTests(unittest.TestCase):
             {
                 "status": "active",
                 "version": "2.0.0",
+                "version_note": "Retire future phrase for activation revalidation coverage.",
                 "approved_terms": [],
                 "unsettled_terms": [],
                 "retired_terms": [
