@@ -1,6 +1,9 @@
 import unittest
 
-from runtime.github_mission_control_projection import project_github_workstreams
+from runtime.github_mission_control_projection import (
+    RETIRED_TERMINOLOGY_PLACEHOLDER,
+    project_github_workstreams,
+)
 from runtime.github_work import GitHubWorkItem, GitHubWorkSnapshot
 
 
@@ -99,6 +102,23 @@ class GitHubMissionControlProjectionTests(unittest.TestCase):
             workstreams[1].next_action,
             "Record Matt's review decision.",
         )
+
+    def test_redacts_retired_language_but_preserves_repository_evidence(self) -> None:
+        issue = self.item(
+            kind="issue",
+            number=58,
+            title="Restore Opportunity Card workflow",
+        )
+
+        workstream = project_github_workstreams(
+            self.snapshot(issues=(issue,))
+        )[0]
+
+        self.assertEqual(
+            workstream.title,
+            f"Issue #58: {RETIRED_TERMINOLOGY_PLACEHOLDER}",
+        )
+        self.assertEqual(workstream.evidence, (issue.evidence,))
 
     def test_missing_snapshot_fails_closed(self) -> None:
         self.assertEqual(project_github_workstreams(None), ())
