@@ -34,7 +34,7 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         self.assertIn("Create first qualified opportunity", output)
         self.assertNotIn("PR 104", output)
         self.assertIn("being handled in the background", output)
-        self.assertEqual(brief.status, "operational")
+        self.assertEqual(brief.status, "healthy")
 
     def test_platform_work_surfaces_only_when_it_blocks_an_agency_outcome(self):
         state = AgencyState.from_items(
@@ -73,7 +73,7 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())
         brief = AgencyExecutiveBriefService().build(state)
 
-        self.assertEqual(brief.status, "operational")
+        self.assertEqual(brief.status, "healthy")
         self.assertIn("commercial opportunity", brief.recommendation)
         self.assertNotIn("repository", brief.recommendation.casefold())
 
