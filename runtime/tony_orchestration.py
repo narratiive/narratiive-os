@@ -6,6 +6,8 @@ import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
 
+from runtime.tony_executive_interpretation import interpret_observability_result
+
 
 class TonyGatewayError(RuntimeError):
     def __init__(self, code: str, message: str, *, retryable: bool = False) -> None:
@@ -170,6 +172,9 @@ class TonyOrchestrationAdapter:
         "engineering_task.recover": "engineering_tasks.recover",
         "engineering_task.cancel": "engineering_tasks.cancel",
     }
+    EXECUTIVE_OBSERVABILITY_ACTIONS = frozenset(
+        {"health", "run.status", "job.get", "approval.list", "approval.get"}
+    )
 
     def __init__(self, transport: GatewayTransport) -> None:
         self.transport = transport
@@ -210,11 +215,20 @@ class TonyOrchestrationAdapter:
         data = result.get("data", {})
         if not isinstance(data, Mapping):
             data = {"value": data}
+        resolved_correlation_id = str(result.get("correlation_id", correlation_id))
+        message = self._manager_message(command.action, data)
+        if command.action in self.EXECUTIVE_OBSERVABILITY_ACTIONS:
+            executive_message = interpret_observability_result(
+                action=command.action,
+                data=data,
+                evidence_reference=f"gateway:{gateway_command}:{resolved_correlation_id}",
+            )
+            message = executive_message.render_compact()
         return TonyResponse(
             ok=True,
-            message=self._manager_message(command.action, data),
+            message=message,
             data=dict(data),
-            correlation_id=str(result.get("correlation_id", correlation_id)),
+            correlation_id=resolved_correlation_id,
             command=gateway_command,
         )
 
