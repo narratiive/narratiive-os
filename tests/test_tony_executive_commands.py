@@ -26,12 +26,12 @@ def snapshot() -> MissionControlSnapshot:
         progress={"status": "healthy"},
         workstreams=(
             WorkstreamStatus(
-                workstream_id="briefing",
-                title="Executive briefing",
+                workstream_id="outreach",
+                title="Founder outreach",
                 state="functional",
                 owner="Tony",
-                next_action="Validate live command routing",
-                evidence=("commit:dda5cd6",),
+                next_action="Send five tailored introductions",
+                evidence=("crm:outreach",),
             ),
             WorkstreamStatus(
                 workstream_id="mission-control",
@@ -55,34 +55,34 @@ def snapshot() -> MissionControlSnapshot:
 
 
 class TonyExecutiveCommandServiceTests(unittest.TestCase):
-    def test_morning_command_builds_evidence_backed_brief(self):
+    def test_morning_command_builds_agency_first_brief(self):
         base = StubCommandService(snapshot)
         service = TonyExecutiveCommandService(base)
 
         response = service.execute("/morning", [])
 
         self.assertEqual(response.command, "morning")
-        self.assertEqual(response.status, "healthy")
+        self.assertEqual(response.status, "operational")
         self.assertEqual(response.data["period"], "morning")
-        self.assertEqual(len(response.data["priorities"]), 1)
-        self.assertIn("Morning brief", response.message)
+        self.assertIn("Morning agency brief", response.message)
+        self.assertIn("Commercial:", response.message)
+        self.assertIn("Founder outreach", response.message)
+        self.assertNotIn("Mission Control —", response.message)
+        self.assertIn("agency_state", response.data)
         self.assertEqual(base.calls, [])
 
-    def test_evening_command_separates_completed_and_open_work(self):
-        base = StubCommandService(snapshot)
-        service = TonyExecutiveCommandService(base)
+    def test_evening_command_uses_agency_renderer(self):
+        service = TonyExecutiveCommandService(StubCommandService(snapshot))
 
         response = service.execute("/evening", [])
 
         self.assertEqual(response.command, "evening")
         self.assertEqual(response.data["period"], "evening")
-        self.assertEqual(len(response.data["completed"]), 1)
-        self.assertEqual(len(response.data["open_items"]), 1)
-        self.assertIn("End-of-day review", response.message)
+        self.assertIn("End-of-day agency review", response.message)
+        self.assertIn("Commercial:", response.message)
 
     def test_command_aliases_resolve_to_canonical_periods(self):
-        base = StubCommandService(snapshot)
-        service = TonyExecutiveCommandService(base)
+        service = TonyExecutiveCommandService(StubCommandService(snapshot))
 
         morning = service.execute("/standup", [])
         evening = service.execute("/end_of_day", [])
@@ -112,14 +112,13 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
             raise ValueError("invalid snapshot")
 
         service = TonyExecutiveCommandService(StubCommandService(broken_loader))
-
         response = service.execute("/evening", [])
 
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
         self.assertIn("invalid snapshot", response.message)
 
-    def test_successful_brief_is_archived_before_it_is_returned(self):
+    def test_successful_brief_preserves_legacy_archive(self):
         class RecordingArchive:
             def __init__(self):
                 self.briefs = []
@@ -135,7 +134,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
 
         response = service.execute("/morning", [])
 
-        self.assertEqual(response.status, "healthy")
+        self.assertEqual(response.status, "operational")
         self.assertEqual(len(archive.briefs), 1)
         self.assertEqual(archive.briefs[0].period.value, "morning")
 
@@ -148,23 +147,22 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
             StubCommandService(snapshot),
             brief_archive=BrokenArchive(),
         )
-
         response = service.execute("/morning", [])
 
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
         self.assertIn("archive integrity failure", response.message)
 
-    def test_configured_github_failure_prevents_brief_and_archive(self):
+    def test_github_unavailable_does_not_replace_agency_brief(self):
         base = StubCommandService(snapshot)
         base.github_configured = True
         service = TonyExecutiveCommandService(base)
 
         response = service.execute("/morning", [])
 
-        self.assertEqual(response.status, "error")
-        self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
-        self.assertIn("GitHub state is unavailable", response.message)
+        self.assertEqual(response.status, "operational")
+        self.assertIn("Founder outreach", response.message)
+        self.assertNotIn("GitHub state is unavailable", response.message)
 
 
 if __name__ == "__main__":
