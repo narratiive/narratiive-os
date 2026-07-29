@@ -11,7 +11,15 @@ from runtime.tony_orchestration import (
 class TonyOrchestrationTests(unittest.TestCase):
     def test_maps_actions_to_public_gateway_with_idempotency_and_correlation(self):
         transport = FakeGatewayTransport([
-            {"ok": True, "command": "runs.get", "data": {"status": "awaiting_approval"}}
+            {
+                "ok": True,
+                "command": "runs.get",
+                "correlation_id": "gateway-run-1",
+                "data": {
+                    "status": "awaiting_approval",
+                    "provider_debug": "secret-internal-value",
+                },
+            }
         ])
         adapter = TonyOrchestrationAdapter(transport)
         result = adapter.execute(
@@ -28,7 +36,11 @@ class TonyOrchestrationTests(unittest.TestCase):
         self.assertEqual(call["payload"]["workspace_id"], "rave")
         self.assertEqual(call["idempotency_key"], "command-1")
         self.assertEqual(call["correlation_id"], "tony-command-1")
-        self.assertIn("awaiting_approval", result.message)
+        self.assertIn("Tony's read: The workflow is awaiting_approval.", result.message)
+        self.assertIn("resolve the outstanding gate", result.message)
+        self.assertNotIn("secret-internal-value", result.message)
+        self.assertEqual(result.data["provider_debug"], "secret-internal-value")
+        self.assertEqual(result.correlation_id, "gateway-run-1")
 
     def test_health_job_and_approval_observability_actions(self):
         transport = FakeGatewayTransport([
@@ -63,9 +75,34 @@ class TonyOrchestrationTests(unittest.TestCase):
             [call["payload"]["command"] for call in transport.calls],
             ["health", "jobs.get", "approvals.get"],
         )
-        self.assertEqual(results[0].message, "Narratiive OS health: ok.")
-        self.assertEqual(results[1].message, "Job status: completed.")
-        self.assertEqual(results[2].message, "Approval status: awaiting_approval.")
+        self.assertIn("reporting ok health", results[0].message)
+        self.assertIn("The job is completed", results[1].message)
+        self.assertIn("The approval is awaiting_approval", results[2].message)
+        self.assertTrue(all("Why it matters:" in result.message for result in results))
+
+    def test_non_observability_actions_keep_existing_manager_message_contract(self):
+        transport = FakeGatewayTransport([
+            {
+                "ok": True,
+                "command": "blueprints.export",
+                "data": {
+                    "status": "completed",
+                    "presentation_url": "https://docs.google.com/presentation/d/deck/edit",
+                },
+            }
+        ])
+        result = TonyOrchestrationAdapter(transport).execute(
+            TonyCommand(
+                action="blueprint.export",
+                workspace_id="rave",
+                client_id="rave-client",
+                command_id="export-message-1",
+            )
+        )
+        self.assertEqual(
+            result.message,
+            "Blueprint export completed. https://docs.google.com/presentation/d/deck/edit",
+        )
 
     def test_duplicate_commands_reuse_same_idempotency_key(self):
         transport = FakeGatewayTransport()
