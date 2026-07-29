@@ -48,6 +48,21 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
             start_interval=60,
         ),
         AgentSpec(
+            "com.narratiive.proactive-watch",
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(proactive_brief),
+                "--mode",
+                "escalation",
+            ),
+            False,
+            start_interval=900,
+            run_at_load=False,
+        ),
+        AgentSpec(
             "com.narratiive.proactive-morning",
             (
                 str(python_path),
@@ -200,6 +215,7 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
     for label in (
         "com.narratiive.proactive-evening",
         "com.narratiive.proactive-morning",
+        "com.narratiive.proactive-watch",
         "com.narratiive.service-supervisor",
         "com.narratiive.tony-http-bridge",
         "com.narratiive.runtime",
