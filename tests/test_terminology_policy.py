@@ -7,6 +7,7 @@ class TerminologyPolicyTests(unittest.TestCase):
     def setUp(self) -> None:
         self.policy = TerminologyPolicy({
             "version": "1.0.0",
+            "version_note": "Initial canonical terminology policy.",
             "status": "active",
             "approved_terms": [
                 {"term": "Growth Blueprint", "use": "Canonical strategic output"},
@@ -28,14 +29,25 @@ class TerminologyPolicyTests(unittest.TestCase):
         self.assertEqual(self.policy.scan("The team is growth sprinting today."), [])
 
     def test_exposes_versioned_canonical_collections(self) -> None:
+        self.assertEqual(self.policy.version, "1.0.0")
+        self.assertEqual(self.policy.version_note, "Initial canonical terminology policy.")
         self.assertEqual(self.policy.approved_terms[0]["term"], "Growth Blueprint")
         self.assertEqual(self.policy.unsettled_terms[0]["concept"], "Paid engagement")
         self.assertEqual(self.policy.retired_terms[0]["term"], "Opportunity Card")
+
+    def test_rejects_missing_version_note(self) -> None:
+        with self.assertRaisesRegex(ValueError, "requires a version_note"):
+            TerminologyPolicy({
+                "version": "1.0.0",
+                "status": "active",
+                "retired_terms": [{"term": "Old Name", "rationale": "Retired"}],
+            })
 
     def test_rejects_duplicate_retired_terms(self) -> None:
         with self.assertRaisesRegex(ValueError, "Duplicate retired term"):
             TerminologyPolicy({
                 "version": "1",
+                "version_note": "Test policy.",
                 "status": "active",
                 "retired_terms": [
                     {"term": "Old Name", "rationale": "One"},
@@ -47,6 +59,7 @@ class TerminologyPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "requires use"):
             TerminologyPolicy({
                 "version": "1",
+                "version_note": "Test policy.",
                 "status": "active",
                 "approved_terms": [{"term": "Growth Blueprint", "use": ""}],
                 "retired_terms": [{"term": "Old Name", "rationale": "Retired"}],
@@ -59,6 +72,7 @@ class TerminologyPolicyTests(unittest.TestCase):
         ):
             TerminologyPolicy({
                 "version": "1",
+                "version_note": "Test policy.",
                 "status": "active",
                 "approved_terms": [
                     {"term": "Growth Sprint", "use": "Current offer"},
@@ -75,6 +89,7 @@ class TerminologyPolicyTests(unittest.TestCase):
         ):
             TerminologyPolicy({
                 "version": "1",
+                "version_note": "Test policy.",
                 "status": "active",
                 "unsettled_terms": [
                     {"concept": "Opportunity Card", "rule": "Do not name yet"},
@@ -91,6 +106,7 @@ class TerminologyPolicyTests(unittest.TestCase):
         ):
             TerminologyPolicy({
                 "version": "1",
+                "version_note": "Test policy.",
                 "status": "active",
                 "approved_terms": [
                     {"term": "Paid Engagement", "use": "Approved offer"},

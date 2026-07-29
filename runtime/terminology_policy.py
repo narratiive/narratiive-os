@@ -21,7 +21,8 @@ class TerminologyViolation:
 class TerminologyPolicy:
     def __init__(self, payload: dict) -> None:
         self._validate(payload)
-        self.version = payload["version"]
+        self.version = payload["version"].strip()
+        self.version_note = payload["version_note"].strip()
         self.approved_terms = tuple(payload.get("approved_terms", ()))
         self.unsettled_terms = tuple(payload.get("unsettled_terms", ()))
         self.retired_terms = tuple(payload["retired_terms"])
@@ -37,6 +38,8 @@ class TerminologyPolicy:
             raise ValueError("Terminology policy must be active")
         if not isinstance(payload.get("version"), str) or not payload["version"].strip():
             raise ValueError("Terminology policy requires a version")
+        if not isinstance(payload.get("version_note"), str) or not payload["version_note"].strip():
+            raise ValueError("Terminology policy requires a version_note")
 
         approved_names = TerminologyPolicy._validate_named_entries(
             payload.get("approved_terms", []),

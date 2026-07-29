@@ -56,7 +56,10 @@ class TonyTerminologyCommandService:
         )
         retired = tuple(entry["term"] for entry in self.policy.retired_terms)
 
-        lines = [f"Narratiive vocabulary v{self.policy.version}"]
+        lines = [
+            f"Narratiive vocabulary v{self.policy.version}",
+            f"Version note: {self.policy.version_note}",
+        ]
         if approved:
             lines.append("Approved:")
             lines.extend(f"- {item}" for item in approved)
@@ -73,6 +76,7 @@ class TonyTerminologyCommandService:
             message="\n".join(lines),
             data={
                 "policy_version": self.policy.version,
+                "version_note": self.policy.version_note,
                 "approved_terms": list(self.policy.approved_terms),
                 "unsettled_terms": list(self.policy.unsettled_terms),
                 "retired_terms": list(self.policy.retired_terms),
