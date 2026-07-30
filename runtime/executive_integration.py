@@ -4,6 +4,7 @@ from dataclasses import replace
 from typing import Iterable
 
 from runtime.executive_brief import BriefPeriod, ExecutiveBrief, ExecutiveBriefService
+from runtime.executive_memory import ExecutiveMemoryStore, MemoryKind, MemoryScope
 from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 
 
@@ -84,20 +85,104 @@ class ExecutiveChangeFilter:
         return tuple(output)
 
 
+class ExecutiveMemoryIntegration:
+    """Select and record durable continuity for executive brief generation."""
+
+    RECALL_KINDS = (
+        MemoryKind.DECISION,
+        MemoryKind.COMMITMENT,
+        MemoryKind.APPROVAL,
+        MemoryKind.CONTEXT,
+        MemoryKind.OUTCOME,
+    )
+
+    def __init__(
+        self,
+        store: ExecutiveMemoryStore,
+        *,
+        scope: MemoryScope | None = None,
+    ) -> None:
+        self.store = store
+        self.scope = scope or MemoryScope()
+
+    def recall(self, *, limit: int = 8) -> tuple[str, ...]:
+        records = self.store.select(
+            scope=self.scope,
+            kinds=self.RECALL_KINDS,
+            minimum_importance=3,
+            limit=limit,
+        )
+        return tuple(self._line(record.kind, record.summary) for record in records)
+
+    def approvals(self, *, limit: int = 5) -> tuple[str, ...]:
+        records = self.store.select(
+            scope=self.scope,
+            kinds=(MemoryKind.APPROVAL, MemoryKind.DECISION, MemoryKind.COMMITMENT),
+            minimum_importance=3,
+            requires_matt=True,
+            limit=limit,
+        )
+        return tuple(self._line(record.kind, record.summary) for record in records)
+
+    def capture(self, brief: ExecutiveBrief) -> None:
+        summary = (
+            f"{brief.period.value} executive brief generated: "
+            f"{len(brief.changed)} changes, {len(brief.blockers)} blockers, "
+            f"{len(brief.approvals)} approvals"
+        )
+        existing = self.store.select(
+            scope=self.scope,
+            kinds=(MemoryKind.OUTCOME,),
+            minimum_importance=1,
+            limit=1,
+        )
+        if existing and existing[0].summary == summary:
+            return
+        self.store.append(
+            kind=MemoryKind.OUTCOME,
+            summary=summary,
+            detail=brief.executive.recommendation,
+            scope=self.scope,
+            source="executive_brief",
+            importance=3,
+        )
+
+    @staticmethod
+    def _line(kind: MemoryKind, summary: str) -> str:
+        return f"Memory — {kind.value}: {summary}"
+
+
 class IntegratedExecutiveBriefService(ExecutiveBriefService):
     """Business-first executive brief service used by live Tony commands."""
+
+    def __init__(
+        self,
+        mission_control=None,
+        *,
+        memory: ExecutiveMemoryIntegration | None = None,
+    ) -> None:
+        super().__init__(mission_control)
+        self._memory = memory
 
     def build(self, snapshot: MissionControlSnapshot, period: BriefPeriod) -> ExecutiveBrief:
         brief = super().build(snapshot, period)
         ordered = sorted(snapshot.workstreams, key=ExecutivePriorityEngine.key)
         active = tuple(item for item in ordered if item.state not in {"tested", "used", "unknown"})
+        recalled = self._memory.recall() if self._memory is not None else ()
+        recalled_approvals = self._memory.approvals() if self._memory is not None else ()
 
         priorities = ExecutiveChangeFilter.unique(
-            (self._work_line(item) for item in active),
+            (
+                *(self._work_line(item) for item in active),
+                *(recalled if period is BriefPeriod.MORNING else ()),
+            ),
             limit=self.PRIORITY_LIMIT,
         )
         open_items = ExecutiveChangeFilter.unique(
-            (self._work_line(item) for item in active),
+            (
+                *(self._work_line(item) for item in active),
+                *(recalled if period is BriefPeriod.EVENING else ()),
+            ),
             limit=self.ITEM_LIMIT,
         )
         tony_handling = ExecutiveChangeFilter.unique(
@@ -110,23 +195,28 @@ class IntegratedExecutiveBriefService(ExecutiveBriefService):
         )
         carry_forward = ExecutiveChangeFilter.unique(
             (
-                self._work_line(item)
-                for item in active
-                if item.state in {"blocked", "known", "functional"}
+                *(self._work_line(item) for item in active if item.state in {"blocked", "known", "functional"}),
+                *(recalled if period is BriefPeriod.EVENING else ()),
             ),
             limit=self.PRIORITY_LIMIT,
         )
 
-        return replace(
+        integrated = replace(
             brief,
             priorities=priorities if period is BriefPeriod.MORNING else (),
             open_items=open_items if period is BriefPeriod.EVENING else (),
             changed=ExecutiveChangeFilter.unique(brief.changed, limit=self.ITEM_LIMIT),
             blockers=ExecutiveChangeFilter.unique(brief.blockers, limit=self.ITEM_LIMIT),
-            approvals=ExecutiveChangeFilter.unique(brief.approvals, limit=self.ITEM_LIMIT),
+            approvals=ExecutiveChangeFilter.unique(
+                (*recalled_approvals, *brief.approvals),
+                limit=self.ITEM_LIMIT,
+            ),
             tony_handling=tony_handling if period is BriefPeriod.MORNING else (),
             carry_forward=carry_forward if period is BriefPeriod.EVENING else (),
             system_watchouts=ExecutiveChangeFilter.unique(
                 brief.system_watchouts, limit=self.ITEM_LIMIT
             ),
         )
+        if self._memory is not None:
+            self._memory.capture(integrated)
+        return integrated
