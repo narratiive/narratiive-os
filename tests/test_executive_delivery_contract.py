@@ -54,6 +54,26 @@ class ExecutiveMessageContentTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "at least one item"):
             ExecutiveMessageContent.from_materials([" "])
 
+    def test_rejects_retired_language_in_executive_brief(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "retired terminology: Opportunity Card",
+        ):
+            ExecutiveMessageContent.from_command_response(
+                command="morning",
+                message="Send the Opportunity Card today.",
+                data={"evidence": ["issue:58"]},
+            )
+
+    def test_rejects_retired_language_in_rendered_escalation_material(self):
+        with self.assertRaisesRegex(
+            ValueError,
+            "retired terminology: Growth Sprint",
+        ):
+            ExecutiveMessageContent.from_materials(
+                ["approval: Growth Sprint proposal"]
+            )
+
 
 class TelegramExecutiveRendererTests(unittest.TestCase):
     def setUp(self):
