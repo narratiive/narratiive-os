@@ -3,9 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol
 
+from runtime.terminology_policy import TerminologyPolicy
+
 
 VALID_DELIVERY_CHANNELS = {"telegram", "email", "slack"}
 VALID_EXECUTIVE_MESSAGE_KINDS = {"brief", "escalation"}
+
+
+def _reject_retired_language(*texts: str) -> None:
+    policy = TerminologyPolicy.from_path()
+    violations = policy.scan_many(texts)
+    if not violations:
+        return
+    terms = ", ".join(dict.fromkeys(violation.term for violation in violations))
+    raise ValueError(f"Executive message contains retired terminology: {terms}")
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,10 +58,17 @@ class ExecutiveMessageContent:
         if not summary:
             raise ValueError("Executive message summary is required")
         evidence = tuple(dict.fromkeys(item.strip() for item in self.evidence if item.strip()))
+        data = dict(self.data)
+        rendered_data: tuple[str, ...] = ()
+        if kind == "escalation":
+            materials = data.get("materials", ())
+            if isinstance(materials, (list, tuple)):
+                rendered_data = tuple(str(item) for item in materials)
+        _reject_retired_language(title, summary, *rendered_data)
         object.__setattr__(self, "kind", kind)
         object.__setattr__(self, "title", title)
         object.__setattr__(self, "summary", summary)
-        object.__setattr__(self, "data", dict(self.data))
+        object.__setattr__(self, "data", data)
         object.__setattr__(self, "evidence", evidence)
 
     @classmethod
