@@ -7,10 +7,13 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 from uuid import uuid4
 
 from .wsgi_api import RuntimeWSGIApp
+
+
+MissionControlSnapshotLoader = Callable[[str], Any]
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,12 +21,15 @@ class GatewayConfig:
     api_key: str
     idempotency_root: str | Path
     max_body_bytes: int = 1_000_000
+    mission_control_workspace_id: str | None = None
 
     def __post_init__(self) -> None:
         if not self.api_key.strip():
             raise ValueError("api_key must not be empty")
         if self.max_body_bytes <= 0:
             raise ValueError("max_body_bytes must be positive")
+        if self.mission_control_workspace_id is not None and not self.mission_control_workspace_id.strip():
+            raise ValueError("mission_control_workspace_id must not be empty")
 
 
 class FileIdempotencyStore:
@@ -69,9 +75,15 @@ class FileIdempotencyStore:
 class ProductionGateway:
     """Operational WSGI boundary with auth, correlation and idempotency."""
 
-    def __init__(self, app: RuntimeWSGIApp, config: GatewayConfig) -> None:
+    def __init__(
+        self,
+        app: RuntimeWSGIApp,
+        config: GatewayConfig,
+        mission_control_loader: MissionControlSnapshotLoader | None = None,
+    ) -> None:
         self.app = app
         self.config = config
+        self.mission_control_loader = mission_control_loader
         self.idempotency = FileIdempotencyStore(config.idempotency_root)
 
     def __call__(self, environ: dict, start_response: Callable) -> Iterable[bytes]:
@@ -82,13 +94,18 @@ class ProductionGateway:
         if method == "GET" and path in {"/health", "/live", "/ready"}:
             return self._json(start_response, "200 OK", {"ok": True, "status": "ok", "correlation_id": correlation_id}, correlation_id)
 
+        if method == "GET" and path == "/mission-control":
+            unauthorized = self._authorize(environ, start_response, correlation_id)
+            if unauthorized is not None:
+                return unauthorized
+            return self._mission_control(environ, start_response, correlation_id)
+
         if method != "POST" or path != "/commands":
             return self._json(start_response, "404 Not Found", {"ok": False, "error": {"code": "not_found", "message": "not found"}, "correlation_id": correlation_id}, correlation_id)
 
-        supplied = environ.get("HTTP_AUTHORIZATION", "")
-        expected = f"Bearer {self.config.api_key}"
-        if not hmac.compare_digest(supplied, expected):
-            return self._json(start_response, "401 Unauthorized", {"ok": False, "error": {"code": "unauthorized", "message": "invalid credentials"}, "correlation_id": correlation_id}, correlation_id)
+        unauthorized = self._authorize(environ, start_response, correlation_id)
+        if unauthorized is not None:
+            return unauthorized
 
         try:
             length = int(environ.get("CONTENT_LENGTH") or "0")
@@ -131,6 +148,54 @@ class ProductionGateway:
             self.idempotency.put(idem_key, request_hash, status, headers, response_body)
         start_response(status, headers)
         return [response_body]
+
+    def _authorize(
+        self,
+        environ: Mapping[str, object],
+        start_response: Callable,
+        correlation_id: str,
+    ) -> list[bytes] | None:
+        supplied = str(environ.get("HTTP_AUTHORIZATION", ""))
+        expected = f"Bearer {self.config.api_key}"
+        if hmac.compare_digest(supplied, expected):
+            return None
+        return self._json(start_response, "401 Unauthorized", {"ok": False, "error": {"code": "unauthorized", "message": "invalid credentials"}, "correlation_id": correlation_id}, correlation_id)
+
+    def _mission_control(
+        self,
+        environ: Mapping[str, object],
+        start_response: Callable,
+        correlation_id: str,
+    ) -> list[bytes]:
+        configured_workspace = self.config.mission_control_workspace_id
+        if self.mission_control_loader is None or configured_workspace is None:
+            return self._json(start_response, "503 Service Unavailable", {"ok": False, "error": {"code": "mission_control_unavailable", "message": "Mission Control is not configured"}, "correlation_id": correlation_id}, correlation_id)
+
+        requested_workspace = str(environ.get("HTTP_X_WORKSPACE_ID", "")).strip()
+        if not requested_workspace:
+            return self._json(start_response, "400 Bad Request", {"ok": False, "error": {"code": "workspace_required", "message": "X-Workspace-ID is required"}, "correlation_id": correlation_id}, correlation_id)
+        if not hmac.compare_digest(requested_workspace, configured_workspace):
+            return self._json(start_response, "404 Not Found", {"ok": False, "error": {"code": "workspace_not_found", "message": "workspace not found"}, "correlation_id": correlation_id}, correlation_id)
+
+        try:
+            snapshot = self.mission_control_loader(configured_workspace)
+            payload = snapshot.to_dict()
+            if not isinstance(payload, dict):
+                raise TypeError("snapshot must serialize to an object")
+        except Exception:
+            return self._json(start_response, "503 Service Unavailable", {"ok": False, "error": {"code": "mission_control_untrusted", "message": "Mission Control could not build a trusted snapshot"}, "correlation_id": correlation_id}, correlation_id)
+
+        return self._json(
+            start_response,
+            "200 OK",
+            {
+                "ok": True,
+                "workspace_id": configured_workspace,
+                "snapshot": payload,
+                "correlation_id": correlation_id,
+            },
+            correlation_id,
+        )
 
     @staticmethod
     def _json(start_response: Callable, status: str, payload: Mapping[str, object], correlation_id: str) -> list[bytes]:
