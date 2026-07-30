@@ -7,8 +7,10 @@ from typing import Any
 from wsgiref.simple_server import make_server
 
 from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_app
+from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
+from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
@@ -68,18 +70,30 @@ def build_app() -> TonyHTTPBridge:
             str(REPOSITORY_ROOT / ".runtime" / "executive-review-records"),
         )
     )
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+        or "narratiive"
+    )
     executive_service = TonyExecutiveCommandService(
         app.command_service,
         brief_archive=app.brief_archive,
         friday_record_loader=lambda: load_friday_review_records(records_root),
-        workspace_id=(
-            os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
-            or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
-            or "narratiive"
-        ),
+        workspace_id=workspace_id,
     )
     capability_service = TonyCapabilityCommandService(executive_service)
-    app.command_service = TonyTerminologyCommandService(capability_service)
+    memory_path = Path(
+        os.getenv(
+            "TONY_EXECUTIVE_MEMORY_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "executive-memory.jsonl"),
+        )
+    )
+    memory_service = TonyMemoryCommandService(
+        capability_service,
+        ExecutiveMemoryStore(memory_path),
+        agency_id=workspace_id,
+    )
+    app.command_service = TonyTerminologyCommandService(memory_service)
     return app
 
 
