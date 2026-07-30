@@ -6,11 +6,12 @@ from unittest import mock
 from openclaw import tony_live_bridge
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
+from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
 class TonyLiveBridgeTests(unittest.TestCase):
-    def test_build_app_composes_terminology_capability_and_executive_commands(self) -> None:
+    def test_build_app_composes_terminology_memory_capability_and_executive_commands(self) -> None:
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
@@ -22,7 +23,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
         self.assertIs(app, base_app)
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
-        capability = app.command_service.command_service
+        memory = app.command_service.command_service
+        self.assertIsInstance(memory, TonyMemoryCommandService)
+        capability = memory.command_service
         self.assertIsInstance(capability, TonyCapabilityCommandService)
         executive = capability.command_service
         self.assertIsInstance(executive, TonyExecutiveCommandService)
