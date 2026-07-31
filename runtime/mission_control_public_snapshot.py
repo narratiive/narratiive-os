@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Mapping, Protocol
 
 from runtime.mission_control_domains import MissionControlDomainRegistry
@@ -8,6 +9,24 @@ from runtime.mission_control_domains import MissionControlDomainRegistry
 
 class SerializableSnapshot(Protocol):
     def to_dict(self) -> dict[str, Any]: ...
+
+
+def _freeze_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({str(key): _freeze_value(item) for key, item in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_value(item) for item in value)
+    if isinstance(value, (str, int, float, bool)) or value is None:
+        return value
+    raise TypeError("Mission Control snapshots must contain only serializable values")
+
+
+def _thaw_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return {key: _thaw_value(item) for key, item in value.items()}
+    if isinstance(value, tuple):
+        return [_thaw_value(item) for item in value]
+    return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -26,16 +45,16 @@ class MissionControlPublicSnapshot:
             raise TypeError("Mission Control snapshot payload must be an object")
         if not isinstance(self.domains, Mapping):
             raise TypeError("Mission Control domain payload must be an object")
+
         object.__setattr__(self, "workspace_id", workspace_id)
+        object.__setattr__(self, "snapshot", _freeze_value(self.snapshot))
+        object.__setattr__(self, "domains", _freeze_value(self.domains))
 
     def to_dict(self) -> dict[str, Any]:
         return {
             "workspace_id": self.workspace_id,
-            "snapshot": dict(self.snapshot),
-            "domains": {
-                name: dict(value)
-                for name, value in self.domains.items()
-            },
+            "snapshot": _thaw_value(self.snapshot),
+            "domains": _thaw_value(self.domains),
         }
 
 
