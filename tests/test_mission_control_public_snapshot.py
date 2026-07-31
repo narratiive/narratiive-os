@@ -65,6 +65,55 @@ class MissionControlPublicSnapshotTests(unittest.TestCase):
 
         self.assertEqual(first, second)
 
+    def test_snapshot_isolated_from_source_mutation(self) -> None:
+        source_payload = {
+            "status": "partial",
+            "recommended_focus_details": [{"recommendation": "Review approvals"}],
+        }
+        public = self.builder.build(
+            requested_workspace_id="narratiive",
+            snapshot=StubSnapshot(source_payload),
+        )
+
+        source_payload["status"] = "healthy"
+        source_payload["recommended_focus_details"][0]["recommendation"] = "Changed"
+
+        payload = public.to_dict()
+        self.assertEqual(payload["snapshot"]["status"], "partial")
+        self.assertEqual(
+            payload["snapshot"]["recommended_focus_details"][0]["recommendation"],
+            "Review approvals",
+        )
+
+    def test_serialized_payload_mutation_does_not_change_snapshot(self) -> None:
+        public = self.builder.build(
+            requested_workspace_id="narratiive",
+            snapshot=StubSnapshot(
+                {
+                    "status": "partial",
+                    "recommended_focus_details": [{"recommendation": "Review approvals"}],
+                }
+            ),
+        )
+
+        first = public.to_dict()
+        first["snapshot"]["status"] = "healthy"
+        first["snapshot"]["recommended_focus_details"][0]["recommendation"] = "Changed"
+
+        second = public.to_dict()
+        self.assertEqual(second["snapshot"]["status"], "partial")
+        self.assertEqual(
+            second["snapshot"]["recommended_focus_details"][0]["recommendation"],
+            "Review approvals",
+        )
+
+    def test_non_serializable_nested_value_fails_closed(self) -> None:
+        with self.assertRaisesRegex(TypeError, "serializable values"):
+            self.builder.build(
+                requested_workspace_id="narratiive",
+                snapshot=StubSnapshot({"status": object()}),
+            )
+
     def test_cross_workspace_snapshot_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "workspace mismatch"):
             self.builder.build(
