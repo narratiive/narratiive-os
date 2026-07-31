@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
 from types import MappingProxyType
 from typing import Any, Mapping, Protocol
 
@@ -16,7 +17,11 @@ def _freeze_value(value: Any) -> Any:
         return MappingProxyType({str(key): _freeze_value(item) for key, item in value.items()})
     if isinstance(value, (list, tuple)):
         return tuple(_freeze_value(item) for item in value)
-    if isinstance(value, (str, int, float, bool)) or value is None:
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError("Mission Control snapshots require finite numeric values")
+        return value
+    if isinstance(value, (str, int, bool)) or value is None:
         return value
     raise TypeError("Mission Control snapshots must contain only serializable values")
 

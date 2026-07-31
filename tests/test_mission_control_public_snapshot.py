@@ -1,3 +1,4 @@
+import json
 import unittest
 
 from runtime.mission_control_domains import REQUIRED_MISSION_CONTROL_DOMAINS
@@ -113,6 +114,25 @@ class MissionControlPublicSnapshotTests(unittest.TestCase):
                 requested_workspace_id="narratiive",
                 snapshot=StubSnapshot({"status": object()}),
             )
+
+    def test_non_finite_numbers_fail_closed(self) -> None:
+        for value in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ValueError, "finite numeric values"):
+                    self.builder.build(
+                        requested_workspace_id="narratiive",
+                        snapshot=StubSnapshot({"confidence": value}),
+                    )
+
+    def test_snapshot_is_strict_json_serializable(self) -> None:
+        public = self.builder.build(
+            requested_workspace_id="narratiive",
+            snapshot=StubSnapshot({"confidence": 0.8, "status": "healthy"}),
+        )
+
+        encoded = json.dumps(public.to_dict(), allow_nan=False, sort_keys=True)
+
+        self.assertIn('"confidence": 0.8', encoded)
 
     def test_cross_workspace_snapshot_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "workspace mismatch"):
