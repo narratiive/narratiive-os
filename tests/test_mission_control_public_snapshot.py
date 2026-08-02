@@ -28,17 +28,10 @@ class MissionControlPublicSnapshotTests(unittest.TestCase):
                 }
             ),
             domain_values={
-                "active_work": {
-                    "state": "connected",
-                    "evidence": ["workstreams/0"],
-                },
-                "approvals": {
-                    "state": "connected",
-                    "evidence": ["approvals_required/0"],
-                },
+                "active_work": {"state": "connected", "evidence": ["workstreams/0"]},
+                "approvals": {"state": "connected", "evidence": ["approvals_required/0"]},
             },
         )
-
         payload = public.to_dict()
         self.assertEqual(payload["workspace_id"], "narratiive")
         self.assertEqual(payload["snapshot"]["status"], "partial")
@@ -52,101 +45,69 @@ class MissionControlPublicSnapshotTests(unittest.TestCase):
             "health": {"state": "connected", "evidence": ["progress/status"]},
             "recent_wins": {"state": "connected", "evidence": ["recent_wins/0"]},
         }
-
-        first = self.builder.build(
-            requested_workspace_id="narratiive",
-            snapshot=source,
-            domain_values=domains,
-        ).to_dict()
-        second = self.builder.build(
-            requested_workspace_id="narratiive",
-            snapshot=source,
-            domain_values=domains,
-        ).to_dict()
-
+        first = self.builder.build(requested_workspace_id="narratiive", snapshot=source, domain_values=domains).to_dict()
+        second = self.builder.build(requested_workspace_id="narratiive", snapshot=source, domain_values=domains).to_dict()
         self.assertEqual(first, second)
 
     def test_snapshot_isolated_from_source_mutation(self) -> None:
-        source_payload = {
-            "status": "partial",
-            "recommended_focus_details": [{"recommendation": "Review approvals"}],
-        }
-        public = self.builder.build(
-            requested_workspace_id="narratiive",
-            snapshot=StubSnapshot(source_payload),
-        )
-
+        source_payload = {"status": "partial", "recommended_focus_details": [{"recommendation": "Review approvals"}]}
+        public = self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot(source_payload))
         source_payload["status"] = "healthy"
         source_payload["recommended_focus_details"][0]["recommendation"] = "Changed"
-
         payload = public.to_dict()
         self.assertEqual(payload["snapshot"]["status"], "partial")
-        self.assertEqual(
-            payload["snapshot"]["recommended_focus_details"][0]["recommendation"],
-            "Review approvals",
-        )
+        self.assertEqual(payload["snapshot"]["recommended_focus_details"][0]["recommendation"], "Review approvals")
 
     def test_serialized_payload_mutation_does_not_change_snapshot(self) -> None:
         public = self.builder.build(
             requested_workspace_id="narratiive",
-            snapshot=StubSnapshot(
-                {
-                    "status": "partial",
-                    "recommended_focus_details": [{"recommendation": "Review approvals"}],
-                }
-            ),
+            snapshot=StubSnapshot({"status": "partial", "recommended_focus_details": [{"recommendation": "Review approvals"}]}),
         )
-
         first = public.to_dict()
         first["snapshot"]["status"] = "healthy"
         first["snapshot"]["recommended_focus_details"][0]["recommendation"] = "Changed"
-
         second = public.to_dict()
         self.assertEqual(second["snapshot"]["status"], "partial")
-        self.assertEqual(
-            second["snapshot"]["recommended_focus_details"][0]["recommendation"],
-            "Review approvals",
-        )
+        self.assertEqual(second["snapshot"]["recommended_focus_details"][0]["recommendation"], "Review approvals")
 
     def test_non_serializable_nested_value_fails_closed(self) -> None:
         with self.assertRaisesRegex(TypeError, "serializable values"):
-            self.builder.build(
-                requested_workspace_id="narratiive",
-                snapshot=StubSnapshot({"status": object()}),
-            )
+            self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot({"status": object()}))
 
     def test_non_finite_numbers_fail_closed(self) -> None:
         for value in (float("nan"), float("inf"), float("-inf")):
             with self.subTest(value=value):
                 with self.assertRaisesRegex(ValueError, "finite numeric values"):
-                    self.builder.build(
-                        requested_workspace_id="narratiive",
-                        snapshot=StubSnapshot({"confidence": value}),
-                    )
+                    self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot({"confidence": value}))
 
     def test_snapshot_is_strict_json_serializable(self) -> None:
-        public = self.builder.build(
-            requested_workspace_id="narratiive",
-            snapshot=StubSnapshot({"confidence": 0.8, "status": "healthy"}),
-        )
-
+        public = self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot({"confidence": 0.8, "status": "healthy"}))
         encoded = json.dumps(public.to_dict(), allow_nan=False, sort_keys=True)
-
         self.assertIn('"confidence": 0.8', encoded)
+
+    def test_canonical_json_is_deterministic_compact_and_unicode_safe(self) -> None:
+        source = StubSnapshot({"status": "healthy", "note": "Narratiive ✓"})
+        domains = {"health": {"state": "connected", "evidence": ["progress/status"]}}
+        first = self.builder.build(requested_workspace_id="narratiive", snapshot=source, domain_values=domains).to_json()
+        second = self.builder.build(requested_workspace_id="narratiive", snapshot=source, domain_values=domains).to_json()
+        self.assertEqual(first, second)
+        self.assertNotIn("\n", first)
+        self.assertNotIn(": ", first)
+        self.assertIn("Narratiive ✓", first)
+        self.assertEqual(json.loads(first)["snapshot"]["status"], "healthy")
+
+    def test_canonical_json_sorts_mapping_keys(self) -> None:
+        public = self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot({"zeta": 1, "alpha": 2}))
+        encoded = public.to_json()
+        self.assertLess(encoded.index('"alpha"'), encoded.index('"zeta"'))
 
     def test_cross_workspace_snapshot_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "workspace mismatch"):
-            self.builder.build(
-                requested_workspace_id="client-a",
-                snapshot=StubSnapshot({"status": "healthy"}),
-            )
+            self.builder.build(requested_workspace_id="client-a", snapshot=StubSnapshot({"status": "healthy"}))
 
     def test_non_object_snapshot_fails_closed(self) -> None:
         with self.assertRaisesRegex(TypeError, "snapshot must serialize to an object"):
-            self.builder.build(
-                requested_workspace_id="narratiive",
-                snapshot=StubSnapshot(["not", "an", "object"]),
-            )
+            self.builder.build(requested_workspace_id="narratiive", snapshot=StubSnapshot(["not", "an", "object"]))
 
     def test_invalid_domain_evidence_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "connected Mission Control domains require evidence"):
