@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from math import isfinite
 from types import MappingProxyType
@@ -61,6 +62,17 @@ class MissionControlPublicSnapshot:
             "snapshot": _thaw_value(self.snapshot),
             "domains": _thaw_value(self.domains),
         }
+
+    def to_json(self) -> str:
+        """Return stable, standards-compliant JSON for presentation adapters."""
+
+        return json.dumps(
+            self.to_dict(),
+            allow_nan=False,
+            ensure_ascii=False,
+            separators=(",", ":"),
+            sort_keys=True,
+        )
 
 
 class MissionControlPublicSnapshotBuilder:
