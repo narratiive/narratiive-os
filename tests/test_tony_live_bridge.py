@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import io
+import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
@@ -15,13 +19,18 @@ class TonyLiveBridgeTests(unittest.TestCase):
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
+        base_app.bridge_token = ""
         archive = mock.Mock()
         base_app.brief_archive = archive
 
-        with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            tony_live_bridge, "build_base_app", return_value=base_app
+        ), mock.patch.dict(
+            "os.environ", {"TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json")}
+        ):
             app = tony_live_bridge.build_app()
 
-        self.assertIs(app, base_app)
+        self.assertIs(app.base, base_app)
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
@@ -38,11 +47,52 @@ class TonyLiveBridgeTests(unittest.TestCase):
         loader = mock.Mock()
         base_service.mission_control_loader = loader
         base_app.command_service = base_service
+        base_app.bridge_token = ""
 
-        with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app):
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            tony_live_bridge, "build_base_app", return_value=base_app
+        ), mock.patch.dict(
+            "os.environ", {"TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json")}
+        ):
             app = tony_live_bridge.build_app()
 
         self.assertIs(app.command_service.mission_control_loader, loader)
+
+    def test_lead_ingestion_is_authenticated_and_persisted(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base_app = mock.Mock()
+            base_app.bridge_token = "secret"
+            base_app.command_service = mock.Mock()
+            base_app.brief_archive = mock.Mock()
+            store = tony_live_bridge.FileInboundLeadStore(Path(tmp) / "leads.json")
+            app = tony_live_bridge.LeadAwareTonyApplication(base_app, store)
+            payload = json.dumps(
+                {
+                    "lead_id": "lead-1",
+                    "contact": "Steve",
+                    "company": "Steve Company",
+                    "source": "Growth Diagnostic",
+                    "status": "New",
+                }
+            ).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST",
+                "PATH_INFO": "/leads/ingest",
+                "CONTENT_LENGTH": str(len(payload)),
+                "CONTENT_TYPE": "application/json",
+                "HTTP_AUTHORIZATION": "Bearer secret",
+                "wsgi.input": io.BytesIO(payload),
+            }
+            status = {}
+
+            response = app(environ, lambda value, headers: status.update(value=value, headers=headers))
+
+            self.assertTrue(status["value"].startswith("200"))
+            body = json.loads(b"".join(response).decode("utf-8"))
+            self.assertTrue(body["ok"])
+            saved = store.read()
+            self.assertEqual(len(saved), 1)
+            self.assertEqual(saved[0].contact, "Steve")
 
     def test_build_app_fails_closed_without_command_service(self) -> None:
         base_app = mock.Mock()
