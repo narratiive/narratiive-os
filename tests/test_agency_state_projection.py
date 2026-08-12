@@ -33,7 +33,8 @@ class AgencyStateProjectionTests(unittest.TestCase):
         lead_feed = state.items_for(AgencyArea.AUTOMATION)
         self.assertEqual(len(lead_feed), 1)
         self.assertIn("Inbound lead feed unavailable", lead_feed[0].title)
-        self.assertTrue(lead_feed[0].blocks_agency_outcome)
+        self.assertFalse(lead_feed[0].blocks_agency_outcome)
+        self.assertFalse(lead_feed[0].blocked)
 
     def test_connected_empty_lead_source_creates_truthful_commercial_empty_state(self):
         snapshot = MissionControlSnapshot(
