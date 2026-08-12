@@ -16,5 +16,15 @@ if [[ ! -x "$PYTHON" ]]; then
   exit 1
 fi
 
+PYTHON_VERSION="$($PYTHON -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+PYTHON_OK="$($PYTHON -c 'import sys; print("yes" if sys.version_info >= (3, 10) else "no")')"
+if [[ "$PYTHON_OK" != "yes" ]]; then
+  echo "Narratiive OS requires Python 3.10+; canonical .venv is $PYTHON_VERSION" >&2
+  exit 1
+fi
+
+echo "Narratiive OS deploy: $REPO"
+echo "Python: $PYTHON ($PYTHON_VERSION)"
+
 cd "$REPO"
 exec "$PYTHON" "$DEPLOY" --apply
