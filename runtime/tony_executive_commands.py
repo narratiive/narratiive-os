@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from runtime.agency_executive_brief import (
@@ -15,12 +17,14 @@ from runtime.friday_executive_review import (
     ReviewRecord,
     ReviewRecordType,
 )
+from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
 
 ReviewRecordLoader = Callable[[], Iterable[dict[str, Any]]]
 TerminologyPolicyLoader = Callable[[], TerminologyPolicy]
+InboundLeadLoader = Callable[[], Iterable[InboundLead]]
 _FRIDAY_RECORD_FIELDS = {
     "record_id",
     "occurred_at",
@@ -56,6 +60,7 @@ class TonyExecutiveCommandService:
         workspace_id: str = "narratiive",
         agency_projector: AgencyStateProjector | None = None,
         agency_brief_service: AgencyExecutiveBriefService | None = None,
+        inbound_lead_loader: InboundLeadLoader | None = None,
     ) -> None:
         self.command_service = command_service
         self.brief_service = brief_service or IntegratedExecutiveBriefService()
@@ -68,6 +73,20 @@ class TonyExecutiveCommandService:
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
 
+        self._lead_store_path: Path | None = None
+        if inbound_lead_loader is None:
+            self._lead_store_path = Path(
+                os.getenv(
+                    "TONY_INBOUND_LEADS_PATH",
+                    ".runtime/inbound-leads.json",
+                )
+            ).resolve()
+            self.inbound_lead_loader = FileInboundLeadStore(self._lead_store_path).read
+            self._explicit_inbound_loader = False
+        else:
+            self.inbound_lead_loader = inbound_lead_loader
+            self._explicit_inbound_loader = True
+
     @property
     def mission_control_loader(self):
         """Expose delegated configuration for bridge health and diagnostics."""
@@ -76,6 +95,11 @@ class TonyExecutiveCommandService:
     @property
     def github_configured(self) -> bool:
         return bool(getattr(self.command_service, "github_configured", False))
+
+    def _lead_source_available(self) -> bool:
+        if self._explicit_inbound_loader:
+            return True
+        return bool(self._lead_store_path and self._lead_store_path.exists())
 
     def execute(
         self,
@@ -98,7 +122,13 @@ class TonyExecutiveCommandService:
         try:
             policy = self.terminology_policy_loader()
             snapshot = loader()
-            state = self.agency_projector.project(snapshot)
+            lead_source_available = self._lead_source_available()
+            leads = tuple(self.inbound_lead_loader()) if lead_source_available else ()
+            state = self.agency_projector.project(
+                snapshot,
+                leads,
+                lead_source_available=lead_source_available,
+            )
             brief = self.agency_brief_service.build(state, period)
             message = brief.render_compact()
             violations = policy.scan(message)
@@ -124,6 +154,8 @@ class TonyExecutiveCommandService:
         data = brief.to_dict()
         data["agency_state"] = state.to_dict()
         data["terminology_policy_version"] = policy.version
+        data["inbound_leads_loaded"] = len(leads)
+        data["inbound_lead_source_available"] = lead_source_available
         return CommandResponse(
             command=canonical_command,
             status=brief.status,
