@@ -11,6 +11,40 @@ CANONICAL_NOTION_LEADS_DATABASE_ID = "34b0c9cf-a8f2-80aa-9862-f05f4a65c676"
 CANONICAL_NOTION_LEADS_DATA_SOURCE_ID = "34b0c9cf-a8f2-80af-98e4-000b95243de6"
 
 
+def _plain_text(value: Any) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, (int, float, bool)):
+        return str(value).strip()
+    if isinstance(value, list):
+        parts = [_plain_text(item) for item in value]
+        return " ".join(part for part in parts if part).strip()
+    if not isinstance(value, dict):
+        return ""
+
+    for key in ("plain_text", "content", "name", "email", "url"):
+        if value.get(key):
+            return _plain_text(value[key])
+    for key in ("title", "rich_text", "select", "status", "email", "url", "number"):
+        if key in value:
+            return _plain_text(value[key])
+    return ""
+
+
+def _property(properties: dict[str, Any], name: str) -> str:
+    return _plain_text(properties.get(name))
+
+
+def _default_summary(contact: str, company: str, notes: str) -> str:
+    notes = " ".join(notes.split()).strip()
+    if not notes:
+        return ""
+    subject = company or contact or "This lead"
+    return f"{subject} submitted an inbound growth enquiry: {notes}"
+
+
 @dataclass(frozen=True, slots=True)
 class InboundLead:
     lead_id: str
@@ -24,6 +58,8 @@ class InboundLead:
     recommended_next_action: str = "Review the lead and decide the next commercial action."
     created_at: str = ""
     notion_url: str = ""
+    notes: str = ""
+    ai_summary: str = ""
 
     def __post_init__(self) -> None:
         if not self.lead_id.strip():
@@ -35,22 +71,68 @@ class InboundLead:
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> "InboundLead":
+        # Accept both the normalized contract and an entire Notion Create Page
+        # response so n8n does not need to reproduce Narratiive business logic.
+        properties = value.get("properties") if isinstance(value.get("properties"), dict) else {}
+
+        def choose(*names: str, default: str = "") -> str:
+            for name in names:
+                raw = value.get(name)
+                text = _plain_text(raw)
+                if text:
+                    return text
+                if properties:
+                    text = _property(properties, name)
+                    if text:
+                        return text
+            return default
+
+        notion_url = choose("notion_url", "url")
+        lead_id = choose("lead_id", "id") or notion_url
+        contact = choose("contact", "Contact", "name")
+        company = choose("company", "Company")
+        email = choose("email", "Email")
+        source = choose("source", "Source", default="Unknown") or "Unknown"
+        status = choose("status", "Status", default="New") or "New"
+        notes = choose("notes", "Notes")
+        pipeline_stage = choose("pipeline_stage", "Pipeline Stage")
+        lead_temperature = choose("lead_temperature", "Lead Temperature")
+        recommended_next_action = choose("recommended_next_action", "Recommended Next Action")
+        ai_summary = choose("ai_summary", "AI Summary")
+        created_at = choose("created_at", "createdTime", "created_time")
+
+        # Capture surfaces provide facts. Narratiive owns workflow defaults.
+        # An inbound submission is visible immediately but is not auto-qualified.
+        if source.casefold() in {"tally", "growth diagnostic", "website"}:
+            if not pipeline_stage:
+                pipeline_stage = "New Diagnostic"
+            if not lead_temperature:
+                lead_temperature = "Warm"
+            if not recommended_next_action:
+                recommended_next_action = (
+                    "Review the growth challenge, validate fit for Narratiive, and decide whether to prepare "
+                    "an Opportunity Card or invite the lead to discovery."
+                )
+            if not ai_summary:
+                ai_summary = _default_summary(contact, company, notes)
+
         return cls(
-            lead_id=str(value.get("lead_id") or value.get("id") or value.get("notion_url") or "").strip(),
-            contact=str(value.get("contact") or value.get("Contact") or value.get("name") or "").strip(),
-            company=str(value.get("company") or value.get("Company") or "").strip(),
-            email=str(value.get("email") or value.get("Email") or "").strip(),
-            source=str(value.get("source") or value.get("Source") or "Unknown").strip() or "Unknown",
-            status=str(value.get("status") or value.get("Status") or "New").strip() or "New",
-            pipeline_stage=str(value.get("pipeline_stage") or value.get("Pipeline Stage") or "").strip(),
-            lead_temperature=str(value.get("lead_temperature") or value.get("Lead Temperature") or "").strip(),
-            recommended_next_action=str(
-                value.get("recommended_next_action")
-                or value.get("Recommended Next Action")
+            lead_id=lead_id.strip(),
+            contact=contact.strip(),
+            company=company.strip(),
+            email=email.strip(),
+            source=source.strip() or "Unknown",
+            status=status.strip() or "New",
+            pipeline_stage=pipeline_stage.strip(),
+            lead_temperature=lead_temperature.strip(),
+            recommended_next_action=(
+                recommended_next_action.strip()
                 or "Review the lead and decide the next commercial action."
-            ).strip(),
-            created_at=str(value.get("created_at") or value.get("createdTime") or "").strip(),
-            notion_url=str(value.get("notion_url") or value.get("url") or "").strip(),
+            ),
+            created_at=created_at.strip(),
+            notion_url=notion_url.strip(),
+            notes=notes.strip(),
+            ai_summary=ai_summary.strip(),
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -88,7 +170,7 @@ class FileInboundLeadStore:
     """Durable synchronized view of inbound leads for Tony's executive runtime.
 
     Notion remains the commercial source of truth. This store is a local projection
-    fed by the same n8n capture flow so Tony can reason about live leads without
+    fed by the same capture flow so Tony can reason about live leads without
     treating repository workstreams as a proxy for the sales pipeline.
     """
 
