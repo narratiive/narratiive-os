@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 from datetime import datetime
+from pathlib import Path
 from typing import Any, Callable, Iterable
 
 from runtime.agency_executive_brief import (
@@ -15,7 +17,7 @@ from runtime.friday_executive_review import (
     ReviewRecord,
     ReviewRecordType,
 )
-from runtime.inbound_leads import InboundLead
+from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse, TonyCommandService
 
@@ -70,7 +72,20 @@ class TonyExecutiveCommandService:
         self.terminology_policy_loader = terminology_policy_loader or TerminologyPolicy.from_path
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
-        self.inbound_lead_loader = inbound_lead_loader
+
+        self._lead_store_path: Path | None = None
+        if inbound_lead_loader is None:
+            self._lead_store_path = Path(
+                os.getenv(
+                    "TONY_INBOUND_LEADS_PATH",
+                    ".runtime/inbound-leads.json",
+                )
+            ).resolve()
+            self.inbound_lead_loader = FileInboundLeadStore(self._lead_store_path).read
+            self._explicit_inbound_loader = False
+        else:
+            self.inbound_lead_loader = inbound_lead_loader
+            self._explicit_inbound_loader = True
 
     @property
     def mission_control_loader(self):
@@ -80,6 +95,11 @@ class TonyExecutiveCommandService:
     @property
     def github_configured(self) -> bool:
         return bool(getattr(self.command_service, "github_configured", False))
+
+    def _lead_source_available(self) -> bool:
+        if self._explicit_inbound_loader:
+            return True
+        return bool(self._lead_store_path and self._lead_store_path.exists())
 
     def execute(
         self,
@@ -102,10 +122,8 @@ class TonyExecutiveCommandService:
         try:
             policy = self.terminology_policy_loader()
             snapshot = loader()
-            leads: tuple[InboundLead, ...] = ()
-            lead_source_available = self.inbound_lead_loader is not None
-            if self.inbound_lead_loader is not None:
-                leads = tuple(self.inbound_lead_loader())
+            lead_source_available = self._lead_source_available()
+            leads = tuple(self.inbound_lead_loader()) if lead_source_available else ()
             state = self.agency_projector.project(
                 snapshot,
                 leads,
