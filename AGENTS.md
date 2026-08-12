@@ -117,6 +117,37 @@ convenient.
 - If two applicable sources remain inconsistent, stop the affected work, record
   the conflict, and route it to the relevant owner.
 
+## Canonical local runtime
+
+On Matt's Mac Mini, the canonical Narratiive OS checkout is:
+
+```text
+~/Documents/narratiive-os
+```
+
+Do not instruct Matt to deploy Narratiive OS from any other repository path
+unless he explicitly says the checkout has moved. The retired repository name
+must not be reintroduced into source, tests, documentation, scripts, prompts, or
+deployment instructions.
+
+Narratiive OS requires Python 3.10 or newer. For local runtime, deployment, test,
+and LaunchAgent commands use the repository virtual environment:
+
+```text
+.venv/bin/python
+```
+
+Do not use macOS `/usr/bin/python3` for Narratiive OS deployment. The canonical
+one-command Mac deployment entry point is:
+
+```bash
+zsh ~/Documents/narratiive-os/scripts/deploy_narratiive_os.sh
+```
+
+That wrapper resolves the canonical checkout and delegates to
+`scripts/deploy_tony_runtime.py --apply` with the repository virtual-environment
+Python.
+
 ## Local verification
 
 The existing runtime test command is:
