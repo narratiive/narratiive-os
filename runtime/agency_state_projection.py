@@ -76,6 +76,9 @@ class AgencyStateProjector:
                     )
                 )
             else:
+                # Missing commercial telemetry is a trust/watchout issue, not by
+                # itself a reason to label the whole agency blocked. Crucially,
+                # Tony also does not infer that the pipeline is empty.
                 items.append(
                     AgencyItem(
                         item_id="commercial-source-unavailable",
@@ -84,8 +87,6 @@ class AgencyStateProjector:
                         status="attention",
                         next_action="Restore the live lead feed before making claims about pipeline emptiness.",
                         evidence=("Tony could not verify the canonical inbound lead source.",),
-                        blocked=True,
-                        blocks_agency_outcome=True,
                     )
                 )
 
