@@ -1,0 +1,11 @@
+# Python / virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+
+# Narratiive OS local runtime state
+.runtime/
+runtime-state/
+
+# macOS
+.DS_Store
