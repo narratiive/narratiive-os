@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
@@ -47,6 +47,7 @@ class TonyExecutiveCommandService:
         "end_of_day": AgencyBriefPeriod.EVENING,
     }
     _FRIDAY_COMMANDS = {"friday", "friday_review", "weekly_review", "executive_review"}
+    _LEAD_COMMANDS = {"lead", "leads", "inbound", "inbound_leads", "pipeline"}
 
     def __init__(
         self,
@@ -107,9 +108,13 @@ class TonyExecutiveCommandService:
         objects: Iterable[dict[str, Any]],
     ) -> CommandResponse:
         normalized = " ".join(command.strip().split())
-        name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
+        lowered = normalized.casefold().lstrip("/")
+        name = lowered.split(" ", 1)[0] if lowered else ""
         if name in self._FRIDAY_COMMANDS:
             return self._execute_friday_review(objects)
+
+        if self._is_lead_query(lowered):
+            return self._execute_lead_query(lowered)
 
         period = self._PERIODS.get(name)
         if period is None:
@@ -138,7 +143,6 @@ class TonyExecutiveCommandService:
                     f"executive brief uses retired terminology under policy {policy.version}: {terms}"
                 )
 
-            # Preserve the existing evidence archive and GitHub change baseline quietly.
             if self.brief_archive is not None:
                 legacy_period = self._legacy_period(period)
                 archive_brief = self.brief_service.build(snapshot, legacy_period)
@@ -162,6 +166,93 @@ class TonyExecutiveCommandService:
             message=message,
             data=data,
         )
+
+    @classmethod
+    def _is_lead_query(cls, lowered: str) -> bool:
+        if not lowered:
+            return False
+        first = lowered.split(" ", 1)[0]
+        if first in cls._LEAD_COMMANDS:
+            return True
+        phrases = (
+            "inbound lead",
+            "inbound leads",
+            "today's leads",
+            "todays leads",
+            "yesterday's leads",
+            "yesterdays leads",
+            "commercial opportunities",
+            "current opportunities",
+        )
+        return any(phrase in lowered for phrase in phrases)
+
+    def _execute_lead_query(self, lowered: str) -> CommandResponse:
+        if not self._lead_source_available():
+            return self._error(
+                "leads",
+                "inbound_lead_source_unavailable",
+                "I can't verify inbound leads because the live lead feed is unavailable.",
+            )
+        try:
+            leads = tuple(self.inbound_lead_loader())
+        except Exception as exc:
+            return self._error(
+                "leads",
+                "inbound_lead_source_untrusted",
+                f"I couldn't read the live inbound lead feed: {exc}",
+            )
+
+        scope = "current"
+        scoped = leads
+        now = self.clock()
+        if "yesterday" in lowered:
+            scope = "yesterday"
+            target = (now - timedelta(days=1)).date()
+            scoped = tuple(item for item in leads if self._lead_date(item) == target)
+        elif "today" in lowered:
+            scope = "today"
+            target = now.date()
+            scoped = tuple(item for item in leads if self._lead_date(item) == target)
+
+        if not scoped:
+            message = f"No inbound leads are recorded for {scope}."
+        else:
+            lines = [f"Inbound leads — {scope}: {len(scoped)}"]
+            for lead in scoped[:10]:
+                company = f" — {lead.company}" if lead.company else ""
+                qualifiers = ", ".join(
+                    value for value in (lead.source, lead.lead_temperature, lead.pipeline_stage) if value
+                )
+                lines.append(f"• {lead.contact}{company} ({qualifiers})")
+                if lead.ai_summary:
+                    lines.append(f"  {lead.ai_summary}")
+                lines.append(f"  Next: {lead.recommended_next_action}")
+            message = "\n".join(lines)
+
+        return CommandResponse(
+            command="leads",
+            status="healthy",
+            message=message,
+            data={
+                "scope": scope,
+                "count": len(scoped),
+                "leads": [item.to_dict() for item in scoped],
+                "inbound_lead_source_available": True,
+            },
+        )
+
+    @staticmethod
+    def _lead_date(lead: InboundLead):
+        value = lead.created_at.strip()
+        if not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is not None:
+            parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
+        return parsed.date()
 
     @staticmethod
     def _legacy_period(period: AgencyBriefPeriod):
