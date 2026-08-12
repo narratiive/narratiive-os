@@ -36,8 +36,6 @@ The checked-out repository is the source of truth.
 - Preserve the separate Growth Specification object lifecycle and do not treat
   its objects as interchangeable with the older workflow templates.
 - Do not edit `main` directly. Work on a branch and submit a pull request.
-- Do not approve or merge your own work. AI agents may not count their own
-  review as approval.
 - An authorised human must approve every client-facing output before release,
   dispatch, publication, presentation export, or production use.
 - Never invent evidence, claims, client facts, research, proof points, approval,
@@ -73,7 +71,7 @@ restate role authority.
 The Constitution controls interpretation of this entry point. The invariants
 restated above are non-waivable; no role or exception process may bypass
 evidence, lineage, immutable history, workspace/client isolation, credential
-security, independent review, or human approval.
+security, or human approval for client-facing release.
 
 ## Repository change contract
 
@@ -98,8 +96,36 @@ Before handoff:
 - inspect the complete diff for scope, secrets, client data, terminology,
   lineage, and approval-gate regressions;
 - report tests run, assumptions, unresolved risks, and affected streams;
-- do not commit, push, approve, merge, publish, export, or send unless the user
-  explicitly authorises that specific action.
+- client-facing release, dispatch, publication, export, or sending still
+  requires the authorised human approval defined by the relevant contract.
+
+## Standing repository merge delegation
+
+Matt has granted a standing repository-administration delegation for
+Narratiive OS technical work. ChatGPT may create, push, mark ready, and merge a
+pull request without returning for a separate per-PR permission when all of the
+following are true:
+
+- the work is within an already authorised Narratiive OS objective or task;
+- the pull request uses a branch and does not edit `main` directly;
+- all required automated checks for the pull request are green;
+- the complete diff has been reviewed for scope, secrets, client data,
+  terminology, lineage, destructive migration risk, and approval-gate regressions;
+- there is no unresolved review thread, merge conflict, or known material risk;
+- the merge itself does not release, publish, dispatch, export, or send a
+  client-facing artefact.
+
+This delegation includes PRs authored by ChatGPT: passing required checks plus
+the explicit diff/risk review above is sufficient for repository merge. A
+separate self-approval review event must not be fabricated or counted as an
+independent human review.
+
+The standing delegation does **not** delegate Matt's reserved commercial,
+client-facing, security-sensitive, destructive, legal, financial, credential,
+or product-canon decisions. If a PR depends on one of those decisions and that
+decision has not already been made, stop at the decision boundary rather than
+inferring approval. Matt may revoke or narrow this standing delegation at any
+time.
 
 ## Canon and conflict handling
 
@@ -153,7 +179,7 @@ Python.
 The existing runtime test command is:
 
 ```bash
-python -m unittest discover -s tests -v
+.venv/bin/python -m unittest discover -s tests -v
 ```
 
 Python 3.10 or newer is required by the repository; CI currently runs the suite
