@@ -34,6 +34,9 @@ class LeadAwareTonyApplication:
         self.base = base
         self.lead_store = lead_store
 
+    def __getattr__(self, name: str):
+        return getattr(self.base, name)
+
     def __call__(self, environ, start_response):
         method = str(environ.get("REQUEST_METHOD", "")).upper()
         path = str(environ.get("PATH_INFO", "/")) or "/"
