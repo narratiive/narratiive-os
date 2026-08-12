@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+from typing import Iterable
+
 from runtime.agency_state import AgencyArea, AgencyItem, AgencyState
+from runtime.inbound_leads import InboundLead
 from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 
 
 class AgencyStateProjector:
-    """Translate operational evidence into Tony's agency-facing source model."""
+    """Translate operational and live commercial evidence into Tony's agency view."""
 
     _AREA_KEYWORDS: tuple[tuple[AgencyArea, tuple[str, ...]], ...] = (
         (AgencyArea.COMMERCIAL, ("lead", "pipeline", "prospect", "outreach", "proposal", "discovery", "opportunity", "sales")),
@@ -30,8 +33,20 @@ class AgencyStateProjector:
         "enquiry",
     )
 
-    def project(self, snapshot: MissionControlSnapshot) -> AgencyState:
+    def project(
+        self,
+        snapshot: MissionControlSnapshot,
+        leads: Iterable[InboundLead] = (),
+        *,
+        lead_source_available: bool = False,
+    ) -> AgencyState:
         items = [self._project_workstream(item) for item in snapshot.workstreams]
+
+        for lead in leads:
+            # Completed leads remain in Notion history but should not clutter the
+            # daily commercial brief. Active/new/waiting leads stay visible.
+            if lead.status.casefold() != "complete":
+                items.append(lead.to_agency_item())
 
         for index, approval in enumerate(snapshot.approvals_required):
             items.append(
@@ -49,16 +64,30 @@ class AgencyStateProjector:
             )
 
         if not any(item.area in {AgencyArea.COMMERCIAL, AgencyArea.CLIENTS} for item in items):
-            items.append(
-                AgencyItem(
-                    item_id="commercial-empty-state",
-                    area=AgencyArea.COMMERCIAL,
-                    title="No qualified opportunity currently recorded",
-                    status="attention",
-                    next_action="Create and progress the next qualified opportunity.",
-                    evidence=("No commercial or client workstream is present in Mission Control.",),
+            if lead_source_available:
+                items.append(
+                    AgencyItem(
+                        item_id="commercial-empty-state",
+                        area=AgencyArea.COMMERCIAL,
+                        title="No active lead or qualified opportunity currently recorded",
+                        status="attention",
+                        next_action="Create and progress the next commercial opportunity.",
+                        evidence=("The live inbound lead feed is connected and contains no active leads.",),
+                    )
                 )
-            )
+            else:
+                items.append(
+                    AgencyItem(
+                        item_id="commercial-source-unavailable",
+                        area=AgencyArea.AUTOMATION,
+                        title="Inbound lead feed unavailable",
+                        status="attention",
+                        next_action="Restore the live lead feed before making claims about pipeline emptiness.",
+                        evidence=("Tony could not verify the canonical inbound lead source.",),
+                        blocked=True,
+                        blocks_agency_outcome=True,
+                    )
+                )
 
         return AgencyState.from_items(snapshot.generated_at, items)
 
