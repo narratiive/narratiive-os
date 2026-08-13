@@ -40,6 +40,9 @@ class TelegramInboundConfig:
             str(env.get("TONY_TELEGRAM_BRIDGE_URL", "")).strip()
             or "http://127.0.0.1:8790/telegram/inbound"
         )
+        bridge_url = bridge_url.rstrip("/")
+        if bridge_url in {"http://127.0.0.1:8790", "http://localhost:8790"}:
+            bridge_url += "/telegram/inbound"
         bridge_token = str(env.get("TONY_BRIDGE_TOKEN", "")).strip()
         api_base = str(env.get("TONY_TELEGRAM_API_BASE", "")).strip() or "https://api.telegram.org"
         offset_raw = str(env.get("TONY_TELEGRAM_OFFSET_PATH", "")).strip()
@@ -47,7 +50,7 @@ class TelegramInboundConfig:
         return cls(
             bot_token=bot_token,
             allowed_chat_id=chat_id,
-            bridge_url=bridge_url.rstrip("/"),
+            bridge_url=bridge_url,
             bridge_token=bridge_token,
             api_base=api_base.rstrip("/"),
             offset_path=offset_path.resolve(),
