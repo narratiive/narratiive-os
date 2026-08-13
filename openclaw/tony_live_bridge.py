@@ -46,7 +46,14 @@ class LeadAwareTonyApplication:
             return self._telegram_inbound(environ, start_response)
         return self.base(environ, start_response)
 
-    def _authorize(self, environ, start_response):
+    @staticmethod
+    def _is_loopback(environ) -> bool:
+        remote = str(environ.get("REMOTE_ADDR", "")).strip().casefold()
+        return remote in {"127.0.0.1", "::1", "localhost"}
+
+    def _authorize(self, environ, start_response, *, allow_loopback: bool = False):
+        if allow_loopback and self._is_loopback(environ):
+            return None
         if not self.base.bridge_token:
             return None
         supplied = str(environ.get("HTTP_AUTHORIZATION", ""))
@@ -85,7 +92,10 @@ class LeadAwareTonyApplication:
         return self._respond(start_response, status, payload)
 
     def _ingest(self, environ, start_response):
-        denied = self._authorize(environ, start_response)
+        # n8n and Tony run on the same Mac. Trust loopback ingestion so the local
+        # workflow does not need to duplicate the bridge secret. Any non-local
+        # request remains protected by TONY_BRIDGE_TOKEN.
+        denied = self._authorize(environ, start_response, allow_loopback=True)
         if denied is not None:
             return denied
         try:
