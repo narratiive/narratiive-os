@@ -28,7 +28,7 @@ _REQUIRED_FRIDAY_FIELDS = {
 
 
 class LeadAwareTonyApplication:
-    """Add a small authenticated lead-ingestion boundary to Tony's live bridge."""
+    """Add lead ingestion and conversational Telegram ingress to Tony's live bridge."""
 
     def __init__(self, base: TonyHTTPBridge, lead_store: FileInboundLeadStore) -> None:
         self.base = base
@@ -42,23 +42,54 @@ class LeadAwareTonyApplication:
         path = str(environ.get("PATH_INFO", "/")) or "/"
         if method == "POST" and path == "/leads/ingest":
             return self._ingest(environ, start_response)
+        if method == "POST" and path == "/telegram/inbound":
+            return self._telegram_inbound(environ, start_response)
         return self.base(environ, start_response)
 
-    def _ingest(self, environ, start_response):
-        if self.base.bridge_token:
-            supplied = str(environ.get("HTTP_AUTHORIZATION", ""))
-            if supplied != f"Bearer {self.base.bridge_token}":
-                return self._respond(
-                    start_response,
-                    HTTPStatus.UNAUTHORIZED,
-                    {"ok": False, "error": {"code": "unauthorized", "message": "Invalid bridge token"}},
-                )
+    def _authorize(self, environ, start_response):
+        if not self.base.bridge_token:
+            return None
+        supplied = str(environ.get("HTTP_AUTHORIZATION", ""))
+        if supplied == f"Bearer {self.base.bridge_token}":
+            return None
+        return self._respond(
+            start_response,
+            HTTPStatus.UNAUTHORIZED,
+            {"ok": False, "error": {"code": "unauthorized", "message": "Invalid bridge token"}},
+        )
+
+    def _read_json(self, environ) -> dict[str, Any]:
+        length = int(environ.get("CONTENT_LENGTH") or "0")
+        raw = environ["wsgi.input"].read(length).decode("utf-8")
+        request = json.loads(raw or "{}")
+        if not isinstance(request, dict):
+            raise ValueError("request must be an object")
+        return request
+
+    def _telegram_inbound(self, environ, start_response):
+        denied = self._authorize(environ, start_response)
+        if denied is not None:
+            return denied
         try:
-            length = int(environ.get("CONTENT_LENGTH") or "0")
-            raw = environ["wsgi.input"].read(length).decode("utf-8")
-            request = json.loads(raw or "{}")
-            if not isinstance(request, dict):
-                raise ValueError("request must be an object")
+            request = self._read_json(environ)
+            text = str(request.get("text") or request.get("message") or "").strip()
+            if not text:
+                raise ValueError("text is required")
+            status, payload = self.base._handle_telegram_command(text)
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return self._respond(
+                start_response,
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_telegram_message", "message": str(exc)}},
+            )
+        return self._respond(start_response, status, payload)
+
+    def _ingest(self, environ, start_response):
+        denied = self._authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        try:
+            request = self._read_json(environ)
             payload = request.get("lead") if isinstance(request.get("lead"), dict) else request
             lead = InboundLead.from_mapping(payload)
             self.lead_store.upsert(lead)
