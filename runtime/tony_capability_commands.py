@@ -13,26 +13,8 @@ class TonyCapabilityCommandService:
     """Expose Tony's capabilities and apply the default executive conversation layer."""
 
     _COMMANDS = {"capabilities", "commands", "help"}
-    _FOLLOW_UP_MARKERS = (
-        "tell me more",
-        "what about",
-        "more on",
-        "more about",
-        "go deeper",
-        "why them",
-        "why this",
-    )
-    _ACTION_MARKERS = (
-        "let's pursue",
-        "lets pursue",
-        "pursue",
-        "take forward",
-        "move forward with",
-        "follow up with",
-        "reach out to",
-        "go after",
-        "progress",
-    )
+    _FOLLOW_UP_MARKERS = ("tell me more", "what about", "more on", "more about", "go deeper", "why them", "why this")
+    _ACTION_MARKERS = ("let's pursue", "lets pursue", "pursue", "take forward", "move forward with", "follow up with", "reach out to", "go after", "progress")
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
@@ -62,20 +44,11 @@ class TonyCapabilityCommandService:
 
         configured = self._configured_features()
         snapshot = self.registry.snapshot(configured)
-        return CommandResponse(
-            command="capabilities",
-            status=snapshot["status"],
-            message=self.registry.telegram_summary(configured),
-            data=snapshot,
-        )
+        return CommandResponse(command="capabilities", status=snapshot["status"], message=self.registry.telegram_summary(configured), data=snapshot)
 
     @staticmethod
     def _reference_tokens(value: str) -> set[str]:
-        return {
-            token
-            for token in re.findall(r"[a-z0-9]+", value.casefold())
-            if len(token) >= 3
-        }
+        return {token for token in re.findall(r"[a-z0-9]+", value.casefold()) if len(token) >= 3}
 
     def _resolve_lead_reference(self, command: str) -> InboundLead | None:
         if not self._last_leads:
@@ -88,6 +61,17 @@ class TonyCapabilityCommandService:
                 matches.append(lead)
         return matches[0] if len(matches) == 1 else None
 
+    @staticmethod
+    def _execution_plan(lead: InboundLead) -> list[dict[str, str]]:
+        contact = lead.contact or "the lead"
+        company = lead.company or "their business"
+        return [
+            {"owner": "Tony", "action": f"Prepare a concise commercial brief for {contact} at {company} using the lead evidence already captured."},
+            {"owner": "Claude", "action": f"Draft a personalised first-touch approach for {contact}, grounded in the stated business problem and Narratiive's current proposition."},
+            {"owner": "Tony", "action": "Review the draft for evidence, tone and commercial relevance before anything is sent."},
+            {"owner": "Matt", "action": "Approve the first external outreach until a pre-authorised sending policy is explicitly in place."},
+        ]
+
     def _lead_action(self, command: str) -> CommandResponse | None:
         lowered = command.casefold()
         if not any(marker in lowered for marker in self._ACTION_MARKERS):
@@ -97,23 +81,20 @@ class TonyCapabilityCommandService:
             return None
 
         next_action = lead.recommended_next_action.strip()
+        plan = self._execution_plan(lead)
         message = f"Good. I’ll treat {lead.contact}"
         if lead.company:
             message += f" at {lead.company}"
         message += " as the lead to progress."
         if next_action:
-            message += f" Next: {next_action}"
-        message += " I haven’t sent or changed anything externally yet."
+            message += f" Commercial objective: {next_action}"
+        message += " I’d handle it this way: " + " ".join(f"{index + 1}) {step['owner']}: {step['action']}" for index, step in enumerate(plan))
+        message += " Nothing has been sent or changed externally yet."
         return CommandResponse(
             command="lead_action",
             status="healthy",
             message=message,
-            data={
-                "intent": "progress_lead",
-                "lead": lead.to_dict(),
-                "next_action": next_action,
-                "external_action_taken": False,
-            },
+            data={"intent": "progress_lead", "lead": lead.to_dict(), "next_action": next_action, "execution_plan": plan, "approval_required": True, "external_action_taken": False},
         )
 
     def _lead_follow_up(self, command: str) -> CommandResponse | None:
@@ -122,16 +103,10 @@ class TonyCapabilityCommandService:
         lowered = command.casefold()
         if not any(marker in lowered for marker in self._FOLLOW_UP_MARKERS):
             return None
-
         lead = self._resolve_lead_reference(lowered)
         if lead is None:
             return None
-        return CommandResponse(
-            command="leads",
-            status="healthy",
-            message=render_inbound_leads((lead,), scope="selected lead", detailed=True),
-            data={"scope": "selected lead", "count": 1, "leads": [lead.to_dict()]},
-        )
+        return CommandResponse(command="leads", status="healthy", message=render_inbound_leads((lead,), scope="selected lead", detailed=True), data={"scope": "selected lead", "count": 1, "leads": [lead.to_dict()]})
 
     def _executive_response(self, command: str, response: CommandResponse) -> CommandResponse:
         if response.command != "leads" or response.status == "error":
@@ -149,17 +124,7 @@ class TonyCapabilityCommandService:
                 continue
         self._last_leads = tuple(leads)
         scope = str(response.data.get("scope", "current"))
-        message = render_inbound_leads(
-            leads,
-            scope=scope,
-            detailed=wants_lead_detail(command),
-        )
-        return CommandResponse(
-            command=response.command,
-            status=response.status,
-            message=message,
-            data=response.data,
-        )
+        return CommandResponse(command=response.command, status=response.status, message=render_inbound_leads(leads, scope=scope, detailed=wants_lead_detail(command)), data=response.data)
 
     def _configured_features(self) -> set[str]:
         features: set[str] = set()
