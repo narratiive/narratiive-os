@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from runtime.executive_conversation import render_inbound_leads, wants_lead_detail
@@ -12,10 +13,20 @@ class TonyCapabilityCommandService:
     """Expose Tony's capabilities and apply the default executive conversation layer."""
 
     _COMMANDS = {"capabilities", "commands", "help"}
+    _FOLLOW_UP_MARKERS = (
+        "tell me more",
+        "what about",
+        "more on",
+        "more about",
+        "go deeper",
+        "why them",
+        "why this",
+    )
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
         self.registry = registry or TonyCapabilityRegistry()
+        self._last_leads: tuple[InboundLead, ...] = ()
 
     @property
     def mission_control_loader(self):
@@ -29,6 +40,9 @@ class TonyCapabilityCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            follow_up = self._lead_follow_up(normalized)
+            if follow_up is not None:
+                return follow_up
             response = self.command_service.execute(command, objects)
             return self._executive_response(command, response)
 
@@ -42,7 +56,38 @@ class TonyCapabilityCommandService:
         )
 
     @staticmethod
-    def _executive_response(command: str, response: CommandResponse) -> CommandResponse:
+    def _reference_tokens(value: str) -> set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", value.casefold())
+            if len(token) >= 3
+        }
+
+    def _lead_follow_up(self, command: str) -> CommandResponse | None:
+        if not self._last_leads:
+            return None
+        lowered = command.casefold()
+        if not any(marker in lowered for marker in self._FOLLOW_UP_MARKERS):
+            return None
+
+        command_tokens = self._reference_tokens(lowered)
+        matches = []
+        for lead in self._last_leads:
+            reference_tokens = self._reference_tokens(" ".join((lead.contact, lead.company)))
+            if command_tokens.intersection(reference_tokens):
+                matches.append(lead)
+        if len(matches) != 1:
+            return None
+
+        lead = matches[0]
+        return CommandResponse(
+            command="leads",
+            status="healthy",
+            message=render_inbound_leads((lead,), scope="selected lead", detailed=True),
+            data={"scope": "selected lead", "count": 1, "leads": [lead.to_dict()]},
+        )
+
+    def _executive_response(self, command: str, response: CommandResponse) -> CommandResponse:
         if response.command != "leads" or response.status == "error":
             return response
         raw_leads = response.data.get("leads", []) if isinstance(response.data, dict) else []
@@ -56,6 +101,7 @@ class TonyCapabilityCommandService:
                 leads.append(InboundLead.from_mapping(item))
             except ValueError:
                 continue
+        self._last_leads = tuple(leads)
         scope = str(response.data.get("scope", "current"))
         message = render_inbound_leads(
             leads,
