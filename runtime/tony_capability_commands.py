@@ -15,11 +15,13 @@ class TonyCapabilityCommandService:
     _COMMANDS = {"capabilities", "commands", "help"}
     _FOLLOW_UP_MARKERS = ("tell me more", "what about", "more on", "more about", "go deeper", "why them", "why this")
     _ACTION_MARKERS = ("let's pursue", "lets pursue", "pursue", "take forward", "move forward with", "follow up with", "reach out to", "go after", "progress")
+    _PREPARE_MARKERS = ("prepare it", "draft it", "go ahead", "do it", "get it ready", "prepare the outreach", "draft the outreach")
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
         self.registry = registry or TonyCapabilityRegistry()
         self._last_leads: tuple[InboundLead, ...] = ()
+        self._active_lead: InboundLead | None = None
 
     @property
     def mission_control_loader(self):
@@ -33,6 +35,9 @@ class TonyCapabilityCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            preparation = self._lead_preparation(normalized)
+            if preparation is not None:
+                return preparation
             action = self._lead_action(normalized)
             if action is not None:
                 return action
@@ -80,6 +85,7 @@ class TonyCapabilityCommandService:
         if lead is None:
             return None
 
+        self._active_lead = lead
         next_action = lead.recommended_next_action.strip()
         plan = self._execution_plan(lead)
         message = f"Good. I’ll treat {lead.contact}"
@@ -97,6 +103,38 @@ class TonyCapabilityCommandService:
             data={"intent": "progress_lead", "lead": lead.to_dict(), "next_action": next_action, "execution_plan": plan, "approval_required": True, "external_action_taken": False},
         )
 
+    def _lead_preparation(self, command: str) -> CommandResponse | None:
+        lowered = command.casefold()
+        if self._active_lead is None or not any(marker in lowered for marker in self._PREPARE_MARKERS):
+            return None
+        lead = self._active_lead
+        objective = lead.recommended_next_action.strip() or "Progress the opportunity with a relevant first-touch approach."
+        brief = {
+            "task_type": "personalised_first_touch",
+            "owner": "Claude",
+            "reviewer": "Tony",
+            "contact": lead.contact,
+            "company": lead.company,
+            "business_signal": lead.ai_summary.strip() or lead.notes.strip(),
+            "commercial_objective": objective,
+            "constraints": [
+                "Use only evidence present in the lead record and current Narratiive proposition.",
+                "Keep the approach concise, specific and commercially useful.",
+                "Do not send externally; return the draft to Tony for review.",
+            ],
+        }
+        message = (
+            f"Yes. I’ve turned the decision on {lead.contact} into a delegation-ready brief for Claude. "
+            "I’ll remain accountable for reviewing the returned draft before it comes back to you. "
+            "The brief is ready to hand off, but I have not claimed delegation or external execution until a worker confirms receipt and returns an artefact."
+        )
+        return CommandResponse(
+            command="lead_preparation",
+            status="healthy",
+            message=message,
+            data={"intent": "delegate_lead_preparation", "lead": lead.to_dict(), "delegation_brief": brief, "delegation_status": "ready", "approval_required_for_send": True, "external_action_taken": False},
+        )
+
     def _lead_follow_up(self, command: str) -> CommandResponse | None:
         if not self._last_leads:
             return None
@@ -106,6 +144,7 @@ class TonyCapabilityCommandService:
         lead = self._resolve_lead_reference(lowered)
         if lead is None:
             return None
+        self._active_lead = lead
         return CommandResponse(command="leads", status="healthy", message=render_inbound_leads((lead,), scope="selected lead", detailed=True), data={"scope": "selected lead", "count": 1, "leads": [lead.to_dict()]})
 
     def _executive_response(self, command: str, response: CommandResponse) -> CommandResponse:
