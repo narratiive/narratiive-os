@@ -21,7 +21,7 @@ class TelegramInboundError(RuntimeError):
 class TelegramInboundConfig:
     bot_token: str
     allowed_chat_id: str
-    bridge_url: str = "http://127.0.0.1:8790"
+    bridge_url: str = "http://127.0.0.1:8790/telegram/inbound"
     bridge_token: str = ""
     api_base: str = "https://api.telegram.org"
     poll_timeout_seconds: int = 25
@@ -36,7 +36,10 @@ class TelegramInboundConfig:
             raise TelegramInboundError(
                 "TONY_TELEGRAM_BOT_TOKEN and TONY_TELEGRAM_CHAT_ID are required for inbound Telegram"
             )
-        bridge_url = str(env.get("TONY_TELEGRAM_BRIDGE_URL", "")).strip() or "http://127.0.0.1:8790"
+        bridge_url = (
+            str(env.get("TONY_TELEGRAM_BRIDGE_URL", "")).strip()
+            or "http://127.0.0.1:8790/telegram/inbound"
+        )
         bridge_token = str(env.get("TONY_BRIDGE_TOKEN", "")).strip()
         api_base = str(env.get("TONY_TELEGRAM_API_BASE", "")).strip() or "https://api.telegram.org"
         offset_raw = str(env.get("TONY_TELEGRAM_OFFSET_PATH", "")).strip()
