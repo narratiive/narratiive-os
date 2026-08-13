@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable
 
 from runtime.executive_conversation import render_inbound_leads, wants_lead_detail
@@ -54,6 +55,14 @@ class TonyCapabilityCommandService:
             data=snapshot,
         )
 
+    @staticmethod
+    def _reference_tokens(value: str) -> set[str]:
+        return {
+            token
+            for token in re.findall(r"[a-z0-9]+", value.casefold())
+            if len(token) >= 3
+        }
+
     def _lead_follow_up(self, command: str) -> CommandResponse | None:
         if not self._last_leads:
             return None
@@ -61,10 +70,11 @@ class TonyCapabilityCommandService:
         if not any(marker in lowered for marker in self._FOLLOW_UP_MARKERS):
             return None
 
+        command_tokens = self._reference_tokens(lowered)
         matches = []
         for lead in self._last_leads:
-            names = (lead.contact, lead.company)
-            if any(value and value.casefold() in lowered for value in names):
+            reference_tokens = self._reference_tokens(" ".join((lead.contact, lead.company)))
+            if command_tokens.intersection(reference_tokens):
                 matches.append(lead)
         if len(matches) != 1:
             return None
