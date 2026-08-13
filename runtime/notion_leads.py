@@ -152,9 +152,15 @@ def build_authoritative_lead_loader(
 ) -> Callable[[], tuple[InboundLead, ...]]:
     """Build the authoritative lead loader used by Tony.
 
-    A configured Notion connection is required. We deliberately fail closed when
-    Notion cannot be read instead of falling back to an empty local cache and
-    making a false claim that there are no leads.
+    Configuration is resolved at read time so Tony can still start if the Notion
+    credential is missing. Lead queries then fail closed with an explicit source
+    error instead of silently falling back to an empty cache.
     """
-    config = NotionLeadConfig.from_env(os.environ if env is None else env)
-    return NotionLeadSource(config, cache=cache).read
+    supplied_env = env
+
+    def load() -> tuple[InboundLead, ...]:
+        active_env = os.environ if supplied_env is None else supplied_env
+        config = NotionLeadConfig.from_env(active_env)
+        return NotionLeadSource(config, cache=cache).read()
+
+    return load
