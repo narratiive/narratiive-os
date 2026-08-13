@@ -10,6 +10,7 @@ from wsgiref.simple_server import make_server
 from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_app
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
@@ -195,13 +196,14 @@ def build_app() -> LeadAwareTonyApplication:
         )
     ).resolve()
     lead_store = FileInboundLeadStore(lead_path)
+    authoritative_lead_loader = build_authoritative_lead_loader(lead_store)
 
     executive_service = TonyExecutiveCommandService(
         app.command_service,
         brief_archive=app.brief_archive,
         friday_record_loader=lambda: load_friday_review_records(records_root),
         workspace_id=workspace_id,
-        inbound_lead_loader=lead_store.read,
+        inbound_lead_loader=authoritative_lead_loader,
     )
     capability_service = TonyCapabilityCommandService(executive_service)
     memory_path = Path(
