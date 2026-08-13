@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import datetime
 
+from runtime.executive_conversation import render_inbound_leads, wants_lead_detail
 from runtime.inbound_leads import InboundLead
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -68,6 +69,14 @@ class TonyInboundQueryTests(unittest.TestCase):
         self.assertEqual(response.status, "healthy")
         self.assertEqual(response.data["count"], 0)
         self.assertIn("No inbound leads are recorded for today", response.message)
+
+    def test_executive_renderer_is_concise_by_default(self):
+        message = render_inbound_leads((self.paul,), scope="today")
+        self.assertIn("1 inbound lead today", message)
+        self.assertIn("Priority:", message)
+        self.assertNotIn("Next:", message)
+        self.assertFalse(wants_lead_detail("What inbound leads did we get today?"))
+        self.assertTrue(wants_lead_detail("Tell me more detail about today's leads"))
 
 
 if __name__ == "__main__":
