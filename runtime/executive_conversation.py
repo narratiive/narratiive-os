@@ -21,8 +21,6 @@ def _clean(text: str) -> str:
 def _signal(lead: InboundLead) -> str:
     summary = _clean(lead.ai_summary)
     if summary:
-        # AI summaries sometimes contain several sentences of form metadata. Keep
-        # only the first useful sentence for executive scanability.
         first = re.split(r"(?<=[.!?])\s+", summary, maxsplit=1)[0]
         return first[:220].rstrip()
     notes = _clean(lead.notes)
@@ -31,14 +29,27 @@ def _signal(lead: InboundLead) -> str:
     return "New inbound enquiry received."
 
 
+def _commercial_score(lead: InboundLead) -> int:
+    score = {"hot": 40, "warm": 25, "cold": 5}.get(lead.lead_temperature.casefold(), 10)
+    stage = lead.pipeline_stage.casefold()
+    if "proposal" in stage or "discovery" in stage:
+        score += 12
+    if lead.company.strip():
+        score += 4
+    if lead.email.strip():
+        score += 3
+    if _signal(lead) != "New inbound enquiry received.":
+        score += 6
+    return score
+
+
 def _recommendation(leads: tuple[InboundLead, ...]) -> str:
-    warm = sum(1 for lead in leads if lead.lead_temperature.casefold() == "warm")
-    hot = sum(1 for lead in leads if lead.lead_temperature.casefold() == "hot")
-    if hot:
-        return f"Priority: review the {hot} hot lead{'s' if hot != 1 else ''} first and decide the next commercial move today."
-    if warm:
-        return f"Priority: review the {warm} warm lead{'s' if warm != 1 else ''} and decide which warrant a discovery conversation."
-    return "Priority: review fit and decide which leads warrant follow-up."
+    ranked = sorted(leads, key=_commercial_score, reverse=True)
+    strongest = ranked[0]
+    name = strongest.contact or strongest.company or "the strongest lead"
+    if len(ranked) == 1:
+        return f"Priority: {name} is the clearest opportunity; review fit and decide the next commercial move."
+    return f"Priority: start with {name}; it has the strongest current commercial signal. Then review the remaining {len(ranked) - 1} lead{'s' if len(ranked) - 1 != 1 else ''}."
 
 
 def render_inbound_leads(
@@ -77,7 +88,7 @@ def render_inbound_leads(
         temperature_summary = f" ({', '.join(parts)})"
 
     lines = [f"{len(items)} inbound lead{'s' if len(items) != 1 else ''} {scope}{temperature_summary}."]
-    for lead in items[:7]:
+    for lead in sorted(items, key=_commercial_score, reverse=True)[:7]:
         company = f" — {lead.company}" if lead.company else ""
         lines.append(f"• {lead.contact}{company}: {_signal(lead)}")
     if len(items) > 7:
