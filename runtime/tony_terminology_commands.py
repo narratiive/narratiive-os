@@ -7,7 +7,7 @@ from runtime.tony_command_service import CommandResponse
 
 
 class TonyTerminologyCommandService:
-    """Expose canonical vocabulary and fail closed on repository-retired language."""
+    """Expose canonical vocabulary and rewrite retired language before delivery."""
 
     VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
@@ -33,16 +33,29 @@ class TonyTerminologyCommandService:
         violations = self.policy.scan_many(self._strings(response.message, response.data))
         if not violations:
             return response
-        terms = sorted({item.term for item in violations}, key=str.casefold)
+
+        rewritten_message = self.policy.rewrite(response.message)
+        rewritten_data = self._rewrite_value(response.data)
+        remaining = self.policy.scan_many(self._strings(rewritten_message, rewritten_data))
+        if remaining:
+            return CommandResponse(
+                command=response.command,
+                status="error",
+                message=(
+                    "I couldn't phrase that response safely using the current Narratiive language. "
+                    "The underlying information is still available, but I need to reframe the wording."
+                ),
+                data={
+                    "error_code": "terminology_rewrite_failed",
+                    "policy_version": self.policy.version,
+                },
+            )
+
         return CommandResponse(
             command=response.command,
-            status="error",
-            message="Tony output was blocked because it used retired Narratiive terminology.",
-            data={
-                "error_code": "terminology_violation",
-                "policy_version": self.policy.version,
-                "retired_terms": terms,
-            },
+            status=response.status,
+            message=rewritten_message,
+            data=rewritten_data,
         )
 
     def _vocabulary(self) -> CommandResponse:
@@ -82,6 +95,19 @@ class TonyTerminologyCommandService:
                 "retired_terms": list(self.policy.retired_terms),
             },
         )
+
+    def _rewrite_value(self, value: Any) -> Any:
+        if isinstance(value, str):
+            return self.policy.rewrite(value)
+        if isinstance(value, dict):
+            return {key: self._rewrite_value(nested) for key, nested in value.items()}
+        if isinstance(value, list):
+            return [self._rewrite_value(nested) for nested in value]
+        if isinstance(value, tuple):
+            return tuple(self._rewrite_value(nested) for nested in value)
+        if isinstance(value, set):
+            return {self._rewrite_value(nested) for nested in value}
+        return value
 
     @classmethod
     def _strings(cls, message: str, data: Any) -> Iterable[str]:

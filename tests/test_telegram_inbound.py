@@ -74,6 +74,13 @@ class TelegramInboundTests(unittest.TestCase):
             service._process_update({"message": {"chat": {"id": 999}, "text": "ignore me"}})
         self.assertEqual(sender.messages, [("123", "Tony:What inbound leads did we get today?")])
 
+    def test_user_reply_sanitizer_removes_internal_error_codes(self):
+        reply = "I couldn't phrase that safely.\nError: terminology_violation\nerror_code: hidden"
+        self.assertEqual(
+            TelegramInboundService._sanitize_user_reply(reply),
+            "I couldn't phrase that safely.",
+        )
+
     def test_offsets_persist_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "offset.json"

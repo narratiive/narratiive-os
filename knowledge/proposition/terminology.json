@@ -1,7 +1,7 @@
 {
   "policy_id": "narratiive_terminology",
-  "version": "1.0.0",
-  "version_note": "Initial canonical terminology policy establishing approved, unsettled, and retired Narratiive vocabulary.",
+  "version": "1.1.0",
+  "version_note": "Retired Narratiive terms are rewritten into approved descriptive language rather than blocking Tony outputs.",
   "status": "active",
   "owner": "Narratiive",
   "governance": {
@@ -21,7 +21,7 @@
     {"concept": "Paid commercial engagement", "rule": "Do not invent or revive an engagement label; use descriptive language until an approved name is versioned here."}
   ],
   "retired_terms": [
-    {"term": "Opportunity Card", "replacement": null, "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."},
-    {"term": "Growth Sprint", "replacement": null, "rationale": "The phrase has been superseded and is not an approved commercial engagement name."}
+    {"term": "Opportunity Card", "replacement": "personalised prospecting asset", "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."},
+    {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "The phrase has been superseded and is not an approved commercial engagement name."}
   ]
 }

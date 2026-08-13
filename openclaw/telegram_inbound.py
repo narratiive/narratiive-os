@@ -165,8 +165,21 @@ class TelegramInboundService:
         reply = str(payload.get("reply") or payload.get("message") or "").strip()
         if not reply:
             error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
-            reply = str(error.get("message") or "Tony could not answer that request.").strip()
+            reply = str(error.get("message") or "Tony couldn't complete that request reliably.").strip()
+        reply = self._sanitize_user_reply(reply)
         return reply[:3500]
+
+    @staticmethod
+    def _sanitize_user_reply(reply: str) -> str:
+        """Keep developer diagnostics out of Matt-facing Telegram replies."""
+        lines = []
+        for line in reply.splitlines():
+            lowered = line.strip().casefold()
+            if lowered.startswith("error:") or lowered.startswith("error_code:"):
+                continue
+            lines.append(line)
+        cleaned = "\n".join(lines).strip()
+        return cleaned or "Tony couldn't complete that request reliably."
 
     def _read_offset(self) -> int:
         if not self.config.offset_path.exists():

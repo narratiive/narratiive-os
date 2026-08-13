@@ -30,7 +30,7 @@ class TonyTerminologyCommandTests(unittest.TestCase):
                 {"concept": "Paid engagement", "rule": "Use descriptive language"}
             ],
             "retired_terms": [
-                {"term": "Growth Sprint", "replacement": None, "rationale": "Superseded"}
+                {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "Superseded"}
             ],
         })
 
@@ -39,13 +39,14 @@ class TonyTerminologyCommandTests(unittest.TestCase):
         service = TonyTerminologyCommandService(StubService(response), self.policy)
         self.assertIs(service.execute("/status", ()), response)
 
-    def test_blocks_retired_language_in_nested_data(self) -> None:
+    def test_rewrites_retired_language_in_nested_data(self) -> None:
         response = CommandResponse(command="status", status="ok", message="Ready.", data={"next": ["Start Growth Sprint"]})
         service = TonyTerminologyCommandService(StubService(response), self.policy)
         result = service.execute("/status", ())
-        self.assertEqual(result.status, "error")
-        self.assertEqual(result.data["error_code"], "terminology_violation")
-        self.assertEqual(result.data["retired_terms"], ["Growth Sprint"])
+        self.assertEqual(result.status, "ok")
+        self.assertEqual(result.message, "Ready.")
+        self.assertEqual(result.data["next"], ["Start paid commercial engagement"])
+        self.assertNotIn("Growth Sprint", str(result.data))
 
     def test_vocabulary_returns_repository_policy_without_delegation(self) -> None:
         response = CommandResponse(command="status", status="ok", message="unused", data={})

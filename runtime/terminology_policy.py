@@ -67,6 +67,9 @@ class TerminologyPolicy:
                 raise ValueError("Each retired term requires a non-empty term")
             if not isinstance(rationale, str) or not rationale.strip():
                 raise ValueError(f"Retired term '{term}' requires a rationale")
+            replacement = entry.get("replacement")
+            if replacement is not None and (not isinstance(replacement, str) or not replacement.strip()):
+                raise ValueError(f"Retired term '{term}' replacement must be null or non-empty text")
             key = TerminologyPolicy._normalise_name(term)
             if key in retired_names:
                 raise ValueError(f"Duplicate retired term: {term}")
@@ -146,8 +149,29 @@ class TerminologyPolicy:
         violations: list[TerminologyViolation] = []
         for entry in self.retired_terms:
             for match in self._pattern(entry["term"]).finditer(text):
-                violations.append(TerminologyViolation(entry["term"], match.start(), match.end(), entry.get("replacement"), entry["rationale"]))
+                violations.append(
+                    TerminologyViolation(
+                        entry["term"],
+                        match.start(),
+                        match.end(),
+                        entry.get("replacement"),
+                        entry["rationale"],
+                    )
+                )
         return sorted(violations, key=lambda item: (item.start, item.end))
 
     def scan_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
         return [violation for text in texts for violation in self.scan(text)]
+
+    def rewrite(self, text: str) -> str:
+        """Rewrite retired terminology into current descriptive language.
+
+        A policy-supplied replacement is preferred. Where a retired term has no
+        explicit replacement, use a deliberately generic description rather than
+        blocking an otherwise useful Tony response.
+        """
+        rewritten = text
+        for entry in self.retired_terms:
+            replacement = str(entry.get("replacement") or "current Narratiive approach").strip()
+            rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
+        return rewritten
