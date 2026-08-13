@@ -73,6 +73,30 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         self.assertIn("Nothing has been sent or changed externally yet", response.message)
         self.assertEqual(len(base.calls), 1)
 
+    def test_prepare_it_turns_active_lead_into_delegation_ready_brief(self):
+        base = StubService()
+        base.response = self._lead_response()
+        service = TonyCapabilityCommandService(base)
+        service.execute("What inbound leads did we get today?", [])
+        service.execute("Let's pursue Lesley", [])
+        response = service.execute("Go ahead and prepare it", [])
+        self.assertEqual(response.command, "lead_preparation")
+        self.assertEqual(response.data["intent"], "delegate_lead_preparation")
+        self.assertEqual(response.data["delegation_status"], "ready")
+        self.assertEqual(response.data["delegation_brief"]["owner"], "Claude")
+        self.assertEqual(response.data["delegation_brief"]["reviewer"], "Tony")
+        self.assertEqual(response.data["delegation_brief"]["contact"], "Lesley Harman")
+        self.assertTrue(response.data["approval_required_for_send"])
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertIn("have not claimed delegation or external execution", response.message)
+        self.assertEqual(len(base.calls), 1)
+
+    def test_prepare_without_active_decision_delegates_normally(self):
+        base = StubService()
+        service = TonyCapabilityCommandService(base)
+        service.execute("Go ahead and prepare it", [])
+        self.assertEqual(len(base.calls), 1)
+
     def test_follow_up_without_prior_lead_context_delegates(self):
         base = StubService()
         service = TonyCapabilityCommandService(base)
