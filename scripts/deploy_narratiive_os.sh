@@ -26,5 +26,13 @@ fi
 echo "Narratiive OS deploy: $REPO"
 echo "Python: $PYTHON ($PYTHON_VERSION)"
 
+# Deployment validation must not inherit live Notion credentials from an
+# interactive shell. The running Tony LaunchAgents load runtime.env themselves,
+# so clearing these variables here isolates tests without removing live access.
+unset NARRATIIVE_NOTION_TOKEN
+unset NOTION_API_TOKEN
+unset NOTION_API_KEY
+unset NOTION_TOKEN
+
 cd "$REPO"
 exec "$PYTHON" "$DEPLOY" --apply
