@@ -47,6 +47,18 @@ class TelegramInboundTests(unittest.TestCase):
             )
         self.assertEqual(config.bridge_url, "http://127.0.0.1:8790/telegram/inbound")
 
+    def test_config_upgrades_legacy_root_bridge_override(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            config = TelegramInboundConfig.from_env(
+                {
+                    "TONY_TELEGRAM_BOT_TOKEN": "token",
+                    "TONY_TELEGRAM_CHAT_ID": "123",
+                    "TONY_TELEGRAM_BRIDGE_URL": "http://127.0.0.1:8790",
+                },
+                repository_root=Path(tmp),
+            )
+        self.assertEqual(config.bridge_url, "http://127.0.0.1:8790/telegram/inbound")
+
     def test_process_update_replies_only_to_allowed_chat(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = TelegramInboundConfig(
