@@ -61,28 +61,15 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         service = TonyCapabilityCommandService(base)
         self.assertIs(service.mission_control_loader, base.mission_control_loader)
 
+    def _lead_response(self):
+        return CommandResponse("leads", "healthy", "raw", {"scope": "today", "leads": [
+            {"lead_id": "lesley", "contact": "Lesley Harman", "company": "Harman Communications Ltd", "email": "lesley@example.com", "source": "Tally", "status": "New", "pipeline_stage": "New Diagnostic", "lead_temperature": "Warm", "ai_summary": "Growth is limited by confused outreach.", "recommended_next_action": "Invite Lesley to discovery."},
+            {"lead_id": "jimmy", "contact": "Jimmy Diamond", "company": "Jimmy Diamond Ltd", "email": "jimmy@example.com", "source": "Tally", "status": "New", "pipeline_stage": "New Diagnostic", "lead_temperature": "Warm", "ai_summary": "Needs a clearer growth story."},
+        ]})
+
     def test_named_follow_up_uses_previous_lead_context_without_requery(self):
         base = StubService()
-        base.response = CommandResponse(
-            "leads", "healthy", "raw", {
-                "scope": "today",
-                "leads": [
-                    {
-                        "lead_id": "lesley", "contact": "Lesley Harman",
-                        "company": "Harman Communications Ltd", "email": "lesley@example.com",
-                        "source": "Tally", "status": "New", "pipeline_stage": "New Diagnostic",
-                        "lead_temperature": "Warm", "ai_summary": "Growth is limited by confused outreach.",
-                        "recommended_next_action": "Invite Lesley to discovery.",
-                    },
-                    {
-                        "lead_id": "jimmy", "contact": "Jimmy Diamond",
-                        "company": "Jimmy Diamond Ltd", "email": "jimmy@example.com",
-                        "source": "Tally", "status": "New", "pipeline_stage": "New Diagnostic",
-                        "lead_temperature": "Warm", "ai_summary": "Needs a clearer growth story.",
-                    },
-                ],
-            },
-        )
+        base.response = self._lead_response()
         service = TonyCapabilityCommandService(base)
         service.execute("What inbound leads did we get today?", [])
         response = service.execute("Tell me more about Lesley", [])
@@ -91,6 +78,19 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         self.assertIn("Lesley Harman", response.message)
         self.assertIn("Next: Invite Lesley to discovery.", response.message)
         self.assertNotIn("Jimmy Diamond", response.message)
+        self.assertEqual(len(base.calls), 1)
+
+    def test_progress_lead_creates_explicit_handoff_without_claiming_execution(self):
+        base = StubService()
+        base.response = self._lead_response()
+        service = TonyCapabilityCommandService(base)
+        service.execute("What inbound leads did we get today?", [])
+        response = service.execute("Let's pursue Lesley", [])
+        self.assertEqual(response.command, "lead_action")
+        self.assertEqual(response.data["intent"], "progress_lead")
+        self.assertEqual(response.data["lead"]["lead_id"], "lesley")
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertIn("Invite Lesley to discovery", response.message)
         self.assertEqual(len(base.calls), 1)
 
     def test_follow_up_without_prior_lead_context_delegates(self):

@@ -22,6 +22,17 @@ class TonyCapabilityCommandService:
         "why them",
         "why this",
     )
+    _ACTION_MARKERS = (
+        "let's pursue",
+        "lets pursue",
+        "pursue",
+        "take forward",
+        "move forward with",
+        "follow up with",
+        "reach out to",
+        "go after",
+        "progress",
+    )
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
@@ -40,6 +51,9 @@ class TonyCapabilityCommandService:
         normalized = " ".join(command.strip().split())
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            action = self._lead_action(normalized)
+            if action is not None:
+                return action
             follow_up = self._lead_follow_up(normalized)
             if follow_up is not None:
                 return follow_up
@@ -63,6 +77,45 @@ class TonyCapabilityCommandService:
             if len(token) >= 3
         }
 
+    def _resolve_lead_reference(self, command: str) -> InboundLead | None:
+        if not self._last_leads:
+            return None
+        command_tokens = self._reference_tokens(command)
+        matches = []
+        for lead in self._last_leads:
+            reference_tokens = self._reference_tokens(" ".join((lead.contact, lead.company)))
+            if command_tokens.intersection(reference_tokens):
+                matches.append(lead)
+        return matches[0] if len(matches) == 1 else None
+
+    def _lead_action(self, command: str) -> CommandResponse | None:
+        lowered = command.casefold()
+        if not any(marker in lowered for marker in self._ACTION_MARKERS):
+            return None
+        lead = self._resolve_lead_reference(lowered)
+        if lead is None:
+            return None
+
+        next_action = lead.recommended_next_action.strip()
+        message = f"Good. I’ll treat {lead.contact}"
+        if lead.company:
+            message += f" at {lead.company}"
+        message += " as the lead to progress."
+        if next_action:
+            message += f" Next: {next_action}"
+        message += " I haven’t sent or changed anything externally yet."
+        return CommandResponse(
+            command="lead_action",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "progress_lead",
+                "lead": lead.to_dict(),
+                "next_action": next_action,
+                "external_action_taken": False,
+            },
+        )
+
     def _lead_follow_up(self, command: str) -> CommandResponse | None:
         if not self._last_leads:
             return None
@@ -70,16 +123,9 @@ class TonyCapabilityCommandService:
         if not any(marker in lowered for marker in self._FOLLOW_UP_MARKERS):
             return None
 
-        command_tokens = self._reference_tokens(lowered)
-        matches = []
-        for lead in self._last_leads:
-            reference_tokens = self._reference_tokens(" ".join((lead.contact, lead.company)))
-            if command_tokens.intersection(reference_tokens):
-                matches.append(lead)
-        if len(matches) != 1:
+        lead = self._resolve_lead_reference(lowered)
+        if lead is None:
             return None
-
-        lead = matches[0]
         return CommandResponse(
             command="leads",
             status="healthy",
