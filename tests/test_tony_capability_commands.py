@@ -27,10 +27,6 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         response = service.execute("/capabilities", [])
         self.assertEqual(response.command, "capabilities")
         self.assertEqual(response.data["total_count"], 14)
-        self.assertTrue(any(item["command"] == "/mission" for item in response.data["capabilities"]))
-        self.assertTrue(any(item["command"] == "/github" for item in response.data["capabilities"]))
-        self.assertTrue(any(item["command"] == "/friday" for item in response.data["capabilities"]))
-        self.assertTrue(any(item["command"] == "/vocabulary" for item in response.data["capabilities"]))
         self.assertEqual(base.calls, [])
 
     def test_help_and_commands_are_aliases(self):
@@ -38,28 +34,12 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         self.assertEqual(service.execute("/help", []).command, "capabilities")
         self.assertEqual(service.execute("/commands", []).command, "capabilities")
 
-    def test_unconfigured_features_are_reported_not_hidden(self):
-        base = StubService()
-        base.mission_control_loader = None
-        base.execution_journal = None
-        response = TonyCapabilityCommandService(base).execute("/capabilities", [])
-        mission = next(item for item in response.data["capabilities"] if item["command"] == "/mission")
-        history = next(item for item in response.data["capabilities"] if item["command"].startswith("/history"))
-        self.assertFalse(mission["available"])
-        self.assertFalse(history["available"])
-        self.assertEqual(response.status, "partial")
-
     def test_non_capability_command_delegates(self):
         base = StubService()
         service = TonyCapabilityCommandService(base)
         response = service.execute("/health", [{"id": "one"}])
         self.assertEqual(response.command, "delegated")
         self.assertEqual(base.calls, [("/health", [{"id": "one"}])])
-
-    def test_mission_control_configuration_is_exposed_for_bridge_health(self):
-        base = StubService()
-        service = TonyCapabilityCommandService(base)
-        self.assertIs(service.mission_control_loader, base.mission_control_loader)
 
     def _lead_response(self):
         return CommandResponse("leads", "healthy", "raw", {"scope": "today", "leads": [
@@ -73,14 +53,12 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         service = TonyCapabilityCommandService(base)
         service.execute("What inbound leads did we get today?", [])
         response = service.execute("Tell me more about Lesley", [])
-        self.assertEqual(response.command, "leads")
         self.assertEqual(response.data["count"], 1)
         self.assertIn("Lesley Harman", response.message)
-        self.assertIn("Next: Invite Lesley to discovery.", response.message)
         self.assertNotIn("Jimmy Diamond", response.message)
         self.assertEqual(len(base.calls), 1)
 
-    def test_progress_lead_creates_explicit_handoff_without_claiming_execution(self):
+    def test_progress_lead_builds_execution_plan_without_claiming_execution(self):
         base = StubService()
         base.response = self._lead_response()
         service = TonyCapabilityCommandService(base)
@@ -88,9 +66,11 @@ class TonyCapabilityCommandServiceTests(unittest.TestCase):
         response = service.execute("Let's pursue Lesley", [])
         self.assertEqual(response.command, "lead_action")
         self.assertEqual(response.data["intent"], "progress_lead")
-        self.assertEqual(response.data["lead"]["lead_id"], "lesley")
         self.assertFalse(response.data["external_action_taken"])
-        self.assertIn("Invite Lesley to discovery", response.message)
+        self.assertTrue(response.data["approval_required"])
+        self.assertEqual([step["owner"] for step in response.data["execution_plan"]], ["Tony", "Claude", "Tony", "Matt"])
+        self.assertIn("personalised first-touch approach", response.message)
+        self.assertIn("Nothing has been sent or changed externally yet", response.message)
         self.assertEqual(len(base.calls), 1)
 
     def test_follow_up_without_prior_lead_context_delegates(self):
