@@ -16,12 +16,14 @@ class TonyCapabilityCommandService:
     _FOLLOW_UP_MARKERS = ("tell me more", "what about", "more on", "more about", "go deeper", "why them", "why this")
     _ACTION_MARKERS = ("let's pursue", "lets pursue", "pursue", "take forward", "move forward with", "follow up with", "reach out to", "go after", "progress")
     _PREPARE_MARKERS = ("prepare it", "draft it", "go ahead", "do it", "get it ready", "prepare the outreach", "draft the outreach")
+    _RETURN_MARKERS = ("review the returned draft", "review the draft", "claude returned", "worker returned", "here is the draft", "here's the draft")
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
         self.registry = registry or TonyCapabilityRegistry()
         self._last_leads: tuple[InboundLead, ...] = ()
         self._active_lead: InboundLead | None = None
+        self._pending_delegation: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -33,8 +35,12 @@ class TonyCapabilityCommandService:
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
+        records = list(objects)
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            returned = self._worker_return(normalized, records)
+            if returned is not None:
+                return returned
             preparation = self._lead_preparation(normalized)
             if preparation is not None:
                 return preparation
@@ -44,7 +50,7 @@ class TonyCapabilityCommandService:
             follow_up = self._lead_follow_up(normalized)
             if follow_up is not None:
                 return follow_up
-            response = self.command_service.execute(command, objects)
+            response = self.command_service.execute(command, records)
             return self._executive_response(command, response)
 
         configured = self._configured_features()
@@ -86,6 +92,7 @@ class TonyCapabilityCommandService:
             return None
 
         self._active_lead = lead
+        self._pending_delegation = None
         next_action = lead.recommended_next_action.strip()
         plan = self._execution_plan(lead)
         message = f"Good. I’ll treat {lead.contact}"
@@ -123,6 +130,7 @@ class TonyCapabilityCommandService:
                 "Do not send externally; return the draft to Tony for review.",
             ],
         }
+        self._pending_delegation = brief
         message = (
             f"Yes. I’ve turned the decision on {lead.contact} into a delegation-ready brief for Claude. "
             "I’ll remain accountable for reviewing the returned draft before it comes back to you. "
@@ -133,6 +141,73 @@ class TonyCapabilityCommandService:
             status="healthy",
             message=message,
             data={"intent": "delegate_lead_preparation", "lead": lead.to_dict(), "delegation_brief": brief, "delegation_status": "ready", "approval_required_for_send": True, "external_action_taken": False},
+        )
+
+    @staticmethod
+    def _returned_artifact(records: list[dict[str, Any]]) -> tuple[str, str] | None:
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            worker = str(record.get("worker") or record.get("owner") or "worker").strip()
+            for key in ("artifact", "content", "draft", "result"):
+                value = record.get(key)
+                if isinstance(value, str) and value.strip():
+                    return worker, value.strip()
+        return None
+
+    def _worker_return(self, command: str, records: list[dict[str, Any]]) -> CommandResponse | None:
+        if self._active_lead is None or self._pending_delegation is None:
+            return None
+        lowered = command.casefold()
+        artifact = self._returned_artifact(records)
+        if artifact is None and not any(marker in lowered for marker in self._RETURN_MARKERS):
+            return None
+        if artifact is None:
+            return CommandResponse(
+                command="delegated_work_review",
+                status="error",
+                message="I’m ready to review the delegated work, but I don’t have a returned draft or artefact to assess yet.",
+                data={"intent": "review_delegated_work", "delegation_status": "awaiting_artifact", "external_action_taken": False},
+            )
+
+        worker, content = artifact
+        lead = self._active_lead
+        lowered_content = content.casefold()
+        first_name = lead.contact.split()[0].casefold() if lead.contact else ""
+        contact_present = bool(first_name and first_name in lowered_content)
+        company_present = not lead.company or lead.company.casefold() in lowered_content
+        substantive = len(content.split()) >= 35
+        checks = {
+            "contact_specific": contact_present,
+            "company_specific": company_present,
+            "substantive": substantive,
+        }
+        ready = all(checks.values())
+        review_status = "ready_for_approval" if ready else "revision_required"
+        if ready:
+            assessment = "It passes the basic evidence-and-specificity gate and is ready for your approval."
+        else:
+            failed = ", ".join(key.replace("_", " ") for key, passed in checks.items() if not passed)
+            assessment = f"I would not put this in front of you yet; it needs revision on: {failed}."
+        message = (
+            f"{worker} has returned work for {lead.contact}. I’ve reviewed the artefact against the delegation brief. "
+            f"{assessment} Nothing has been sent externally."
+        )
+        return CommandResponse(
+            command="delegated_work_review",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "review_delegated_work",
+                "delegation_status": "returned",
+                "review_status": review_status,
+                "worker": worker,
+                "lead": lead.to_dict(),
+                "artifact": content,
+                "review_checks": checks,
+                "approval_required_for_send": True,
+                "external_action_taken": False,
+            },
         )
 
     def _lead_follow_up(self, command: str) -> CommandResponse | None:
