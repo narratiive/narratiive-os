@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
+from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -44,7 +45,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
-        learning = memory.command_service
+        adaptive = memory.command_service
+        self.assertIsInstance(adaptive, TonyAdaptiveResponseCommandService)
+        learning = adaptive.command_service
         self.assertIsInstance(learning, TonyExecutiveLearningCommandService)
         outcomes = learning.command_service
         self.assertIsInstance(outcomes, TonyOutcomeAccountabilityCommandService)
