@@ -105,6 +105,93 @@ class TonyPersistentAgencyFocusTests(unittest.TestCase):
             self.assertFalse(repeated.data["external_action_taken"])
             self.assertIn("already prepared", repeated.message)
 
+    def test_verified_worker_result_closes_pending_action_and_persists_completion(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            service = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            action_id = service._pending_action["action_id"]
+
+            result = service.execute(
+                "action_result",
+                [{
+                    "executive_action_result": {
+                        "action_id": action_id,
+                        "status": "completed",
+                        "evidence": {"message_id": "gmail-123"},
+                        "summary": "Reply evidence retrieved and reviewed.",
+                        "external_action_taken": False,
+                    }
+                }],
+            )
+
+            self.assertEqual(result.status, "healthy")
+            self.assertTrue(result.data["accepted"])
+            self.assertEqual(result.data["execution_status"], "completed_verified")
+            self.assertIsNone(service._pending_action)
+            self.assertFalse(result.data["external_action_taken"])
+
+            restarted = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            status = restarted.execute("Has that been done?", [])
+            self.assertEqual(status.data["execution_status"], "completed_verified")
+            self.assertIn("backed by recorded execution evidence", status.message)
+
+    def test_worker_result_without_evidence_does_not_close_action(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            service = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            action_id = service._pending_action["action_id"]
+
+            result = service.execute(
+                "worker_return",
+                [{"action_id": action_id, "status": "completed", "evidence": ""}],
+            )
+
+            self.assertEqual(result.status, "attention")
+            self.assertFalse(result.data["accepted"])
+            self.assertIsNotNone(service._pending_action)
+            self.assertIn("Completion evidence is required", result.message)
+
+    def test_mismatched_result_cannot_mutate_current_action(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            service = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            expected = service._pending_action["action_id"]
+
+            result = service.execute(
+                "record_action_result",
+                [{"action_id": "different-action", "status": "success", "evidence": {"receipt": "abc"}}],
+            )
+
+            self.assertFalse(result.data["accepted"])
+            self.assertEqual(service._pending_action["action_id"], expected)
+            self.assertIn("does not match", result.message)
+
+    def test_completed_action_is_not_surfaced_as_stalled_later(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            start = datetime(2026, 8, 14, 8, 0, tzinfo=timezone.utc)
+            service = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store, clock=lambda: start)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            action_id = service._pending_action["action_id"]
+            service.execute(
+                "action_result",
+                [{"action_id": action_id, "status": "returned", "evidence": {"worker_run_id": "claude-1"}}],
+            )
+
+            later = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(), store_path=store, clock=lambda: start + timedelta(hours=4)
+            )
+            brief = later.execute("morning", [])
+            self.assertNotIn("Stalled action:", brief.message)
+            self.assertNotIn("stalled_executive_action", brief.data)
+
     def test_stalled_worker_action_is_promoted_into_agency_focus(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Path(tmp) / "focus.json"
