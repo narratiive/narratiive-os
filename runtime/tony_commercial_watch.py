@@ -9,7 +9,7 @@ from runtime.tony_command_service import CommandResponse
 
 
 class TonyCommercialWatchCommandService:
-    """Persist commercial commitments and surface overdue follow-ups proactively."""
+    """Persist commercial commitments and surface the most important commercial attention."""
 
     _WATCH_MARKERS = (
         "what needs attention",
@@ -59,6 +59,7 @@ class TonyCommercialWatchCommandService:
         "send over",
         "would love to",
     )
+    _POSITIVE_REPLY_WINDOW_DAYS = 3
 
     def __init__(
         self,
@@ -206,24 +207,8 @@ class TonyCommercialWatchCommandService:
                 },
             )
 
-        now = self.clock()
-        commitment = dict(commitment)
-        commitment["status"] = "resolved"
-        commitment["resolved_at"] = now.isoformat()
-        commitment["resolution_reason"] = "reply_received"
-        commitment["reply"] = {
-            "message_id": str(reply.get("message_id") or reply.get("id") or "").strip(),
-            "from": str(reply.get("from") or reply.get("sender") or "").strip(),
-            "subject": subject,
-            "received_at": str(reply.get("received_at") or reply.get("receivedAt") or now.isoformat()).strip(),
-            "body_excerpt": " ".join(body.split())[:240],
-        }
-        commitments[commitment["commitment_id"]] = commitment
-        self._write(commitments)
-
         declined = any(marker in combined for marker in self._DECLINE_MARKERS)
         positive = not declined and any(marker in combined for marker in self._POSITIVE_MARKERS)
-
         if declined:
             status = "healthy"
             disposition = "declined"
@@ -248,6 +233,23 @@ class TonyCommercialWatchCommandService:
                 f"{label} replied, so I have cleared the scheduled follow-up. I can't justify an urgency call from the "
                 "message evidence alone; review it and decide the next commercial action."
             )
+
+        now = self.clock()
+        commitment = dict(commitment)
+        commitment["status"] = "resolved"
+        commitment["resolved_at"] = now.isoformat()
+        commitment["resolution_reason"] = "reply_received"
+        commitment["disposition"] = disposition
+        commitment["recommended_next_action"] = next_action
+        commitment["reply"] = {
+            "message_id": str(reply.get("message_id") or reply.get("id") or "").strip(),
+            "from": str(reply.get("from") or reply.get("sender") or "").strip(),
+            "subject": subject,
+            "received_at": str(reply.get("received_at") or reply.get("receivedAt") or now.isoformat()).strip(),
+            "body_excerpt": " ".join(body.split())[:240],
+        }
+        commitments[commitment["commitment_id"]] = commitment
+        self._write(commitments)
 
         return CommandResponse(
             command="commercial_reply",
@@ -280,14 +282,69 @@ class TonyCommercialWatchCommandService:
                 overdue.append(item)
         return sorted(overdue, key=lambda item: (str(item.get("due_on")), str(item.get("contact"))))
 
+    def _recent_positive_replies(self) -> list[dict[str, Any]]:
+        now = self.clock()
+        recent: list[dict[str, Any]] = []
+        for item in self._read().values():
+            if str(item.get("status")) != "resolved" or str(item.get("disposition")) != "positive_intent":
+                continue
+            try:
+                resolved = datetime.fromisoformat(str(item.get("resolved_at")))
+            except ValueError:
+                continue
+            age = now.date() - resolved.date()
+            if 0 <= age.days <= self._POSITIVE_REPLY_WINDOW_DAYS:
+                recent.append(item)
+        return sorted(recent, key=lambda item: str(item.get("resolved_at")), reverse=True)
+
+    @staticmethod
+    def _lead_label(item: dict[str, Any]) -> str:
+        contact = str(item.get("contact") or "the lead")
+        company = str(item.get("company") or "").strip()
+        return f"{contact} at {company}" if company else contact
+
     def _watch_response(self) -> CommandResponse:
+        positive_replies = self._recent_positive_replies()
         overdue = self._overdue()
+
+        if positive_replies:
+            first = positive_replies[0]
+            label = self._lead_label(first)
+            extra = ""
+            if overdue:
+                extra = f" There {'is' if len(overdue) == 1 else 'are'} also {len(overdue)} overdue follow-up{'s' if len(overdue) != 1 else ''} to clear afterwards."
+            message = (
+                f"Immediate commercial priority: {label} replied with positive commercial intent. "
+                "Review that reply and decide whether to move the opportunity to discovery before lower-priority work."
+                f"{extra}"
+            )
+            return CommandResponse(
+                command="commercial_watch",
+                status="attention",
+                message=message,
+                data={
+                    "intent": "synthesise_commercial_priorities",
+                    "priority": "positive_reply",
+                    "positive_reply_count": len(positive_replies),
+                    "positive_replies": positive_replies,
+                    "overdue_count": len(overdue),
+                    "overdue": overdue,
+                },
+            )
+
         if not overdue:
             return CommandResponse(
                 command="commercial_watch",
                 status="healthy",
-                message="Nothing in the recorded commercial follow-up queue is overdue right now.",
-                data={"intent": "review_commercial_commitments", "overdue_count": 0, "overdue": []},
+                message="Nothing in the recorded commercial follow-up queue needs immediate attention right now.",
+                data={
+                    "intent": "synthesise_commercial_priorities",
+                    "priority": None,
+                    "positive_reply_count": 0,
+                    "positive_replies": [],
+                    "overdue_count": 0,
+                    "overdue": [],
+                },
             )
 
         first = overdue[0]
@@ -306,24 +363,50 @@ class TonyCommercialWatchCommandService:
             command="commercial_watch",
             status="attention",
             message=message,
-            data={"intent": "review_commercial_commitments", "overdue_count": len(overdue), "overdue": overdue},
+            data={
+                "intent": "synthesise_commercial_priorities",
+                "priority": "overdue_follow_up",
+                "positive_reply_count": 0,
+                "positive_replies": [],
+                "overdue_count": len(overdue),
+                "overdue": overdue,
+            },
         )
 
     def _augment_brief(self, response: CommandResponse) -> CommandResponse:
         if response.status == "error":
             return response
+        positive_replies = self._recent_positive_replies()
         overdue = self._overdue()
-        if not overdue:
+        if not positive_replies and not overdue:
             return response
 
-        first = overdue[0]
-        company = f" at {first['company']}" if first.get("company") else ""
-        alert = (
-            f"Commercial attention: {len(overdue)} follow-up{'s are' if len(overdue) != 1 else ' is'} overdue; "
-            f"start with {first['contact']}{company}, due {first['due_on']}."
-        )
+        if positive_replies:
+            first = positive_replies[0]
+            alert = (
+                f"Commercial priority: {self._lead_label(first)} replied positively; review the reply and decide whether "
+                "to move to discovery before lower-priority work."
+            )
+            if overdue:
+                alert += f" {len(overdue)} overdue follow-up{'s also need' if len(overdue) != 1 else ' also needs'} clearing afterwards."
+            priority = "positive_reply"
+        else:
+            first = overdue[0]
+            company = f" at {first['company']}" if first.get("company") else ""
+            alert = (
+                f"Commercial attention: {len(overdue)} follow-up{'s are' if len(overdue) != 1 else ' is'} overdue; "
+                f"start with {first['contact']}{company}, due {first['due_on']}."
+            )
+            priority = "overdue_follow_up"
+
         data = dict(response.data) if isinstance(response.data, dict) else {}
-        data["commercial_watch"] = {"overdue_count": len(overdue), "overdue": overdue}
+        data["commercial_watch"] = {
+            "priority": priority,
+            "positive_reply_count": len(positive_replies),
+            "positive_replies": positive_replies,
+            "overdue_count": len(overdue),
+            "overdue": overdue,
+        }
         return CommandResponse(
             command=response.command,
             status="attention" if response.status == "healthy" else response.status,
