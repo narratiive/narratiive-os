@@ -116,6 +116,74 @@ class TonyAgencyFocusTests(unittest.TestCase):
         self.assertEqual(priorities[2]["reason"], "business_priority")
         self.assertIn("Your first priority is the positive reply from Jimmy", response.message)
 
+    def test_follow_up_why_explains_the_judgement_without_requerying(self):
+        inner = StubCommandService(
+            {
+                "agency_state": {"executive_items": []},
+                "commercial_watch": {
+                    "positive_replies": [
+                        {
+                            "lead_id": "jimmy",
+                            "contact": "Jimmy",
+                            "company": "Jimmy Diamond Ltd",
+                            "recommended_next_action": "Move the opportunity to discovery.",
+                        }
+                    ],
+                    "overdue": [
+                        {
+                            "commitment_id": "follow-up:lesley",
+                            "lead_id": "lesley",
+                            "contact": "Lesley",
+                            "company": "Harman Communications",
+                            "due_on": "2026-08-13",
+                        }
+                    ],
+                },
+            }
+        )
+        service = TonyAgencyFocusCommandService(inner)
+
+        service.execute("What should I focus on today?", [])
+        response = service.execute("Why is that first?", [])
+
+        self.assertEqual(response.command, "agency_focus_rationale")
+        self.assertEqual(response.data["intent"], "explain_agency_focus")
+        self.assertIn("fresh positive buying intent", response.message)
+        self.assertIn("overdue follow-up", response.message)
+        self.assertEqual(inner.calls, ["morning"])
+
+    def test_internal_work_choice_is_challenged_when_business_priority_is_stronger(self):
+        inner = StubCommandService(
+            {
+                "agency_state": {
+                    "executive_items": [
+                        {
+                            "item_id": "client-risk",
+                            "area": "clients",
+                            "title": "Client renewal at risk",
+                            "blocked": True,
+                            "requires_matt": True,
+                            "next_action": "Call the client today.",
+                        }
+                    ]
+                },
+                "commercial_watch": {},
+            }
+        )
+        service = TonyAgencyFocusCommandService(inner)
+
+        service.execute("What should I focus on today?", [])
+        response = service.execute("Let's work on the backend deployment today.", [])
+
+        self.assertEqual(response.command, "agency_focus_challenge")
+        self.assertEqual(response.status, "attention")
+        self.assertEqual(response.data["intent"], "challenge_lower_value_focus_choice")
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertIn("Client renewal at risk", response.message)
+        self.assertIn("I would not prioritise", response.message)
+        self.assertIn("I will follow that decision", response.message)
+        self.assertEqual(inner.calls, ["morning"])
+
     def test_focus_query_falls_back_to_commercial_creation_when_no_verified_priority_exists(self):
         inner = StubCommandService({"agency_state": {"executive_items": []}, "commercial_watch": {}})
         service = TonyAgencyFocusCommandService(inner)
