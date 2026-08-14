@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from runtime.tony_agency_focus import TonyAgencyFocusCommandService
 from runtime.tony_command_service import CommandResponse
@@ -26,8 +26,17 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         "where are we with that",
     )
 
-    def __init__(self, command_service, *, store_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        command_service,
+        *,
+        store_path: Path | None = None,
+        clock: Callable[[], datetime] | None = None,
+        stall_after: timedelta = timedelta(hours=2),
+    ) -> None:
         self.store_path = store_path or Path(".runtime/agency-focus-context.json")
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.stall_after = stall_after
         super().__init__(command_service)
         state = self._load_state()
         self._last_priorities = state["priorities"]
@@ -38,10 +47,25 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         lowered = normalized.casefold()
         if self._pending_action and any(marker in lowered for marker in self._ACTION_STATUS_MARKERS):
             return self._pending_action_status()
-        return super().execute(command, objects)
+
+        response = super().execute(command, objects)
+        if response.command in {"morning", "evening"}:
+            response = self._augment_brief_with_stalled_action(response)
+        return response
 
     def _focus_response(self, agency_response: CommandResponse) -> CommandResponse:
         response = super()._focus_response(agency_response)
+        stalled = self._stalled_action_priority()
+        if stalled:
+            existing = response.data.get("priorities", []) if isinstance(response.data, dict) else []
+            priorities = [dict(item) for item in existing if isinstance(item, dict)]
+            original_key = str((self._pending_action or {}).get("priority_key") or "")
+            priorities = [item for item in priorities if str(item.get("key") or "") != original_key]
+            priorities.append(stalled)
+            priorities.sort(key=lambda item: (int(item.get("tier", 99)), int(item.get("area_rank", 99)), str(item.get("label") or "")))
+            priorities = priorities[:3]
+            self._last_priorities = tuple(dict(item) for item in priorities)
+            response = self._render_focus_with_priorities(response, priorities)
         self._persist_state()
         return response
 
@@ -49,6 +73,9 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         priority = dict(self._last_priorities[0])
         priority_key = str(priority.get("key") or "")
         if self._pending_action and str(self._pending_action.get("priority_key") or "") == priority_key:
+            return self._pending_action_status(duplicate_request=True)
+
+        if priority.get("reason") == "stalled_delegated_action":
             return self._pending_action_status(duplicate_request=True)
 
         response = super()._prepare_first_priority_action()
@@ -61,7 +88,7 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
             "priority": priority,
             "execution_handoff": dict(handoff),
             "status": status,
-            "prepared_at": datetime.now(timezone.utc).isoformat(),
+            "prepared_at": self._now_utc().isoformat(),
             "external_action_taken": False,
         }
         self._persist_state()
@@ -95,8 +122,107 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
                 "execution_status": status,
                 "external_action_taken": False,
                 "duplicate_handoff_suppressed": duplicate_request,
+                "stalled": self._pending_action_is_stalled(),
             },
         )
+
+    def _stalled_action_priority(self) -> dict[str, Any] | None:
+        if not self._pending_action_is_stalled():
+            return None
+        pending = dict(self._pending_action or {})
+        original = pending.get("priority") if isinstance(pending.get("priority"), dict) else {}
+        handoff = pending.get("execution_handoff") if isinstance(pending.get("execution_handoff"), dict) else {}
+        status = str(pending.get("status") or "awaiting_worker_confirmation")
+        worker = str(handoff.get("worker") or "the assigned worker")
+        label = str(original.get("label") or "the prepared priority")
+        age = self._pending_action_age()
+        age_hours = max(0, int(age.total_seconds() // 3600)) if age else 0
+
+        if status == "awaiting_matt":
+            action = f"Your decision is still needed before this can progress. It has been waiting for about {age_hours} hour(s)."
+            tier = 25
+        else:
+            action = (
+                f"The prepared handoff to {worker} has no execution or return evidence after about {age_hours} hour(s). "
+                "Verify the worker state or reissue the handoff before lower-priority internal work."
+            )
+            tier = 12
+
+        return {
+            "key": f"stalled_action:{pending.get('priority_key') or label}",
+            "tier": tier,
+            "area_rank": int(original.get("area_rank", 4)),
+            "area": str(original.get("area") or "operations"),
+            "label": f"the stalled action for {label}",
+            "action": action,
+            "reason": "stalled_delegated_action",
+            "source": "executive_action_accountability",
+            "requires_matt": status == "awaiting_matt",
+            "target": dict(original.get("target") or {}),
+        }
+
+    def _augment_brief_with_stalled_action(self, response: CommandResponse) -> CommandResponse:
+        stalled = self._stalled_action_priority()
+        if not stalled:
+            return response
+        data = dict(response.data) if isinstance(response.data, dict) else {}
+        data["stalled_executive_action"] = dict(stalled)
+        message = f"Stalled action: {stalled['label']}. {stalled['action']}\n{response.message}"
+        return CommandResponse(
+            command=response.command,
+            status="attention",
+            message=message,
+            data=data,
+        )
+
+    def _render_focus_with_priorities(self, response: CommandResponse, priorities: list[dict[str, Any]]) -> CommandResponse:
+        if not priorities:
+            return response
+        first = priorities[0]
+        lines = [f"Your first priority is {first['label']}. {first['action']}"]
+        if len(priorities) > 1:
+            lines.append("Then:")
+            for priority in priorities[1:]:
+                lines.append(f"- {priority['label']} — {priority['action']}")
+        lines.append("I would leave engineering or infrastructure work alone unless it is directly blocking one of these agency outcomes.")
+        data = dict(response.data) if isinstance(response.data, dict) else {}
+        data["priorities"] = [dict(item) for item in priorities]
+        data["stalled_executive_action"] = dict(first) if first.get("reason") == "stalled_delegated_action" else self._stalled_action_priority()
+        return CommandResponse(
+            command=response.command,
+            status="attention",
+            message="\n".join(lines),
+            data=data,
+        )
+
+    def _reason_text(self, priority: dict[str, Any]) -> str:
+        if str(priority.get("reason") or "") == "stalled_delegated_action":
+            return "a priority we already chose and prepared has stopped progressing without execution evidence"
+        return super()._reason_text(priority)
+
+    def _pending_action_is_stalled(self) -> bool:
+        age = self._pending_action_age()
+        return age is not None and age >= self.stall_after
+
+    def _pending_action_age(self) -> timedelta | None:
+        if not self._pending_action:
+            return None
+        value = str(self._pending_action.get("prepared_at") or "").strip()
+        if not value:
+            return None
+        try:
+            prepared = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if prepared.tzinfo is None:
+            prepared = prepared.replace(tzinfo=timezone.utc)
+        return self._now_utc() - prepared.astimezone(timezone.utc)
+
+    def _now_utc(self) -> datetime:
+        value = self.clock()
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
     def _load_state(self) -> dict[str, Any]:
         empty = {"priorities": (), "pending_action": None}
