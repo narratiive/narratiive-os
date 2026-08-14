@@ -25,6 +25,40 @@ class TonyCommercialWatchCommandService:
         "whats stalled",
     )
     _BRIEF_COMMANDS = {"morning", "morning_brief", "standup", "evening", "evening_review", "end_of_day"}
+    _REPLY_EVENTS = {"reply_received", "inbound_message", "message_received", "gmail_reply"}
+    _AUTO_REPLY_MARKERS = (
+        "automatic reply",
+        "auto reply",
+        "autoreply",
+        "out of office",
+        "away from the office",
+        "currently away",
+    )
+    _DECLINE_MARKERS = (
+        "not interested",
+        "no thanks",
+        "no thank you",
+        "not for us",
+        "not a fit",
+        "please unsubscribe",
+        "remove me",
+        "we'll pass",
+        "we will pass",
+    )
+    _POSITIVE_MARKERS = (
+        "interested",
+        "sounds good",
+        "tell me more",
+        "let's talk",
+        "lets talk",
+        "book a call",
+        "set up a call",
+        "schedule a call",
+        "happy to chat",
+        "worth a conversation",
+        "send over",
+        "would love to",
+    )
 
     def __init__(
         self,
@@ -46,6 +80,11 @@ class TonyCommercialWatchCommandService:
         return bool(getattr(self.command_service, "github_configured", False))
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
+        evidence = tuple(objects)
+        reply = self._extract_reply(evidence)
+        if reply is not None:
+            return self._handle_reply(reply)
+
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
         name = lowered.split(" ", 1)[0].lstrip("/") if lowered else ""
@@ -53,7 +92,7 @@ class TonyCommercialWatchCommandService:
         if any(marker in lowered for marker in self._WATCH_MARKERS):
             return self._watch_response()
 
-        response = self.command_service.execute(command, objects)
+        response = self.command_service.execute(command, evidence)
         self._capture_commitment(response)
 
         if name in self._BRIEF_COMMANDS:
@@ -90,6 +129,7 @@ class TonyCommercialWatchCommandService:
             "lead_id": lead_id,
             "contact": contact,
             "company": str(lead.get("company") or lead.get("Company") or "").strip(),
+            "email": str(lead.get("email") or lead.get("Email") or "").strip(),
             "action": str(follow_up.get("action") or "").strip(),
             "owner": str(follow_up.get("owner") or "Tony").strip() or "Tony",
             "created_at": now.isoformat(),
@@ -99,6 +139,132 @@ class TonyCommercialWatchCommandService:
         commitments = self._read()
         commitments[commitment["commitment_id"]] = commitment
         self._write(commitments)
+
+    def _extract_reply(self, objects: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:
+        for item in objects:
+            if not isinstance(item, dict):
+                continue
+            candidate = item.get("reply") if isinstance(item.get("reply"), dict) else item
+            provider = str(candidate.get("provider") or candidate.get("source") or "").strip().casefold()
+            event = str(candidate.get("event") or candidate.get("type") or "").strip().casefold()
+            direction = str(candidate.get("direction") or "").strip().casefold()
+            if provider == "gmail" and (event in self._REPLY_EVENTS or direction == "inbound"):
+                return dict(candidate)
+        return None
+
+    def _handle_reply(self, reply: dict[str, Any]) -> CommandResponse:
+        lead_id = str(reply.get("lead_id") or reply.get("leadId") or "").strip()
+        body = str(reply.get("body") or reply.get("text") or reply.get("snippet") or "").strip()
+        subject = str(reply.get("subject") or "").strip()
+        combined = f"{subject}\n{body}".casefold()
+
+        commitments = self._read()
+        commitment = next(
+            (
+                item
+                for item in commitments.values()
+                if str(item.get("status")) == "pending" and lead_id and str(item.get("lead_id")) == lead_id
+            ),
+            None,
+        )
+
+        if commitment is None:
+            return CommandResponse(
+                command="commercial_reply",
+                status="attention",
+                message=(
+                    "A Gmail reply arrived, but I can't safely match it to a pending commercial follow-up. "
+                    "I have not changed any commitment state."
+                ),
+                data={
+                    "intent": "reconcile_unmatched_commercial_reply",
+                    "lead_id": lead_id,
+                    "commitment_resolved": False,
+                    "external_action_taken": False,
+                },
+            )
+
+        contact = str(commitment.get("contact") or "the lead")
+        company = str(commitment.get("company") or "").strip()
+        label = f"{contact} at {company}" if company else contact
+
+        if any(marker in combined for marker in self._AUTO_REPLY_MARKERS):
+            return CommandResponse(
+                command="commercial_reply",
+                status="healthy",
+                message=(
+                    f"An automatic reply arrived from {label}. I have kept the commercial follow-up open because "
+                    "an out-of-office response is not evidence of engagement."
+                ),
+                data={
+                    "intent": "ignore_automatic_reply",
+                    "lead_id": lead_id,
+                    "commitment_id": commitment["commitment_id"],
+                    "commitment_status": "pending",
+                    "commitment_resolved": False,
+                    "external_action_taken": False,
+                },
+            )
+
+        now = self.clock()
+        commitment = dict(commitment)
+        commitment["status"] = "resolved"
+        commitment["resolved_at"] = now.isoformat()
+        commitment["resolution_reason"] = "reply_received"
+        commitment["reply"] = {
+            "message_id": str(reply.get("message_id") or reply.get("id") or "").strip(),
+            "from": str(reply.get("from") or reply.get("sender") or "").strip(),
+            "subject": subject,
+            "received_at": str(reply.get("received_at") or reply.get("receivedAt") or now.isoformat()).strip(),
+            "body_excerpt": " ".join(body.split())[:240],
+        }
+        commitments[commitment["commitment_id"]] = commitment
+        self._write(commitments)
+
+        declined = any(marker in combined for marker in self._DECLINE_MARKERS)
+        positive = not declined and any(marker in combined for marker in self._POSITIVE_MARKERS)
+
+        if declined:
+            status = "healthy"
+            disposition = "declined"
+            next_action = "Close the outreach loop unless there is a specific reason to revisit the account later."
+            message = (
+                f"{label} replied and the message indicates a decline. I have cleared the scheduled follow-up. "
+                "No immediate escalation is needed."
+            )
+        elif positive:
+            status = "attention"
+            disposition = "positive_intent"
+            next_action = "Review the reply now and decide whether to move the opportunity into a discovery conversation."
+            message = (
+                f"{label} replied with positive commercial intent. I have cleared the scheduled follow-up. "
+                "This deserves attention now; I recommend reviewing the reply and deciding whether to move to discovery."
+            )
+        else:
+            status = "healthy"
+            disposition = "reply_received"
+            next_action = "Review the reply and decide the next commercial action."
+            message = (
+                f"{label} replied, so I have cleared the scheduled follow-up. I can't justify an urgency call from the "
+                "message evidence alone; review it and decide the next commercial action."
+            )
+
+        return CommandResponse(
+            command="commercial_reply",
+            status=status,
+            message=message,
+            data={
+                "intent": "assess_commercial_reply",
+                "lead_id": lead_id,
+                "commitment_id": commitment["commitment_id"],
+                "commitment_status": "resolved",
+                "commitment_resolved": True,
+                "disposition": disposition,
+                "recommended_next_action": next_action,
+                "reply_evidence": commitment["reply"],
+                "external_action_taken": False,
+            },
+        )
 
     def _overdue(self) -> list[dict[str, Any]]:
         today = self.clock().date()
