@@ -54,6 +54,12 @@ class TonyApprovedSendHandoffTests(unittest.TestCase):
         self.assertEqual(review.data["review_status"], "ready_for_approval")
         return service
 
+    def _approved_service(self) -> TonyCapabilityCommandService:
+        service = self._reviewed_service()
+        approval = service.execute("Looks good, send it", [])
+        self.assertEqual(approval.data["execution_status"], "awaiting_confirmation")
+        return service
+
     def test_approval_creates_gmail_and_notion_execution_package_without_claiming_execution(self):
         service = self._reviewed_service()
         response = service.execute("Looks good, send it", [])
@@ -94,6 +100,52 @@ class TonyApprovedSendHandoffTests(unittest.TestCase):
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["execution_status"], "not_ready")
         self.assertFalse(response.data["external_action_taken"])
+
+    def test_gmail_confirmation_unlocks_notion_update_and_follow_up_without_claiming_notion(self):
+        service = self._approved_service()
+        response = service.execute(
+            "Gmail sent it",
+            [{"system": "gmail", "status": "sent", "message_id": "gmail-123"}],
+        )
+
+        self.assertEqual(response.command, "outreach_execution_confirmation")
+        self.assertEqual(response.status, "healthy")
+        self.assertEqual(response.data["execution_status"], "gmail_confirmed_notion_pending")
+        self.assertTrue(response.data["gmail_confirmed"])
+        self.assertEqual(response.data["gmail_receipt"], "gmail-123")
+        self.assertFalse(response.data["notion_confirmed"])
+        self.assertEqual(response.data["notion_update"]["status"], "Contacted")
+        self.assertEqual(response.data["follow_up_commitment"]["trigger"], "3_business_days_after_confirmed_send")
+        self.assertTrue(response.data["external_action_taken"])
+        self.assertIn("will not claim the commercial record changed", response.message)
+
+    def test_missing_gmail_evidence_does_not_mark_lead_contacted(self):
+        service = self._approved_service()
+        response = service.execute("Confirm execution", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["execution_status"], "awaiting_gmail_confirmation")
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertIn("will not mark the lead as contacted", response.message)
+
+    def test_gmail_and_notion_confirmation_close_execution_loop(self):
+        service = self._approved_service()
+        response = service.execute(
+            "Execution confirmed",
+            [
+                {"system": "gmail", "status": "sent", "message_id": "gmail-123"},
+                {"system": "notion", "status": "updated", "page_id": "notion-456"},
+            ],
+        )
+
+        self.assertEqual(response.status, "healthy")
+        self.assertEqual(response.data["execution_status"], "confirmed_complete")
+        self.assertTrue(response.data["gmail_confirmed"])
+        self.assertTrue(response.data["notion_confirmed"])
+        self.assertEqual(response.data["notion_receipt"], "notion-456")
+        self.assertEqual(response.data["follow_up_commitment"]["status"], "pending")
+        self.assertTrue(response.data["external_action_taken"])
+        self.assertIn("Confirmed end to end", response.message)
 
 
 if __name__ == "__main__":

@@ -18,6 +18,7 @@ class TonyCapabilityCommandService:
     _PREPARE_MARKERS = ("prepare it", "draft it", "go ahead", "do it", "get it ready", "prepare the outreach", "draft the outreach")
     _RETURN_MARKERS = ("review the returned draft", "review the draft", "claude returned", "worker returned", "here is the draft", "here's the draft")
     _APPROVAL_MARKERS = ("approve it", "approved", "send it", "looks good", "go ahead and send", "happy with it")
+    _CONFIRMATION_MARKERS = ("confirm execution", "send confirmed", "gmail sent", "message sent", "execution result", "execution confirmed")
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
@@ -26,6 +27,7 @@ class TonyCapabilityCommandService:
         self._active_lead: InboundLead | None = None
         self._pending_delegation: dict[str, Any] | None = None
         self._approved_artifact: str | None = None
+        self._pending_execution: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -40,6 +42,9 @@ class TonyCapabilityCommandService:
         records = list(objects)
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            confirmation = self._execution_confirmation(normalized, records)
+            if confirmation is not None:
+                return confirmation
             approval = self._approved_send_handoff(normalized)
             if approval is not None:
                 return approval
@@ -99,6 +104,7 @@ class TonyCapabilityCommandService:
         self._active_lead = lead
         self._pending_delegation = None
         self._approved_artifact = None
+        self._pending_execution = None
         next_action = lead.recommended_next_action.strip()
         plan = self._execution_plan(lead)
         message = f"Good. I’ll treat {lead.contact}"
@@ -138,6 +144,7 @@ class TonyCapabilityCommandService:
         }
         self._pending_delegation = brief
         self._approved_artifact = None
+        self._pending_execution = None
         message = (
             f"Yes. I’ve turned the decision on {lead.contact} into a delegation-ready brief for Claude. "
             "I’ll remain accountable for reviewing the returned draft before it comes back to you. "
@@ -192,6 +199,7 @@ class TonyCapabilityCommandService:
         ready = all(checks.values())
         review_status = "ready_for_approval" if ready else "revision_required"
         self._approved_artifact = content if ready else None
+        self._pending_execution = None
         if ready:
             assessment = "It passes the basic evidence-and-specificity gate and is ready for your approval."
         else:
@@ -245,6 +253,7 @@ class TonyCapabilityCommandService:
                 "note": "Record outreach only after Gmail confirms the send.",
             },
         }
+        self._pending_execution = execution_package
         message = (
             f"Approved. I’ve packaged the reviewed outreach for {lead.contact} into an execution handoff for Gmail, with a follow-up Notion update that must only run after send confirmation. "
             "I have not claimed the email was sent or the lead record changed; both remain awaiting confirmed execution."
@@ -261,6 +270,90 @@ class TonyCapabilityCommandService:
                 "execution_status": "awaiting_confirmation",
                 "approval_received": True,
                 "external_action_taken": False,
+            },
+        )
+
+    @staticmethod
+    def _execution_evidence(records: list[dict[str, Any]], system: str) -> dict[str, Any] | None:
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            source = str(record.get("system") or record.get("service") or record.get("provider") or "").casefold()
+            if source != system.casefold():
+                continue
+            status = str(record.get("status") or record.get("state") or "").casefold()
+            if status in {"sent", "confirmed", "completed", "success", "succeeded", "updated"}:
+                return record
+        return None
+
+    def _execution_confirmation(self, command: str, records: list[dict[str, Any]]) -> CommandResponse | None:
+        if self._active_lead is None or self._pending_execution is None:
+            return None
+        lowered = command.casefold()
+        gmail = self._execution_evidence(records, "gmail")
+        notion = self._execution_evidence(records, "notion")
+        if gmail is None and notion is None and not any(marker in lowered for marker in self._CONFIRMATION_MARKERS):
+            return None
+        if gmail is None:
+            return CommandResponse(
+                command="outreach_execution_confirmation",
+                status="error",
+                message="I still do not have evidence that Gmail sent the approved outreach, so I will not mark the lead as contacted or start a follow-up clock.",
+                data={"intent": "confirm_outreach_execution", "execution_status": "awaiting_gmail_confirmation", "external_action_taken": False},
+            )
+
+        lead = self._active_lead
+        gmail_receipt = str(gmail.get("message_id") or gmail.get("id") or gmail.get("receipt") or "").strip()
+        notion_update = dict(self._pending_execution["notion"])
+        follow_up = {
+            "owner": "Tony",
+            "action": f"Check for a reply from {lead.contact} and surface the opportunity if there is no response within 3 business days.",
+            "trigger": "3_business_days_after_confirmed_send",
+            "status": "pending",
+        }
+        if notion is None:
+            message = (
+                f"Gmail has confirmed the outreach to {lead.contact} was sent. I now have evidence for the external action. "
+                "The Notion update is authorised to run, but I will not claim the commercial record changed until Notion confirms it. "
+                "I’ve also recorded the follow-up commitment for three business days after the confirmed send."
+            )
+            return CommandResponse(
+                command="outreach_execution_confirmation",
+                status="healthy",
+                message=message,
+                data={
+                    "intent": "confirm_outreach_execution",
+                    "lead": lead.to_dict(),
+                    "execution_status": "gmail_confirmed_notion_pending",
+                    "gmail_confirmed": True,
+                    "gmail_receipt": gmail_receipt,
+                    "notion_update": notion_update,
+                    "notion_confirmed": False,
+                    "follow_up_commitment": follow_up,
+                    "external_action_taken": True,
+                },
+            )
+
+        notion_receipt = str(notion.get("page_id") or notion.get("id") or notion.get("receipt") or "").strip()
+        self._pending_execution = None
+        message = (
+            f"Confirmed end to end: Gmail sent the outreach to {lead.contact}, and Notion confirmed the lead record update. "
+            "The commercial loop is closed for this step, and I’ll surface the opportunity again if there is no response within three business days."
+        )
+        return CommandResponse(
+            command="outreach_execution_confirmation",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "confirm_outreach_execution",
+                "lead": lead.to_dict(),
+                "execution_status": "confirmed_complete",
+                "gmail_confirmed": True,
+                "gmail_receipt": gmail_receipt,
+                "notion_confirmed": True,
+                "notion_receipt": notion_receipt,
+                "follow_up_commitment": follow_up,
+                "external_action_taken": True,
             },
         )
 
