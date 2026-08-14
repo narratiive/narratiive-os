@@ -17,6 +17,7 @@ class TonyCapabilityCommandService:
     _ACTION_MARKERS = ("let's pursue", "lets pursue", "pursue", "take forward", "move forward with", "follow up with", "reach out to", "go after", "progress")
     _PREPARE_MARKERS = ("prepare it", "draft it", "go ahead", "do it", "get it ready", "prepare the outreach", "draft the outreach")
     _RETURN_MARKERS = ("review the returned draft", "review the draft", "claude returned", "worker returned", "here is the draft", "here's the draft")
+    _APPROVAL_MARKERS = ("approve it", "approved", "send it", "looks good", "go ahead and send", "happy with it")
 
     def __init__(self, command_service, registry: TonyCapabilityRegistry | None = None) -> None:
         self.command_service = command_service
@@ -24,6 +25,7 @@ class TonyCapabilityCommandService:
         self._last_leads: tuple[InboundLead, ...] = ()
         self._active_lead: InboundLead | None = None
         self._pending_delegation: dict[str, Any] | None = None
+        self._approved_artifact: str | None = None
 
     @property
     def mission_control_loader(self):
@@ -38,6 +40,9 @@ class TonyCapabilityCommandService:
         records = list(objects)
         name = normalized.split(" ", 1)[0].lower().lstrip("/") if normalized else ""
         if name not in self._COMMANDS:
+            approval = self._approved_send_handoff(normalized)
+            if approval is not None:
+                return approval
             returned = self._worker_return(normalized, records)
             if returned is not None:
                 return returned
@@ -93,6 +98,7 @@ class TonyCapabilityCommandService:
 
         self._active_lead = lead
         self._pending_delegation = None
+        self._approved_artifact = None
         next_action = lead.recommended_next_action.strip()
         plan = self._execution_plan(lead)
         message = f"Good. I’ll treat {lead.contact}"
@@ -131,6 +137,7 @@ class TonyCapabilityCommandService:
             ],
         }
         self._pending_delegation = brief
+        self._approved_artifact = None
         message = (
             f"Yes. I’ve turned the decision on {lead.contact} into a delegation-ready brief for Claude. "
             "I’ll remain accountable for reviewing the returned draft before it comes back to you. "
@@ -184,6 +191,7 @@ class TonyCapabilityCommandService:
         }
         ready = all(checks.values())
         review_status = "ready_for_approval" if ready else "revision_required"
+        self._approved_artifact = content if ready else None
         if ready:
             assessment = "It passes the basic evidence-and-specificity gate and is ready for your approval."
         else:
@@ -206,6 +214,52 @@ class TonyCapabilityCommandService:
                 "artifact": content,
                 "review_checks": checks,
                 "approval_required_for_send": True,
+                "external_action_taken": False,
+            },
+        )
+
+    def _approved_send_handoff(self, command: str) -> CommandResponse | None:
+        lowered = command.casefold()
+        if not any(marker in lowered for marker in self._APPROVAL_MARKERS):
+            return None
+        if self._active_lead is None or not self._approved_artifact:
+            return CommandResponse(
+                command="approved_outreach_handoff",
+                status="error",
+                message="I can only prepare a send handoff after I have reviewed a returned draft and marked it ready for approval. Nothing has been sent.",
+                data={"intent": "execute_approved_outreach", "execution_status": "not_ready", "external_action_taken": False},
+            )
+
+        lead = self._active_lead
+        execution_package = {
+            "gmail": {
+                "action": "send_email",
+                "recipient": lead.email,
+                "body": self._approved_artifact,
+                "require_confirmation": True,
+            },
+            "notion": {
+                "action": "update_lead_after_confirmed_send",
+                "lead_id": lead.lead_id,
+                "status": "Contacted",
+                "note": "Record outreach only after Gmail confirms the send.",
+            },
+        }
+        message = (
+            f"Approved. I’ve packaged the reviewed outreach for {lead.contact} into an execution handoff for Gmail, with a follow-up Notion update that must only run after send confirmation. "
+            "I have not claimed the email was sent or the lead record changed; both remain awaiting confirmed execution."
+        )
+        return CommandResponse(
+            command="approved_outreach_handoff",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "execute_approved_outreach",
+                "lead": lead.to_dict(),
+                "artifact": self._approved_artifact,
+                "execution_package": execution_package,
+                "execution_status": "awaiting_confirmation",
+                "approval_received": True,
                 "external_action_taken": False,
             },
         )
