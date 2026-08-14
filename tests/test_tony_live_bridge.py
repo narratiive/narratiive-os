@@ -8,11 +8,11 @@ from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
-from runtime.tony_agency_focus import TonyAgencyFocusCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
+from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
@@ -28,7 +28,11 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
             tony_live_bridge, "build_base_app", return_value=base_app
         ), mock.patch.dict(
-            "os.environ", {"TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json")}
+            "os.environ",
+            {
+                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
+                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
+            },
         ):
             app = tony_live_bridge.build_app()
 
@@ -37,7 +41,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
         focus = memory.command_service
-        self.assertIsInstance(focus, TonyAgencyFocusCommandService)
+        self.assertIsInstance(focus, TonyPersistentAgencyFocusCommandService)
         commercial_watch = focus.command_service
         self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
         capability = commercial_watch.command_service
@@ -58,7 +62,11 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
             tony_live_bridge, "build_base_app", return_value=base_app
         ), mock.patch.dict(
-            "os.environ", {"TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json")}
+            "os.environ",
+            {
+                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
+                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
+            },
         ):
             app = tony_live_bridge.build_app()
 
