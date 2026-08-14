@@ -19,6 +19,34 @@ class TonyAgencyFocusCommandService:
         "top priorities",
         "where should i focus",
     )
+    _RATIONALE_MARKERS = (
+        "why",
+        "why that",
+        "why first",
+        "why is that",
+        "why should i",
+        "why should we",
+    )
+    _INTERNAL_WORK_MARKERS = (
+        "engineering",
+        "infrastructure",
+        "runtime",
+        "repository",
+        "deployment",
+        "automation",
+        "backend",
+        "system work",
+        "internal systems",
+    )
+    _CHOICE_MARKERS = (
+        "let's work on",
+        "lets work on",
+        "i want to work on",
+        "i'm going to work on",
+        "im going to work on",
+        "we should work on",
+        "i think we should work on",
+    )
     _AREA_PRIORITY = {
         "commercial": 0,
         "clients": 1,
@@ -31,9 +59,18 @@ class TonyAgencyFocusCommandService:
     }
     _BUSINESS_AREAS = {"commercial", "clients", "delivery", "finance", "operations", "automation"}
     _CURRENT_REVENUE_RISK_AREAS = {"clients", "delivery", "finance"}
+    _REASON_EXPLANATIONS = {
+        "current_revenue_or_delivery_risk": "it protects existing revenue or a current client commitment",
+        "new_positive_commercial_intent": "there is fresh positive buying intent and response speed matters",
+        "commercial_blocker": "it is actively blocking a commercial outcome",
+        "overdue_commercial_commitment": "we have already made a commercial commitment and it is overdue",
+        "matt_decision_required": "the work cannot progress without your judgement",
+        "business_priority": "it is the strongest verified business priority once urgent risks and decisions are cleared",
+    }
 
     def __init__(self, command_service) -> None:
         self.command_service = command_service
+        self._last_priorities: tuple[dict[str, Any], ...] = ()
 
     @property
     def mission_control_loader(self):
@@ -46,6 +83,15 @@ class TonyAgencyFocusCommandService:
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
+
+        if self._last_priorities and self._is_rationale_query(lowered):
+            return self._explain_last_focus()
+
+        if self._last_priorities and self._is_internal_work_choice(lowered):
+            first = self._last_priorities[0]
+            if str(first.get("area") or "").casefold() not in {"engineering", "infrastructure"}:
+                return self._challenge_internal_choice(normalized, first)
+
         if not any(marker in lowered for marker in self._FOCUS_MARKERS):
             return self.command_service.execute(command, objects)
 
@@ -111,6 +157,7 @@ class TonyAgencyFocusCommandService:
 
         priorities = self._deduplicate_and_sort(priorities)
         top = priorities[:3]
+        self._last_priorities = tuple(dict(item) for item in top)
 
         if not top:
             message = (
@@ -129,9 +176,7 @@ class TonyAgencyFocusCommandService:
             )
 
         first = top[0]
-        lines = [
-            f"Your first priority is {first['label']}. {first['action']}"
-        ]
+        lines = [f"Your first priority is {first['label']}. {first['action']}"]
         if len(top) > 1:
             lines.append("Then:")
             for priority in top[1:]:
@@ -150,6 +195,63 @@ class TonyAgencyFocusCommandService:
                 "source_brief_status": agency_response.status,
                 "commercial_watch": commercial_watch,
             },
+        )
+
+    def _explain_last_focus(self) -> CommandResponse:
+        first = self._last_priorities[0]
+        first_reason = self._reason_text(first)
+        lines = [f"I put {first['label']} first because {first_reason}."]
+        if len(self._last_priorities) > 1:
+            second = self._last_priorities[1]
+            lines.append(
+                f"{second['label']} comes next because {self._reason_text(second)}, but it has less immediate business consequence."
+            )
+        lines.append(
+            "That ordering is evidence-led rather than absolute; if new client, revenue or delivery evidence appears, I would re-rank it."
+        )
+        return CommandResponse(
+            command="agency_focus_rationale",
+            status="healthy",
+            message="\n".join(lines),
+            data={
+                "intent": "explain_agency_focus",
+                "priorities": [dict(item) for item in self._last_priorities],
+                "first_priority_reason": first.get("reason"),
+            },
+        )
+
+    def _challenge_internal_choice(self, choice: str, first: dict[str, Any]) -> CommandResponse:
+        reason = self._reason_text(first)
+        message = (
+            f"I would not prioritise {choice.rstrip('.')} yet. "
+            f"{first['label']} has the stronger business consequence because {reason}. "
+            f"My recommendation is to clear that first, then return to the internal work. "
+            "If you still choose the internal work, I will follow that decision rather than quietly overriding it."
+        )
+        return CommandResponse(
+            command="agency_focus_challenge",
+            status="attention",
+            message=message,
+            data={
+                "intent": "challenge_lower_value_focus_choice",
+                "proposed_choice": choice,
+                "recommended_priority": dict(first),
+                "external_action_taken": False,
+            },
+        )
+
+    def _reason_text(self, priority: dict[str, Any]) -> str:
+        reason = str(priority.get("reason") or "").strip()
+        return self._REASON_EXPLANATIONS.get(reason, "it has the strongest verified business consequence in the current evidence")
+
+    @classmethod
+    def _is_rationale_query(cls, lowered: str) -> bool:
+        return any(lowered == marker or lowered.startswith(marker + " ") for marker in cls._RATIONALE_MARKERS)
+
+    @classmethod
+    def _is_internal_work_choice(cls, lowered: str) -> bool:
+        return any(marker in lowered for marker in cls._CHOICE_MARKERS) and any(
+            marker in lowered for marker in cls._INTERNAL_WORK_MARKERS
         )
 
     def _agency_priority(self, item: dict[str, Any], *, tier: int, reason: str) -> dict[str, Any]:
