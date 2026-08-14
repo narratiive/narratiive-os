@@ -40,6 +40,7 @@ class TonyAgencyFocusCommandService:
         "go ahead with that",
         "take that forward",
     )
+    _ACKNOWLEDGEMENT_PREFIXES = ("ok, ", "okay, ", "yes, ", "right, ", "great, ", "fine, ")
     _INTERNAL_WORK_MARKERS = (
         "engineering",
         "infrastructure",
@@ -312,7 +313,12 @@ class TonyAgencyFocusCommandService:
 
     @classmethod
     def _is_first_action_query(cls, lowered: str) -> bool:
-        return any(lowered == marker or lowered.startswith(marker + " ") for marker in cls._FIRST_ACTION_MARKERS)
+        candidate = lowered
+        for prefix in cls._ACKNOWLEDGEMENT_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip()
+                break
+        return any(candidate == marker or candidate.startswith(marker + " ") for marker in cls._FIRST_ACTION_MARKERS)
 
     @classmethod
     def _is_internal_work_choice(cls, lowered: str) -> bool:
