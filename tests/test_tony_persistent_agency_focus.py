@@ -73,7 +73,38 @@ class TonyPersistentAgencyFocusTests(unittest.TestCase):
             self.assertEqual(response.data["priority"]["target"]["lead_id"], "lesley-1")
             self.assertFalse(response.data["external_action_taken"])
 
-    def test_new_empty_focus_clears_stale_persisted_context(self):
+    def test_prepared_action_survives_restart_and_reports_truthful_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            first = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            first.execute("What matters most?", [])
+            first.execute("OK, do the first one", [])
+
+            restarted_inner = StubCommandService()
+            restarted = TonyPersistentAgencyFocusCommandService(restarted_inner, store_path=store)
+            response = restarted.execute("What's happening with that?", [])
+
+            self.assertEqual(response.command, "agency_focus_action_status")
+            self.assertEqual(response.data["execution_status"], "awaiting_worker_confirmation")
+            self.assertEqual(response.data["pending_action"]["execution_handoff"]["worker"], "Gmail")
+            self.assertFalse(response.data["external_action_taken"])
+            self.assertIn("do not yet have confirmation", response.message)
+            self.assertEqual(restarted_inner.calls, [])
+
+    def test_repeated_action_request_does_not_create_false_duplicate_execution(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            service = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("OK, do the first one", [])
+            repeated = service.execute("Do the first one", [])
+
+            self.assertEqual(repeated.command, "agency_focus_action_status")
+            self.assertTrue(repeated.data["duplicate_handoff_suppressed"])
+            self.assertFalse(repeated.data["external_action_taken"])
+            self.assertIn("already prepared", repeated.message)
+
+    def test_new_empty_focus_clears_stale_priorities_but_keeps_open_action_accountability(self):
         class EmptyStub(StubCommandService):
             def execute(self, command, objects):
                 self.calls.append(command)
@@ -90,13 +121,18 @@ class TonyPersistentAgencyFocusTests(unittest.TestCase):
             store = Path(tmp) / "focus.json"
             seeded = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=store)
             seeded.execute("What matters most?", [])
+            seeded.execute("Do the first one", [])
 
             empty = TonyPersistentAgencyFocusCommandService(EmptyStub(), store_path=store)
             empty.execute("What matters most?", [])
 
             restarted = TonyPersistentAgencyFocusCommandService(EmptyStub(), store_path=store)
-            response = restarted.execute("Why is that first?", [])
-            self.assertEqual(response.command, "delegated")
+            rationale = restarted.execute("Why is that first?", [])
+            status = restarted.execute("What are you waiting on?", [])
+
+            self.assertEqual(rationale.command, "delegated")
+            self.assertEqual(status.command, "agency_focus_action_status")
+            self.assertFalse(status.data["external_action_taken"])
 
 
 if __name__ == "__main__":
