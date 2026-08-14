@@ -60,6 +60,27 @@ class TonyCommercialWatchTests(unittest.TestCase):
         )
         writer.execute("Execution confirmed", [])
 
+    def _record_positive_reply(self, when: datetime = datetime(2026, 8, 17, 9, 30)) -> CommandResponse:
+        service = TonyCommercialWatchCommandService(
+            StubCommandService(CommandResponse("delegated", "healthy", "delegated", {})),
+            store_path=self.store,
+            clock=lambda: when,
+        )
+        return service.execute(
+            "Gmail reply received",
+            [
+                {
+                    "provider": "gmail",
+                    "event": "reply_received",
+                    "lead_id": "lesley-1",
+                    "message_id": "msg-123",
+                    "from": "lesley@example.com",
+                    "subject": "Re: growth",
+                    "body": "Thanks, this sounds good. Happy to chat next week.",
+                }
+            ],
+        )
+
     def test_confirmation_persists_follow_up_with_three_business_day_due_date(self):
         service = TonyCommercialWatchCommandService(
             StubCommandService(self.confirmation_response()),
@@ -87,6 +108,7 @@ class TonyCommercialWatchTests(unittest.TestCase):
 
         self.assertEqual(response.command, "commercial_watch")
         self.assertEqual(response.status, "attention")
+        self.assertEqual(response.data["priority"], "overdue_follow_up")
         self.assertEqual(response.data["overdue_count"], 1)
         self.assertIn("Lesley Harman", response.message)
         self.assertIn("before starting lower-priority work", response.message)
@@ -104,6 +126,7 @@ class TonyCommercialWatchTests(unittest.TestCase):
 
         self.assertEqual(response.status, "attention")
         self.assertIn("Commercial attention", response.message)
+        self.assertEqual(response.data["commercial_watch"]["priority"], "overdue_follow_up")
         self.assertEqual(response.data["commercial_watch"]["overdue_count"], 1)
 
     def test_positive_gmail_reply_resolves_commitment_and_escalates(self):
@@ -138,8 +161,80 @@ class TonyCommercialWatchTests(unittest.TestCase):
         stored = json.loads(self.store.read_text(encoding="utf-8"))[0]
         self.assertEqual(stored["status"], "resolved")
         self.assertEqual(stored["resolution_reason"], "reply_received")
+        self.assertEqual(stored["disposition"], "positive_intent")
         self.assertEqual(stored["reply"]["message_id"], "msg-123")
         self.assertEqual(base.calls, [])
+
+    def test_recent_positive_reply_remains_visible_in_attention_view(self):
+        self._seed_commitment()
+        self._record_positive_reply()
+
+        reader = TonyCommercialWatchCommandService(
+            StubCommandService(CommandResponse("delegated", "healthy", "delegated", {})),
+            store_path=self.store,
+            clock=lambda: datetime(2026, 8, 18, 8, 30),
+        )
+        response = reader.execute("What needs my attention?", [])
+
+        self.assertEqual(response.status, "attention")
+        self.assertEqual(response.data["intent"], "synthesise_commercial_priorities")
+        self.assertEqual(response.data["priority"], "positive_reply")
+        self.assertEqual(response.data["positive_reply_count"], 1)
+        self.assertEqual(response.data["overdue_count"], 0)
+        self.assertIn("Immediate commercial priority", response.message)
+        self.assertIn("Lesley Harman", response.message)
+        self.assertIn("before lower-priority work", response.message)
+
+    def test_positive_reply_is_prioritised_ahead_of_overdue_follow_ups(self):
+        self._seed_commitment()
+        self._record_positive_reply()
+        commitments = json.loads(self.store.read_text(encoding="utf-8"))
+        commitments.append(
+            {
+                "commitment_id": "outreach-follow-up:jimmy-1",
+                "lead_id": "jimmy-1",
+                "contact": "Jimmy Diamond",
+                "company": "Jimmy Diamond Ltd",
+                "email": "jimmy@example.com",
+                "action": "Follow up with Jimmy.",
+                "owner": "Tony",
+                "created_at": "2026-08-14T11:00:00",
+                "due_on": "2026-08-18",
+                "status": "pending",
+            }
+        )
+        self.store.write_text(json.dumps(commitments), encoding="utf-8")
+
+        reader = TonyCommercialWatchCommandService(
+            StubCommandService(CommandResponse("delegated", "healthy", "delegated", {})),
+            store_path=self.store,
+            clock=lambda: datetime(2026, 8, 20, 9, 0),
+        )
+        response = reader.execute("What needs my attention?", [])
+
+        self.assertEqual(response.status, "attention")
+        self.assertEqual(response.data["priority"], "positive_reply")
+        self.assertEqual(response.data["positive_reply_count"], 1)
+        self.assertEqual(response.data["overdue_count"], 1)
+        self.assertIn("Lesley Harman", response.message)
+        self.assertIn("also 1 overdue follow-up", response.message)
+
+    def test_morning_brief_prioritises_recent_positive_reply(self):
+        self._seed_commitment()
+        self._record_positive_reply()
+
+        base = StubCommandService(CommandResponse("morning", "healthy", "Morning brief is otherwise clear.", {"period": "morning"}))
+        reader = TonyCommercialWatchCommandService(
+            base,
+            store_path=self.store,
+            clock=lambda: datetime(2026, 8, 18, 8, 30),
+        )
+        response = reader.execute("morning", [])
+
+        self.assertEqual(response.status, "attention")
+        self.assertEqual(response.data["commercial_watch"]["priority"], "positive_reply")
+        self.assertIn("Commercial priority", response.message)
+        self.assertIn("replied positively", response.message)
 
     def test_automatic_reply_does_not_clear_follow_up(self):
         self._seed_commitment()
@@ -192,6 +287,8 @@ class TonyCommercialWatchTests(unittest.TestCase):
         self.assertEqual(response.data["disposition"], "declined")
         self.assertTrue(response.data["commitment_resolved"])
         self.assertIn("No immediate escalation", response.message)
+        stored = json.loads(self.store.read_text(encoding="utf-8"))[0]
+        self.assertEqual(stored["disposition"], "declined")
 
     def test_unmatched_gmail_reply_does_not_mutate_commitments(self):
         self._seed_commitment()
