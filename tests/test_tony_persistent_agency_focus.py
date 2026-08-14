@@ -293,6 +293,66 @@ class TonyPersistentAgencyFocusTests(unittest.TestCase):
             self.assertEqual(status.command, "agency_focus_action_status")
             self.assertFalse(status.data["external_action_taken"])
 
+    def test_what_next_after_verified_completion_reassesses_live_priorities(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            inner = StubCommandService()
+            service = TonyPersistentAgencyFocusCommandService(inner, store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            action_id = service._pending_action["action_id"]
+            service.execute(
+                "action_result",
+                [{"action_id": action_id, "status": "completed", "evidence": {"worker_run_id": "gmail-1"}}],
+            )
+            calls_before = len(inner.calls)
+
+            response = service.execute("What's next?", [])
+
+            self.assertEqual(response.command, "agency_focus_next_step")
+            self.assertEqual(response.data["intent"], "reassess_after_completed_action")
+            self.assertEqual(response.data["next_priority"]["target"]["lead_id"], "lesley-1")
+            self.assertIn("underlying business priority is still active", response.message)
+            self.assertGreater(len(inner.calls), calls_before)
+            self.assertEqual(inner.calls[-1], "morning")
+
+    def test_what_next_after_completion_with_no_live_priority_recommends_commercial_creation(self):
+        class EmptyStub(StubCommandService):
+            def __init__(self) -> None:
+                super().__init__()
+                self.empty = False
+
+            def execute(self, command, objects):
+                if command == "morning" and self.empty:
+                    self.calls.append(command)
+                    return CommandResponse(
+                        "morning",
+                        "healthy",
+                        "brief",
+                        {"agency_state": {"executive_items": []}, "commercial_watch": {}},
+                    )
+                return super().execute(command, objects)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            inner = EmptyStub()
+            service = TonyPersistentAgencyFocusCommandService(inner, store_path=store)
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+            action_id = service._pending_action["action_id"]
+            service.execute(
+                "worker_return",
+                [{"action_id": action_id, "status": "returned", "evidence": {"worker_run_id": "gmail-2"}}],
+            )
+            inner.empty = True
+
+            response = service.execute("What should we do next?", [])
+
+            self.assertEqual(response.command, "agency_focus_next_step")
+            self.assertIsNone(response.data["next_priority"])
+            self.assertIn("create or advance a commercial opportunity", response.message)
+            self.assertFalse(response.data["external_action_taken"])
+
 
 if __name__ == "__main__":
     unittest.main()

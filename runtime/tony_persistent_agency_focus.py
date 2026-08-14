@@ -25,6 +25,15 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         "what are you waiting on",
         "where are we with that",
     )
+    _NEXT_STEP_MARKERS = (
+        "what next",
+        "what's next",
+        "whats next",
+        "what should we do next",
+        "what should i do next",
+        "where do we go next",
+        "what now",
+    )
     _ACTION_RESULT_COMMANDS = {"action_result", "record_action_result", "worker_return"}
     _VERIFIED_RESULT_STATES = {"completed", "executed", "returned", "success", "succeeded"}
 
@@ -58,6 +67,10 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
                 return self._pending_action_status()
             if self._last_completed_action:
                 return self._completed_action_status()
+        if self._last_completed_action and not self._pending_action and any(
+            marker in lowered for marker in self._NEXT_STEP_MARKERS
+        ):
+            return self._reassess_after_completion(materialized)
 
         response = super().execute(command, materialized)
         if response.command in {"morning", "evening"}:
@@ -156,6 +169,52 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
                 "execution_status": "completed_verified",
                 "completed_action": dict(completed),
                 "external_action_taken": completed["external_action_taken"],
+            },
+        )
+
+    def _reassess_after_completion(self, objects: tuple[dict[str, Any], ...]) -> CommandResponse:
+        completed = dict(self._last_completed_action or {})
+        completed_priority = completed.get("priority") if isinstance(completed.get("priority"), dict) else {}
+        completed_key = str(completed.get("priority_key") or completed_priority.get("key") or "")
+        completed_label = str(completed_priority.get("label") or "the last priority")
+
+        agency_response = self.command_service.execute("morning", objects)
+        if agency_response.status == "error":
+            return agency_response
+        focus = self._focus_response(agency_response)
+        data = dict(focus.data) if isinstance(focus.data, dict) else {}
+        priorities = [dict(item) for item in data.get("priorities", []) if isinstance(item, dict)]
+
+        if not priorities:
+            message = (
+                f"The verified step for {completed_label} is complete. There is no new verified agency issue demanding attention right now. "
+                "I would use the next block to create or advance a commercial opportunity rather than default to internal systems work."
+            )
+            next_priority = None
+        else:
+            next_priority = priorities[0]
+            next_key = str(next_priority.get("key") or "")
+            if completed_key and next_key == completed_key:
+                message = (
+                    f"The delegated step for {completed_label} is complete, but the underlying business priority is still active on current evidence. "
+                    f"Next, {next_priority['action']}"
+                )
+            else:
+                message = (
+                    f"The verified step for {completed_label} is complete. The next priority is {next_priority['label']}. "
+                    f"{next_priority['action']}"
+                )
+
+        return CommandResponse(
+            command="agency_focus_next_step",
+            status=focus.status,
+            message=message,
+            data={
+                "intent": "reassess_after_completed_action",
+                "completed_action": completed,
+                "next_priority": dict(next_priority) if next_priority else None,
+                "priorities": priorities,
+                "external_action_taken": bool(completed.get("external_action_taken", False)),
             },
         )
 
