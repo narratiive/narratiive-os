@@ -12,6 +12,7 @@ from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
+from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
@@ -32,6 +33,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
             {
                 "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
                 "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
+                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
             },
         ):
             app = tony_live_bridge.build_app()
@@ -40,7 +42,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
-        focus = memory.command_service
+        outcomes = memory.command_service
+        self.assertIsInstance(outcomes, TonyOutcomeAccountabilityCommandService)
+        focus = outcomes.command_service
         self.assertIsInstance(focus, TonyPersistentAgencyFocusCommandService)
         commercial_watch = focus.command_service
         self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
@@ -66,6 +70,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
             {
                 "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
                 "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
+                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
             },
         ):
             app = tony_live_bridge.build_app()
