@@ -15,6 +15,7 @@ from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
+from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
@@ -221,6 +222,16 @@ def build_app() -> LeadAwareTonyApplication:
         commercial_watch_service,
         store_path=agency_focus_context_path,
     )
+    executive_outcomes_path = Path(
+        os.getenv(
+            "TONY_EXECUTIVE_OUTCOMES_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "executive-outcomes.json"),
+        )
+    )
+    outcome_service = TonyOutcomeAccountabilityCommandService(
+        agency_focus_service,
+        store_path=executive_outcomes_path,
+    )
     memory_path = Path(
         os.getenv(
             "TONY_EXECUTIVE_MEMORY_PATH",
@@ -228,7 +239,7 @@ def build_app() -> LeadAwareTonyApplication:
         )
     )
     memory_service = TonyMemoryCommandService(
-        agency_focus_service,
+        outcome_service,
         ExecutiveMemoryStore(memory_path),
         agency_id=workspace_id,
     )
