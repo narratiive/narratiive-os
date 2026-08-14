@@ -8,6 +8,7 @@ from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
+from runtime.tony_agency_focus import TonyAgencyFocusCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -16,7 +17,7 @@ from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
 class TonyLiveBridgeTests(unittest.TestCase):
-    def test_build_app_composes_terminology_memory_capability_and_executive_commands(self) -> None:
+    def test_build_app_composes_terminology_memory_focus_commercial_capability_and_executive_commands(self) -> None:
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
@@ -35,7 +36,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
-        commercial_watch = memory.command_service
+        focus = memory.command_service
+        self.assertIsInstance(focus, TonyAgencyFocusCommandService)
+        commercial_watch = focus.command_service
         self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
         capability = commercial_watch.command_service
         self.assertIsInstance(capability, TonyCapabilityCommandService)
