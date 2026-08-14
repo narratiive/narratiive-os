@@ -12,6 +12,7 @@ from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_capability_commands import TonyCapabilityCommandService
+from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
@@ -206,6 +207,16 @@ def build_app() -> LeadAwareTonyApplication:
         inbound_lead_loader=authoritative_lead_loader,
     )
     capability_service = TonyCapabilityCommandService(executive_service)
+    commercial_commitments_path = Path(
+        os.getenv(
+            "TONY_COMMERCIAL_COMMITMENTS_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "commercial-commitments.json"),
+        )
+    )
+    commercial_watch_service = TonyCommercialWatchCommandService(
+        capability_service,
+        store_path=commercial_commitments_path,
+    )
     memory_path = Path(
         os.getenv(
             "TONY_EXECUTIVE_MEMORY_PATH",
@@ -213,7 +224,7 @@ def build_app() -> LeadAwareTonyApplication:
         )
     )
     memory_service = TonyMemoryCommandService(
-        capability_service,
+        commercial_watch_service,
         ExecutiveMemoryStore(memory_path),
         agency_id=workspace_id,
     )
