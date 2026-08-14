@@ -11,6 +11,7 @@ from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_ap
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
+from runtime.tony_agency_focus import TonyAgencyFocusCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -217,6 +218,7 @@ def build_app() -> LeadAwareTonyApplication:
         capability_service,
         store_path=commercial_commitments_path,
     )
+    agency_focus_service = TonyAgencyFocusCommandService(commercial_watch_service)
     memory_path = Path(
         os.getenv(
             "TONY_EXECUTIVE_MEMORY_PATH",
@@ -224,7 +226,7 @@ def build_app() -> LeadAwareTonyApplication:
         )
     )
     memory_service = TonyMemoryCommandService(
-        commercial_watch_service,
+        agency_focus_service,
         ExecutiveMemoryStore(memory_path),
         agency_id=workspace_id,
     )
