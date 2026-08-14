@@ -27,6 +27,20 @@ class TonyAgencyFocusCommandService:
         "why should i",
         "why should we",
     )
+    _FIRST_ACTION_MARKERS = (
+        "do the first one",
+        "do the first",
+        "take the first one",
+        "take the first",
+        "go ahead with the first",
+        "start with the first",
+        "take care of the first",
+        "do that first",
+        "do that",
+        "go ahead with that",
+        "take that forward",
+    )
+    _ACKNOWLEDGEMENT_PREFIXES = ("ok, ", "okay, ", "yes, ", "right, ", "great, ", "fine, ")
     _INTERNAL_WORK_MARKERS = (
         "engineering",
         "infrastructure",
@@ -87,6 +101,9 @@ class TonyAgencyFocusCommandService:
         if self._last_priorities and self._is_rationale_query(lowered):
             return self._explain_last_focus()
 
+        if self._last_priorities and self._is_first_action_query(lowered):
+            return self._prepare_first_priority_action()
+
         if self._last_priorities and self._is_internal_work_choice(lowered):
             first = self._last_priorities[0]
             if str(first.get("area") or "").casefold() not in {"engineering", "infrastructure"}:
@@ -109,7 +126,6 @@ class TonyAgencyFocusCommandService:
 
         priorities: list[dict[str, Any]] = []
 
-        # Protect existing revenue and delivery first when there is a real blocker.
         for item in executive_items:
             if not isinstance(item, dict):
                 continue
@@ -124,7 +140,6 @@ class TonyAgencyFocusCommandService:
                 if isinstance(reply, dict):
                     priorities.append(self._positive_reply_priority(reply))
 
-        # Commercial blockers matter after protected-client risk but before routine follow-up work.
         for item in executive_items:
             if not isinstance(item, dict):
                 continue
@@ -138,7 +153,6 @@ class TonyAgencyFocusCommandService:
                 if isinstance(follow_up, dict):
                     priorities.append(self._overdue_priority(follow_up))
 
-        # Decisions explicitly requiring Matt come before normal operating work.
         for item in executive_items:
             if not isinstance(item, dict):
                 continue
@@ -146,7 +160,6 @@ class TonyAgencyFocusCommandService:
             if bool(item.get("requires_matt")) and area in self._BUSINESS_AREAS and not bool(item.get("blocked")):
                 priorities.append(self._agency_priority(item, tier=30, reason="matt_decision_required"))
 
-        # Fill remaining space with the highest-value business work. Platform work is deliberately excluded here.
         for item in executive_items:
             if not isinstance(item, dict):
                 continue
@@ -168,11 +181,7 @@ class TonyAgencyFocusCommandService:
                 command="agency_focus",
                 status="healthy",
                 message=message,
-                data={
-                    "intent": "synthesise_agency_focus",
-                    "priorities": [],
-                    "source_brief_status": agency_response.status,
-                },
+                data={"intent": "synthesise_agency_focus", "priorities": [], "source_brief_status": agency_response.status},
             )
 
         first = top[0]
@@ -181,9 +190,7 @@ class TonyAgencyFocusCommandService:
             lines.append("Then:")
             for priority in top[1:]:
                 lines.append(f"- {priority['label']} — {priority['action']}")
-        lines.append(
-            "I would leave engineering or infrastructure work alone unless it is directly blocking one of these agency outcomes."
-        )
+        lines.append("I would leave engineering or infrastructure work alone unless it is directly blocking one of these agency outcomes.")
 
         return CommandResponse(
             command="agency_focus",
@@ -203,12 +210,8 @@ class TonyAgencyFocusCommandService:
         lines = [f"I put {first['label']} first because {first_reason}."]
         if len(self._last_priorities) > 1:
             second = self._last_priorities[1]
-            lines.append(
-                f"{second['label']} comes next because {self._reason_text(second)}, but it has less immediate business consequence."
-            )
-        lines.append(
-            "That ordering is evidence-led rather than absolute; if new client, revenue or delivery evidence appears, I would re-rank it."
-        )
+            lines.append(f"{second['label']} comes next because {self._reason_text(second)}, but it has less immediate business consequence.")
+        lines.append("That ordering is evidence-led rather than absolute; if new client, revenue or delivery evidence appears, I would re-rank it.")
         return CommandResponse(
             command="agency_focus_rationale",
             status="healthy",
@@ -220,12 +223,72 @@ class TonyAgencyFocusCommandService:
             },
         )
 
+    def _prepare_first_priority_action(self) -> CommandResponse:
+        priority = dict(self._last_priorities[0])
+        handoff = self._execution_handoff(priority)
+        worker = handoff["worker"]
+        action = handoff["action"]
+        message = (
+            f"Yes. I’ll take {priority['label']} forward first. "
+            f"The next controlled step is for {worker} to {action}. "
+            "I have prepared the handoff, but I have not claimed that any external tool, message or record change has happened yet."
+        )
+        if handoff["approval_required"]:
+            message += " Any external send or irreversible change remains behind your approval."
+        return CommandResponse(
+            command="agency_focus_action",
+            status="attention" if priority["tier"] < 50 else "healthy",
+            message=message,
+            data={
+                "intent": "progress_top_agency_priority",
+                "priority": priority,
+                "execution_handoff": handoff,
+                "execution_status": "ready_for_handoff",
+                "external_action_taken": False,
+            },
+        )
+
+    def _execution_handoff(self, priority: dict[str, Any]) -> dict[str, Any]:
+        reason = str(priority.get("reason") or "")
+        target = dict(priority.get("target") or {})
+        if reason == "new_positive_commercial_intent":
+            return {
+                "worker": "Gmail",
+                "action": "retrieve the verified reply thread so Tony can assess the response and prepare the right discovery follow-up",
+                "then_owner": "Tony",
+                "approval_required": True,
+                "target": target,
+            }
+        if reason == "overdue_commercial_commitment":
+            return {
+                "worker": "Gmail",
+                "action": "check the lead thread for a reply before Tony decides the next commercial move",
+                "then_owner": "Tony",
+                "approval_required": True,
+                "target": target,
+            }
+        if bool(priority.get("requires_matt")):
+            return {
+                "worker": "Matt",
+                "action": str(priority.get("action") or "make the required executive decision"),
+                "then_owner": "Tony",
+                "approval_required": False,
+                "target": target,
+            }
+        return {
+            "worker": "Claude",
+            "action": f"prepare the work needed to advance this priority: {priority.get('action')}",
+            "then_owner": "Tony",
+            "approval_required": True,
+            "target": target,
+        }
+
     def _challenge_internal_choice(self, choice: str, first: dict[str, Any]) -> CommandResponse:
         reason = self._reason_text(first)
         message = (
             f"I would not prioritise {choice.rstrip('.')} yet. "
             f"{first['label']} has the stronger business consequence because {reason}. "
-            f"My recommendation is to clear that first, then return to the internal work. "
+            "My recommendation is to clear that first, then return to the internal work. "
             "If you still choose the internal work, I will follow that decision rather than quietly overriding it."
         )
         return CommandResponse(
@@ -249,10 +312,17 @@ class TonyAgencyFocusCommandService:
         return any(lowered == marker or lowered.startswith(marker + " ") for marker in cls._RATIONALE_MARKERS)
 
     @classmethod
+    def _is_first_action_query(cls, lowered: str) -> bool:
+        candidate = lowered
+        for prefix in cls._ACKNOWLEDGEMENT_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip()
+                break
+        return any(candidate == marker or candidate.startswith(marker + " ") for marker in cls._FIRST_ACTION_MARKERS)
+
+    @classmethod
     def _is_internal_work_choice(cls, lowered: str) -> bool:
-        return any(marker in lowered for marker in cls._CHOICE_MARKERS) and any(
-            marker in lowered for marker in cls._INTERNAL_WORK_MARKERS
-        )
+        return any(marker in lowered for marker in cls._CHOICE_MARKERS) and any(marker in lowered for marker in cls._INTERNAL_WORK_MARKERS)
 
     def _agency_priority(self, item: dict[str, Any], *, tier: int, reason: str) -> dict[str, Any]:
         area = str(item.get("area") or "").strip().casefold()
@@ -267,6 +337,8 @@ class TonyAgencyFocusCommandService:
             "action": action,
             "reason": reason,
             "source": "agency_state",
+            "requires_matt": bool(item.get("requires_matt")),
+            "target": {"item_id": str(item.get("item_id") or ""), "area": area},
         }
 
     def _positive_reply_priority(self, item: dict[str, Any]) -> dict[str, Any]:
@@ -283,6 +355,8 @@ class TonyAgencyFocusCommandService:
             "action": action,
             "reason": "new_positive_commercial_intent",
             "source": "commercial_watch",
+            "requires_matt": False,
+            "target": {"lead_id": str(item.get("lead_id") or ""), "contact": contact, "company": company},
         }
 
     @staticmethod
@@ -303,6 +377,13 @@ class TonyAgencyFocusCommandService:
             "action": action,
             "reason": "overdue_commercial_commitment",
             "source": "commercial_watch",
+            "requires_matt": False,
+            "target": {
+                "commitment_id": str(item.get("commitment_id") or ""),
+                "lead_id": str(item.get("lead_id") or ""),
+                "contact": contact,
+                "company": company,
+            },
         }
 
     @staticmethod
@@ -313,7 +394,4 @@ class TonyAgencyFocusCommandService:
             current = unique.get(key)
             if current is None or (priority["tier"], priority["area_rank"]) < (current["tier"], current["area_rank"]):
                 unique[key] = priority
-        return sorted(
-            unique.values(),
-            key=lambda item: (item["tier"], item["area_rank"], str(item["label"]).casefold()),
-        )
+        return sorted(unique.values(), key=lambda item: (item["tier"], item["area_rank"], str(item["label"]).casefold()))

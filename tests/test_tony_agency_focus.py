@@ -152,6 +152,70 @@ class TonyAgencyFocusTests(unittest.TestCase):
         self.assertIn("overdue follow-up", response.message)
         self.assertEqual(inner.calls, ["morning"])
 
+    def test_do_first_one_turns_positive_reply_into_gmail_handoff_without_claiming_execution(self):
+        inner = StubCommandService(
+            {
+                "agency_state": {"executive_items": []},
+                "commercial_watch": {
+                    "positive_replies": [
+                        {
+                            "lead_id": "jimmy",
+                            "contact": "Jimmy",
+                            "company": "Jimmy Diamond Ltd",
+                            "recommended_next_action": "Move the opportunity to discovery.",
+                        }
+                    ],
+                    "overdue": [],
+                },
+            }
+        )
+        service = TonyAgencyFocusCommandService(inner)
+
+        service.execute("What should I focus on today?", [])
+        response = service.execute("OK, do the first one", [])
+
+        self.assertEqual(response.command, "agency_focus_action")
+        self.assertEqual(response.data["intent"], "progress_top_agency_priority")
+        self.assertEqual(response.data["execution_status"], "ready_for_handoff")
+        self.assertFalse(response.data["external_action_taken"])
+        handoff = response.data["execution_handoff"]
+        self.assertEqual(handoff["worker"], "Gmail")
+        self.assertEqual(handoff["then_owner"], "Tony")
+        self.assertEqual(handoff["target"]["lead_id"], "jimmy")
+        self.assertTrue(handoff["approval_required"])
+        self.assertIn("have not claimed", response.message)
+        self.assertEqual(inner.calls, ["morning"])
+
+    def test_do_first_one_preserves_matt_owned_client_decision(self):
+        inner = StubCommandService(
+            {
+                "agency_state": {
+                    "executive_items": [
+                        {
+                            "item_id": "client-risk",
+                            "area": "clients",
+                            "title": "Client renewal at risk",
+                            "blocked": True,
+                            "requires_matt": True,
+                            "next_action": "Call the client today.",
+                        }
+                    ]
+                },
+                "commercial_watch": {},
+            }
+        )
+        service = TonyAgencyFocusCommandService(inner)
+
+        service.execute("What matters most?", [])
+        response = service.execute("Do that first", [])
+
+        handoff = response.data["execution_handoff"]
+        self.assertEqual(handoff["worker"], "Matt")
+        self.assertEqual(handoff["action"], "Call the client today.")
+        self.assertFalse(handoff["approval_required"])
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertEqual(inner.calls, ["morning"])
+
     def test_internal_work_choice_is_challenged_when_business_priority_is_stronger(self):
         inner = StubCommandService(
             {
