@@ -9,6 +9,7 @@ from unittest import mock
 
 from openclaw import tony_live_bridge
 from runtime.tony_capability_commands import TonyCapabilityCommandService
+from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
@@ -34,7 +35,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         memory = app.command_service.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
-        capability = memory.command_service
+        commercial_watch = memory.command_service
+        self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
+        capability = commercial_watch.command_service
         self.assertIsInstance(capability, TonyCapabilityCommandService)
         executive = capability.command_service
         self.assertIsInstance(executive, TonyExecutiveCommandService)
