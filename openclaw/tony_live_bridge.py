@@ -11,11 +11,11 @@ from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_ap
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
-from runtime.tony_agency_focus import TonyAgencyFocusCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
+from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
@@ -95,9 +95,6 @@ class LeadAwareTonyApplication:
         return self._respond(start_response, status, payload)
 
     def _ingest(self, environ, start_response):
-        # n8n and Tony run on the same Mac. Trust loopback ingestion so the local
-        # workflow does not need to duplicate the bridge secret. Any non-local
-        # request remains protected by TONY_BRIDGE_TOKEN.
         denied = self._authorize(environ, start_response, allow_loopback=True)
         if denied is not None:
             return denied
@@ -155,18 +152,14 @@ def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
         try:
             value = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise ValueError(
-                f"Friday Review evidence file is unreadable: {path.name}"
-            ) from exc
+            raise ValueError(f"Friday Review evidence file is unreadable: {path.name}") from exc
 
         candidates = value if isinstance(value, list) else [value]
         if not candidates:
             raise ValueError(f"Friday Review evidence file is empty: {path.name}")
         for candidate in candidates:
             if not isinstance(candidate, dict) or not _REQUIRED_FRIDAY_FIELDS.issubset(candidate):
-                raise ValueError(
-                    f"Friday Review evidence record is invalid: {path.name}"
-                )
+                raise ValueError(f"Friday Review evidence record is invalid: {path.name}")
             records.append(candidate)
 
     if not records:
@@ -218,7 +211,16 @@ def build_app() -> LeadAwareTonyApplication:
         capability_service,
         store_path=commercial_commitments_path,
     )
-    agency_focus_service = TonyAgencyFocusCommandService(commercial_watch_service)
+    agency_focus_context_path = Path(
+        os.getenv(
+            "TONY_AGENCY_FOCUS_CONTEXT_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "agency-focus-context.json"),
+        )
+    )
+    agency_focus_service = TonyPersistentAgencyFocusCommandService(
+        commercial_watch_service,
+        store_path=agency_focus_context_path,
+    )
     memory_path = Path(
         os.getenv(
             "TONY_EXECUTIVE_MEMORY_PATH",
