@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from runtime.tony_command_service import CommandResponse
@@ -103,6 +104,77 @@ class TonyPersistentAgencyFocusTests(unittest.TestCase):
             self.assertTrue(repeated.data["duplicate_handoff_suppressed"])
             self.assertFalse(repeated.data["external_action_taken"])
             self.assertIn("already prepared", repeated.message)
+
+    def test_stalled_worker_action_is_promoted_into_agency_focus(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            start = datetime(2026, 8, 14, 8, 0, tzinfo=timezone.utc)
+            service = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start,
+            )
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+
+            later = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start + timedelta(hours=3),
+            )
+            response = later.execute("What should I focus on today?", [])
+
+            reasons = [item["reason"] for item in response.data["priorities"]]
+            self.assertIn("stalled_delegated_action", reasons)
+            stalled = next(item for item in response.data["priorities"] if item["reason"] == "stalled_delegated_action")
+            self.assertIn("no execution or return evidence", stalled["action"])
+            self.assertFalse(response.data["stalled_executive_action"]["requires_matt"])
+
+    def test_stalled_worker_action_is_surfaced_in_daily_brief_without_prompting_for_status(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            start = datetime(2026, 8, 14, 8, 0, tzinfo=timezone.utc)
+            service = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start,
+            )
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+
+            later = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start + timedelta(hours=3),
+            )
+            response = later.execute("morning", [])
+
+            self.assertEqual(response.command, "morning")
+            self.assertEqual(response.status, "attention")
+            self.assertIn("Stalled action:", response.message)
+            self.assertIn("stalled_executive_action", response.data)
+
+    def test_recent_prepared_action_is_not_falsely_called_stalled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "focus.json"
+            start = datetime(2026, 8, 14, 8, 0, tzinfo=timezone.utc)
+            service = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start,
+            )
+            service.execute("What matters most?", [])
+            service.execute("Do the first one", [])
+
+            later = TonyPersistentAgencyFocusCommandService(
+                StubCommandService(),
+                store_path=store,
+                clock=lambda: start + timedelta(minutes=90),
+            )
+            response = later.execute("morning", [])
+
+            self.assertNotIn("Stalled action:", response.message)
+            self.assertNotIn("stalled_executive_action", response.data)
 
     def test_new_empty_focus_clears_stale_priorities_but_keeps_open_action_accountability(self):
         class EmptyStub(StubCommandService):
