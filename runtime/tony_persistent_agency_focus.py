@@ -25,6 +25,8 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         "what are you waiting on",
         "where are we with that",
     )
+    _ACTION_RESULT_COMMANDS = {"action_result", "record_action_result", "worker_return"}
+    _VERIFIED_RESULT_STATES = {"completed", "executed", "returned", "success", "succeeded"}
 
     def __init__(
         self,
@@ -41,14 +43,23 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         state = self._load_state()
         self._last_priorities = state["priorities"]
         self._pending_action: dict[str, Any] | None = state["pending_action"]
+        self._last_completed_action: dict[str, Any] | None = state["last_completed_action"]
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
-        if self._pending_action and any(marker in lowered for marker in self._ACTION_STATUS_MARKERS):
-            return self._pending_action_status()
+        name = lowered.split(" ", 1)[0].lstrip("/") if lowered else ""
+        materialized = tuple(objects)
 
-        response = super().execute(command, objects)
+        if name in self._ACTION_RESULT_COMMANDS:
+            return self._record_action_result(materialized)
+        if any(marker in lowered for marker in self._ACTION_STATUS_MARKERS):
+            if self._pending_action:
+                return self._pending_action_status()
+            if self._last_completed_action:
+                return self._completed_action_status()
+
+        response = super().execute(command, materialized)
         if response.command in {"morning", "evening"}:
             response = self._augment_brief_with_stalled_action(response)
         return response
@@ -83,16 +94,96 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         handoff = data.get("execution_handoff") if isinstance(data.get("execution_handoff"), dict) else {}
         worker = str(handoff.get("worker") or "worker")
         status = "awaiting_matt" if worker.casefold() == "matt" else "awaiting_worker_confirmation"
+        prepared_at = self._now_utc().isoformat()
         self._pending_action = {
+            "action_id": f"{priority_key}:{prepared_at}",
             "priority_key": priority_key,
             "priority": priority,
             "execution_handoff": dict(handoff),
             "status": status,
-            "prepared_at": self._now_utc().isoformat(),
+            "prepared_at": prepared_at,
             "external_action_taken": False,
         }
         self._persist_state()
         return response
+
+    def _record_action_result(self, objects: tuple[dict[str, Any], ...]) -> CommandResponse:
+        if not self._pending_action:
+            return CommandResponse(
+                command="agency_focus_action_result",
+                status="attention",
+                message="I cannot close an executive action because there is no open prepared action to match this evidence against.",
+                data={"intent": "record_executive_action_result", "accepted": False, "reason": "no_pending_action"},
+            )
+
+        result = self._extract_action_result(objects)
+        if result is None:
+            return self._untrusted_action_result("No structured execution result was supplied.")
+
+        expected_id = str(self._pending_action.get("action_id") or "")
+        supplied_id = str(result.get("action_id") or result.get("executive_action_id") or "").strip()
+        if not supplied_id or supplied_id != expected_id:
+            return self._untrusted_action_result("The execution result does not match the currently open action.")
+
+        result_state = str(result.get("status") or result.get("outcome") or "").strip().casefold()
+        if result_state not in self._VERIFIED_RESULT_STATES:
+            return self._untrusted_action_result("The worker result does not contain a verified completion state.")
+
+        evidence = result.get("evidence")
+        if evidence is None or evidence == "" or evidence == [] or evidence == {}:
+            return self._untrusted_action_result("Completion evidence is required before I can close the action.")
+
+        completed = dict(self._pending_action)
+        completed["status"] = "completed_verified"
+        completed["completed_at"] = self._now_utc().isoformat()
+        completed["completion_evidence"] = evidence
+        completed["result_summary"] = str(result.get("summary") or "").strip()
+        completed["external_action_taken"] = bool(result.get("external_action_taken", False))
+        self._last_completed_action = completed
+        self._pending_action = None
+        self._persist_state()
+
+        priority = completed.get("priority") if isinstance(completed.get("priority"), dict) else {}
+        label = str(priority.get("label") or "the priority")
+        external = " External execution is confirmed by the supplied evidence." if completed["external_action_taken"] else " This confirms the delegated step, not any unverified external action."
+        return CommandResponse(
+            command="agency_focus_action_result",
+            status="healthy",
+            message=f"Verified: the prepared action for {label} is complete.{external}",
+            data={
+                "intent": "record_executive_action_result",
+                "accepted": True,
+                "execution_status": "completed_verified",
+                "completed_action": dict(completed),
+                "external_action_taken": completed["external_action_taken"],
+            },
+        )
+
+    @staticmethod
+    def _extract_action_result(objects: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:
+        for item in objects:
+            if not isinstance(item, dict):
+                continue
+            nested = item.get("executive_action_result")
+            if isinstance(nested, dict):
+                return dict(nested)
+            if "action_id" in item or "executive_action_id" in item:
+                return dict(item)
+        return None
+
+    def _untrusted_action_result(self, reason: str) -> CommandResponse:
+        return CommandResponse(
+            command="agency_focus_action_result",
+            status="attention",
+            message=f"I have not closed the action. {reason}",
+            data={
+                "intent": "record_executive_action_result",
+                "accepted": False,
+                "reason": reason,
+                "pending_action": dict(self._pending_action or {}),
+                "external_action_taken": False,
+            },
+        )
 
     def _pending_action_status(self, *, duplicate_request: bool = False) -> CommandResponse:
         pending = dict(self._pending_action or {})
@@ -123,6 +214,22 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
                 "external_action_taken": False,
                 "duplicate_handoff_suppressed": duplicate_request,
                 "stalled": self._pending_action_is_stalled(),
+            },
+        )
+
+    def _completed_action_status(self) -> CommandResponse:
+        completed = dict(self._last_completed_action or {})
+        priority = completed.get("priority") if isinstance(completed.get("priority"), dict) else {}
+        label = str(priority.get("label") or "the last priority")
+        return CommandResponse(
+            command="agency_focus_action_status",
+            status="healthy",
+            message=f"The last prepared action for {label} is complete and backed by recorded execution evidence.",
+            data={
+                "intent": "track_top_agency_priority_action",
+                "execution_status": "completed_verified",
+                "completed_action": completed,
+                "external_action_taken": bool(completed.get("external_action_taken", False)),
             },
         )
 
@@ -225,7 +332,7 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         return value.astimezone(timezone.utc)
 
     def _load_state(self) -> dict[str, Any]:
-        empty = {"priorities": (), "pending_action": None}
+        empty = {"priorities": (), "pending_action": None, "last_completed_action": None}
         if not self.store_path.exists():
             return empty
         try:
@@ -240,13 +347,20 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
             clean_priorities = tuple(dict(item) for item in priorities if isinstance(item, dict))[:3]
         pending = raw.get("pending_action")
         clean_pending = dict(pending) if isinstance(pending, dict) else None
-        return {"priorities": clean_priorities, "pending_action": clean_pending}
+        completed = raw.get("last_completed_action")
+        clean_completed = dict(completed) if isinstance(completed, dict) else None
+        return {
+            "priorities": clean_priorities,
+            "pending_action": clean_pending,
+            "last_completed_action": clean_completed,
+        }
 
     def _persist_state(self) -> None:
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "priorities": [dict(item) for item in self._last_priorities],
             "pending_action": dict(self._pending_action) if self._pending_action else None,
+            "last_completed_action": dict(self._last_completed_action) if self._last_completed_action else None,
         }
         tmp = self.store_path.with_suffix(self.store_path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
