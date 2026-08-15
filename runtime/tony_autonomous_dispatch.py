@@ -28,9 +28,38 @@ class TonyAutonomousDispatchCommandService:
 
     This layer is deliberately narrow. It never decides that an action is safe; it
     consumes the risk decision already made upstream. Approval-gated writes remain
-    untouched. A dispatcher must return structured evidence before Tony can say a
-    read or preparation step actually ran.
+    untouched. A dispatcher must return structured evidence that satisfies the
+    dispatch contract before Tony can say a read or preparation step actually ran.
     """
+
+    _SOURCE_ID_KEYS = {
+        "source_id",
+        "source_ids",
+        "thread_id",
+        "message_id",
+        "message_ids",
+        "event_id",
+        "event_ids",
+        "record_id",
+        "record_ids",
+        "page_id",
+        "page_ids",
+        "commit_sha",
+        "run_id",
+        "url",
+    }
+    _WORK_PRODUCT_KEYS = {
+        "work_product",
+        "draft",
+        "content",
+        "summary",
+        "analysis",
+        "recommendation",
+        "recommendations",
+        "options",
+        "artifact",
+        "result",
+    }
 
     def __init__(
         self,
@@ -91,7 +120,8 @@ class TonyAutonomousDispatchCommandService:
                 message_suffix=f" I attempted the safe {worker} step, but it did not return verified evidence: {exc}",
             )
 
-        if not isinstance(evidence, dict) or not evidence:
+        verified, reason = self._verify_evidence(dispatch, evidence)
+        if not verified:
             return self._with_dispatch_state(
                 response,
                 data,
@@ -99,7 +129,10 @@ class TonyAutonomousDispatchCommandService:
                 dispatch,
                 state="dispatch_unverified",
                 execution_truth="dispatch_attempted_unverified",
-                message_suffix=f" I attempted the safe {worker} step, but no structured evidence came back, so I am not treating it as complete.",
+                message_suffix=(
+                    f" I attempted the safe {worker} step, but the returned evidence did not satisfy the dispatch contract"
+                    f" ({reason}), so I am not treating it as complete."
+                ),
             )
 
         result = DispatchResult(worker=worker, status="verified", evidence=evidence)
@@ -115,6 +148,47 @@ class TonyAutonomousDispatchCommandService:
         updated.data["dispatch_result"] = result.to_dict()
         updated.data["execution_status"] = "autonomous_step_verified"
         return updated
+
+    @classmethod
+    def _verify_evidence(cls, dispatch: dict[str, Any], evidence: Any) -> tuple[bool, str]:
+        if not isinstance(evidence, dict) or not evidence:
+            return False, "no structured evidence returned"
+        if evidence.get("ok") is False or evidence.get("verified") is False or evidence.get("error"):
+            return False, "worker reported an error or unverified result"
+
+        mode = str(dispatch.get("execution_mode") or "").strip()
+        if mode == "autonomous_read":
+            read_only = evidence.get("read_only") is True or evidence.get("mutation_count") == 0
+            if not read_only:
+                return False, "read-only execution was not demonstrated"
+            if not cls._has_source_identifier(evidence):
+                return False, "source identifiers are missing"
+            return True, "verified read evidence"
+
+        if mode == "autonomous_prepare":
+            if not cls._has_work_product(evidence):
+                return False, "returned work product is missing"
+            return True, "verified internal work product"
+
+        return False, "dispatch execution mode is missing or not autonomous"
+
+    @classmethod
+    def _has_source_identifier(cls, evidence: dict[str, Any]) -> bool:
+        return any(cls._meaningful(evidence.get(key)) for key in cls._SOURCE_ID_KEYS)
+
+    @classmethod
+    def _has_work_product(cls, evidence: dict[str, Any]) -> bool:
+        return any(cls._meaningful(evidence.get(key)) for key in cls._WORK_PRODUCT_KEYS)
+
+    @staticmethod
+    def _meaningful(value: Any) -> bool:
+        if value is None:
+            return False
+        if isinstance(value, str):
+            return bool(value.strip())
+        if isinstance(value, (list, tuple, set, dict)):
+            return bool(value)
+        return True
 
     @staticmethod
     def _with_dispatch_state(
