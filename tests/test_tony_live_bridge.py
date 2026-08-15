@@ -9,6 +9,7 @@ from unittest import mock
 
 from openclaw import tony_live_bridge
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
+from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -21,7 +22,7 @@ from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
 class TonyLiveBridgeTests(unittest.TestCase):
-    def test_build_app_composes_terminology_memory_focus_commercial_capability_and_executive_commands(self) -> None:
+    def test_build_app_composes_terminology_dispatch_memory_focus_commercial_capability_and_executive_commands(self) -> None:
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
@@ -39,12 +40,16 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
                 "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
             },
+            clear=True,
         ):
             app = tony_live_bridge.build_app()
 
         self.assertIs(app.base, base_app)
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
-        memory = app.command_service.command_service
+        dispatch = app.command_service.command_service
+        self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
+        self.assertEqual(dispatch.dispatchers, {})
+        memory = dispatch.command_service
         self.assertIsInstance(memory, TonyMemoryCommandService)
         adaptive = memory.command_service
         self.assertIsInstance(adaptive, TonyAdaptiveResponseCommandService)
@@ -65,6 +70,31 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIs(executive.command_service, base_service)
         self.assertIs(executive.brief_archive, archive)
 
+    def test_build_app_configures_explicit_live_dispatchers(self) -> None:
+        base_app = mock.Mock()
+        base_app.command_service = mock.Mock()
+        base_app.bridge_token = ""
+        base_app.brief_archive = mock.Mock()
+
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
+            tony_live_bridge, "build_base_app", return_value=base_app
+        ), mock.patch.dict(
+            "os.environ",
+            {
+                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
+                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
+                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
+                "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
+                "TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9999/gmail/read",
+            },
+            clear=True,
+        ):
+            app = tony_live_bridge.build_app()
+
+        dispatch = app.command_service.command_service
+        self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
+        self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
+
     def test_build_app_preserves_mission_control_health_configuration(self) -> None:
         base_app = mock.Mock()
         base_service = mock.Mock()
@@ -83,6 +113,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
                 "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
             },
+            clear=True,
         ):
             app = tony_live_bridge.build_app()
 
