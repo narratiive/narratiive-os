@@ -98,6 +98,111 @@ class TonyOutcomeEvidenceTests(unittest.TestCase):
         self.assertEqual(inner.received[0]["outcome_status"], "inconclusive")
         self.assertIn("kept the judgement inconclusive", response.message)
 
+    def test_qualified_reply_within_business_day_window_is_positive(self):
+        inner = StubOutcomeService(success_signal="Qualified positive reply within three business days")
+        service = TonyOutcomeEvidenceCommandService(inner)
+
+        response = service.execute(
+            "outcome_result",
+            [{
+                "action_id": "adaptive-1",
+                "outcome_status": "negative",
+                "evidence": {
+                    "measurement": {
+                        "type": "qualified_event_within_business_days",
+                        "event_observed": True,
+                        "event_qualified": True,
+                        "business_days_elapsed": 2,
+                        "max_business_days": 3,
+                    }
+                },
+            }],
+        )
+
+        interpretation = response.data["outcome_interpretation"]
+        self.assertEqual(response.data["business_outcome_status"], "positive")
+        self.assertEqual(interpretation["measurement_type"], "qualified_event_within_business_days")
+        self.assertTrue(interpretation["criterion_met"])
+        self.assertEqual(inner.received[0]["outcome_status"], "positive")
+
+    def test_missing_qualified_reply_before_window_closes_stays_inconclusive(self):
+        inner = StubOutcomeService(success_signal="Qualified positive reply within three business days")
+        service = TonyOutcomeEvidenceCommandService(inner)
+
+        response = service.execute(
+            "outcome_result",
+            [{
+                "action_id": "adaptive-1",
+                "outcome_status": "negative",
+                "evidence": {
+                    "measurement": {
+                        "type": "qualified_event_within_business_days",
+                        "event_observed": False,
+                        "event_qualified": False,
+                        "business_days_elapsed": 1,
+                        "max_business_days": 3,
+                    }
+                },
+            }],
+        )
+
+        interpretation = response.data["outcome_interpretation"]
+        self.assertEqual(response.data["business_outcome_status"], "inconclusive")
+        self.assertEqual(interpretation["reason"], "criterion_still_open")
+        self.assertIsNone(interpretation["criterion_met"])
+        self.assertIn("still open", response.message)
+
+    def test_qualified_reply_not_achieved_by_deadline_is_negative(self):
+        inner = StubOutcomeService(success_signal="Qualified positive reply within three business days")
+        service = TonyOutcomeEvidenceCommandService(inner)
+
+        response = service.execute(
+            "outcome_result",
+            [{
+                "action_id": "adaptive-1",
+                "outcome_status": "positive",
+                "evidence": {
+                    "measurement": {
+                        "type": "qualified_event_within_business_days",
+                        "event_observed": True,
+                        "event_qualified": False,
+                        "business_days_elapsed": 3,
+                        "max_business_days": 3,
+                    }
+                },
+            }],
+        )
+
+        interpretation = response.data["outcome_interpretation"]
+        self.assertEqual(response.data["business_outcome_status"], "negative")
+        self.assertEqual(interpretation["reason"], "qualified_event_not_achieved_in_window")
+        self.assertFalse(interpretation["criterion_met"])
+        self.assertEqual(inner.received[0]["outcome_status"], "negative")
+
+    def test_late_qualified_reply_does_not_satisfy_window(self):
+        inner = StubOutcomeService(success_signal="Qualified positive reply within three business days")
+        service = TonyOutcomeEvidenceCommandService(inner)
+
+        response = service.execute(
+            "outcome_result",
+            [{
+                "action_id": "adaptive-1",
+                "outcome_status": "positive",
+                "evidence": {
+                    "measurement": {
+                        "type": "qualified_event_within_business_days",
+                        "event_observed": True,
+                        "event_qualified": True,
+                        "business_days_elapsed": 4,
+                        "max_business_days": 3,
+                    }
+                },
+            }],
+        )
+
+        self.assertEqual(response.data["business_outcome_status"], "negative")
+        self.assertFalse(response.data["outcome_interpretation"]["criterion_met"])
+
     def test_non_adaptive_outcomes_keep_existing_contract(self):
         inner = StubOutcomeService(adaptive=False)
         service = TonyOutcomeEvidenceCommandService(inner)
