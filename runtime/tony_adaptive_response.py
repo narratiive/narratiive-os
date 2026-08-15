@@ -36,6 +36,16 @@ class TonyAdaptiveResponseCommandService:
         "review claudes redesign",
         "is the redesign good enough",
     )
+    _FINAL_APPROVAL_MARKERS = (
+        "approve it",
+        "approve the redesign",
+        "run the test",
+        "go with that",
+        "go with the recommendation",
+        "let's test it",
+        "lets test it",
+        "go ahead with the test",
+    )
     _REDESIGN_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
 
@@ -44,6 +54,7 @@ class TonyAdaptiveResponseCommandService:
         self.learning_store_path = learning_store_path or Path(".runtime/executive-learning.json")
         self._pending_adaptation: dict[str, Any] | None = None
         self._pending_redesign_review: dict[str, Any] | None = None
+        self._pending_reviewed_adaptation: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -57,6 +68,8 @@ class TonyAdaptiveResponseCommandService:
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
         artefacts = tuple(item for item in objects if isinstance(item, dict))
+        if self._pending_reviewed_adaptation and self._is_final_approval(lowered):
+            return self._prepare_approved_adaptive_test()
         if self._pending_redesign_review and any(marker in lowered for marker in self._RETURN_MARKERS):
             return self._review_adaptation_return(artefacts)
         if self._pending_adaptation and self._is_adaptation_approval(lowered):
@@ -187,6 +200,7 @@ class TonyAdaptiveResponseCommandService:
             gaps.append("a measurable success signal")
 
         if gaps:
+            self._pending_reviewed_adaptation = None
             return CommandResponse(
                 "executive_adaptation_review",
                 "attention",
@@ -199,6 +213,16 @@ class TonyAdaptiveResponseCommandService:
                 },
             )
 
+        pending = dict(self._pending_redesign_review or {})
+        priority = pending.get("priority") if isinstance(pending.get("priority"), dict) else {}
+        reviewed = {
+            "priority": dict(priority),
+            "options": list(options) if isinstance(options, list) else [],
+            "recommendation": recommendation,
+            "changed_variable": changed_variable,
+            "success_signal": success_signal,
+        }
+        self._pending_reviewed_adaptation = reviewed
         self._pending_redesign_review = None
         return CommandResponse(
             "executive_adaptation_review",
@@ -218,10 +242,48 @@ class TonyAdaptiveResponseCommandService:
             },
         )
 
+    def _prepare_approved_adaptive_test(self) -> CommandResponse:
+        assert self._pending_reviewed_adaptation is not None
+        reviewed = dict(self._pending_reviewed_adaptation)
+        priority = reviewed.get("priority") if isinstance(reviewed.get("priority"), dict) else {}
+        label = str(priority.get("label") or "this priority")
+        handoff = {
+            "task_type": "approved_adaptive_test",
+            "execution_owner": "Tony",
+            "priority": dict(priority),
+            "approved_recommendation": reviewed.get("recommendation", ""),
+            "changed_variable": reviewed.get("changed_variable", ""),
+            "success_signal": reviewed.get("success_signal", ""),
+            "options": list(reviewed.get("options") or []),
+            "tool_resolution_required": True,
+            "tool_selection_rule": "Choose the execution tool from the approved option and actual business action; do not invent a send, update or external execution path without evidence.",
+            "completion_evidence_required": True,
+            "outcome_evidence_required": True,
+            "execution_performed": False,
+        }
+        self._pending_reviewed_adaptation = None
+        return CommandResponse(
+            "executive_adaptive_test_handoff",
+            "healthy",
+            f"Approved. I have converted the redesign for {label} into a controlled test handoff. The test must change {handoff['changed_variable']} and be judged against: {handoff['success_signal']}. I still need the actual execution tool to confirm completion before I call anything done.",
+            {
+                "intent": "execute_approved_adaptive_test",
+                "adaptation_status": "approved_test_handoff_ready",
+                "execution_handoff": handoff,
+                "execution_performed": False,
+                "external_action_taken": False,
+            },
+        )
+
     @classmethod
     def _is_adaptation_approval(cls, lowered: str) -> bool:
         cleaned = lowered.strip().rstrip(".!?")
         return any(marker == cleaned or cleaned.endswith(f" {marker}") for marker in cls._APPROVAL_MARKERS)
+
+    @classmethod
+    def _is_final_approval(cls, lowered: str) -> bool:
+        cleaned = lowered.strip().rstrip(".!?")
+        return any(marker == cleaned or cleaned.endswith(f" {marker}") for marker in cls._FINAL_APPROVAL_MARKERS)
 
     def _latest_relevant_lesson(self) -> dict[str, Any] | None:
         lessons = self._load_lessons()
