@@ -14,7 +14,7 @@ class TonyVerifiedExecutionStatusCommandService:
     This layer never infers that an action happened from intent or approval. It only
     confirms execution from verified dispatch context, deliberately separates execution
     proof from business-outcome proof, and keeps a lightweight persistent watch on the
-    most recent approved write until outcome evidence exists elsewhere in the system.
+    most recent approved write until matched outcome evidence closes the loop.
     """
 
     _EXECUTION_MARKERS = (
@@ -38,6 +38,8 @@ class TonyVerifiedExecutionStatusCommandService:
         "did that achieve the result",
         "did it achieve the result",
     )
+    _WRITE_OUTCOME_COMMANDS = {"write_outcome", "approved_write_outcome"}
+    _OUTCOME_STATES = {"positive", "negative", "mixed", "no_change", "inconclusive"}
     _ACKNOWLEDGEMENT_PREFIXES = ("ok, ", "okay, ", "yes, ", "right, ", "great, ", "fine, ")
     _RESULT_ID_KEYS = ("message_id", "page_id", "record_id", "event_id", "commit_sha", "deployment_id", "id")
 
@@ -53,7 +55,9 @@ class TonyVerifiedExecutionStatusCommandService:
         self.store_path = store_path or Path(".runtime/verified-write-outcome-watch.json")
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.check_after = check_after
-        self._awaiting_write_outcome = self._load_watch()
+        state = self._load_state()
+        self._awaiting_write_outcome: dict[str, Any] | None = state["awaiting_write_outcome"]
+        self._last_write_outcome: dict[str, Any] | None = state["last_write_outcome"]
 
     @property
     def mission_control_loader(self):
@@ -64,7 +68,15 @@ class TonyVerifiedExecutionStatusCommandService:
         return bool(getattr(self.command_service, "github_configured", False))
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
-        normalized = " ".join(command.strip().split()).casefold()
+        normalized_text = " ".join(command.strip().split())
+        normalized = normalized_text.casefold()
+        name = normalized.split(" ", 1)[0].lstrip("/") if normalized else ""
+        materialized = tuple(objects)
+
+        write_outcome = self._extract_write_outcome(materialized)
+        if name in self._WRITE_OUTCOME_COMMANDS or (name == "outcome_evidence" and write_outcome is not None):
+            return self._record_write_outcome(materialized)
+
         execution_query = self._matches(normalized, self._EXECUTION_MARKERS)
         outcome_query = self._matches(normalized, self._OUTCOME_MARKERS)
         if execution_query or outcome_query:
@@ -72,13 +84,33 @@ class TonyVerifiedExecutionStatusCommandService:
             if status_response is not None:
                 return status_response
 
-        response = self.command_service.execute(command, objects)
+        response = self.command_service.execute(command, materialized)
         self._capture_verified_approved_write(response)
         if response.command in {"morning", "evening"}:
             response = self._augment_brief_with_outcome_watch(response)
         return response
 
     def _status_response(self, *, outcome_query: bool) -> CommandResponse | None:
+        if outcome_query and self._last_write_outcome:
+            outcome = dict(self._last_write_outcome)
+            state = str(outcome.get("outcome_status") or "inconclusive")
+            action = str(outcome.get("action") or "the last approved action")
+            summary = str(outcome.get("summary") or "").strip()
+            suffix = f" {summary}" if summary else ""
+            return CommandResponse(
+                command="verified_execution_outcome",
+                status="healthy" if state == "positive" else "attention",
+                message=f"The recorded business outcome for {action} is {state}.{suffix}",
+                data={
+                    "intent": "report_verified_write_outcome",
+                    "business_outcome_verified": True,
+                    "outcome_state": state,
+                    "outcome": outcome,
+                    "outcome_watch_active": False,
+                    "external_action_taken": False,
+                },
+            )
+
         context = getattr(self.command_service, "_last_verified_result", None)
         if not isinstance(context, dict):
             return None
@@ -175,7 +207,70 @@ class TonyVerifiedExecutionStatusCommandService:
             "verified_at": self._now().isoformat(),
             "execution_evidence_summary": str(data.get("executive_result") or response.message).strip(),
         }
-        self._persist_watch()
+        self._last_write_outcome = None
+        self._persist_state()
+
+    def _record_write_outcome(self, objects: tuple[dict[str, Any], ...]) -> CommandResponse:
+        if not self._awaiting_write_outcome:
+            return self._reject_write_outcome("There is no verified approved write currently awaiting business-outcome evidence.")
+
+        result = self._extract_write_outcome(objects)
+        if result is None:
+            return self._reject_write_outcome("No structured approved-write outcome evidence was supplied.")
+
+        expected_id = str(self._awaiting_write_outcome.get("execution_result_id") or "").strip()
+        supplied_id = str(result.get("execution_result_id") or result.get("result_id") or "").strip()
+        if not expected_id or not supplied_id or supplied_id != expected_id:
+            return self._reject_write_outcome("The outcome evidence does not match the verified approved write being assessed.")
+
+        state = str(result.get("outcome_status") or result.get("outcome") or "").strip().casefold()
+        if state not in self._OUTCOME_STATES:
+            return self._reject_write_outcome("Outcome status must be positive, negative, mixed, no_change or inconclusive.")
+
+        evidence = result.get("evidence")
+        if evidence is None or evidence == "" or evidence == [] or evidence == {}:
+            return self._reject_write_outcome("Business-outcome evidence is required before I can close the write outcome watch.")
+
+        watch = dict(self._awaiting_write_outcome)
+        outcome = {
+            "worker": str(watch.get("worker") or "").strip(),
+            "action": str(watch.get("action") or "approved action").strip(),
+            "target": dict(watch.get("target") or {}) if isinstance(watch.get("target"), dict) else {},
+            "execution_result_id": expected_id,
+            "outcome_status": state,
+            "evidence": evidence,
+            "summary": str(result.get("summary") or "").strip(),
+            "recorded_at": self._now().isoformat(),
+        }
+        self._last_write_outcome = outcome
+        self._awaiting_write_outcome = None
+        self._persist_state()
+
+        action = str(outcome["action"])
+        if state == "positive":
+            judgement = "The evidence supports the intended business effect. I would preserve what worked and reassess the next priority before scaling it further."
+            status = "healthy"
+        elif state in {"negative", "no_change"}:
+            judgement = "The evidence does not support the intended business effect. I would not repeat the same move unchanged; we should adapt the next action."
+            status = "attention"
+        else:
+            judgement = "The evidence is not strong enough for a clean success or failure call. I would keep the judgement provisional rather than over-claiming the result."
+            status = "attention"
+
+        return CommandResponse(
+            command="verified_write_outcome_review",
+            status=status,
+            message=f"Outcome review for {action}: {state}. {judgement}",
+            data={
+                "intent": "review_verified_write_outcome",
+                "accepted": True,
+                "business_outcome_verified": True,
+                "business_outcome_status": state,
+                "outcome": dict(outcome),
+                "outcome_watch_active": False,
+                "external_action_taken": False,
+            },
+        )
 
     def _augment_brief_with_outcome_watch(self, response: CommandResponse) -> CommandResponse:
         if not self._awaiting_write_outcome or not self._watch_due():
@@ -209,25 +304,67 @@ class TonyVerifiedExecutionStatusCommandService:
             verified = verified.replace(tzinfo=timezone.utc)
         return self._now() - verified.astimezone(timezone.utc) >= self.check_after
 
-    def _load_watch(self) -> dict[str, Any] | None:
+    @staticmethod
+    def _extract_write_outcome(objects: tuple[dict[str, Any], ...]) -> dict[str, Any] | None:
+        for item in objects:
+            if not isinstance(item, dict):
+                continue
+            nested = item.get("approved_write_outcome")
+            if isinstance(nested, dict):
+                return dict(nested)
+            if "execution_result_id" in item and ("outcome_status" in item or "outcome" in item):
+                return dict(item)
+        return None
+
+    def _reject_write_outcome(self, reason: str) -> CommandResponse:
+        return CommandResponse(
+            command="verified_write_outcome_review",
+            status="attention",
+            message=f"I have not recorded a business outcome for the approved write. {reason}",
+            data={
+                "intent": "review_verified_write_outcome",
+                "accepted": False,
+                "reason": reason,
+                "business_outcome_verified": False,
+                "business_outcome_status": "unverified" if self._awaiting_write_outcome else "unknown",
+                "outcome_watch_active": bool(self._awaiting_write_outcome),
+            },
+        )
+
+    def _load_state(self) -> dict[str, Any]:
+        empty = {"awaiting_write_outcome": None, "last_write_outcome": None}
         if not self.store_path.exists():
-            return None
+            return empty
         try:
             raw = json.loads(self.store_path.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            return None
+            return empty
         if not isinstance(raw, dict):
-            return None
+            return empty
+
+        if "awaiting_write_outcome" in raw or "last_write_outcome" in raw:
+            awaiting = raw.get("awaiting_write_outcome")
+            outcome = raw.get("last_write_outcome")
+            return {
+                "awaiting_write_outcome": dict(awaiting) if isinstance(awaiting, dict) else None,
+                "last_write_outcome": dict(outcome) if isinstance(outcome, dict) else None,
+            }
+
+        # Backward compatibility with PR 195's single-watch state shape.
         worker = str(raw.get("worker") or "").strip()
         verified_at = str(raw.get("verified_at") or "").strip()
-        if not worker or not verified_at:
-            return None
-        return dict(raw)
+        if worker and verified_at:
+            return {"awaiting_write_outcome": dict(raw), "last_write_outcome": None}
+        return empty
 
-    def _persist_watch(self) -> None:
+    def _persist_state(self) -> None:
         self.store_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "awaiting_write_outcome": dict(self._awaiting_write_outcome) if self._awaiting_write_outcome else None,
+            "last_write_outcome": dict(self._last_write_outcome) if self._last_write_outcome else None,
+        }
         tmp = self.store_path.with_suffix(self.store_path.suffix + ".tmp")
-        tmp.write_text(json.dumps(self._awaiting_write_outcome, indent=2, sort_keys=True), encoding="utf-8")
+        tmp.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
         tmp.replace(self.store_path)
 
     def _now(self) -> datetime:
