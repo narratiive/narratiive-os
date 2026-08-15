@@ -24,14 +24,14 @@ class DispatchResult:
 
 
 class TonyAutonomousDispatchCommandService:
-    """Execute only explicitly eligible autonomous dispatch contracts.
+    """Execute contracts that are either autonomously safe or explicitly approved.
 
-    This layer is deliberately narrow. It never decides that an action is safe; it
-    consumes the risk decision already made upstream. Approval-gated writes remain
-    untouched. A dispatcher must return structured evidence that satisfies the
-    dispatch contract before Tony can say a read or preparation step actually ran.
-    Verified work is then summarised into Tony's visible reply so autonomous work
-    advances the conversation instead of merely exposing raw worker evidence.
+    This layer is deliberately narrow. It never decides that an action is safe and it
+    never invents approval; it consumes the risk and approval decisions already made
+    upstream. A dispatcher must return structured evidence that satisfies the dispatch
+    contract before Tony can say a step actually ran. Verified work is then summarised
+    into Tony's visible reply so execution advances the conversation without exposing
+    implementation plumbing.
     """
 
     _SOURCE_ID_KEYS = {
@@ -61,6 +61,17 @@ class TonyAutonomousDispatchCommandService:
         "options",
         "artifact",
         "result",
+    }
+    _WRITE_PROOF_KEYS = {
+        "sent",
+        "created",
+        "updated",
+        "deleted",
+        "published",
+        "deployed",
+        "merged",
+        "committed",
+        "mutation_count",
     }
     _EXECUTIVE_RESULT_KEYS = (
         "recommendation",
@@ -126,15 +137,24 @@ class TonyAutonomousDispatchCommandService:
         if not isinstance(handoff, dict):
             return response
         dispatch = handoff.get("dispatch")
-        if not isinstance(dispatch, dict) or not bool(dispatch.get("eligible")):
-            return response
-        if dispatch.get("state") != "ready_for_autonomous_dispatch":
+        if not isinstance(dispatch, dict):
             return response
         if dispatch.get("execution_truth") != "not_dispatched":
             return response
 
+        autonomous_ready = bool(dispatch.get("eligible")) and dispatch.get("state") == "ready_for_autonomous_dispatch"
+        approved_write = (
+            str(dispatch.get("execution_mode") or "") == "approval_gated_write"
+            and dispatch.get("state") == "approved_pending_execution"
+            and dispatch.get("approval_granted") is True
+            and handoff.get("approval_granted") is True
+        )
+        if not autonomous_ready and not approved_write:
+            return response
+
         worker = str(dispatch.get("worker") or "").strip()
         handler = self.dispatchers.get(worker)
+        step_kind = "approved" if approved_write else "safe"
         if handler is None:
             return self._with_dispatch_state(
                 response,
@@ -143,7 +163,7 @@ class TonyAutonomousDispatchCommandService:
                 dispatch,
                 state="dispatcher_unavailable",
                 execution_truth="not_dispatched",
-                message_suffix=f" I could not dispatch the safe {worker or 'worker'} step because no live dispatcher is configured.",
+                message_suffix=f" I could not dispatch the {step_kind} {worker or 'worker'} step because no live dispatcher is configured.",
             )
 
         try:
@@ -156,7 +176,7 @@ class TonyAutonomousDispatchCommandService:
                 dispatch,
                 state="dispatch_failed",
                 execution_truth="dispatch_attempted_unverified",
-                message_suffix=f" I attempted the safe {worker} step, but it did not return verified evidence: {exc}",
+                message_suffix=f" I attempted the {step_kind} {worker} step, but it did not return verified evidence: {exc}",
             )
 
         verified, reason = self._verify_evidence(dispatch, evidence)
@@ -169,7 +189,7 @@ class TonyAutonomousDispatchCommandService:
                 state="dispatch_unverified",
                 execution_truth="dispatch_attempted_unverified",
                 message_suffix=(
-                    f" I attempted the safe {worker} step, but the returned evidence did not satisfy the dispatch contract"
+                    f" I attempted the {step_kind} {worker} step, but the returned evidence did not satisfy the dispatch contract"
                     f" ({reason}), so I am not treating it as complete."
                 ),
             )
@@ -192,7 +212,7 @@ class TonyAutonomousDispatchCommandService:
             message_suffix=f" {executive_result}",
         )
         updated.data["dispatch_result"] = result.to_dict()
-        updated.data["execution_status"] = "autonomous_step_verified"
+        updated.data["execution_status"] = "approved_step_verified" if approved_write else "autonomous_step_verified"
         updated.data["executive_result"] = executive_result
         return updated
 
@@ -293,7 +313,16 @@ class TonyAutonomousDispatchCommandService:
                 return False, "returned work product is missing"
             return True, "verified internal work product"
 
-        return False, "dispatch execution mode is missing or not autonomous"
+        if mode == "approval_gated_write":
+            if dispatch.get("approval_granted") is not True or dispatch.get("state") != "approved_pending_execution":
+                return False, "explicit scoped approval is missing"
+            if not cls._has_write_proof(evidence):
+                return False, "write execution proof is missing"
+            if not cls._has_source_identifier(evidence):
+                return False, "write result identifiers are missing"
+            return True, "verified approved write evidence"
+
+        return False, "dispatch execution mode is missing or unsupported"
 
     @classmethod
     def _executive_result_summary(
@@ -302,23 +331,18 @@ class TonyAutonomousDispatchCommandService:
         dispatch: dict[str, Any],
         evidence: dict[str, Any],
     ) -> str:
-        """Turn verified worker evidence into a concise executive-facing result.
-
-        Raw source identifiers remain in structured data for auditability, but Tony's
-        visible response should communicate the useful result rather than implementation
-        plumbing. Workers are encouraged to return `summary` or `recommendation`; the
-        fallback remains truthful when the contract proves execution but no narrative
-        result was supplied.
-        """
+        """Turn verified worker evidence into a concise executive-facing result."""
         for key in cls._EXECUTIVE_RESULT_KEYS:
             value = evidence.get(key)
             rendered = cls._render_result_value(value)
             if rendered:
-                return f"{worker} completed the safe step. {rendered}"
+                return f"{worker} completed the step. {rendered}"
 
         mode = str(dispatch.get("execution_mode") or "").strip()
         if mode == "autonomous_read":
             return f"{worker} completed the read-only check and returned verified source evidence."
+        if mode == "approval_gated_write":
+            return f"{worker} completed the approved action and returned verified execution evidence."
         return f"{worker} completed the internal preparation step and returned verified work for review."
 
     @classmethod
@@ -346,6 +370,18 @@ class TonyAutonomousDispatchCommandService:
     @classmethod
     def _has_work_product(cls, evidence: dict[str, Any]) -> bool:
         return any(cls._meaningful(evidence.get(key)) for key in cls._WORK_PRODUCT_KEYS)
+
+    @classmethod
+    def _has_write_proof(cls, evidence: dict[str, Any]) -> bool:
+        for key in cls._WRITE_PROOF_KEYS:
+            value = evidence.get(key)
+            if key == "mutation_count":
+                if isinstance(value, (int, float)) and value > 0:
+                    return True
+                continue
+            if value is True:
+                return True
+        return False
 
     @staticmethod
     def _meaningful(value: Any) -> bool:
