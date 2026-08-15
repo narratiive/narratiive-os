@@ -145,6 +145,7 @@ class TonyExecutiveToolRouter:
             "worker": worker,
             "instruction": action,
             "target": dict(target),
+            "execution_mode": execution_mode,
             "expected_evidence": expected_evidence,
             "return_to": "Tony",
             "execution_truth": "not_dispatched",

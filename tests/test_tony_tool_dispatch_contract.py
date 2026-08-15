@@ -22,6 +22,7 @@ class TonyToolDispatchContractTests(unittest.TestCase):
         self.assertTrue(dispatch["eligible"])
         self.assertEqual(dispatch["state"], "ready_for_autonomous_dispatch")
         self.assertEqual(dispatch["worker"], "Gmail")
+        self.assertEqual(dispatch["execution_mode"], "autonomous_read")
         self.assertEqual(dispatch["target"]["lead_id"], "lesley")
         self.assertIn("verified read result", dispatch["expected_evidence"])
         self.assertEqual(dispatch["return_to"], "Tony")
@@ -40,6 +41,7 @@ class TonyToolDispatchContractTests(unittest.TestCase):
         self.assertEqual(handoff["execution_mode"], "autonomous_prepare")
         self.assertTrue(dispatch["eligible"])
         self.assertEqual(dispatch["state"], "ready_for_autonomous_dispatch")
+        self.assertEqual(dispatch["execution_mode"], "autonomous_prepare")
         self.assertIn("internal work product", dispatch["expected_evidence"])
 
     def test_external_send_cannot_enter_autonomous_dispatch(self):
@@ -57,6 +59,7 @@ class TonyToolDispatchContractTests(unittest.TestCase):
         self.assertEqual(handoff["execution_mode"], "approval_gated_write")
         self.assertFalse(dispatch["eligible"])
         self.assertEqual(dispatch["state"], "awaiting_approval")
+        self.assertEqual(dispatch["execution_mode"], "approval_gated_write")
         self.assertIn("explicit approval", dispatch["expected_evidence"])
         self.assertEqual(dispatch["execution_truth"], "not_dispatched")
 
@@ -79,8 +82,10 @@ class TonyToolDispatchContractTests(unittest.TestCase):
 
         self.assertTrue(inspect["dispatch"]["eligible"])
         self.assertEqual(inspect["dispatch"]["state"], "ready_for_autonomous_dispatch")
+        self.assertEqual(inspect["dispatch"]["execution_mode"], "autonomous_read")
         self.assertFalse(deploy["dispatch"]["eligible"])
         self.assertEqual(deploy["dispatch"]["state"], "awaiting_approval")
+        self.assertEqual(deploy["dispatch"]["execution_mode"], "approval_gated_write")
 
 
 if __name__ == "__main__":

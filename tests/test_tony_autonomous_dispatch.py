@@ -17,7 +17,14 @@ class StubCommandService:
         return self.response
 
 
-def routed_response(*, eligible=True, state="ready_for_autonomous_dispatch", worker="Gmail"):
+def routed_response(
+    *,
+    eligible=True,
+    state="ready_for_autonomous_dispatch",
+    worker="Gmail",
+    execution_mode=None,
+):
+    mode = execution_mode or ("autonomous_prepare" if worker == "Claude" else "autonomous_read")
     return CommandResponse(
         command="agency_focus_action",
         status="healthy",
@@ -34,6 +41,7 @@ def routed_response(*, eligible=True, state="ready_for_autonomous_dispatch", wor
                     "worker": worker,
                     "instruction": "retrieve the verified thread",
                     "target": {"lead_id": "lesley"},
+                    "execution_mode": mode,
                     "expected_evidence": "verified read result",
                     "return_to": "Tony",
                     "execution_truth": "not_dispatched",
@@ -44,7 +52,7 @@ def routed_response(*, eligible=True, state="ready_for_autonomous_dispatch", wor
 
 
 class TonyAutonomousDispatchTests(unittest.TestCase):
-    def test_eligible_dispatch_runs_and_requires_structured_evidence(self):
+    def test_eligible_dispatch_runs_and_requires_contract_compliant_read_evidence(self):
         calls = []
 
         def gmail(contract):
@@ -67,7 +75,13 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
     def test_approval_gated_handoff_is_never_dispatched(self):
         calls = []
         service = TonyAutonomousDispatchCommandService(
-            StubCommandService(routed_response(eligible=False, state="awaiting_approval")),
+            StubCommandService(
+                routed_response(
+                    eligible=False,
+                    state="awaiting_approval",
+                    execution_mode="approval_gated_write",
+                )
+            ),
             dispatchers={"Gmail": lambda contract: calls.append(contract) or {"sent": True}},
         )
 
@@ -107,6 +121,52 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
         self.assertEqual(failed.data["autonomous_dispatch_state"], "dispatch_failed")
         self.assertNotIn("dispatch_result", failed.data)
         self.assertIn("did not return verified evidence", failed.message)
+
+    def test_non_empty_error_payload_is_not_mistaken_for_verified_execution(self):
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response()),
+            dispatchers={"Gmail": lambda contract: {"error": "thread not found", "read_only": True}},
+        )
+
+        response = service.execute("do the first one", [])
+
+        self.assertEqual(response.data["autonomous_dispatch_state"], "dispatch_unverified")
+        self.assertNotIn("dispatch_result", response.data)
+        self.assertIn("did not satisfy the dispatch contract", response.message)
+
+    def test_read_dispatch_requires_read_only_proof_and_source_identifier(self):
+        mutation_service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response()),
+            dispatchers={"Gmail": lambda contract: {"thread_id": "thread-123", "read_only": False}},
+        )
+        mutated = mutation_service.execute("do the first one", [])
+        self.assertEqual(mutated.data["autonomous_dispatch_state"], "dispatch_unverified")
+        self.assertIn("read-only execution was not demonstrated", mutated.message)
+
+        anonymous_service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response()),
+            dispatchers={"Gmail": lambda contract: {"read_only": True, "messages": ["hello"]}},
+        )
+        anonymous = anonymous_service.execute("do the first one", [])
+        self.assertEqual(anonymous.data["autonomous_dispatch_state"], "dispatch_unverified")
+        self.assertIn("source identifiers are missing", anonymous.message)
+
+    def test_prepare_dispatch_requires_a_real_returned_work_product(self):
+        weak_service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response(worker="Claude")),
+            dispatchers={"Claude": lambda contract: {"ok": True, "status": "finished"}},
+        )
+        weak = weak_service.execute("do the first one", [])
+        self.assertEqual(weak.data["autonomous_dispatch_state"], "dispatch_unverified")
+        self.assertIn("returned work product is missing", weak.message)
+
+        strong_service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response(worker="Claude")),
+            dispatchers={"Claude": lambda contract: {"work_product": "Specific strategic recommendation", "verified": True}},
+        )
+        strong = strong_service.execute("do the first one", [])
+        self.assertEqual(strong.data["autonomous_dispatch_state"], "dispatch_verified")
+        self.assertEqual(strong.data["dispatch_result"]["evidence"]["work_product"], "Specific strategic recommendation")
 
 
 if __name__ == "__main__":
