@@ -183,16 +183,17 @@ class TonyOutcomeEvidenceCommandService:
         cls,
         measurement: dict[str, Any],
         *,
-        agreed_numeric: tuple[str, float] | None = None,
+        agreed_numeric: tuple[str, float, bool] | None = None,
     ):
         supplied_operator = str(measurement.get("operator") or "").strip()
         supplied_target = measurement.get("target_value")
         if agreed_numeric is None:
             operator = supplied_operator
             target = supplied_target
+            is_percentage = False
             bound = False
         else:
-            operator, target = agreed_numeric
+            operator, target, is_percentage = agreed_numeric
             bound = True
         if operator not in cls._OPERATORS:
             return None
@@ -201,13 +202,16 @@ class TonyOutcomeEvidenceCommandService:
             return None
         if not isinstance(target, (int, float)) or isinstance(target, bool):
             return None
+        observed_for_comparison = float(observed)
+        if is_percentage and abs(observed_for_comparison) > 1:
+            observed_for_comparison /= 100.0
         comparisons = {
-            ">": observed > target,
-            ">=": observed >= target,
-            "<": observed < target,
-            "<=": observed <= target,
-            "==": observed == target,
-            "!=": observed != target,
+            ">": observed_for_comparison > target,
+            ">=": observed_for_comparison >= target,
+            "<": observed_for_comparison < target,
+            "<=": observed_for_comparison <= target,
+            "==": observed_for_comparison == target,
+            "!=": observed_for_comparison != target,
         }
         criterion_met = comparisons[operator]
         return {
@@ -216,7 +220,7 @@ class TonyOutcomeEvidenceCommandService:
             "reason": "measurement_compared",
             "measurement_type": "numeric",
             "operator": operator,
-            "observed_value": observed,
+            "observed_value": observed_for_comparison,
             "target_value": target,
             "criterion_met": criterion_met,
             "supplied_operator": supplied_operator or None,
@@ -275,7 +279,7 @@ class TonyOutcomeEvidenceCommandService:
         }
 
     @classmethod
-    def _criterion_numeric(cls, success_signal: str) -> tuple[str, float] | None:
+    def _criterion_numeric(cls, success_signal: str) -> tuple[str, float, bool] | None:
         match = re.search(
             r"(>=|<=|==|!=|>|<)\s*(-?\d+(?:\.\d+)?)\s*(%)?",
             success_signal,
@@ -284,9 +288,10 @@ class TonyOutcomeEvidenceCommandService:
             return None
         operator = match.group(1)
         value = float(match.group(2))
-        if match.group(3):
+        is_percentage = bool(match.group(3))
+        if is_percentage:
             value /= 100.0
-        return operator, value
+        return operator, value, is_percentage
 
     @classmethod
     def _criterion_window_days(cls, success_signal: str) -> int | None:
