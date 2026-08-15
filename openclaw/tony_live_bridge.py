@@ -23,6 +23,7 @@ from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_persistent_autonomous_result import TonyPersistentAutonomousResultCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
+from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -274,7 +275,8 @@ def build_app() -> LeadAwareTonyApplication:
         dispatchers=build_http_dispatchers(),
         store_path=autonomous_result_context_path,
     )
-    app.command_service = TonyTerminologyCommandService(dispatch_service)
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(dispatch_service)
+    app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
 
