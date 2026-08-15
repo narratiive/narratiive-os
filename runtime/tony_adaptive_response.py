@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from runtime.tony_command_service import CommandResponse
 
@@ -49,9 +50,18 @@ class TonyAdaptiveResponseCommandService:
     _REDESIGN_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
 
-    def __init__(self, command_service, *, learning_store_path: Path | None = None) -> None:
+    def __init__(
+        self,
+        command_service,
+        *,
+        learning_store_path: Path | None = None,
+        action_store_path: Path | None = None,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self.command_service = command_service
         self.learning_store_path = learning_store_path or Path(".runtime/executive-learning.json")
+        self.action_store_path = action_store_path or Path(".runtime/agency-focus-context.json")
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._pending_adaptation: dict[str, Any] | None = None
         self._pending_redesign_review: dict[str, Any] | None = None
         self._pending_reviewed_adaptation: dict[str, Any] | None = None
@@ -261,19 +271,71 @@ class TonyAdaptiveResponseCommandService:
             "outcome_evidence_required": True,
             "execution_performed": False,
         }
+        action = self._persist_adaptive_test_action(priority, handoff)
+        handoff["action_id"] = action["action_id"]
         self._pending_reviewed_adaptation = None
         return CommandResponse(
             "executive_adaptive_test_handoff",
             "healthy",
-            f"Approved. I have converted the redesign for {label} into a controlled test handoff. The test must change {handoff['changed_variable']} and be judged against: {handoff['success_signal']}. I still need the actual execution tool to confirm completion before I call anything done.",
+            f"Approved. I have converted the redesign for {label} into a controlled test handoff and registered it for follow-through. The test must change {handoff['changed_variable']} and be judged against: {handoff['success_signal']}. I still need the actual execution tool to confirm completion before I call anything done.",
             {
                 "intent": "execute_approved_adaptive_test",
                 "adaptation_status": "approved_test_handoff_ready",
                 "execution_handoff": handoff,
+                "executive_action": action,
                 "execution_performed": False,
                 "external_action_taken": False,
             },
         )
+
+    def _persist_adaptive_test_action(self, priority: dict[str, Any], handoff: dict[str, Any]) -> dict[str, Any]:
+        prepared_at = self._now_utc().isoformat()
+        priority_key = str(priority.get("key") or "adaptive_test")
+        action_id = f"adaptive:{priority_key}:{prepared_at}"
+        action = {
+            "action_id": action_id,
+            "priority_key": priority_key,
+            "priority": dict(priority),
+            "execution_handoff": {
+                "worker": "Execution tool (to be resolved)",
+                "action": "Resolve the approved option to the correct tool and execute the controlled adaptive test.",
+                **dict(handoff),
+            },
+            "status": "awaiting_worker_confirmation",
+            "prepared_at": prepared_at,
+            "external_action_taken": False,
+            "adaptive_test": True,
+            "changed_variable": str(handoff.get("changed_variable") or ""),
+            "success_signal": str(handoff.get("success_signal") or ""),
+        }
+        state = self._load_action_state()
+        state["pending_action"] = action
+        self._write_action_state(state)
+        return action
+
+    def _load_action_state(self) -> dict[str, Any]:
+        empty = {"priorities": [], "pending_action": None, "last_completed_action": None}
+        if not self.action_store_path.exists():
+            return empty
+        try:
+            raw = json.loads(self.action_store_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return empty
+        if not isinstance(raw, dict):
+            return empty
+        return dict(raw)
+
+    def _write_action_state(self, state: dict[str, Any]) -> None:
+        self.action_store_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = self.action_store_path.with_suffix(self.action_store_path.suffix + ".tmp")
+        tmp.write_text(json.dumps(state, indent=2, sort_keys=True), encoding="utf-8")
+        tmp.replace(self.action_store_path)
+
+    def _now_utc(self) -> datetime:
+        value = self.clock()
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
 
     @classmethod
     def _is_adaptation_approval(cls, lowered: str) -> bool:
