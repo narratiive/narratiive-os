@@ -80,15 +80,15 @@ class TonyExecutiveToolRouter:
         worker = "Claude"
         rationale = "the work needs reasoning, drafting or synthesis before execution"
 
+        # Prefer the execution surface that owns the primary action, not a system
+        # merely mentioned as the downstream destination (for example, an n8n
+        # workflow that ultimately writes a record into Notion).
         if self._contains(text, self._CALENDAR_MARKERS):
             worker = "Google Calendar"
             rationale = "the next step is primarily scheduling or meeting coordination"
         elif self._contains(text, self._GMAIL_MARKERS):
             worker = "Gmail"
             rationale = "the next step depends on an email thread, reply or outreach action"
-        elif self._contains(text, self._NOTION_MARKERS):
-            worker = "Notion"
-            rationale = "the next step is primarily a structured agency or commercial record action"
         elif self._contains(text, self._REPLIT_MARKERS):
             worker = "Replit"
             rationale = "the next step is a website or web-product implementation task"
@@ -98,6 +98,9 @@ class TonyExecutiveToolRouter:
         elif self._contains(text, self._GITHUB_MARKERS) or area in {"engineering", "infrastructure"}:
             worker = "GitHub"
             rationale = "the next step is repository, runtime or deployment work"
+        elif self._contains(text, self._NOTION_MARKERS):
+            worker = "Notion"
+            rationale = "the next step is primarily a structured agency or commercial record action"
 
         return {
             "worker": worker,
