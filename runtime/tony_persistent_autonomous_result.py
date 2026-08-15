@@ -14,8 +14,9 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
 
     The parent service owns dispatch safety, evidence verification and conversational
     follow-ups. This wrapper makes only already-verified conversational context durable,
-    timestamps it, and refuses to answer from stale persisted evidence. Corrupt,
-    incomplete or expired state is ignored rather than trusted.
+    timestamps it, refuses to answer from stale persisted evidence, and may refresh an
+    expired read-only result when the user explicitly asks about it and the same safe
+    dispatcher remains available.
     """
 
     _REQUIRED_KEYS = {"worker", "dispatch", "evidence", "executive_result", "verified_at"}
@@ -38,12 +39,16 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split()).casefold()
         if self._last_verified_result is not None and self._context_is_stale(self._last_verified_result):
+            stale_context = dict(self._last_verified_result)
             was_follow_up = self._matches_follow_up(normalized, self._RESULT_RECALL_MARKERS) or self._matches_follow_up(
                 normalized, self._RESULT_RECOMMENDATION_MARKERS
             )
             self._last_verified_result = None
             self._clear_context()
             if was_follow_up:
+                refreshed = self._refresh_stale_read_context(stale_context)
+                if refreshed is not None:
+                    return refreshed
                 return CommandResponse(
                     command="autonomous_result_stale",
                     status="healthy",
@@ -65,6 +70,80 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                 self._last_verified_result["verified_at"] = self._now().isoformat()
             self._persist_context(self._last_verified_result)
         return response
+
+    def _refresh_stale_read_context(self, context: dict[str, Any]) -> CommandResponse | None:
+        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        if str(dispatch.get("execution_mode") or "").strip() != "autonomous_read":
+            return None
+
+        worker = str(context.get("worker") or dispatch.get("worker") or "").strip()
+        handler = self.dispatchers.get(worker)
+        if not worker or handler is None:
+            return None
+
+        try:
+            evidence = handler(dict(dispatch))
+        except Exception as exc:
+            return CommandResponse(
+                command="autonomous_result_refresh_failed",
+                status="healthy",
+                message=(
+                    f"That result had expired, so I tried to refresh the safe {worker} read, but it did not return "
+                    f"verified evidence: {exc}"
+                ),
+                data={
+                    "intent": "refresh_stale_autonomous_result",
+                    "worker": worker,
+                    "context_state": "stale",
+                    "refresh_attempted": True,
+                    "refresh_verified": False,
+                    "external_action_taken": False,
+                },
+            )
+
+        verified, reason = self._verify_evidence(dispatch, evidence)
+        if not verified:
+            return CommandResponse(
+                command="autonomous_result_refresh_unverified",
+                status="healthy",
+                message=(
+                    f"That result had expired, so I refreshed the safe {worker} read, but the returned evidence was "
+                    f"not strong enough to treat as current ({reason})."
+                ),
+                data={
+                    "intent": "refresh_stale_autonomous_result",
+                    "worker": worker,
+                    "context_state": "stale",
+                    "refresh_attempted": True,
+                    "refresh_verified": False,
+                    "external_action_taken": False,
+                },
+            )
+
+        executive_result = self._executive_result_summary(worker, dispatch, evidence)
+        refreshed_context = {
+            "worker": worker,
+            "dispatch": dict(dispatch),
+            "evidence": dict(evidence),
+            "executive_result": executive_result,
+            "verified_at": self._now().isoformat(),
+        }
+        self._last_verified_result = refreshed_context
+        self._persist_context(refreshed_context)
+        return CommandResponse(
+            command="autonomous_result_refreshed",
+            status="healthy",
+            message=f"The previous result had expired, so I refreshed the safe {worker} read. {executive_result}",
+            data={
+                "intent": "refresh_stale_autonomous_result",
+                "worker": worker,
+                "context_state": "fresh",
+                "refresh_attempted": True,
+                "refresh_verified": True,
+                "executive_result": executive_result,
+                "external_action_taken": False,
+            },
+        )
 
     def _load_context(self) -> dict[str, Any] | None:
         if not self.store_path.exists():
