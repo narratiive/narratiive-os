@@ -7,6 +7,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from runtime.tony_autonomous_dispatch import DispatchHandler, TonyAutonomousDispatchCommandService
 from runtime.tony_command_service import CommandResponse
+from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
 
 class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommandService):
@@ -14,12 +15,22 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
 
     The parent service owns dispatch safety, evidence verification and conversational
     follow-ups. This wrapper makes only already-verified conversational context durable,
-    timestamps it, refuses to answer from stale persisted evidence, and may refresh an
-    expired read-only result when the user explicitly asks about it and the same safe
-    dispatcher remains available.
+    timestamps it, refuses to answer from stale persisted evidence, may refresh an
+    expired read-only result when the user explicitly asks about it, and can carry a
+    grounded worker recommendation into the next controlled execution handoff.
     """
 
     _REQUIRED_KEYS = {"worker", "dispatch", "evidence", "executive_result", "verified_at"}
+    _RESULT_ACTION_MARKERS = (
+        "do that",
+        "do it",
+        "go ahead",
+        "go ahead with that",
+        "take that forward",
+        "proceed",
+        "make that happen",
+        "move on that",
+    )
 
     def __init__(
         self,
@@ -29,10 +40,12 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
         store_path: Path,
         clock: Callable[[], datetime] | None = None,
         max_context_age: timedelta = timedelta(hours=8),
+        tool_router: TonyExecutiveToolRouter | None = None,
     ) -> None:
         self.store_path = store_path
         self.clock = clock or (lambda: datetime.now(timezone.utc))
         self.max_context_age = max_context_age
+        self.tool_router = tool_router or TonyExecutiveToolRouter()
         super().__init__(command_service, dispatchers=dispatchers)
         self._last_verified_result = self._load_context()
 
@@ -63,6 +76,9 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                     },
                 )
 
+        if self._last_verified_result is not None and self._is_action_query(normalized):
+            return self._progress_verified_recommendation()
+
         before = self._last_verified_result
         response = super().execute(command, objects)
         if self._last_verified_result is not None and self._last_verified_result != before:
@@ -70,6 +86,70 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                 self._last_verified_result["verified_at"] = self._now().isoformat()
             self._persist_context(self._last_verified_result)
         return response
+
+    def _progress_verified_recommendation(self) -> CommandResponse:
+        context = dict(self._last_verified_result or {})
+        worker = str(context.get("worker") or "the worker").strip()
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        proposal = self._first_rendered(evidence, ("recommended_next_action", "next_action", "recommendation"))
+        if not proposal:
+            return CommandResponse(
+                command="autonomous_result_action",
+                status="healthy",
+                message=(
+                    f"I have verified evidence back from {worker}, but it does not contain a grounded next action. "
+                    "I will not invent a consequential move from an ambiguous result; I would re-rank the current agency priorities first."
+                ),
+                data={
+                    "intent": "progress_verified_autonomous_result",
+                    "worker": worker,
+                    "execution_status": "insufficient_grounded_action",
+                    "external_action_taken": False,
+                },
+            )
+
+        prior_dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        target = prior_dispatch.get("target") if isinstance(prior_dispatch.get("target"), dict) else {}
+        priority = {
+            "label": f"the verified {worker} result",
+            "action": proposal,
+            "area": str(target.get("area") or "operations"),
+            "target": dict(target),
+        }
+        handoff = self.tool_router.route(priority)
+        next_worker = str(handoff.get("worker") or "the appropriate worker")
+        message = (
+            f"Yes. Based on the verified {worker} evidence, I’ll carry that recommendation forward. "
+            f"The next controlled step is for {next_worker} to {handoff['action']}. "
+            "I have prepared the handoff, but I have not claimed that the worker, message or record change has happened yet."
+        )
+        if bool(handoff.get("approval_required")):
+            message += " This step changes external or persisted state, so it remains behind your approval before execution."
+        else:
+            message += " This is reversible internal/read-only work and is eligible for autonomous execution by the configured runtime."
+
+        return CommandResponse(
+            command="autonomous_result_action",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "progress_verified_autonomous_result",
+                "worker": worker,
+                "grounded_next_action": proposal,
+                "execution_handoff": handoff,
+                "execution_status": "ready_for_handoff",
+                "external_action_taken": False,
+            },
+        )
+
+    @classmethod
+    def _is_action_query(cls, lowered: str) -> bool:
+        candidate = lowered.strip().rstrip("?!.,")
+        for prefix in cls._ACKNOWLEDGEMENT_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip().rstrip("?!.,")
+                break
+        return any(candidate == marker or candidate.startswith(marker + " ") for marker in cls._RESULT_ACTION_MARKERS)
 
     def _refresh_stale_read_context(self, context: dict[str, Any]) -> CommandResponse | None:
         dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
