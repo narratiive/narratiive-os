@@ -118,13 +118,30 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
         }
         handoff = self.tool_router.route(priority)
         next_worker = str(handoff.get("worker") or "the appropriate worker")
+        approval_required = bool(handoff.get("approval_required"))
+
+        # The user reached this branch by explicitly saying "do that", "go ahead",
+        # or equivalent against a verified, grounded recommendation. That utterance is
+        # scoped approval for this exact handoff. Preserve the platform risk policy, but
+        # do not force the user through a redundant second approval turn.
+        if approval_required:
+            handoff["approval_granted"] = True
+            handoff["approval_scope"] = "grounded_next_action"
+            dispatch = handoff.get("dispatch") if isinstance(handoff.get("dispatch"), dict) else {}
+            dispatch["state"] = "approved_pending_execution"
+            dispatch["approval_granted"] = True
+            dispatch["approval_scope"] = "grounded_next_action"
+            handoff["dispatch"] = dispatch
+
         message = (
             f"Yes. Based on the verified {worker} evidence, I’ll carry that recommendation forward. "
             f"The next controlled step is for {next_worker} to {handoff['action']}. "
             "I have prepared the handoff, but I have not claimed that the worker, message or record change has happened yet."
         )
-        if bool(handoff.get("approval_required")):
-            message += " This step changes external or persisted state, so it remains behind your approval before execution."
+        if approval_required:
+            message += (
+                " Your instruction is the approval for this exact grounded step, so I have marked the handoff approved and ready for verified execution."
+            )
         else:
             message += " This is reversible internal/read-only work and is eligible for autonomous execution by the configured runtime."
 
@@ -137,7 +154,7 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                 "worker": worker,
                 "grounded_next_action": proposal,
                 "execution_handoff": handoff,
-                "execution_status": "ready_for_handoff",
+                "execution_status": "approved_for_execution" if approval_required else "ready_for_handoff",
                 "external_action_taken": False,
             },
         )

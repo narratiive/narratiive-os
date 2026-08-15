@@ -53,7 +53,7 @@ class TonyResultActionContinuityTests(unittest.TestCase):
         )
         return service, stub
 
-    def test_go_ahead_carries_grounded_recommendation_into_controlled_handoff(self):
+    def test_go_ahead_carries_grounded_recommendation_and_scoped_approval(self):
         service, stub = self._service(
             {
                 "summary": "Lesley replied positively and asked what a first conversation would involve.",
@@ -68,13 +68,19 @@ class TonyResultActionContinuityTests(unittest.TestCase):
         self.assertEqual(response.command, "autonomous_result_action")
         self.assertEqual(response.data["intent"], "progress_verified_autonomous_result")
         self.assertEqual(response.data["grounded_next_action"], "Reply to Lesley and offer a 30-minute discovery call.")
+        self.assertEqual(response.data["execution_status"], "approved_for_execution")
         handoff = response.data["execution_handoff"]
         self.assertEqual(handoff["worker"], "Gmail")
         self.assertTrue(handoff["approval_required"])
+        self.assertTrue(handoff["approval_granted"])
+        self.assertEqual(handoff["approval_scope"], "grounded_next_action")
         self.assertEqual(handoff["execution_mode"], "approval_gated_write")
-        self.assertEqual(handoff["dispatch"]["state"], "awaiting_approval")
+        self.assertEqual(handoff["dispatch"]["state"], "approved_pending_execution")
+        self.assertTrue(handoff["dispatch"]["approval_granted"])
+        self.assertEqual(handoff["dispatch"]["approval_scope"], "grounded_next_action")
         self.assertFalse(response.data["external_action_taken"])
-        self.assertIn("remains behind your approval", response.message)
+        self.assertIn("instruction is the approval", response.message)
+        self.assertNotIn("remains behind your approval", response.message)
         self.assertEqual(stub.calls, [])
 
     def test_safe_internal_recommendation_is_routed_without_inventing_execution(self):
@@ -92,6 +98,7 @@ class TonyResultActionContinuityTests(unittest.TestCase):
         handoff = response.data["execution_handoff"]
         self.assertEqual(handoff["worker"], "Claude")
         self.assertFalse(handoff["approval_required"])
+        self.assertNotIn("approval_granted", handoff)
         self.assertEqual(handoff["execution_mode"], "autonomous_prepare")
         self.assertEqual(handoff["execution_truth"], "handoff_prepared_only")
         self.assertFalse(response.data["external_action_taken"])
