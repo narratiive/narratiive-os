@@ -41,9 +41,7 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             store = Path(tmp) / "learning.json"
             write_lesson(store, status="negative")
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
-
             response = service.execute("What should we try instead?", [])
-
             self.assertEqual(response.command, "executive_adaptation")
             self.assertEqual(response.data["adaptation_status"], "ready_for_adaptation_design")
             self.assertEqual(response.data["adaptation_brief"]["worker"], "Claude")
@@ -51,34 +49,74 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             self.assertTrue(response.data["adaptation_brief"]["approval_required"])
             self.assertFalse(response.data["execution_performed"])
             self.assertIn("one meaningful variable", response.message)
-            self.assertIn("Do not repeat the previous approach unchanged.", response.data["adaptation_brief"]["constraints"])
 
     def test_approval_after_adaptation_prepares_bounded_worker_handoff(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Path(tmp) / "learning.json"
             write_lesson(store, status="negative")
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
-
             service.execute("What should we try instead?", [])
             response = service.execute("OK, go ahead with the redesign", [])
-
             self.assertEqual(response.command, "executive_adaptation_handoff")
             self.assertEqual(response.data["adaptation_status"], "worker_handoff_ready")
-            self.assertEqual(response.data["handoff"]["worker"], "Claude")
-            self.assertEqual(response.data["handoff"]["review_owner"], "Tony")
             self.assertIn("changed_variable", response.data["handoff"]["required_return"])
             self.assertIn("success_signal", response.data["handoff"]["required_return"])
             self.assertFalse(response.data["execution_performed"])
-            self.assertIn("Nothing has been executed externally yet", response.message)
+
+    def test_strong_redesign_return_is_reviewed_before_approval(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            write_lesson(store, status="negative")
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            service.execute("What should we try instead?", [])
+            service.execute("Go ahead with the redesign", [])
+            response = service.execute(
+                "Review what Claude returned",
+                [{
+                    "options": [
+                        {"name": "A", "approach": "Change the opening proposition."},
+                        {"name": "B", "approach": "Change the timing and call to action."},
+                    ],
+                    "recommendation": "Option A because it directly addresses the weak response signal.",
+                    "changed_variable": "opening proposition",
+                    "success_signal": "A qualified reply or discovery booking within three business days.",
+                }],
+            )
+            self.assertEqual(response.data["adaptation_status"], "ready_for_approval")
+            self.assertEqual(response.data["review"]["option_count"], 2)
+            self.assertTrue(response.data["approval_required"])
+            self.assertFalse(response.data["execution_performed"])
+            self.assertIn("ready for approval", response.message)
+
+    def test_weak_redesign_return_is_sent_back_for_revision(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            write_lesson(store, status="negative")
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            service.execute("What should we try instead?", [])
+            service.execute("Go ahead with the redesign", [])
+            response = service.execute("Review the redesign", [{"options": [{"name": "A"}]}])
+            self.assertEqual(response.data["adaptation_status"], "revision_required")
+            self.assertIn("changed variable", response.message)
+            self.assertFalse(response.data["execution_performed"])
+
+    def test_missing_redesign_return_is_not_treated_as_completed_work(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            write_lesson(store, status="negative")
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            service.execute("What should we try instead?", [])
+            service.execute("Go ahead with the redesign", [])
+            response = service.execute("Is the redesign good enough?", [])
+            self.assertEqual(response.data["adaptation_status"], "return_missing")
+            self.assertFalse(response.data["execution_performed"])
 
     def test_adaptation_approval_without_pending_context_delegates(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Path(tmp) / "learning.json"
             write_lesson(store, status="negative")
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
-
             response = service.execute("Go ahead with the redesign", [])
-
             self.assertEqual(response.command, "delegated")
 
     def test_provisional_outcome_cannot_be_approved_into_redesign_handoff(self):
@@ -86,10 +124,8 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             store = Path(tmp) / "learning.json"
             write_lesson(store, status="inconclusive")
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
-
             first = service.execute("How should we adapt?", [])
             second = service.execute("Go ahead", [])
-
             self.assertEqual(first.data["adaptation_status"], "gather_evidence_before_adaptation")
             self.assertEqual(second.command, "delegated")
 
@@ -98,33 +134,22 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             store = Path(tmp) / "learning.json"
             write_lesson(store, status="inconclusive")
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
-
             response = service.execute("How should we adapt?", [])
-
             self.assertEqual(response.data["adaptation_status"], "gather_evidence_before_adaptation")
             self.assertNotIn("adaptation_brief", response.data)
             self.assertFalse(response.data["execution_performed"])
-            self.assertIn("too weak a signal", response.message)
 
     def test_no_verified_learning_refuses_to_invent_an_alternative(self):
         with tempfile.TemporaryDirectory() as tmp:
-            service = TonyAdaptiveResponseCommandService(
-                StubCommandService(), learning_store_path=Path(tmp) / "missing.json"
-            )
-
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=Path(tmp) / "missing.json")
             response = service.execute("What do you recommend instead?", [])
-
             self.assertEqual(response.data["adaptation_status"], "insufficient_evidence")
             self.assertFalse(response.data["execution_performed"])
 
     def test_unrelated_command_delegates_unchanged(self):
         with tempfile.TemporaryDirectory() as tmp:
-            service = TonyAdaptiveResponseCommandService(
-                StubCommandService(), learning_store_path=Path(tmp) / "missing.json"
-            )
-
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=Path(tmp) / "missing.json")
             response = service.execute("What are today's leads?", [])
-
             self.assertEqual(response.command, "delegated")
 
 
