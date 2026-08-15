@@ -78,9 +78,17 @@ class TonyExecutiveToolRouter:
             rationale = "the next step is primarily a structured agency or commercial record action"
 
         approval_required, execution_mode, approval_reason = self._execution_policy(worker, action)
+        worker_action = self._worker_action(worker, action)
+        dispatch = self._dispatch_contract(
+            worker=worker,
+            action=worker_action,
+            target=target,
+            execution_mode=execution_mode,
+            approval_required=approval_required,
+        )
         return {
             "worker": worker,
-            "action": self._worker_action(worker, action),
+            "action": worker_action,
             "then_owner": "Tony",
             "approval_required": approval_required,
             "execution_mode": execution_mode,
@@ -88,6 +96,7 @@ class TonyExecutiveToolRouter:
             "target": target,
             "routing_reason": rationale,
             "execution_truth": "handoff_prepared_only",
+            "dispatch": dispatch,
         }
 
     @staticmethod
@@ -112,6 +121,34 @@ class TonyExecutiveToolRouter:
         if worker == "GitHub":
             return f"prepare the repository change needed to advance this priority: {requested}"
         return requested
+
+    @staticmethod
+    def _dispatch_contract(
+        *,
+        worker: str,
+        action: str,
+        target: dict[str, Any],
+        execution_mode: str,
+        approval_required: bool,
+    ) -> dict[str, Any]:
+        """Describe exactly what may be dispatched without claiming it already ran."""
+        autonomous = execution_mode in {"autonomous_prepare", "autonomous_read"} and not approval_required
+        if execution_mode == "autonomous_read":
+            expected_evidence = "verified read result with source identifiers and no persisted mutation"
+        elif execution_mode == "autonomous_prepare":
+            expected_evidence = "returned internal work product ready for Tony review"
+        else:
+            expected_evidence = "explicit approval followed by verified execution evidence"
+        return {
+            "eligible": autonomous,
+            "state": "ready_for_autonomous_dispatch" if autonomous else "awaiting_approval",
+            "worker": worker,
+            "instruction": action,
+            "target": dict(target),
+            "expected_evidence": expected_evidence,
+            "return_to": "Tony",
+            "execution_truth": "not_dispatched",
+        }
 
     @classmethod
     def _execution_policy(cls, worker: str, action: str) -> tuple[bool, str, str]:
