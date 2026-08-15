@@ -35,6 +35,18 @@ def write_lesson(path: Path, *, status: str) -> None:
     )
 
 
+def strong_return() -> dict:
+    return {
+        "options": [
+            {"name": "A", "approach": "Change the opening proposition."},
+            {"name": "B", "approach": "Change the timing and call to action."},
+        ],
+        "recommendation": "Option A because it directly addresses the weak response signal.",
+        "changed_variable": "opening proposition",
+        "success_signal": "A qualified reply or discovery booking within three business days.",
+    }
+
+
 class TonyAdaptiveResponseTests(unittest.TestCase):
     def test_negative_outcome_becomes_worker_ready_redesign_brief(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -70,23 +82,41 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
             service.execute("What should we try instead?", [])
             service.execute("Go ahead with the redesign", [])
-            response = service.execute(
-                "Review what Claude returned",
-                [{
-                    "options": [
-                        {"name": "A", "approach": "Change the opening proposition."},
-                        {"name": "B", "approach": "Change the timing and call to action."},
-                    ],
-                    "recommendation": "Option A because it directly addresses the weak response signal.",
-                    "changed_variable": "opening proposition",
-                    "success_signal": "A qualified reply or discovery booking within three business days.",
-                }],
-            )
+            response = service.execute("Review what Claude returned", [strong_return()])
             self.assertEqual(response.data["adaptation_status"], "ready_for_approval")
             self.assertEqual(response.data["review"]["option_count"], 2)
             self.assertTrue(response.data["approval_required"])
             self.assertFalse(response.data["execution_performed"])
             self.assertIn("ready for approval", response.message)
+
+    def test_final_approval_creates_controlled_test_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            write_lesson(store, status="negative")
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            service.execute("What should we try instead?", [])
+            service.execute("Go ahead with the redesign", [])
+            service.execute("Review what Claude returned", [strong_return()])
+            response = service.execute("OK, run the test", [])
+            self.assertEqual(response.command, "executive_adaptive_test_handoff")
+            self.assertEqual(response.data["adaptation_status"], "approved_test_handoff_ready")
+            handoff = response.data["execution_handoff"]
+            self.assertEqual(handoff["task_type"], "approved_adaptive_test")
+            self.assertEqual(handoff["priority"]["key"], "lead:lesley")
+            self.assertEqual(handoff["changed_variable"], "opening proposition")
+            self.assertIn("qualified reply", handoff["success_signal"])
+            self.assertTrue(handoff["completion_evidence_required"])
+            self.assertTrue(handoff["outcome_evidence_required"])
+            self.assertFalse(response.data["execution_performed"])
+            self.assertFalse(response.data["external_action_taken"])
+
+    def test_final_approval_without_reviewed_redesign_does_not_invent_handoff(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            write_lesson(store, status="negative")
+            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            response = service.execute("Run the test", [])
+            self.assertEqual(response.command, "delegated")
 
     def test_weak_redesign_return_is_sent_back_for_revision(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -99,6 +129,8 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             self.assertEqual(response.data["adaptation_status"], "revision_required")
             self.assertIn("changed variable", response.message)
             self.assertFalse(response.data["execution_performed"])
+            follow_up = service.execute("Approve it", [])
+            self.assertEqual(follow_up.command, "delegated")
 
     def test_missing_redesign_return_is_not_treated_as_completed_work(self):
         with tempfile.TemporaryDirectory() as tmp:
