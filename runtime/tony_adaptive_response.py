@@ -8,13 +8,7 @@ from runtime.tony_command_service import CommandResponse
 
 
 class TonyAdaptiveResponseCommandService:
-    """Turn verified executive lessons into a safer next move.
-
-    The service reads the same persisted learning evidence as Tony's learning layer.
-    It does not invent causality: negative/no-change evidence creates a bounded
-    redesign brief, while mixed/inconclusive evidence causes Tony to ask for a
-    clearer signal before changing course.
-    """
+    """Turn verified executive lessons into a safer next move."""
 
     _MARKERS = (
         "what should we try instead",
@@ -35,6 +29,13 @@ class TonyAdaptiveResponseCommandService:
         "lets do that",
         "try that",
     )
+    _RETURN_MARKERS = (
+        "review the redesign",
+        "review what claude returned",
+        "review claude's redesign",
+        "review claudes redesign",
+        "is the redesign good enough",
+    )
     _REDESIGN_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
 
@@ -42,6 +43,7 @@ class TonyAdaptiveResponseCommandService:
         self.command_service = command_service
         self.learning_store_path = learning_store_path or Path(".runtime/executive-learning.json")
         self._pending_adaptation: dict[str, Any] | None = None
+        self._pending_redesign_review: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -54,10 +56,13 @@ class TonyAdaptiveResponseCommandService:
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
+        artefacts = tuple(item for item in objects if isinstance(item, dict))
+        if self._pending_redesign_review and any(marker in lowered for marker in self._RETURN_MARKERS):
+            return self._review_adaptation_return(artefacts)
         if self._pending_adaptation and self._is_adaptation_approval(lowered):
             return self._prepare_adaptation_handoff()
         if not any(marker in lowered for marker in self._MARKERS):
-            return self.command_service.execute(command, objects)
+            return self.command_service.execute(command, artefacts)
         return self._adaptation_response()
 
     def _adaptation_response(self) -> CommandResponse:
@@ -68,11 +73,7 @@ class TonyAdaptiveResponseCommandService:
                 "executive_adaptation",
                 "healthy",
                 "I do not yet have enough verified outcome evidence to justify changing the approach. I would get a clearer result signal first.",
-                {
-                    "intent": "prepare_adaptive_approach",
-                    "adaptation_status": "insufficient_evidence",
-                    "execution_performed": False,
-                },
+                {"intent": "prepare_adaptive_approach", "adaptation_status": "insufficient_evidence", "execution_performed": False},
             )
 
         state = str(lesson.get("outcome_status") or "").casefold()
@@ -85,10 +86,7 @@ class TonyAdaptiveResponseCommandService:
             return CommandResponse(
                 "executive_adaptation",
                 "attention",
-                (
-                    f"I would not change course yet on {label}. The last result was {state}, which is too weak a signal to justify a new approach. "
-                    "I recommend gathering one clearer matched outcome first; otherwise we risk learning the wrong lesson."
-                ),
+                f"I would not change course yet on {label}. The last result was {state}, which is too weak a signal to justify a new approach. I recommend gathering one clearer matched outcome first; otherwise we risk learning the wrong lesson.",
                 {
                     "intent": "prepare_adaptive_approach",
                     "adaptation_status": "gather_evidence_before_adaptation",
@@ -123,11 +121,7 @@ class TonyAdaptiveResponseCommandService:
         return CommandResponse(
             "executive_adaptation",
             "attention",
-            (
-                f"I would change the approach rather than retry {label} unchanged. The last verified outcome was {state}"
-                f"{f': {summary}' if summary else ''}. My recommendation is to alter one meaningful variable at a time so the next result teaches us something. "
-                "I have prepared a Claude-ready redesign brief; Tony retains review and approval is still required before execution."
-            ),
+            f"I would change the approach rather than retry {label} unchanged. The last verified outcome was {state}{f': {summary}' if summary else ''}. My recommendation is to alter one meaningful variable at a time so the next result teaches us something. I have prepared a Claude-ready redesign brief; Tony retains review and approval is still required before execution.",
             {
                 "intent": "prepare_adaptive_approach",
                 "adaptation_status": "ready_for_adaptation_design",
@@ -158,18 +152,68 @@ class TonyAdaptiveResponseCommandService:
             "execution_performed": False,
         }
         self._pending_adaptation = None
+        self._pending_redesign_review = handoff
         label = str(pending["priority"].get("label") or "this priority")
         return CommandResponse(
             "executive_adaptation_handoff",
             "healthy",
-            (
-                f"Agreed. I have prepared the adaptive redesign handoff for {label}. Claude should return distinct options, name the variable being changed and define the success signal. "
-                "Tony remains responsible for review. Nothing has been executed externally yet."
-            ),
+            f"Agreed. I have prepared the adaptive redesign handoff for {label}. Claude should return distinct options, name the variable being changed and define the success signal. Tony remains responsible for review. Nothing has been executed externally yet.",
+            {"intent": "delegate_adaptive_redesign", "adaptation_status": "worker_handoff_ready", "handoff": handoff, "execution_performed": False},
+        )
+
+    def _review_adaptation_return(self, artefacts: tuple[dict[str, Any], ...]) -> CommandResponse:
+        if not artefacts:
+            return CommandResponse(
+                "executive_adaptation_review",
+                "attention",
+                "I cannot review the redesign yet because no returned worker artefact is attached. I will not treat the redesign as complete without evidence.",
+                {"intent": "review_adaptive_redesign", "adaptation_status": "return_missing", "execution_performed": False},
+            )
+
+        artefact = artefacts[0]
+        options = artefact.get("options")
+        recommendation = str(artefact.get("recommendation") or "").strip()
+        changed_variable = str(artefact.get("changed_variable") or "").strip()
+        success_signal = str(artefact.get("success_signal") or "").strip()
+        option_count = len(options) if isinstance(options, list) else 0
+        gaps: list[str] = []
+        if option_count < 2 or option_count > 3:
+            gaps.append("two or three materially distinct options")
+        if not recommendation:
+            gaps.append("a preferred option with reasoning")
+        if not changed_variable:
+            gaps.append("the primary changed variable")
+        if not success_signal:
+            gaps.append("a measurable success signal")
+
+        if gaps:
+            return CommandResponse(
+                "executive_adaptation_review",
+                "attention",
+                "The redesign is not ready for approval. I would send it back to Claude because it is missing " + ", ".join(gaps) + ". Nothing should execute yet.",
+                {
+                    "intent": "review_adaptive_redesign",
+                    "adaptation_status": "revision_required",
+                    "missing_requirements": gaps,
+                    "execution_performed": False,
+                },
+            )
+
+        self._pending_redesign_review = None
+        return CommandResponse(
+            "executive_adaptation_review",
+            "healthy",
+            f"The redesign is ready for approval. Claude returned {option_count} options, recommends one, changes {changed_variable}, and defines the success signal as: {success_signal}. I would approve the redesign for the next controlled test; nothing has executed externally yet.",
             {
-                "intent": "delegate_adaptive_redesign",
-                "adaptation_status": "worker_handoff_ready",
-                "handoff": handoff,
+                "intent": "review_adaptive_redesign",
+                "adaptation_status": "ready_for_approval",
+                "review": {
+                    "option_count": option_count,
+                    "recommendation": recommendation,
+                    "changed_variable": changed_variable,
+                    "success_signal": success_signal,
+                },
+                "approval_required": True,
                 "execution_performed": False,
             },
         )
