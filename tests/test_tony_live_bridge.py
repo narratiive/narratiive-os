@@ -19,6 +19,7 @@ from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommand
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
+from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
 
 class TonyLiveBridgeTests(unittest.TestCase):
@@ -46,7 +47,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
         self.assertIs(app.base, base_app)
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
-        dispatch = app.command_service.command_service
+        execution_status = app.command_service.command_service
+        self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
+        dispatch = execution_status.command_service
         self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
         self.assertEqual(dispatch.dispatchers, {})
         memory = dispatch.command_service
@@ -91,7 +94,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         ):
             app = tony_live_bridge.build_app()
 
-        dispatch = app.command_service.command_service
+        execution_status = app.command_service.command_service
+        self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
+        dispatch = execution_status.command_service
         self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
         self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
 
