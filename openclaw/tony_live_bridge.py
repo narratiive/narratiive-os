@@ -18,6 +18,7 @@ from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
+from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
@@ -234,6 +235,7 @@ def build_app() -> LeadAwareTonyApplication:
         agency_focus_service,
         store_path=executive_outcomes_path,
     )
+    outcome_evidence_service = TonyOutcomeEvidenceCommandService(outcome_service)
     executive_learning_path = Path(
         os.getenv(
             "TONY_EXECUTIVE_LEARNING_PATH",
@@ -241,7 +243,7 @@ def build_app() -> LeadAwareTonyApplication:
         )
     )
     learning_service = TonyExecutiveLearningCommandService(
-        outcome_service,
+        outcome_evidence_service,
         store_path=executive_learning_path,
     )
     adaptive_service = TonyAdaptiveResponseCommandService(

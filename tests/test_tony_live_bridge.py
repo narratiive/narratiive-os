@@ -15,6 +15,7 @@ from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
+from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
@@ -49,7 +50,9 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(adaptive, TonyAdaptiveResponseCommandService)
         learning = adaptive.command_service
         self.assertIsInstance(learning, TonyExecutiveLearningCommandService)
-        outcomes = learning.command_service
+        outcome_evidence = learning.command_service
+        self.assertIsInstance(outcome_evidence, TonyOutcomeEvidenceCommandService)
+        outcomes = outcome_evidence.command_service
         self.assertIsInstance(outcomes, TonyOutcomeAccountabilityCommandService)
         focus = outcomes.command_service
         self.assertIsInstance(focus, TonyPersistentAgencyFocusCommandService)
