@@ -70,7 +70,29 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
         self.assertEqual(response.data["execution_status"], "autonomous_step_verified")
         self.assertEqual(response.data["execution_handoff"]["execution_truth"], "verified_dispatch")
         self.assertEqual(response.data["dispatch_result"]["evidence"]["thread_id"], "thread-123")
-        self.assertIn("returned verified evidence", response.message)
+        self.assertIn("completed the read-only check", response.message)
+        self.assertNotIn("thread-123", response.message)
+
+    def test_verified_read_result_is_synthesised_into_visible_executive_answer(self):
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response()),
+            dispatchers={
+                "Gmail": lambda contract: {
+                    "thread_id": "thread-123",
+                    "read_only": True,
+                    "summary": "Lesley replied positively and asked for availability next week.",
+                }
+            },
+        )
+
+        response = service.execute("do the first one", [])
+
+        self.assertEqual(
+            response.data["executive_result"],
+            "Gmail completed the safe step. Lesley replied positively and asked for availability next week.",
+        )
+        self.assertIn("Lesley replied positively", response.message)
+        self.assertNotIn("thread-123", response.message)
 
     def test_approval_gated_handoff_is_never_dispatched(self):
         calls = []
@@ -162,11 +184,39 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
 
         strong_service = TonyAutonomousDispatchCommandService(
             StubCommandService(routed_response(worker="Claude")),
-            dispatchers={"Claude": lambda contract: {"work_product": "Specific strategic recommendation", "verified": True}},
+            dispatchers={
+                "Claude": lambda contract: {
+                    "work_product": "Specific strategic recommendation",
+                    "verified": True,
+                }
+            },
         )
         strong = strong_service.execute("do the first one", [])
         self.assertEqual(strong.data["autonomous_dispatch_state"], "dispatch_verified")
         self.assertEqual(strong.data["dispatch_result"]["evidence"]["work_product"], "Specific strategic recommendation")
+        self.assertIn("Specific strategic recommendation", strong.message)
+        self.assertEqual(
+            strong.data["executive_result"],
+            "Claude completed the safe step. Specific strategic recommendation",
+        )
+
+    def test_result_synthesis_is_bounded_and_does_not_dump_long_worker_output(self):
+        long_summary = "word " * 200
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(routed_response()),
+            dispatchers={
+                "Gmail": lambda contract: {
+                    "thread_id": "thread-123",
+                    "read_only": True,
+                    "summary": long_summary,
+                }
+            },
+        )
+
+        response = service.execute("do the first one", [])
+
+        self.assertLessEqual(len(response.data["executive_result"]), 640)
+        self.assertTrue(response.data["executive_result"].endswith("..."))
 
 
 if __name__ == "__main__":
