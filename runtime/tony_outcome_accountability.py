@@ -84,19 +84,44 @@ class TonyOutcomeAccountabilityCommandService:
         if not action_id:
             return response
 
+        success_signal = str(completed.get("success_signal") or "").strip()
+        changed_variable = str(completed.get("changed_variable") or "").strip()
+        adaptive_test = bool(completed.get("adaptive_test"))
+        measurement_request = None
+        if adaptive_test and success_signal:
+            measurement_request = {
+                "action_id": action_id,
+                "measure_against": success_signal,
+                "changed_variable": changed_variable,
+                "evidence_required": True,
+                "outcome_status_required": True,
+            }
+
         self._awaiting_outcome = {
             "action_id": action_id,
             "priority": dict(completed.get("priority") or {}) if isinstance(completed.get("priority"), dict) else {},
             "completed_at": str(completed.get("completed_at") or self._now_utc().isoformat()),
             "completion_evidence": completed.get("completion_evidence"),
             "result_summary": str(completed.get("result_summary") or "").strip(),
+            "adaptive_test": adaptive_test,
+            "changed_variable": changed_variable,
+            "success_signal": success_signal,
+            "measurement_request": measurement_request,
         }
         self._persist_state()
         data["business_outcome_status"] = "unverified"
-        message = (
-            f"{response.message} Execution is verified; the business outcome is not yet verified. "
-            "I will keep those two claims separate until outcome evidence exists."
-        )
+        if measurement_request:
+            data["outcome_measurement_handoff"] = dict(measurement_request)
+            message = (
+                f"{response.message} Execution is verified; the business outcome is not yet verified. "
+                f"I will judge this test against the agreed success signal: {success_signal}. "
+                "I still need outcome evidence before I can call the test effective."
+            )
+        else:
+            message = (
+                f"{response.message} Execution is verified; the business outcome is not yet verified. "
+                "I will keep those two claims separate until outcome evidence exists."
+            )
         return CommandResponse(response.command, response.status, message, data)
 
     def _record_outcome(self, objects: tuple[dict[str, Any], ...]) -> CommandResponse:
@@ -127,6 +152,9 @@ class TonyOutcomeAccountabilityCommandService:
             "summary": str(result.get("summary") or "").strip(),
             "recorded_at": self._now_utc().isoformat(),
             "priority": dict(self._awaiting_outcome.get("priority") or {}),
+            "adaptive_test": bool(self._awaiting_outcome.get("adaptive_test")),
+            "changed_variable": str(self._awaiting_outcome.get("changed_variable") or ""),
+            "success_signal": str(self._awaiting_outcome.get("success_signal") or ""),
         }
         self._last_outcome = outcome
         self._awaiting_outcome = None
@@ -143,10 +171,12 @@ class TonyOutcomeAccountabilityCommandService:
             judgement = "The evidence is not strong enough for a clean success or failure call. I would keep the judgement provisional and gather the next piece of evidence before scaling or abandoning the approach."
             status = "attention"
 
+        success_signal = str(outcome.get("success_signal") or "").strip()
+        measured = f" Measured against the agreed success signal: {success_signal}." if success_signal else ""
         return CommandResponse(
             command="executive_outcome_review",
             status=status,
-            message=f"Outcome review for {label}: {state}. {judgement}",
+            message=f"Outcome review for {label}: {state}.{measured} {judgement}",
             data={
                 "intent": "review_executive_action_outcome",
                 "accepted": True,
@@ -160,12 +190,14 @@ class TonyOutcomeAccountabilityCommandService:
         if self._awaiting_outcome:
             priority = self._awaiting_outcome.get("priority") if isinstance(self._awaiting_outcome.get("priority"), dict) else {}
             label = str(priority.get("label") or "the last completed action")
+            success_signal = str(self._awaiting_outcome.get("success_signal") or "").strip()
+            measurement = f" The agreed success signal is: {success_signal}." if success_signal else ""
             return CommandResponse(
                 command="executive_outcome_status",
                 status="attention",
                 message=(
-                    f"The delegated step for {label} is verified complete, but I do not yet have evidence that it achieved the business outcome. "
-                    "I would not call it successful until we can point to an actual result."
+                    f"The delegated step for {label} is verified complete, but I do not yet have evidence that it achieved the business outcome."
+                    f"{measurement} I would not call it successful until we can point to an actual result."
                 ),
                 data={
                     "intent": "check_executive_action_outcome",
@@ -205,14 +237,17 @@ class TonyOutcomeAccountabilityCommandService:
         data = dict(response.data) if isinstance(response.data, dict) else {}
         priority = self._awaiting_outcome.get("priority") if isinstance(self._awaiting_outcome.get("priority"), dict) else {}
         label = str(priority.get("label") or "the last completed action")
+        success_signal = str(self._awaiting_outcome.get("success_signal") or "").strip()
         data["executive_outcome_watch"] = {
             "status": "outcome_unverified",
             "action_id": self._awaiting_outcome.get("action_id"),
             "priority": dict(priority),
+            "success_signal": success_signal,
         }
+        measurement = f" Measure it against: {success_signal}." if success_signal else ""
         message = (
-            f"Outcome check: the action for {label} was completed, but its business effect is still unverified. "
-            "Get outcome evidence before treating the work as successful or repeating it.\n"
+            f"Outcome check: the action for {label} was completed, but its business effect is still unverified."
+            f"{measurement} Get outcome evidence before treating the work as successful or repeating it.\n"
             f"{response.message}"
         )
         return CommandResponse(response.command, "attention", message, data)
