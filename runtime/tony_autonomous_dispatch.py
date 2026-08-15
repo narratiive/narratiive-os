@@ -30,6 +30,8 @@ class TonyAutonomousDispatchCommandService:
     consumes the risk decision already made upstream. Approval-gated writes remain
     untouched. A dispatcher must return structured evidence that satisfies the
     dispatch contract before Tony can say a read or preparation step actually ran.
+    Verified work is then summarised into Tony's visible reply so autonomous work
+    advances the conversation instead of merely exposing raw worker evidence.
     """
 
     _SOURCE_ID_KEYS = {
@@ -60,6 +62,18 @@ class TonyAutonomousDispatchCommandService:
         "artifact",
         "result",
     }
+    _EXECUTIVE_RESULT_KEYS = (
+        "recommendation",
+        "summary",
+        "analysis",
+        "work_product",
+        "draft",
+        "content",
+        "result",
+        "options",
+        "recommendations",
+        "artifact",
+    )
 
     def __init__(
         self,
@@ -136,6 +150,7 @@ class TonyAutonomousDispatchCommandService:
             )
 
         result = DispatchResult(worker=worker, status="verified", evidence=evidence)
+        executive_result = self._executive_result_summary(worker, dispatch, evidence)
         updated = self._with_dispatch_state(
             response,
             data,
@@ -143,10 +158,11 @@ class TonyAutonomousDispatchCommandService:
             dispatch,
             state="dispatch_verified",
             execution_truth="verified_dispatch",
-            message_suffix=f" The safe {worker} step has now run and returned verified evidence for my review.",
+            message_suffix=f" {executive_result}",
         )
         updated.data["dispatch_result"] = result.to_dict()
         updated.data["execution_status"] = "autonomous_step_verified"
+        updated.data["executive_result"] = executive_result
         return updated
 
     @classmethod
@@ -171,6 +187,50 @@ class TonyAutonomousDispatchCommandService:
             return True, "verified internal work product"
 
         return False, "dispatch execution mode is missing or not autonomous"
+
+    @classmethod
+    def _executive_result_summary(
+        cls,
+        worker: str,
+        dispatch: dict[str, Any],
+        evidence: dict[str, Any],
+    ) -> str:
+        """Turn verified worker evidence into a concise executive-facing result.
+
+        Raw source identifiers remain in structured data for auditability, but Tony's
+        visible response should communicate the useful result rather than implementation
+        plumbing. Workers are encouraged to return `summary` or `recommendation`; the
+        fallback remains truthful when the contract proves execution but no narrative
+        result was supplied.
+        """
+        for key in cls._EXECUTIVE_RESULT_KEYS:
+            value = evidence.get(key)
+            rendered = cls._render_result_value(value)
+            if rendered:
+                return f"{worker} completed the safe step. {rendered}"
+
+        mode = str(dispatch.get("execution_mode") or "").strip()
+        if mode == "autonomous_read":
+            return f"{worker} completed the read-only check and returned verified source evidence."
+        return f"{worker} completed the internal preparation step and returned verified work for review."
+
+    @classmethod
+    def _render_result_value(cls, value: Any) -> str:
+        if isinstance(value, str):
+            text = " ".join(value.split()).strip()
+            if not text:
+                return ""
+            return text if len(text) <= 600 else text[:597].rstrip() + "..."
+        if isinstance(value, (list, tuple)):
+            items = [cls._render_result_value(item) for item in value[:3]]
+            items = [item for item in items if item]
+            return "; ".join(items)
+        if isinstance(value, dict):
+            for key in ("summary", "recommendation", "content", "result", "title"):
+                rendered = cls._render_result_value(value.get(key))
+                if rendered:
+                    return rendered
+        return ""
 
     @classmethod
     def _has_source_identifier(cls, evidence: dict[str, Any]) -> bool:
