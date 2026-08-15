@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
@@ -10,11 +13,12 @@ class StubPersistentResultService:
     mission_control_loader = None
     github_configured = False
 
-    def __init__(self, context=None, *, stale=False):
+    def __init__(self, context=None, *, stale=False, response=None):
         self._last_verified_result = context
         self.stale = stale
         self.calls = []
         self.cleared = False
+        self.response = response or CommandResponse("delegated", "healthy", "delegated", {})
 
     def _context_is_stale(self, context):
         return self.stale
@@ -24,7 +28,7 @@ class StubPersistentResultService:
 
     def execute(self, command, objects):
         self.calls.append(command)
-        return CommandResponse("delegated", "healthy", "delegated", {})
+        return self.response
 
 
 def verified_gmail_context():
@@ -44,6 +48,31 @@ def verified_gmail_context():
         "executive_result": "Gmail completed the approved action.",
         "verified_at": "2026-08-15T20:00:00+00:00",
     }
+
+
+def verified_write_response():
+    return CommandResponse(
+        "autonomous_result_action",
+        "healthy",
+        "Approved action completed.",
+        {
+            "execution_status": "approved_step_verified",
+            "executive_result": "Gmail completed the approved message send.",
+            "dispatch_result": {
+                "worker": "Gmail",
+                "status": "verified",
+                "evidence": {"sent": True, "message_id": "gmail-456"},
+            },
+            "execution_handoff": {
+                "action": "reply to Lesley and offer a discovery call",
+                "dispatch": {
+                    "worker": "Gmail",
+                    "execution_mode": "approval_gated_write",
+                    "target": {"contact": "Lesley"},
+                },
+            },
+        },
+    )
 
 
 class TonyVerifiedExecutionStatusTests(unittest.TestCase):
@@ -99,6 +128,61 @@ class TonyVerifiedExecutionStatusTests(unittest.TestCase):
 
         self.assertEqual(response.command, "delegated")
         self.assertEqual(base.calls, ["Did that happen?"])
+
+    def test_verified_approved_write_creates_persistent_outcome_watch(self):
+        now = datetime(2026, 8, 15, 20, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "watch.json"
+            base = StubPersistentResultService(response=verified_write_response())
+            service = TonyVerifiedExecutionStatusCommandService(base, store_path=path, clock=lambda: now)
+
+            response = service.execute("OK, do that", [])
+
+            self.assertEqual(response.data["execution_status"], "approved_step_verified")
+            self.assertTrue(path.exists())
+            self.assertEqual(service._awaiting_write_outcome["worker"], "Gmail")
+            self.assertIn("reply to Lesley", service._awaiting_write_outcome["action"])
+            self.assertEqual(service._awaiting_write_outcome["execution_result_id"], "gmail-456")
+
+    def test_due_verified_write_outcome_is_surfaced_in_daily_brief(self):
+        now = datetime(2026, 8, 16, 21, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "watch.json"
+            path.write_text(
+                '{"worker":"Gmail","action":"reply to Lesley","verified_at":"2026-08-15T20:00:00+00:00"}',
+                encoding="utf-8",
+            )
+            base = StubPersistentResultService(response=CommandResponse("morning", "healthy", "Normal brief", {}))
+            service = TonyVerifiedExecutionStatusCommandService(
+                base,
+                store_path=path,
+                clock=lambda: now,
+                check_after=timedelta(hours=24),
+            )
+
+            response = service.execute("morning", [])
+
+            self.assertEqual(response.status, "attention")
+            self.assertIn("Outcome check", response.message)
+            self.assertIn("business effect", response.message)
+            self.assertEqual(response.data["verified_write_outcome_watch"]["status"], "business_outcome_unverified")
+
+    def test_recent_verified_write_does_not_create_false_urgency(self):
+        now = datetime(2026, 8, 15, 22, 0, tzinfo=timezone.utc)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "watch.json"
+            path.write_text(
+                '{"worker":"Gmail","action":"reply to Lesley","verified_at":"2026-08-15T20:00:00+00:00"}',
+                encoding="utf-8",
+            )
+            base = StubPersistentResultService(response=CommandResponse("evening", "healthy", "Normal brief", {}))
+            service = TonyVerifiedExecutionStatusCommandService(base, store_path=path, clock=lambda: now)
+
+            response = service.execute("evening", [])
+
+            self.assertEqual(response.status, "healthy")
+            self.assertEqual(response.message, "Normal brief")
+            self.assertNotIn("verified_write_outcome_watch", response.data)
 
 
 if __name__ == "__main__":
