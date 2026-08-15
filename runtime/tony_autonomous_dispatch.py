@@ -253,10 +253,10 @@ class TonyAutonomousDispatchCommandService:
 
     @classmethod
     def _matches_follow_up(cls, lowered: str, markers: tuple[str, ...]) -> bool:
-        candidate = lowered
+        candidate = lowered.strip().rstrip("?!.,")
         for prefix in cls._ACKNOWLEDGEMENT_PREFIXES:
             if candidate.startswith(prefix):
-                candidate = candidate[len(prefix):].strip()
+                candidate = candidate[len(prefix):].strip().rstrip("?!.,")
                 break
         return any(candidate == marker or candidate.startswith(marker + " ") for marker in markers)
 
