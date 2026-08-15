@@ -12,8 +12,10 @@ from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
+from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
+from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
@@ -261,7 +263,11 @@ def build_app() -> LeadAwareTonyApplication:
         ExecutiveMemoryStore(memory_path),
         agency_id=workspace_id,
     )
-    app.command_service = TonyTerminologyCommandService(memory_service)
+    dispatch_service = TonyAutonomousDispatchCommandService(
+        memory_service,
+        dispatchers=build_http_dispatchers(),
+    )
+    app.command_service = TonyTerminologyCommandService(dispatch_service)
     return LeadAwareTonyApplication(app, lead_store)
 
 
