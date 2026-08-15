@@ -51,6 +51,22 @@ def routed_response(
     )
 
 
+def approved_write_response(*, worker="Gmail"):
+    response = routed_response(
+        eligible=False,
+        state="approved_pending_execution",
+        worker=worker,
+        execution_mode="approval_gated_write",
+    )
+    handoff = response.data["execution_handoff"]
+    handoff["approval_granted"] = True
+    handoff["approval_scope"] = "grounded_next_action"
+    handoff["dispatch"]["approval_granted"] = True
+    handoff["dispatch"]["approval_scope"] = "grounded_next_action"
+    handoff["dispatch"]["instruction"] = "send the approved reply to Lesley"
+    return response
+
+
 class TonyAutonomousDispatchTests(unittest.TestCase):
     def test_eligible_dispatch_runs_and_requires_contract_compliant_read_evidence(self):
         calls = []
@@ -89,12 +105,12 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
 
         self.assertEqual(
             response.data["executive_result"],
-            "Gmail completed the safe step. Lesley replied positively and asked for availability next week.",
+            "Gmail completed the step. Lesley replied positively and asked for availability next week.",
         )
         self.assertIn("Lesley replied positively", response.message)
         self.assertNotIn("thread-123", response.message)
 
-    def test_approval_gated_handoff_is_never_dispatched(self):
+    def test_unapproved_approval_gated_handoff_is_never_dispatched(self):
         calls = []
         service = TonyAutonomousDispatchCommandService(
             StubCommandService(
@@ -112,6 +128,66 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
         self.assertEqual(calls, [])
         self.assertNotIn("autonomous_dispatch_state", response.data)
         self.assertEqual(response.data["execution_handoff"]["dispatch"]["execution_truth"], "not_dispatched")
+
+    def test_explicitly_approved_write_is_dispatched_and_requires_write_evidence(self):
+        calls = []
+
+        def gmail(contract):
+            calls.append(contract)
+            return {
+                "sent": True,
+                "message_id": "sent-456",
+                "thread_id": "thread-123",
+                "summary": "The approved reply was sent to Lesley.",
+            }
+
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(approved_write_response()),
+            dispatchers={"Gmail": gmail},
+        )
+
+        response = service.execute("OK, do that", [])
+
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0]["approval_granted"])
+        self.assertEqual(calls[0]["state"], "approved_pending_execution")
+        self.assertEqual(response.data["autonomous_dispatch_state"], "dispatch_verified")
+        self.assertEqual(response.data["execution_status"], "approved_step_verified")
+        self.assertEqual(response.data["execution_handoff"]["execution_truth"], "verified_dispatch")
+        self.assertEqual(response.data["dispatch_result"]["evidence"]["message_id"], "sent-456")
+        self.assertIn("approved reply was sent", response.message)
+
+    def test_approved_write_without_mutation_proof_remains_unverified(self):
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(approved_write_response()),
+            dispatchers={
+                "Gmail": lambda contract: {
+                    "message_id": "sent-456",
+                    "summary": "I prepared a result but did not prove the send.",
+                }
+            },
+        )
+
+        response = service.execute("OK, do that", [])
+
+        self.assertEqual(response.data["autonomous_dispatch_state"], "dispatch_unverified")
+        self.assertEqual(response.data["execution_handoff"]["execution_truth"], "dispatch_attempted_unverified")
+        self.assertIn("write execution proof is missing", response.message)
+        self.assertNotIn("dispatch_result", response.data)
+
+    def test_approved_write_missing_scoped_approval_is_not_dispatched(self):
+        response = approved_write_response()
+        response.data["execution_handoff"].pop("approval_granted")
+        calls = []
+        service = TonyAutonomousDispatchCommandService(
+            StubCommandService(response),
+            dispatchers={"Gmail": lambda contract: calls.append(contract) or {"sent": True, "message_id": "x"}},
+        )
+
+        result = service.execute("OK, do that", [])
+
+        self.assertEqual(calls, [])
+        self.assertNotIn("autonomous_dispatch_state", result.data)
 
     def test_missing_dispatcher_preserves_truth_and_reports_blocker(self):
         service = TonyAutonomousDispatchCommandService(StubCommandService(routed_response()), dispatchers={})
@@ -197,7 +273,7 @@ class TonyAutonomousDispatchTests(unittest.TestCase):
         self.assertIn("Specific strategic recommendation", strong.message)
         self.assertEqual(
             strong.data["executive_result"],
-            "Claude completed the safe step. Specific strategic recommendation",
+            "Claude completed the step. Specific strategic recommendation",
         )
 
     def test_result_synthesis_is_bounded_and_does_not_dump_long_worker_output(self):
