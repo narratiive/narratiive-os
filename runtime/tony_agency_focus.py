@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import Any, Iterable
 
 from runtime.tony_command_service import CommandResponse
+from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
 
 class TonyAgencyFocusCommandService:
@@ -19,14 +20,7 @@ class TonyAgencyFocusCommandService:
         "top priorities",
         "where should i focus",
     )
-    _RATIONALE_MARKERS = (
-        "why",
-        "why that",
-        "why first",
-        "why is that",
-        "why should i",
-        "why should we",
-    )
+    _RATIONALE_MARKERS = ("why", "why that", "why first", "why is that", "why should i", "why should we")
     _FIRST_ACTION_MARKERS = (
         "do the first one",
         "do the first",
@@ -42,24 +36,12 @@ class TonyAgencyFocusCommandService:
     )
     _ACKNOWLEDGEMENT_PREFIXES = ("ok, ", "okay, ", "yes, ", "right, ", "great, ", "fine, ")
     _INTERNAL_WORK_MARKERS = (
-        "engineering",
-        "infrastructure",
-        "runtime",
-        "repository",
-        "deployment",
-        "automation",
-        "backend",
-        "system work",
-        "internal systems",
+        "engineering", "infrastructure", "runtime", "repository", "deployment", "automation",
+        "backend", "system work", "internal systems",
     )
     _CHOICE_MARKERS = (
-        "let's work on",
-        "lets work on",
-        "i want to work on",
-        "i'm going to work on",
-        "im going to work on",
-        "we should work on",
-        "i think we should work on",
+        "let's work on", "lets work on", "i want to work on", "i'm going to work on",
+        "im going to work on", "we should work on", "i think we should work on",
     )
     _AREA_PRIORITY = {
         "commercial": 0,
@@ -82,8 +64,9 @@ class TonyAgencyFocusCommandService:
         "business_priority": "it is the strongest verified business priority once urgent risks and decisions are cleared",
     }
 
-    def __init__(self, command_service) -> None:
+    def __init__(self, command_service, tool_router: TonyExecutiveToolRouter | None = None) -> None:
         self.command_service = command_service
+        self.tool_router = tool_router or TonyExecutiveToolRouter()
         self._last_priorities: tuple[dict[str, Any], ...] = ()
 
     @property
@@ -100,15 +83,12 @@ class TonyAgencyFocusCommandService:
 
         if self._last_priorities and self._is_rationale_query(lowered):
             return self._explain_last_focus()
-
         if self._last_priorities and self._is_first_action_query(lowered):
             return self._prepare_first_priority_action()
-
         if self._last_priorities and self._is_internal_work_choice(lowered):
             first = self._last_priorities[0]
             if str(first.get("area") or "").casefold() not in {"engineering", "infrastructure"}:
                 return self._challenge_internal_choice(normalized, first)
-
         if not any(marker in lowered for marker in self._FOCUS_MARKERS):
             return self.command_service.execute(command, objects)
 
@@ -123,15 +103,13 @@ class TonyAgencyFocusCommandService:
         agency_state = data.get("agency_state") if isinstance(data.get("agency_state"), dict) else {}
         executive_items = agency_state.get("executive_items") if isinstance(agency_state.get("executive_items"), list) else []
         commercial_watch = data.get("commercial_watch") if isinstance(data.get("commercial_watch"), dict) else {}
-
         priorities: list[dict[str, Any]] = []
 
         for item in executive_items:
             if not isinstance(item, dict):
                 continue
             area = str(item.get("area") or "").strip().casefold()
-            blocked = bool(item.get("blocked"))
-            if blocked and area in self._CURRENT_REVENUE_RISK_AREAS:
+            if bool(item.get("blocked")) and area in self._CURRENT_REVENUE_RISK_AREAS:
                 priorities.append(self._agency_priority(item, tier=0, reason="current_revenue_or_delivery_risk"))
 
         positive_replies = commercial_watch.get("positive_replies")
@@ -206,11 +184,12 @@ class TonyAgencyFocusCommandService:
 
     def _explain_last_focus(self) -> CommandResponse:
         first = self._last_priorities[0]
-        first_reason = self._reason_text(first)
-        lines = [f"I put {first['label']} first because {first_reason}."]
+        lines = [f"I put {first['label']} first because {self._reason_text(first)}."]
         if len(self._last_priorities) > 1:
             second = self._last_priorities[1]
-            lines.append(f"{second['label']} comes next because {self._reason_text(second)}, but it has less immediate business consequence.")
+            lines.append(
+                f"{second['label']} comes next because {self._reason_text(second)}, but it has less immediate business consequence."
+            )
         lines.append("That ordering is evidence-led rather than absolute; if new client, revenue or delivery evidence appears, I would re-rank it.")
         return CommandResponse(
             command="agency_focus_rationale",
@@ -258,6 +237,8 @@ class TonyAgencyFocusCommandService:
                 "then_owner": "Tony",
                 "approval_required": True,
                 "target": target,
+                "routing_reason": "fresh commercial intent should be grounded in the verified email thread",
+                "execution_truth": "handoff_prepared_only",
             }
         if reason == "overdue_commercial_commitment":
             return {
@@ -266,6 +247,8 @@ class TonyAgencyFocusCommandService:
                 "then_owner": "Tony",
                 "approval_required": True,
                 "target": target,
+                "routing_reason": "the next commercial decision depends on verified reply evidence",
+                "execution_truth": "handoff_prepared_only",
             }
         if bool(priority.get("requires_matt")):
             return {
@@ -274,20 +257,15 @@ class TonyAgencyFocusCommandService:
                 "then_owner": "Tony",
                 "approval_required": False,
                 "target": target,
+                "routing_reason": "the priority explicitly requires executive judgement",
+                "execution_truth": "handoff_prepared_only",
             }
-        return {
-            "worker": "Claude",
-            "action": f"prepare the work needed to advance this priority: {priority.get('action')}",
-            "then_owner": "Tony",
-            "approval_required": True,
-            "target": target,
-        }
+        return self.tool_router.route(priority)
 
     def _challenge_internal_choice(self, choice: str, first: dict[str, Any]) -> CommandResponse:
-        reason = self._reason_text(first)
         message = (
             f"I would not prioritise {choice.rstrip('.')} yet. "
-            f"{first['label']} has the stronger business consequence because {reason}. "
+            f"{first['label']} has the stronger business consequence because {self._reason_text(first)}. "
             "My recommendation is to clear that first, then return to the internal work. "
             "If you still choose the internal work, I will follow that decision rather than quietly overriding it."
         )
