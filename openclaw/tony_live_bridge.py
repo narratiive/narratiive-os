@@ -12,7 +12,6 @@ from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
-from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
@@ -22,6 +21,7 @@ from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
+from runtime.tony_persistent_autonomous_result import TonyPersistentAutonomousResultCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 
 
@@ -263,9 +263,16 @@ def build_app() -> LeadAwareTonyApplication:
         ExecutiveMemoryStore(memory_path),
         agency_id=workspace_id,
     )
-    dispatch_service = TonyAutonomousDispatchCommandService(
+    autonomous_result_context_path = Path(
+        os.getenv(
+            "TONY_AUTONOMOUS_RESULT_CONTEXT_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"),
+        )
+    )
+    dispatch_service = TonyPersistentAutonomousResultCommandService(
         memory_service,
         dispatchers=build_http_dispatchers(),
+        store_path=autonomous_result_context_path,
     )
     app.command_service = TonyTerminologyCommandService(dispatch_service)
     return LeadAwareTonyApplication(app, lead_store)
