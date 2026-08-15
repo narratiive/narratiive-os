@@ -25,12 +25,23 @@ class TonyAdaptiveResponseCommandService:
         "what should we change",
         "try something different",
     )
+    _APPROVAL_MARKERS = (
+        "go ahead",
+        "go ahead with the redesign",
+        "prepare the redesign",
+        "prepare that",
+        "do that",
+        "let's do that",
+        "lets do that",
+        "try that",
+    )
     _REDESIGN_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
 
     def __init__(self, command_service, *, learning_store_path: Path | None = None) -> None:
         self.command_service = command_service
         self.learning_store_path = learning_store_path or Path(".runtime/executive-learning.json")
+        self._pending_adaptation: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -43,6 +54,8 @@ class TonyAdaptiveResponseCommandService:
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         lowered = normalized.casefold()
+        if self._pending_adaptation and self._is_adaptation_approval(lowered):
+            return self._prepare_adaptation_handoff()
         if not any(marker in lowered for marker in self._MARKERS):
             return self.command_service.execute(command, objects)
         return self._adaptation_response()
@@ -50,6 +63,7 @@ class TonyAdaptiveResponseCommandService:
     def _adaptation_response(self) -> CommandResponse:
         lesson = self._latest_relevant_lesson()
         if lesson is None:
+            self._pending_adaptation = None
             return CommandResponse(
                 "executive_adaptation",
                 "healthy",
@@ -67,6 +81,7 @@ class TonyAdaptiveResponseCommandService:
         summary = str(lesson.get("outcome_summary") or "").strip()
 
         if state in self._PROVISIONAL_OUTCOMES:
+            self._pending_adaptation = None
             return CommandResponse(
                 "executive_adaptation",
                 "attention",
@@ -100,6 +115,11 @@ class TonyAdaptiveResponseCommandService:
             "approval_required": True,
             "execution_performed": False,
         }
+        self._pending_adaptation = {
+            "priority": {"key": key, "label": label},
+            "prior_outcome": dict(lesson),
+            "adaptation_brief": brief,
+        }
         return CommandResponse(
             "executive_adaptation",
             "attention",
@@ -117,6 +137,47 @@ class TonyAdaptiveResponseCommandService:
                 "execution_performed": False,
             },
         )
+
+    def _prepare_adaptation_handoff(self) -> CommandResponse:
+        assert self._pending_adaptation is not None
+        pending = self._pending_adaptation
+        brief = dict(pending["adaptation_brief"])
+        handoff = {
+            "worker": "Claude",
+            "review_owner": "Tony",
+            "task_type": "adaptive_redesign",
+            "priority": dict(pending["priority"]),
+            "brief": brief,
+            "required_return": {
+                "options": "two_or_three_materially_distinct_options",
+                "recommendation": "one_preferred_option_with_reasoning",
+                "changed_variable": "name_the_primary_variable_changed_from_the_previous_attempt",
+                "success_signal": "define_the_business_signal_that_would_support_or_disprove_the_new_hypothesis",
+            },
+            "approval_boundary": "Tony must review the returned redesign before any external execution.",
+            "execution_performed": False,
+        }
+        self._pending_adaptation = None
+        label = str(pending["priority"].get("label") or "this priority")
+        return CommandResponse(
+            "executive_adaptation_handoff",
+            "healthy",
+            (
+                f"Agreed. I have prepared the adaptive redesign handoff for {label}. Claude should return distinct options, name the variable being changed and define the success signal. "
+                "Tony remains responsible for review. Nothing has been executed externally yet."
+            ),
+            {
+                "intent": "delegate_adaptive_redesign",
+                "adaptation_status": "worker_handoff_ready",
+                "handoff": handoff,
+                "execution_performed": False,
+            },
+        )
+
+    @classmethod
+    def _is_adaptation_approval(cls, lowered: str) -> bool:
+        cleaned = lowered.strip().rstrip(".!?")
+        return any(marker == cleaned or cleaned.endswith(f" {marker}") for marker in cls._APPROVAL_MARKERS)
 
     def _latest_relevant_lesson(self) -> dict[str, Any] | None:
         lessons = self._load_lessons()
