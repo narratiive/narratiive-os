@@ -3,10 +3,12 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_command_service import CommandResponse
+from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 
 
 class StubCommandService:
@@ -92,8 +94,14 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
     def test_final_approval_creates_controlled_test_handoff(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Path(tmp) / "learning.json"
+            action_store = Path(tmp) / "focus.json"
             write_lesson(store, status="negative")
-            service = TonyAdaptiveResponseCommandService(StubCommandService(), learning_store_path=store)
+            service = TonyAdaptiveResponseCommandService(
+                StubCommandService(),
+                learning_store_path=store,
+                action_store_path=action_store,
+                clock=lambda: datetime(2026, 8, 15, 2, 30, tzinfo=timezone.utc),
+            )
             service.execute("What should we try instead?", [])
             service.execute("Go ahead with the redesign", [])
             service.execute("Review what Claude returned", [strong_return()])
@@ -107,8 +115,37 @@ class TonyAdaptiveResponseTests(unittest.TestCase):
             self.assertIn("qualified reply", handoff["success_signal"])
             self.assertTrue(handoff["completion_evidence_required"])
             self.assertTrue(handoff["outcome_evidence_required"])
+            self.assertTrue(handoff["action_id"].startswith("adaptive:lead:lesley:"))
             self.assertFalse(response.data["execution_performed"])
             self.assertFalse(response.data["external_action_taken"])
+
+    def test_approved_adaptive_test_enters_persistent_action_accountability(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            learning_store = Path(tmp) / "learning.json"
+            action_store = Path(tmp) / "focus.json"
+            write_lesson(learning_store, status="negative")
+            service = TonyAdaptiveResponseCommandService(
+                StubCommandService(),
+                learning_store_path=learning_store,
+                action_store_path=action_store,
+                clock=lambda: datetime(2026, 8, 15, 2, 30, tzinfo=timezone.utc),
+            )
+            service.execute("What should we try instead?", [])
+            service.execute("Go ahead with the redesign", [])
+            service.execute("Review what Claude returned", [strong_return()])
+            approved = service.execute("Run the test", [])
+
+            restarted = TonyPersistentAgencyFocusCommandService(StubCommandService(), store_path=action_store)
+            status = restarted.execute("What's happening with that?", [])
+
+            self.assertEqual(status.command, "agency_focus_action_status")
+            self.assertEqual(status.data["execution_status"], "awaiting_worker_confirmation")
+            pending = status.data["pending_action"]
+            self.assertEqual(pending["action_id"], approved.data["execution_handoff"]["action_id"])
+            self.assertTrue(pending["adaptive_test"])
+            self.assertEqual(pending["changed_variable"], "opening proposition")
+            self.assertIn("qualified reply", pending["success_signal"])
+            self.assertFalse(status.data["external_action_taken"])
 
     def test_final_approval_without_reviewed_redesign_does_not_invent_handoff(self):
         with tempfile.TemporaryDirectory() as tmp:
