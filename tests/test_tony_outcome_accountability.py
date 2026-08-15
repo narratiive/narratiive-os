@@ -67,6 +67,63 @@ class TonyOutcomeAccountabilityTests(unittest.TestCase):
             self.assertEqual(status.data["business_outcome_status"], "unverified")
             self.assertIn("would not call it successful", status.message)
 
+    def test_adaptive_completion_creates_measurement_handoff_from_success_signal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "outcomes.json"
+            service = self.service(store)
+            service.command_service.completed.update({
+                "action_id": "adaptive:lead:lesley:2026-08-14T10:00:00+00:00",
+                "adaptive_test": True,
+                "changed_variable": "opening proposition",
+                "success_signal": "A qualified positive reply within three business days",
+            })
+
+            response = service.execute("record_action_result", [])
+
+            self.assertEqual(response.data["business_outcome_status"], "unverified")
+            measurement = response.data["outcome_measurement_handoff"]
+            self.assertEqual(measurement["measure_against"], "A qualified positive reply within three business days")
+            self.assertEqual(measurement["changed_variable"], "opening proposition")
+            self.assertTrue(measurement["evidence_required"])
+            self.assertIn("agreed success signal", response.message)
+
+            restarted = self.service(store)
+            status = restarted.execute("Did that work?", [])
+            self.assertIn("A qualified positive reply within three business days", status.message)
+            self.assertEqual(
+                status.data["awaiting_outcome"]["measurement_request"]["measure_against"],
+                "A qualified positive reply within three business days",
+            )
+
+    def test_adaptive_outcome_preserves_success_signal_for_learning(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "outcomes.json"
+            service = self.service(store)
+            service.command_service.completed.update({
+                "action_id": "adaptive:lead:lesley:2026-08-14T10:00:00+00:00",
+                "adaptive_test": True,
+                "changed_variable": "opening proposition",
+                "success_signal": "A qualified positive reply within three business days",
+            })
+            service.execute("record_action_result", [])
+
+            response = service.execute(
+                "outcome_result",
+                [{
+                    "action_id": service._awaiting_outcome["action_id"],
+                    "outcome_status": "positive",
+                    "evidence": {"reply_id": "reply-2", "signal": "qualified positive reply"},
+                    "summary": "The changed opening generated a qualified response.",
+                }],
+            )
+
+            self.assertEqual(response.data["outcome"]["changed_variable"], "opening proposition")
+            self.assertEqual(
+                response.data["outcome"]["success_signal"],
+                "A qualified positive reply within three business days",
+            )
+            self.assertIn("Measured against the agreed success signal", response.message)
+
     def test_matching_positive_outcome_is_recorded_and_persists(self):
         with tempfile.TemporaryDirectory() as tmp:
             store = Path(tmp) / "outcomes.json"
