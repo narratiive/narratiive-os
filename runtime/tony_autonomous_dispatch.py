@@ -74,6 +74,22 @@ class TonyAutonomousDispatchCommandService:
         "recommendations",
         "artifact",
     )
+    _RESULT_RECALL_MARKERS = (
+        "what did it find",
+        "what did they find",
+        "what came back",
+        "what was the result",
+        "what did you get back",
+        "tell me what came back",
+    )
+    _RESULT_RECOMMENDATION_MARKERS = (
+        "what do you recommend",
+        "what should we do with that",
+        "what should i do with that",
+        "what next",
+        "so what",
+    )
+    _ACKNOWLEDGEMENT_PREFIXES = ("ok, ", "okay, ", "yes, ", "right, ", "great, ", "fine, ")
 
     def __init__(
         self,
@@ -82,6 +98,7 @@ class TonyAutonomousDispatchCommandService:
     ) -> None:
         self.command_service = command_service
         self.dispatchers = dict(dispatchers or {})
+        self._last_verified_result: dict[str, Any] | None = None
 
     @property
     def mission_control_loader(self):
@@ -92,6 +109,14 @@ class TonyAutonomousDispatchCommandService:
         return bool(getattr(self.command_service, "github_configured", False))
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
+        normalized = " ".join(command.strip().split())
+        lowered = normalized.casefold()
+        if self._last_verified_result is not None:
+            if self._matches_follow_up(lowered, self._RESULT_RECALL_MARKERS):
+                return self._recall_last_verified_result()
+            if self._matches_follow_up(lowered, self._RESULT_RECOMMENDATION_MARKERS):
+                return self._recommend_from_last_verified_result()
+
         response = self.command_service.execute(command, objects)
         return self._dispatch_if_eligible(response)
 
@@ -151,6 +176,12 @@ class TonyAutonomousDispatchCommandService:
 
         result = DispatchResult(worker=worker, status="verified", evidence=evidence)
         executive_result = self._executive_result_summary(worker, dispatch, evidence)
+        self._last_verified_result = {
+            "worker": worker,
+            "dispatch": dict(dispatch),
+            "evidence": dict(evidence),
+            "executive_result": executive_result,
+        }
         updated = self._with_dispatch_state(
             response,
             data,
@@ -164,6 +195,82 @@ class TonyAutonomousDispatchCommandService:
         updated.data["execution_status"] = "autonomous_step_verified"
         updated.data["executive_result"] = executive_result
         return updated
+
+    def _recall_last_verified_result(self) -> CommandResponse:
+        context = dict(self._last_verified_result or {})
+        worker = str(context.get("worker") or "the worker").strip()
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        result = self._best_result_text(evidence)
+        if result:
+            message = f"The verified result from {worker} was: {result}"
+        else:
+            message = str(context.get("executive_result") or f"{worker} returned verified evidence.")
+        return CommandResponse(
+            command="autonomous_result_followup",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "recall_verified_autonomous_result",
+                "worker": worker,
+                "executive_result": context.get("executive_result"),
+                "external_action_taken": False,
+            },
+        )
+
+    def _recommend_from_last_verified_result(self) -> CommandResponse:
+        context = dict(self._last_verified_result or {})
+        worker = str(context.get("worker") or "the worker").strip()
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        proposal = self._first_rendered(evidence, ("recommended_next_action", "next_action", "recommendation"))
+        result = self._best_result_text(evidence)
+        if proposal:
+            message = (
+                f"Based on the verified {worker} result, the next proposed move is: {proposal} "
+                "I would use that as the working recommendation, while keeping any consequential send or persisted change behind the existing approval boundary."
+            )
+        elif result:
+            message = (
+                f"The verified result is: {result} "
+                "There is not enough grounded next-action evidence in the return itself for me to invent a consequential move. "
+                "I would re-rank the current agency priorities against this evidence before acting."
+            )
+        else:
+            message = (
+                f"{worker} returned verified evidence, but not enough decision-grade content for a grounded recommendation. "
+                "I would reassess the current agency priorities rather than manufacture a next step."
+            )
+        return CommandResponse(
+            command="autonomous_result_recommendation",
+            status="healthy",
+            message=message,
+            data={
+                "intent": "recommend_from_verified_autonomous_result",
+                "worker": worker,
+                "proposed_next_action": proposal,
+                "external_action_taken": False,
+            },
+        )
+
+    @classmethod
+    def _matches_follow_up(cls, lowered: str, markers: tuple[str, ...]) -> bool:
+        candidate = lowered.strip().rstrip("?!.,")
+        for prefix in cls._ACKNOWLEDGEMENT_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip().rstrip("?!.,")
+                break
+        return any(candidate == marker or candidate.startswith(marker + " ") for marker in markers)
+
+    @classmethod
+    def _best_result_text(cls, evidence: dict[str, Any]) -> str:
+        return cls._first_rendered(evidence, cls._EXECUTIVE_RESULT_KEYS)
+
+    @classmethod
+    def _first_rendered(cls, evidence: dict[str, Any], keys: tuple[str, ...]) -> str:
+        for key in keys:
+            rendered = cls._render_result_value(evidence.get(key))
+            if rendered:
+                return rendered
+        return ""
 
     @classmethod
     def _verify_evidence(cls, dispatch: dict[str, Any], evidence: Any) -> tuple[bool, str]:
