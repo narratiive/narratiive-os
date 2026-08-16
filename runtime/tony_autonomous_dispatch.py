@@ -374,11 +374,8 @@ class TonyAutonomousDispatchCommandService:
         worker = str(dispatch.get("worker") or "").strip().casefold()
         if worker != "gmail":
             return False
-        action = str(dispatch.get("action") or "").strip().casefold()
-        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
-        commercial_target = bool(str(target.get("lead_id") or "").strip() or str(target.get("contact") or "").strip())
-        commercial_action = any(marker in action for marker in ("reply", "email thread", "commercial", "lead"))
-        return commercial_target or commercial_action
+        action = str(dispatch.get("action") or dispatch.get("instruction") or "").strip().casefold()
+        return any(marker in action for marker in ("reply", "email thread", "commercial", "lead"))
 
     @classmethod
     def _has_work_product(cls, evidence: dict[str, Any]) -> bool:
