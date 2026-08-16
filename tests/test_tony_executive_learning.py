@@ -112,6 +112,28 @@ class TonyExecutiveLearningTests(unittest.TestCase):
             self.assertIn("before materially scaling", response.message.lower())
             self.assertFalse(response.data["external_action_taken"])
 
+    def test_four_positive_outcomes_create_measured_scale_candidate(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service_stub = StubCommandService()
+            service_stub.outcome_status = "positive"
+            service = TonyExecutiveLearningCommandService(service_stub, store_path=Path(tmp) / "learning.json")
+            for _ in range(4):
+                service.execute("outcome_result", [])
+
+            response = service.execute("do_first", [])
+
+            self.assertEqual(response.status, "healthy")
+            self.assertEqual(response.data["execution_status"], "ready_for_handoff")
+            guard = response.data["learning_guard"]
+            self.assertEqual(guard["status"], "measured_scale_candidate")
+            self.assertEqual(guard["positive_evidence_count"], 4)
+            self.assertEqual(guard["recommended_scale_mode"], "incremental")
+            self.assertTrue(guard["preserve_success_signal"])
+            self.assertIn("measured scale candidate", response.message.lower())
+            self.assertIn("increase exposure incrementally", response.message.lower())
+            self.assertIn("stop or adapt quickly", response.message.lower())
+            self.assertFalse(response.data["external_action_taken"])
+
     def test_learning_is_scoped_to_matching_priority(self):
         class OtherPriorityStub(StubCommandService):
             def execute(self, command, objects):
