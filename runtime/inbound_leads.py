@@ -48,8 +48,10 @@ def _default_summary(contact: str, company: str, notes: str) -> str:
 def _default_inbound_next_action(contact: str, company: str) -> str:
     subject = company or contact or "this lead"
     return (
-        f"Research {subject} and the stated growth challenge using available verified sources, assess fit for Narratiive, "
-        "and return an evidence-backed recommendation for the next commercial step. Do not send anything or change external state."
+        f"Research {subject} and the stated growth challenge using available verified sources. "
+        "Return the source-backed evidence, assess fit for Narratiive, identify the clearest strategic growth opportunity, "
+        "and prepare a first-pass Growth Blueprint grounded only in that evidence. Mark assumptions and evidence gaps explicitly, "
+        "and recommend whether Tony should advance, revise, or stop the opportunity. Do not send anything or change external state."
     )
 
 
@@ -79,8 +81,6 @@ class InboundLead:
 
     @classmethod
     def from_mapping(cls, value: dict[str, Any]) -> "InboundLead":
-        # Accept both the normalized contract and an entire Notion Create Page
-        # response so n8n does not need to reproduce Narratiive business logic.
         properties = value.get("properties") if isinstance(value.get("properties"), dict) else {}
 
         def choose(*names: str, default: str = "") -> str:
@@ -109,8 +109,6 @@ class InboundLead:
         ai_summary = choose("ai_summary", "AI Summary")
         created_at = choose("created_at", "createdTime", "created_time")
 
-        # Capture surfaces provide facts. Narratiive owns workflow defaults.
-        # An inbound submission is visible immediately but is not auto-qualified.
         if source.casefold() in {"tally", "growth diagnostic", "website"}:
             if not pipeline_stage:
                 pipeline_stage = "New Diagnostic"
@@ -122,22 +120,11 @@ class InboundLead:
                 ai_summary = _default_summary(contact, company, notes)
 
         return cls(
-            lead_id=lead_id.strip(),
-            contact=contact.strip(),
-            company=company.strip(),
-            email=email.strip(),
-            source=source.strip() or "Unknown",
-            status=status.strip() or "New",
-            pipeline_stage=pipeline_stage.strip(),
+            lead_id=lead_id.strip(), contact=contact.strip(), company=company.strip(), email=email.strip(),
+            source=source.strip() or "Unknown", status=status.strip() or "New", pipeline_stage=pipeline_stage.strip(),
             lead_temperature=lead_temperature.strip(),
-            recommended_next_action=(
-                recommended_next_action.strip()
-                or "Review the lead and decide the next commercial action."
-            ),
-            created_at=created_at.strip(),
-            notion_url=notion_url.strip(),
-            notes=notes.strip(),
-            ai_summary=ai_summary.strip(),
+            recommended_next_action=(recommended_next_action.strip() or "Review the lead and decide the next commercial action."),
+            created_at=created_at.strip(), notion_url=notion_url.strip(), notes=notes.strip(), ai_summary=ai_summary.strip(),
         )
 
     def to_dict(self) -> dict[str, str]:
@@ -153,21 +140,16 @@ class InboundLead:
         if self.pipeline_stage:
             qualifiers.append(self.pipeline_stage)
         evidence = tuple(filter(None, (
-            f"source:{self.source}",
-            f"status:{self.status}",
+            f"source:{self.source}", f"status:{self.status}",
             f"pipeline_stage:{self.pipeline_stage}" if self.pipeline_stage else "",
             f"lead_temperature:{self.lead_temperature}" if self.lead_temperature else "",
             f"notion:{self.notion_url}" if self.notion_url else "",
         )))
         return AgencyItem(
-            item_id=f"lead-{self.lead_id}",
-            area=AgencyArea.COMMERCIAL,
+            item_id=f"lead-{self.lead_id}", area=AgencyArea.COMMERCIAL,
             title=f"New lead: {label} ({' / '.join(qualifiers)})",
-            status=self.status.casefold().replace(" ", "_") or "new",
-            next_action=self.recommended_next_action,
-            owner="Tony",
-            evidence=evidence,
-            requires_matt=False,
+            status=self.status.casefold().replace(" ", "_") or "new", next_action=self.recommended_next_action,
+            owner="Tony", evidence=evidence, requires_matt=False,
         )
 
 

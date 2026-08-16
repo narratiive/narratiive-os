@@ -15,18 +15,10 @@ class InboundLeadTests(unittest.TestCase):
                 "Email": {"email": "paul@thompson.com"},
                 "Source": {"select": {"name": "Tally"}},
                 "Status": {"status": {"name": "New"}},
-                "Notes": {
-                    "rich_text": [
-                        {
-                            "plain_text": "We are busy but not getting customers and order value is declining."
-                        }
-                    ]
-                },
+                "Notes": {"rich_text": [{"plain_text": "We are busy but not getting customers and order value is declining."}]},
             },
         }
-
         lead = InboundLead.from_mapping(payload)
-
         self.assertEqual(lead.lead_id, payload["id"])
         self.assertEqual(lead.contact, "Paul Thompson")
         self.assertEqual(lead.company, "thompsons")
@@ -37,23 +29,18 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.lead_temperature, "Warm")
         self.assertIn("Research thompsons", lead.recommended_next_action)
         self.assertIn("verified sources", lead.recommended_next_action)
-        self.assertIn("evidence-backed recommendation", lead.recommended_next_action)
+        self.assertIn("source-backed evidence", lead.recommended_next_action)
+        self.assertIn("Growth Blueprint", lead.recommended_next_action)
+        self.assertIn("assumptions and evidence gaps", lead.recommended_next_action)
         self.assertNotIn("Opportunity Card", lead.recommended_next_action)
         self.assertIn("thompsons submitted an inbound growth enquiry", lead.ai_summary)
         self.assertEqual(lead.created_at, "2026-08-12T22:35:42.392Z")
 
     def test_explicit_commercial_judgement_is_never_overwritten(self):
-        lead = InboundLead.from_mapping(
-            {
-                "lead_id": "lead-1",
-                "contact": "Jane Smith",
-                "source": "Tally",
-                "pipeline_stage": "Discovery Call",
-                "lead_temperature": "Hot",
-                "recommended_next_action": "Prepare for discovery.",
-            }
-        )
-
+        lead = InboundLead.from_mapping({
+            "lead_id": "lead-1", "contact": "Jane Smith", "source": "Tally", "pipeline_stage": "Discovery Call",
+            "lead_temperature": "Hot", "recommended_next_action": "Prepare for discovery.",
+        })
         self.assertEqual(lead.pipeline_stage, "Discovery Call")
         self.assertEqual(lead.lead_temperature, "Hot")
         self.assertEqual(lead.recommended_next_action, "Prepare for discovery.")

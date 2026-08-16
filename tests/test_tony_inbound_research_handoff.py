@@ -19,31 +19,25 @@ class StubCommandService:
             return CommandResponse("delegated", "healthy", "delegated", {})
         item = self.lead.to_agency_item().to_dict()
         return CommandResponse(
-            "morning",
-            "healthy",
-            "brief",
-            {
-                "agency_state": {"executive_items": [item]},
-                "commercial_watch": {"positive_replies": [], "overdue": []},
-            },
+            "morning", "healthy", "brief",
+            {"agency_state": {"executive_items": [item]}, "commercial_watch": {"positive_replies": [], "overdue": []}},
         )
 
 
 class TonyInboundResearchHandoffTests(unittest.TestCase):
-    def test_new_inbound_lead_defaults_to_autonomous_evidence_research(self) -> None:
-        lead = InboundLead.from_mapping(
-            {
-                "id": "lead-1",
-                "Contact": "Jamie Example",
-                "Company": "Example Co",
-                "Source": "Tally",
-                "Notes": "We have grown quickly but our positioning and marketing are fragmented.",
-            }
-        )
-        self.assertIn("Research Example Co", lead.recommended_next_action)
-        self.assertIn("verified sources", lead.recommended_next_action)
-        self.assertIn("evidence-backed recommendation", lead.recommended_next_action)
-        self.assertNotIn("Opportunity Card", lead.recommended_next_action)
+    def test_new_inbound_lead_research_prepares_evidence_grounded_growth_blueprint(self) -> None:
+        lead = InboundLead.from_mapping({
+            "id": "lead-1", "Contact": "Jamie Example", "Company": "Example Co", "Source": "Tally",
+            "Notes": "We have grown quickly but our positioning and marketing are fragmented.",
+        })
+        action = lead.recommended_next_action
+        self.assertIn("Research Example Co", action)
+        self.assertIn("verified sources", action)
+        self.assertIn("source-backed evidence", action)
+        self.assertIn("Growth Blueprint", action)
+        self.assertIn("assumptions and evidence gaps", action)
+        self.assertIn("advance, revise, or stop", action)
+        self.assertNotIn("Opportunity Card", action)
 
         service = TonyAgencyFocusCommandService(StubCommandService(lead))
         focus = service.execute("What should I focus on today?", ())
@@ -56,8 +50,11 @@ class TonyInboundResearchHandoffTests(unittest.TestCase):
         self.assertFalse(handoff["approval_required"])
         self.assertTrue(handoff["dispatch"]["eligible"])
         self.assertEqual(handoff["dispatch"]["state"], "ready_for_autonomous_dispatch")
-        self.assertIn("Research Example Co", handoff["action"])
-        self.assertIn("evidence-backed recommendation", handoff["dispatch"]["instruction"])
+        instruction = handoff["dispatch"]["instruction"]
+        self.assertIn("Research Example Co", instruction)
+        self.assertIn("source-backed evidence", instruction)
+        self.assertIn("first-pass Growth Blueprint", instruction)
+        self.assertIn("Do not send anything or change external state", instruction)
         self.assertFalse(response.data["external_action_taken"])
 
 
