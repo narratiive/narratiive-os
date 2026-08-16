@@ -141,6 +141,7 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             evidence.pop("next_action", None)
             evidence.pop("recommendation", None)
 
+        execution_next_action = ""
         if any(marker in text for marker in cls._AUTO_REPLY_MARKERS):
             disposition = "automatic_reply"
             recommendation = ""
@@ -150,6 +151,7 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         elif any(marker in text for marker in cls._MEETING_MARKERS):
             disposition = "meeting_intent"
             recommendation = "Check calendar availability for the next five business days, then prepare a concise discovery reply with two suitable times."
+            execution_next_action = "Check calendar availability for the next five business days."
         elif any(marker in text for marker in cls._INFORMATION_MARKERS):
             disposition = "information_request"
             recommendation = "Prepare a concise, tailored answer to the lead's question using the verified thread; do not force a meeting before answering what they asked."
@@ -162,10 +164,13 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
 
         if recommendation:
             evidence["recommended_next_action"] = recommendation
+        if execution_next_action:
+            evidence["execution_next_action"] = execution_next_action
         context["evidence"] = evidence
         context["commercial_judgement"] = {
             "disposition": disposition,
             "recommended_next_action": recommendation,
+            "execution_next_action": execution_next_action,
             "judgement_owner": "Tony",
             "evidence_basis": "verified_gmail_read",
         }
