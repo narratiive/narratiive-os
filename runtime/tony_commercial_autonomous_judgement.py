@@ -223,13 +223,18 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             f"Prepare a concise discovery reply to {contact} offering two suitable times from the verified Calendar result. "
             "Use only the returned availability and do not invent or extend any time slot."
         )
+        execution_next_action = (
+            f"Prepare a concise discovery response for {contact} using exactly two suitable times from the verified Calendar result. "
+            "Do not send it, create a calendar event, or invent any availability."
+        )
         evidence["recommended_next_action"] = recommendation
+        evidence["execution_next_action"] = execution_next_action
         evidence["verified_availability_summary"] = availability
         context["evidence"] = evidence
         context["commercial_judgement"] = {
             "disposition": "availability_verified",
             "recommended_next_action": recommendation,
-            "execution_next_action": "",
+            "execution_next_action": execution_next_action,
             "judgement_owner": "Tony",
             "evidence_basis": "verified_calendar_read",
         }
