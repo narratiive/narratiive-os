@@ -14,26 +14,8 @@ class StubCommandService:
 
     def execute(self, command, objects):
         return CommandResponse(
-            "agency_focus_action",
-            "healthy",
-            "Growth Blueprint preparation ready.",
-            {
-                "execution_handoff": {
-                    "worker": "Claude",
-                    "approval_required": False,
-                    "dispatch": {
-                        "eligible": True,
-                        "state": "ready_for_autonomous_dispatch",
-                        "worker": "Claude",
-                        "instruction": "Research this lead and prepare an evidence-grounded Growth Blueprint. Do not prepare or send outreach.",
-                        "target": {"lead_id": "lead-1", "contact": "Alex Example", "area": "commercial"},
-                        "execution_mode": "autonomous_prepare",
-                        "expected_evidence": "Growth Blueprint evidence package",
-                        "return_to": "Tony",
-                        "execution_truth": "not_dispatched",
-                    },
-                }
-            },
+            "agency_focus_action", "healthy", "Growth Blueprint preparation ready.",
+            {"execution_handoff": {"worker": "Claude", "approval_required": False, "dispatch": {"eligible": True, "state": "ready_for_autonomous_dispatch", "worker": "Claude", "instruction": "Research this lead and prepare an evidence-grounded Growth Blueprint. Do not prepare or send outreach.", "target": {"lead_id": "lead-1", "contact": "Alex Example", "area": "commercial"}, "execution_mode": "autonomous_prepare", "expected_evidence": "Growth Blueprint evidence package", "return_to": "Tony", "execution_truth": "not_dispatched"}}},
         )
 
 
@@ -47,18 +29,13 @@ class TonyBlueprintApprovalToOutreachTests(unittest.TestCase):
             "strategic_growth_opportunity": "Unify positioning and demand generation around one defensible growth narrative.",
             "recommendation": "Advance to Matt approval.",
         }
-        tmp = tempfile.TemporaryDirectory()
-        self.addCleanup(tmp.cleanup)
-        service = TonyCommercialAutonomousJudgementCommandService(
-            StubCommandService(),
-            dispatchers={"Claude": lambda contract: evidence},
-            store_path=Path(tmp.name) / "result.json",
-        )
+        tmp = tempfile.TemporaryDirectory(); self.addCleanup(tmp.cleanup)
+        service = TonyCommercialAutonomousJudgementCommandService(StubCommandService(), dispatchers={"Claude": lambda contract: evidence}, store_path=Path(tmp.name) / "result.json")
 
         reviewed = service.execute("OK, do that", [])
         self.assertEqual(reviewed.data["commercial_judgement"]["disposition"], "growth_blueprint_ready")
         self.assertIn("ready for your approval", reviewed.message)
-        self.assertFalse(reviewed.data["external_action_taken"])
+        self.assertIn("Nothing has been sent externally", reviewed.message)
 
         approved = service.execute("OK, do that", [])
         handoff = approved.data["execution_handoff"]
@@ -73,5 +50,4 @@ class TonyBlueprintApprovalToOutreachTests(unittest.TestCase):
         self.assertFalse(approved.data["external_action_taken"])
 
 
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
