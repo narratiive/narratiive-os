@@ -89,6 +89,13 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         "artifact",
         "result",
     )
+    _REVIEWED_SEND_APPROVALS = {
+        "send it",
+        "send that",
+        "send this",
+        "go ahead and send it",
+        "go ahead and send that",
+    }
 
     def __init__(
         self,
@@ -101,6 +108,8 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             self._persist_context(self._last_verified_result)
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
+        if self._is_reviewed_meeting_send_approval(command):
+            command = "do that"
         response = super().execute(command, objects)
         context = self._last_verified_result
         if context is None:
@@ -153,6 +162,20 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             message=response.message + suffix,
             data=data,
         )
+
+    def _is_reviewed_meeting_send_approval(self, command: str) -> bool:
+        context = self._last_verified_result
+        if not isinstance(context, dict):
+            return False
+        judgement = context.get("commercial_judgement")
+        if not isinstance(judgement, dict) or judgement.get("disposition") != "meeting_draft_ready":
+            return False
+        candidate = " ".join(command.strip().split()).casefold().rstrip("?!.,")
+        for prefix in self._ACKNOWLEDGEMENT_PREFIXES:
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip().rstrip("?!.,")
+                break
+        return candidate in self._REVIEWED_SEND_APPROVALS
 
     @classmethod
     def _enrich_context(cls, context: dict[str, Any]) -> bool:
