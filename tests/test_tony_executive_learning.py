@@ -130,8 +130,8 @@ class TonyExecutiveLearningTests(unittest.TestCase):
             self.assertEqual(guard["recommended_scale_mode"], "incremental")
             self.assertTrue(guard["preserve_success_signal"])
             self.assertIn("measured scale candidate", response.message.lower())
-            self.assertIn("increase exposure incrementally", response.message.lower())
-            self.assertIn("stop or adapt quickly", response.message.lower())
+            self.assertIn("one controlled increment", response.message.lower())
+            self.assertIn("stop or adapt", response.message.lower())
             self.assertFalse(response.data["external_action_taken"])
 
     def test_learning_is_scoped_to_matching_priority(self):

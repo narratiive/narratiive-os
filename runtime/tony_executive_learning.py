@@ -128,19 +128,33 @@ class TonyExecutiveLearningCommandService:
             guidance = str(lesson.get("guidance") or self._guidance_for(state))
             positive_run = self._consecutive_positive_count(key)
             if positive_run >= self._SCALE_READY_POSITIVE_RUN:
+                scale_guardrails = {
+                    "mode": "measured_incremental_scale",
+                    "exposure_step": "one_increment_only",
+                    "preserve_working_elements": True,
+                    "preserve_success_signal": True,
+                    "review_checkpoint": "after_next_matched_outcome",
+                    "stop_or_adapt_condition": "material weakening, negative outcome, or no_change outcome",
+                    "approval_required_before_external_scale": True,
+                    "external_action_taken": False,
+                }
                 data["learning_guard"] = {
                     "status": "measured_scale_candidate",
                     "prior_outcome": state,
                     "positive_evidence_count": positive_run,
                     "recommended_scale_mode": "incremental",
                     "preserve_success_signal": True,
+                    "scale_guardrails": scale_guardrails,
                     "lesson": dict(lesson),
                 }
+                data["scale_guardrails"] = dict(scale_guardrails)
+                data["external_action_taken"] = False
                 message = (
                     f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority. "
                     "That is enough evidence to treat this as a measured scale candidate rather than another simple repeat. "
-                    "I would increase exposure incrementally, preserve the elements that appear to be working, and keep the same success signal "
-                    "so we can stop or adapt quickly if the effect weakens."
+                    "I would increase exposure by one controlled increment only, preserve the elements that appear to be working and keep the same success signal. "
+                    "We should review the next matched outcome before increasing exposure again, and stop or adapt if the effect materially weakens. "
+                    "Any external scale-up still requires explicit approval."
                 )
                 return CommandResponse(response.command, response.status, message, data)
 
