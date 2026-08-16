@@ -152,7 +152,7 @@ class TonyAgencyFocusTests(unittest.TestCase):
         self.assertIn("overdue follow-up", response.message)
         self.assertEqual(inner.calls, ["morning"])
 
-    def test_do_first_one_turns_positive_reply_into_gmail_handoff_without_claiming_execution(self):
+    def test_do_first_one_turns_positive_reply_into_autonomous_gmail_read(self):
         inner = StubCommandService(
             {
                 "agency_state": {"executive_items": []},
@@ -182,9 +182,45 @@ class TonyAgencyFocusTests(unittest.TestCase):
         self.assertEqual(handoff["worker"], "Gmail")
         self.assertEqual(handoff["then_owner"], "Tony")
         self.assertEqual(handoff["target"]["lead_id"], "jimmy")
-        self.assertTrue(handoff["approval_required"])
+        self.assertFalse(handoff["approval_required"])
+        self.assertEqual(handoff["execution_mode"], "autonomous_read")
+        self.assertEqual(handoff["dispatch"]["state"], "ready_for_autonomous_dispatch")
+        self.assertTrue(handoff["dispatch"]["eligible"])
+        self.assertIn("verified email thread", handoff["action"])
         self.assertIn("have not claimed", response.message)
+        self.assertNotIn("behind your approval", response.message)
         self.assertEqual(inner.calls, ["morning"])
+
+    def test_do_first_one_turns_overdue_follow_up_into_autonomous_gmail_read(self):
+        inner = StubCommandService(
+            {
+                "agency_state": {"executive_items": []},
+                "commercial_watch": {
+                    "positive_replies": [],
+                    "overdue": [
+                        {
+                            "commitment_id": "follow-up:lesley",
+                            "lead_id": "lesley",
+                            "contact": "Lesley",
+                            "company": "Harman Communications",
+                            "due_on": "2026-08-13",
+                        }
+                    ],
+                },
+            }
+        )
+        service = TonyAgencyFocusCommandService(inner)
+
+        service.execute("What should I focus on today?", [])
+        response = service.execute("Do that first", [])
+
+        handoff = response.data["execution_handoff"]
+        self.assertEqual(handoff["worker"], "Gmail")
+        self.assertFalse(handoff["approval_required"])
+        self.assertEqual(handoff["execution_mode"], "autonomous_read")
+        self.assertEqual(handoff["dispatch"]["state"], "ready_for_autonomous_dispatch")
+        self.assertEqual(handoff["target"]["commitment_id"], "follow-up:lesley")
+        self.assertIn("check the verified email thread", handoff["action"])
 
     def test_do_first_one_preserves_matt_owned_client_decision(self):
         inner = StubCommandService(

@@ -231,25 +231,21 @@ class TonyAgencyFocusCommandService:
         reason = str(priority.get("reason") or "")
         target = dict(priority.get("target") or {})
         if reason == "new_positive_commercial_intent":
-            return {
-                "worker": "Gmail",
-                "action": "retrieve the verified reply thread so Tony can assess the response and prepare the right discovery follow-up",
-                "then_owner": "Tony",
-                "approval_required": True,
-                "target": target,
-                "routing_reason": "fresh commercial intent should be grounded in the verified email thread",
-                "execution_truth": "handoff_prepared_only",
-            }
+            evidence_priority = dict(priority)
+            evidence_priority["action"] = (
+                "retrieve the verified email thread for this lead so Tony can assess the response and prepare the right discovery follow-up"
+            )
+            handoff = self.tool_router.route(evidence_priority)
+            handoff["routing_reason"] = "fresh commercial intent should be grounded in the verified email thread before Tony recommends a consequential response"
+            return handoff
         if reason == "overdue_commercial_commitment":
-            return {
-                "worker": "Gmail",
-                "action": "check the lead thread for a reply before Tony decides the next commercial move",
-                "then_owner": "Tony",
-                "approval_required": True,
-                "target": target,
-                "routing_reason": "the next commercial decision depends on verified reply evidence",
-                "execution_truth": "handoff_prepared_only",
-            }
+            evidence_priority = dict(priority)
+            evidence_priority["action"] = (
+                "check the verified email thread for a reply before Tony decides the next commercial move"
+            )
+            handoff = self.tool_router.route(evidence_priority)
+            handoff["routing_reason"] = "the next commercial decision depends on verified reply evidence, and reading that evidence is reversible"
+            return handoff
         if bool(priority.get("requires_matt")):
             return {
                 "worker": "Matt",
