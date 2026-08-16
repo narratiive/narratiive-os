@@ -35,7 +35,10 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.status, "New")
         self.assertEqual(lead.pipeline_stage, "New Diagnostic")
         self.assertEqual(lead.lead_temperature, "Warm")
-        self.assertIn("validate fit", lead.recommended_next_action)
+        self.assertIn("Research thompsons", lead.recommended_next_action)
+        self.assertIn("verified sources", lead.recommended_next_action)
+        self.assertIn("evidence-backed recommendation", lead.recommended_next_action)
+        self.assertNotIn("Opportunity Card", lead.recommended_next_action)
         self.assertIn("thompsons submitted an inbound growth enquiry", lead.ai_summary)
         self.assertEqual(lead.created_at, "2026-08-12T22:35:42.392Z")
 
