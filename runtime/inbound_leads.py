@@ -45,6 +45,14 @@ def _default_summary(contact: str, company: str, notes: str) -> str:
     return f"{subject} submitted an inbound growth enquiry: {notes}"
 
 
+def _default_inbound_next_action(contact: str, company: str) -> str:
+    subject = company or contact or "this lead"
+    return (
+        f"Research {subject} and the stated growth challenge using available verified sources, assess fit for Narratiive, "
+        "and return an evidence-backed recommendation for the next commercial step. Do not send anything or change external state."
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class InboundLead:
     lead_id: str
@@ -109,10 +117,7 @@ class InboundLead:
             if not lead_temperature:
                 lead_temperature = "Warm"
             if not recommended_next_action:
-                recommended_next_action = (
-                    "Review the growth challenge, validate fit for Narratiive, and decide whether to prepare "
-                    "an Opportunity Card or invite the lead to discovery."
-                )
+                recommended_next_action = _default_inbound_next_action(contact, company)
             if not ai_summary:
                 ai_summary = _default_summary(contact, company, notes)
 
