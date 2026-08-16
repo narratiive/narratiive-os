@@ -87,7 +87,8 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
         self.assertTrue(handoff["approval_required"])
         self.assertTrue(handoff["approval_granted"])
         self.assertIn(self.SUBJECT, handoff["action"])
-        self.assertIn(self.BODY, handoff["dispatch"]["instruction"])
+        self.assertIn(self.BODY, handoff["action"])
+        self.assertIn("Hi Alex", handoff["dispatch"]["instruction"])
         self.assertIn("exactly as reviewed", handoff["dispatch"]["instruction"])
         self.assertFalse(response.data["external_action_taken"])
 
