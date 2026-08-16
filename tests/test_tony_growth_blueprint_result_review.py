@@ -40,7 +40,7 @@ class TonyGrowthBlueprintResultReviewTests(unittest.TestCase):
         self.assertEqual(judgement["disposition"], "growth_blueprint_revision_required")
         self.assertIn("source_backed_evidence_present", judgement["failed_checks"])
         self.assertIn("Revise the Growth Blueprint", judgement["execution_next_action"])
-        self.assertNotIn("send outreach", judgement["execution_next_action"].casefold())
+        self.assertIn("do not prepare or send outreach", judgement["execution_next_action"].casefold())
         self.assertIn("would not progress it yet", response.message)
 
 
