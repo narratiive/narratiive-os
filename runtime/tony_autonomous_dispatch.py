@@ -61,6 +61,12 @@ class TonyAutonomousDispatchCommandService:
         "options",
         "artifact",
         "result",
+        # Outreach preparation returns structured copy rather than a generic
+        # `draft` field. Treat a substantive email body as a real internal work
+        # product so the verified-return path can advance into Tony's review
+        # layer without weakening the write-evidence boundary used for Gmail.
+        "email_body",
+        "outreach_body",
     }
     _WRITE_PROOF_KEYS = {
         "sent",
