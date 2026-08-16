@@ -87,9 +87,13 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
         self.assertTrue(handoff["approval_required"])
         self.assertTrue(handoff["approval_granted"])
         self.assertIn(self.SUBJECT, handoff["action"])
-        self.assertIn(self.BODY, handoff["action"])
         self.assertIn("Hi Alex", handoff["dispatch"]["instruction"])
         self.assertIn("exactly as reviewed", handoff["dispatch"]["instruction"])
+        payload = handoff["dispatch"]["payload"]
+        self.assertEqual(payload["kind"], "reviewed_outreach_email")
+        self.assertEqual(payload["subject"], self.SUBJECT)
+        self.assertEqual(payload["body"], self.BODY)
+        self.assertIn("restrained visual treatment", payload["creative_brief"])
         self.assertFalse(response.data["external_action_taken"])
 
     def test_weak_outreach_is_routed_to_revision_and_never_exposes_send_action(self):
