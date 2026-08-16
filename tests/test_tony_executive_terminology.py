@@ -80,7 +80,7 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
             response.data["terminology_policy_version"], "2026.07-test"
         )
 
-    def test_retired_language_fails_closed_before_archive(self):
+    def test_retired_language_is_rewritten_without_archiving_unsafe_source(self):
         base_snapshot = snapshot()
         unsafe_workstream = replace(
             base_snapshot.workstreams[0],
@@ -104,9 +104,10 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
 
         response = service.execute("/morning", [])
 
-        self.assertEqual(response.status, "error")
-        self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
-        self.assertIn("strategy session", response.message.lower())
+        self.assertEqual(response.status, "healthy")
+        self.assertNotIn("strategy session", response.message.lower())
+        self.assertIn("Growth Blueprint", response.message)
+        self.assertTrue(response.data["terminology_rewritten"])
         self.assertEqual(archive.briefs, [])
 
     def test_unavailable_policy_fails_closed(self):
