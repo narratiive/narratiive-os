@@ -135,7 +135,9 @@ class TonyExecutiveCommandService:
                 lead_source_available=lead_source_available,
             )
             brief = self.agency_brief_service.build(state, period)
-            message = policy.rewrite(brief.render_compact())
+            source_message = brief.render_compact()
+            source_violations = policy.scan(source_message)
+            message = policy.rewrite(source_message)
             violations = policy.scan(message)
             if violations:
                 terms = ", ".join(sorted({item.term for item in violations}))
@@ -143,7 +145,7 @@ class TonyExecutiveCommandService:
                     f"executive brief uses retired terminology after rewrite under policy {policy.version}: {terms}"
                 )
 
-            if self.brief_archive is not None:
+            if self.brief_archive is not None and not source_violations:
                 legacy_period = self._legacy_period(period)
                 archive_brief = self.brief_service.build(snapshot, legacy_period)
                 self.brief_archive.store(archive_brief)
@@ -158,6 +160,7 @@ class TonyExecutiveCommandService:
         data = brief.to_dict()
         data["agency_state"] = state.to_dict()
         data["terminology_policy_version"] = policy.version
+        data["terminology_rewritten"] = bool(source_violations)
         data["inbound_leads_loaded"] = len(leads)
         data["inbound_lead_source_available"] = lead_source_available
         return CommandResponse(
