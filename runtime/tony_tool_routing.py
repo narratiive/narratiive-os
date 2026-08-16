@@ -51,14 +51,26 @@ class TonyExecutiveToolRouter:
         label = str(priority.get("label") or "").strip()
         area = str(priority.get("area") or "").strip().casefold()
         text = f"{label} {action}".casefold()
+        action_text = action.casefold()
         target = dict(priority.get("target") or {})
 
         worker = "Claude"
         rationale = "the work needs reasoning, drafting or synthesis before execution"
 
+        # An explicit draft-only instruction is internal preparation even when its
+        # evidence source or subject mentions Calendar/Gmail. This prevents Tony from
+        # routing a request to *prepare* a response back into a stateful external tool.
+        draft_only = (
+            self._contains(action_text, ("prepare", "draft"))
+            and self._contains(action_text, ("do not send", "don't send", "without sending", "not send"))
+        )
+
         # Prefer the execution surface that owns the primary action, not a system
         # merely mentioned as the downstream destination.
-        if self._contains(text, self._CALENDAR_MARKERS):
+        if draft_only:
+            worker = "Claude"
+            rationale = "the next step is explicitly internal draft preparation and must not mutate an external system"
+        elif self._contains(text, self._CALENDAR_MARKERS):
             worker = "Google Calendar"
             rationale = "the next step is primarily scheduling or meeting coordination"
         elif self._contains(text, self._GMAIL_MARKERS):
