@@ -127,6 +127,13 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         execution_next_action = ""
         if review.status == "ready_for_approval":
             disposition = "growth_blueprint_ready"
+            contact = str(target.get("contact") or "the lead").strip() or "the lead"
+            execution_next_action = (
+                f"Prepare a tailored outreach package for {contact} using only the reviewed Growth Blueprint and verified evidence. "
+                "Return a concise email subject and body plus any supporting personalised creative brief that materially strengthens the approach. "
+                "Preserve evidence gaps and do not invent claims. Do not send the email, update Notion, create a calendar event, or change any external state."
+            )
+            evidence["execution_next_action"] = execution_next_action
         elif review.status == "stop_recommended":
             disposition = "growth_blueprint_stop"
         else:
