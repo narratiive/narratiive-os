@@ -20,6 +20,9 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
     _COMMERCIAL_TEXT_KEYS = ("content", "thread_content", "body", "snippet", "summary", "analysis", "result")
     _CALENDAR_RESULT_KEYS = ("availability", "available_slots", "slots", "options", "summary", "analysis", "result")
     _DRAFT_RESULT_KEYS = ("draft", "work_product", "content", "artifact", "result")
+    _OUTREACH_SUBJECT_KEYS = ("email_subject", "subject")
+    _OUTREACH_BODY_KEYS = ("email_body", "body", "draft", "work_product", "content")
+    _OUTREACH_CREATIVE_KEYS = ("creative_brief", "creative_treatment", "supporting_creative_brief")
     _REVIEWED_SEND_APPROVALS = {"send it", "send that", "send this", "go ahead and send it", "go ahead and send that"}
 
     def __init__(self, command_service, dispatchers: Mapping[str, DispatchHandler] | None = None, **kwargs) -> None:
@@ -28,7 +31,7 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             self._persist_context(self._last_verified_result)
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
-        if self._is_reviewed_meeting_send_approval(command):
+        if self._is_reviewed_meeting_send_approval(command) or self._is_reviewed_outreach_send_approval(command):
             command = "do that"
         response = super().execute(command, objects)
         context = self._last_verified_result
@@ -51,6 +54,11 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             suffix = f" I reviewed the returned Growth Blueprint and would not progress it yet. It needs revision on: {failed or 'the Blueprint quality requirements'}. Nothing has been sent externally."
         elif disposition == "growth_blueprint_stop":
             suffix = f" I reviewed the returned Growth Blueprint and recommend stopping this opportunity. {recommendation}"
+        elif disposition == "outreach_package_ready":
+            suffix = f" I reviewed Claude's returned outreach package. The email is specific, substantive and bounded enough to send. It is ready for your final approval. I recommend: {recommendation} Nothing has been sent externally."
+        elif disposition == "outreach_package_revision_required":
+            failed = ", ".join(str(item) for item in judgement.get("failed_checks", ()))
+            suffix = f" I reviewed Claude's returned outreach package and would not send it yet. It needs revision on: {failed or 'the outreach quality requirements'}. Nothing has been sent externally."
         elif disposition == "meeting_intent":
             suffix = f" My judgement: they are signalling a conversation. I recommend: {recommendation}"
         elif disposition == "availability_verified":
@@ -72,44 +80,174 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             suffix = " My judgement: the reply is not clear enough to justify a consequential next move yet."
         return CommandResponse(response.command, response.status, response.message + suffix, data)
 
-    def _is_reviewed_meeting_send_approval(self, command: str) -> bool:
-        context = self._last_verified_result
-        if not isinstance(context, dict): return False
-        judgement = context.get("commercial_judgement")
-        if not isinstance(judgement, dict) or judgement.get("disposition") != "meeting_draft_ready": return False
+    def _normalised_send_approval(self, command: str) -> bool:
         candidate = " ".join(command.strip().split()).casefold().rstrip("?!.,")
         for prefix in self._ACKNOWLEDGEMENT_PREFIXES:
-            if candidate.startswith(prefix): candidate = candidate[len(prefix):].strip().rstrip("?!.,"); break
+            if candidate.startswith(prefix):
+                candidate = candidate[len(prefix):].strip().rstrip("?!.,")
+                break
         return candidate in self._REVIEWED_SEND_APPROVALS
+
+    def _is_reviewed_meeting_send_approval(self, command: str) -> bool:
+        context = self._last_verified_result
+        if not isinstance(context, dict):
+            return False
+        judgement = context.get("commercial_judgement")
+        return bool(
+            isinstance(judgement, dict)
+            and judgement.get("disposition") == "meeting_draft_ready"
+            and self._normalised_send_approval(command)
+        )
+
+    def _is_reviewed_outreach_send_approval(self, command: str) -> bool:
+        context = self._last_verified_result
+        if not isinstance(context, dict):
+            return False
+        judgement = context.get("commercial_judgement")
+        return bool(
+            isinstance(judgement, dict)
+            and judgement.get("disposition") == "outreach_package_ready"
+            and self._normalised_send_approval(command)
+        )
 
     @classmethod
     def _enrich_context(cls, context: dict[str, Any]) -> bool:
-        if isinstance(context.get("commercial_judgement"), dict): return False
+        if isinstance(context.get("commercial_judgement"), dict):
+            return False
         worker = str(context.get("worker") or "").strip().casefold()
-        if worker in {"google calendar", "calendar"}: return cls._enrich_calendar_context(context)
+        if worker in {"google calendar", "calendar"}:
+            return cls._enrich_calendar_context(context)
         if worker == "claude":
-            return cls._enrich_growth_blueprint_context(context) or cls._enrich_meeting_draft_context(context)
-        if worker != "gmail": return False
+            return (
+                cls._enrich_outreach_package_context(context)
+                or cls._enrich_growth_blueprint_context(context)
+                or cls._enrich_meeting_draft_context(context)
+            )
+        if worker != "gmail":
+            return False
         dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
         evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
-        if str(dispatch.get("execution_mode") or "") != "autonomous_read" or not cls._requires_decision_grade_read(dispatch): return False
+        if str(dispatch.get("execution_mode") or "") != "autonomous_read" or not cls._requires_decision_grade_read(dispatch):
+            return False
         text = cls._commercial_text(evidence).casefold()
-        if not text: return False
+        if not text:
+            return False
         worker_recommendation = str(evidence.get("recommended_next_action") or evidence.get("next_action") or evidence.get("recommendation") or "").strip()
         if worker_recommendation:
             evidence["worker_recommended_next_action"] = worker_recommendation
-            evidence.pop("recommended_next_action", None); evidence.pop("next_action", None); evidence.pop("recommendation", None)
+            evidence.pop("recommended_next_action", None)
+            evidence.pop("next_action", None)
+            evidence.pop("recommendation", None)
         execution_next_action = ""
-        if any(marker in text for marker in cls._AUTO_REPLY_MARKERS): disposition, recommendation = "automatic_reply", ""
-        elif any(marker in text for marker in cls._DECLINE_MARKERS): disposition, recommendation = "declined", "Update the lead record to closed or declined and stop active follow-up."
-        elif any(marker in text for marker in cls._MEETING_MARKERS): disposition, recommendation, execution_next_action = "meeting_intent", "Check calendar availability for the next five business days, then prepare a concise discovery reply with two suitable times.", "Check calendar availability for the next five business days."
-        elif any(marker in text for marker in cls._INFORMATION_MARKERS): disposition, recommendation = "information_request", "Prepare a concise, tailored answer to the lead's question using the verified thread; do not force a meeting before answering what they asked."
-        elif any(marker in text for marker in cls._POSITIVE_MARKERS): disposition, recommendation = "positive_intent", "Reply to the lead, acknowledge the interest, and suggest a discovery conversation as the next option."
-        else: disposition, recommendation = "reply_received", ""
-        if recommendation: evidence["recommended_next_action"] = recommendation
-        if execution_next_action: evidence["execution_next_action"] = execution_next_action
+        if any(marker in text for marker in cls._AUTO_REPLY_MARKERS):
+            disposition, recommendation = "automatic_reply", ""
+        elif any(marker in text for marker in cls._DECLINE_MARKERS):
+            disposition, recommendation = "declined", "Update the lead record to closed or declined and stop active follow-up."
+        elif any(marker in text for marker in cls._MEETING_MARKERS):
+            disposition, recommendation, execution_next_action = "meeting_intent", "Check calendar availability for the next five business days, then prepare a concise discovery reply with two suitable times.", "Check calendar availability for the next five business days."
+        elif any(marker in text for marker in cls._INFORMATION_MARKERS):
+            disposition, recommendation = "information_request", "Prepare a concise, tailored answer to the lead's question using the verified thread; do not force a meeting before answering what they asked."
+        elif any(marker in text for marker in cls._POSITIVE_MARKERS):
+            disposition, recommendation = "positive_intent", "Reply to the lead, acknowledge the interest, and suggest a discovery conversation as the next option."
+        else:
+            disposition, recommendation = "reply_received", ""
+        if recommendation:
+            evidence["recommended_next_action"] = recommendation
+        if execution_next_action:
+            evidence["execution_next_action"] = execution_next_action
         context["evidence"] = evidence
         context["commercial_judgement"] = {"disposition": disposition, "recommended_next_action": recommendation, "execution_next_action": execution_next_action, "judgement_owner": "Tony", "evidence_basis": "verified_gmail_read"}
+        return True
+
+    @classmethod
+    def _enrich_outreach_package_context(cls, context: dict[str, Any]) -> bool:
+        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
+        instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip()
+        lowered_instruction = instruction.casefold()
+        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare":
+            return False
+        if str(target.get("area") or "").strip().casefold() != "commercial":
+            return False
+        if "tailored outreach package" not in lowered_instruction or "do not send" not in lowered_instruction:
+            return False
+
+        subject = cls._first_rendered(evidence, cls._OUTREACH_SUBJECT_KEYS)
+        body = cls._first_rendered(evidence, cls._OUTREACH_BODY_KEYS)
+        creative = cls._first_rendered(evidence, cls._OUTREACH_CREATIVE_KEYS)
+        contact = str(target.get("contact") or "").strip()
+        first_name = contact.split()[0].casefold() if contact else ""
+        body_words = len(body.split()) if body else 0
+        subject_words = len(subject.split()) if subject else 0
+        combined = f"{subject} {body} {creative}".casefold()
+        execution_claims = (
+            "email sent",
+            "i sent the email",
+            "we sent the email",
+            "updated notion",
+            "calendar event created",
+            "meeting booked",
+        )
+        checks = {
+            "subject_present": bool(subject),
+            "subject_concise": 3 <= subject_words <= 14,
+            "body_present": bool(body),
+            "contact_specific": bool(first_name and first_name in body.casefold()),
+            "body_substantive": 35 <= body_words <= 220,
+            "no_false_execution_claim": not any(marker in combined for marker in execution_claims),
+        }
+        ready = all(checks.values())
+        recommendation = ""
+        execution_next_action = ""
+        if ready:
+            recipient = contact or "the lead"
+            recommendation = f"Send the reviewed outreach email to {recipient} via Gmail."
+            execution_next_action = (
+                f"Send the following reviewed outreach email to {recipient} via Gmail exactly as reviewed.\n"
+                f"Subject: {subject}\n\n{body}\n\n"
+                "Do not alter the reviewed subject or body before sending."
+            )
+            evidence.update(
+                {
+                    "recommended_next_action": recommendation,
+                    "execution_next_action": execution_next_action,
+                    "reviewed_outreach_subject": subject,
+                    "reviewed_outreach_body": body,
+                }
+            )
+            if creative:
+                evidence["reviewed_outreach_creative_brief"] = creative
+            disposition = "outreach_package_ready"
+        else:
+            disposition = "outreach_package_revision_required"
+            execution_next_action = (
+                "Revise the tailored outreach package against Tony's failed quality checks. "
+                "Return a concise email subject and a substantive contact-specific email body, plus any useful supporting creative brief. "
+                "Do not send the email or change any external state."
+            )
+            evidence["execution_next_action"] = execution_next_action
+            evidence.pop("reviewed_outreach_subject", None)
+            evidence.pop("reviewed_outreach_body", None)
+            evidence.pop("reviewed_outreach_creative_brief", None)
+        failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]
+        evidence.update(
+            {
+                "outreach_review_status": "ready_for_approval" if ready else "revision_required",
+                "outreach_review_checks": checks,
+            }
+        )
+        context["evidence"] = evidence
+        context["commercial_judgement"] = {
+            "disposition": disposition,
+            "recommended_next_action": recommendation,
+            "execution_next_action": execution_next_action,
+            "review_status": "ready_for_approval" if ready else "revision_required",
+            "review_checks": checks,
+            "failed_checks": failed_checks,
+            "judgement_owner": "Tony",
+            "evidence_basis": "verified_claude_outreach_package",
+        }
         return True
 
     @classmethod
@@ -118,9 +256,12 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
         target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
         instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").casefold()
-        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare": return False
-        if str(target.get("area") or "").strip().casefold() != "commercial": return False
-        if "growth blueprint" not in instruction: return False
+        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare":
+            return False
+        if str(target.get("area") or "").strip().casefold() != "commercial":
+            return False
+        if "growth blueprint" not in instruction:
+            return False
         review = TonyGrowthBlueprintReviewer().review(evidence)
         evidence["growth_blueprint_review"] = review.to_dict()
         recommendation = review.recommendation
@@ -146,35 +287,77 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
 
     @classmethod
     def _enrich_calendar_context(cls, context: dict[str, Any]) -> bool:
-        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}; evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}; target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}; instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip().casefold()
-        if str(dispatch.get("execution_mode") or "") != "autonomous_read" or str(target.get("area") or "").strip().casefold() != "commercial" or not (target.get("lead_id") or target.get("contact")) or not any(marker in instruction for marker in ("availability", "free time", "calendar")): return False
+        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
+        instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip().casefold()
+        if str(dispatch.get("execution_mode") or "") != "autonomous_read" or str(target.get("area") or "").strip().casefold() != "commercial" or not (target.get("lead_id") or target.get("contact")) or not any(marker in instruction for marker in ("availability", "free time", "calendar")):
+            return False
         availability = cls._first_rendered(evidence, cls._CALENDAR_RESULT_KEYS)
-        if not availability: return False
-        contact = str(target.get("contact") or "the lead").strip() or "the lead"; recommendation = f"Prepare a concise discovery reply to {contact} offering two suitable times from the verified Calendar result. Use only the returned availability and do not invent or extend any time slot."; execution_next_action = f"Prepare a concise discovery response for {contact}. The verified Calendar availability is: {availability}. Use exactly two suitable times from that evidence. Do not send it, create a calendar event, or invent any availability."
-        evidence.update({"recommended_next_action": recommendation, "execution_next_action": execution_next_action, "verified_availability_summary": availability}); context["evidence"] = evidence; context["commercial_judgement"] = {"disposition":"availability_verified","recommended_next_action":recommendation,"execution_next_action":execution_next_action,"judgement_owner":"Tony","evidence_basis":"verified_calendar_read"}; return True
+        if not availability:
+            return False
+        contact = str(target.get("contact") or "the lead").strip() or "the lead"
+        recommendation = f"Prepare a concise discovery reply to {contact} offering two suitable times from the verified Calendar result. Use only the returned availability and do not invent or extend any time slot."
+        execution_next_action = f"Prepare a concise discovery response for {contact}. The verified Calendar availability is: {availability}. Use exactly two suitable times from that evidence. Do not send it, create a calendar event, or invent any availability."
+        evidence.update({"recommended_next_action": recommendation, "execution_next_action": execution_next_action, "verified_availability_summary": availability})
+        context["evidence"] = evidence
+        context["commercial_judgement"] = {"disposition": "availability_verified", "recommended_next_action": recommendation, "execution_next_action": execution_next_action, "judgement_owner": "Tony", "evidence_basis": "verified_calendar_read"}
+        return True
 
     @classmethod
     def _enrich_meeting_draft_context(cls, context: dict[str, Any]) -> bool:
-        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}; evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}; target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}; instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip(); lowered_instruction = instruction.casefold()
-        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare" or str(target.get("area") or "").strip().casefold() != "commercial" or "verified calendar availability is:" not in lowered_instruction or "do not send" not in lowered_instruction: return False
-        draft = cls._first_rendered(evidence, cls._DRAFT_RESULT_KEYS); availability = cls._availability_from_instruction(instruction)
-        if not draft or not availability: return False
+        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
+        instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip()
+        lowered_instruction = instruction.casefold()
+        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare" or str(target.get("area") or "").strip().casefold() != "commercial" or "verified calendar availability is:" not in lowered_instruction or "do not send" not in lowered_instruction:
+            return False
+        draft = cls._first_rendered(evidence, cls._DRAFT_RESULT_KEYS)
+        availability = cls._availability_from_instruction(instruction)
+        if not draft or not availability:
+            return False
         worker_recommendation = str(evidence.get("recommended_next_action") or evidence.get("next_action") or evidence.get("recommendation") or "").strip()
-        if worker_recommendation: evidence["worker_recommended_next_action"] = worker_recommendation; evidence.pop("recommended_next_action", None); evidence.pop("next_action", None); evidence.pop("recommendation", None)
-        contact = str(target.get("contact") or "").strip(); first_name = contact.split()[0].casefold() if contact else ""; draft_folded = draft.casefold(); allowed_times = cls._time_tokens(availability); draft_times = cls._time_tokens(draft); used_verified_times = draft_times.intersection(allowed_times); invented_times = draft_times.difference(allowed_times)
-        checks = {"contact_specific": bool(first_name and first_name in draft_folded), "substantive": len(draft.split()) >= 20, "uses_exactly_two_verified_times": len(used_verified_times) == 2, "does_not_invent_times": not invented_times}; ready = all(checks.values()); recommendation = ""; execution_next_action = ""
+        if worker_recommendation:
+            evidence["worker_recommended_next_action"] = worker_recommendation
+            evidence.pop("recommended_next_action", None)
+            evidence.pop("next_action", None)
+            evidence.pop("recommendation", None)
+        contact = str(target.get("contact") or "").strip()
+        first_name = contact.split()[0].casefold() if contact else ""
+        draft_folded = draft.casefold()
+        allowed_times = cls._time_tokens(availability)
+        draft_times = cls._time_tokens(draft)
+        used_verified_times = draft_times.intersection(allowed_times)
+        invented_times = draft_times.difference(allowed_times)
+        checks = {"contact_specific": bool(first_name and first_name in draft_folded), "substantive": len(draft.split()) >= 20, "uses_exactly_two_verified_times": len(used_verified_times) == 2, "does_not_invent_times": not invented_times}
+        ready = all(checks.values())
+        recommendation = ""
+        execution_next_action = ""
         if ready:
-            recipient = contact or "the lead"; recommendation = f"Send the reviewed discovery reply to {recipient} via Gmail."; execution_next_action = f"Send the following reviewed discovery reply to {recipient} via Gmail exactly as reviewed.\n\n{draft}\n\nDo not alter the verified times or add new content before sending."; evidence.update({"recommended_next_action":recommendation,"execution_next_action":execution_next_action,"reviewed_meeting_draft":draft})
-        else: evidence.pop("execution_next_action", None); evidence.pop("reviewed_meeting_draft", None)
-        failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]; evidence.update({"meeting_draft_review_status":"ready_for_approval" if ready else "revision_required","meeting_draft_review_checks":checks,"verified_availability_summary":availability}); context["evidence"] = evidence; context["commercial_judgement"] = {"disposition":"meeting_draft_ready" if ready else "meeting_draft_revision_required","recommended_next_action":recommendation,"execution_next_action":execution_next_action,"review_status":"ready_for_approval" if ready else "revision_required","review_checks":checks,"failed_checks":failed_checks,"judgement_owner":"Tony","evidence_basis":"verified_claude_meeting_draft"}; return True
+            recipient = contact or "the lead"
+            recommendation = f"Send the reviewed discovery reply to {recipient} via Gmail."
+            execution_next_action = f"Send the following reviewed discovery reply to {recipient} via Gmail exactly as reviewed.\n\n{draft}\n\nDo not alter the verified times or add new content before sending."
+            evidence.update({"recommended_next_action": recommendation, "execution_next_action": execution_next_action, "reviewed_meeting_draft": draft})
+        else:
+            evidence.pop("execution_next_action", None)
+            evidence.pop("reviewed_meeting_draft", None)
+        failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]
+        evidence.update({"meeting_draft_review_status": "ready_for_approval" if ready else "revision_required", "meeting_draft_review_checks": checks, "verified_availability_summary": availability})
+        context["evidence"] = evidence
+        context["commercial_judgement"] = {"disposition": "meeting_draft_ready" if ready else "meeting_draft_revision_required", "recommended_next_action": recommendation, "execution_next_action": execution_next_action, "review_status": "ready_for_approval" if ready else "revision_required", "review_checks": checks, "failed_checks": failed_checks, "judgement_owner": "Tony", "evidence_basis": "verified_claude_meeting_draft"}
+        return True
 
     @staticmethod
     def _availability_from_instruction(instruction: str) -> str:
-        match = re.search(r"verified calendar availability is:\s*(.+?)\.\s*use exactly two suitable times", instruction, flags=re.IGNORECASE | re.DOTALL); return match.group(1).strip() if match else ""
+        match = re.search(r"verified calendar availability is:\s*(.+?)\.\s*use exactly two suitable times", instruction, flags=re.IGNORECASE | re.DOTALL)
+        return match.group(1).strip() if match else ""
 
     @staticmethod
-    def _time_tokens(value: str) -> set[str]: return set(re.findall(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b", value))
+    def _time_tokens(value: str) -> set[str]:
+        return set(re.findall(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b", value))
 
     @classmethod
     def _commercial_text(cls, evidence: dict[str, Any]) -> str:
-        parts = [cls._render_result_value(evidence.get(key)) for key in cls._COMMERCIAL_TEXT_KEYS]; return " ".join(part for part in parts if part)
+        parts = [cls._render_result_value(evidence.get(key)) for key in cls._COMMERCIAL_TEXT_KEYS]
+        return " ".join(part for part in parts if part)
