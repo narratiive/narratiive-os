@@ -20,6 +20,7 @@ class StubCommandService:
 
 class TonyCalendarReplyPreparationTests(unittest.TestCase):
     NOW = datetime(2026, 8, 16, 11, 0, tzinfo=timezone.utc)
+    AVAILABILITY = "Tuesday 10:00-10:30 or Wednesday 14:00-14:30"
 
     def service(self):
         tmp = tempfile.TemporaryDirectory()
@@ -40,7 +41,7 @@ class TonyCalendarReplyPreparationTests(unittest.TestCase):
                         },
                     },
                     "evidence": {
-                        "availability": "Tuesday 10:00-10:30 or Wednesday 14:00-14:30",
+                        "availability": self.AVAILABILITY,
                         "read_only": True,
                     },
                     "executive_result": "Calendar returned verified availability.",
@@ -55,7 +56,7 @@ class TonyCalendarReplyPreparationTests(unittest.TestCase):
             clock=lambda: self.NOW,
         )
 
-    def test_verified_availability_prepares_reply_draft_before_any_send(self):
+    def test_verified_availability_prepares_grounded_reply_draft_before_any_send(self):
         service = self.service()
 
         recommendation = service.execute("What do you recommend?", [])
@@ -64,6 +65,7 @@ class TonyCalendarReplyPreparationTests(unittest.TestCase):
         self.assertIn("discovery reply", judgement["recommended_next_action"])
         self.assertIn("two suitable times", judgement["recommended_next_action"])
         self.assertIn("Prepare a concise discovery response", judgement["execution_next_action"])
+        self.assertIn(self.AVAILABILITY, judgement["execution_next_action"])
         self.assertIn("Do not send it", judgement["execution_next_action"])
 
         response = service.execute("OK, do that", [])
@@ -77,6 +79,8 @@ class TonyCalendarReplyPreparationTests(unittest.TestCase):
         self.assertTrue(handoff["dispatch"]["eligible"])
         self.assertEqual(handoff["dispatch"]["state"], "ready_for_autonomous_dispatch")
         self.assertIn("two suitable times", handoff["action"])
+        self.assertIn(self.AVAILABILITY, handoff["action"])
+        self.assertIn(self.AVAILABILITY, handoff["dispatch"]["instruction"])
         self.assertIn("Do not send it", handoff["action"])
         self.assertFalse(response.data["external_action_taken"])
         self.assertNotEqual(handoff["worker"], "Gmail")

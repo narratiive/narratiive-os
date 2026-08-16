@@ -226,8 +226,8 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             "Use only the returned availability and do not invent or extend any time slot."
         )
         execution_next_action = (
-            f"Prepare a concise discovery response for {contact} using exactly two suitable times from the verified Calendar result. "
-            "Do not send it, create a calendar event, or invent any availability."
+            f"Prepare a concise discovery response for {contact}. The verified Calendar availability is: {availability}. "
+            "Use exactly two suitable times from that evidence. Do not send it, create a calendar event, or invent any availability."
         )
         evidence["recommended_next_action"] = recommendation
         evidence["execution_next_action"] = execution_next_action
