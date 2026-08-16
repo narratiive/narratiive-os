@@ -75,7 +75,7 @@ class TonyExecutiveLearningTests(unittest.TestCase):
             self.assertIn("Lesley Harman", response.message)
             self.assertIn("Do not repeat the same approach unchanged", response.message)
 
-    def test_positive_outcome_is_remembered_but_does_not_block_action(self):
+    def test_positive_outcome_informs_repeat_without_blocking_action(self):
         with tempfile.TemporaryDirectory() as tmp:
             service_stub = StubCommandService()
             service_stub.outcome_status = "positive"
@@ -84,8 +84,13 @@ class TonyExecutiveLearningTests(unittest.TestCase):
 
             response = service.execute("do_first", [])
 
+            self.assertEqual(response.status, "healthy")
             self.assertEqual(response.data["execution_status"], "ready_for_handoff")
-            self.assertNotIn("learning_guard", response.data)
+            self.assertEqual(response.data["learning_guard"]["status"], "evidence_supported_repeat")
+            self.assertEqual(response.data["learning_guard"]["prior_outcome"], "positive")
+            self.assertIn("last verified outcome", response.message)
+            self.assertIn("preserve the elements", response.message.lower())
+            self.assertFalse(response.data["external_action_taken"])
 
     def test_learning_is_scoped_to_matching_priority(self):
         class OtherPriorityStub(StubCommandService):
