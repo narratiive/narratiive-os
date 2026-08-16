@@ -84,7 +84,7 @@ class TonyExecutiveTerminologyRewriteTests(unittest.TestCase):
             inbound_lead_loader=lambda: (),
         )
 
-        response = service.execute("What should I focus on today?", ())
+        response = service.execute("/morning", ())
 
         self.assertEqual(response.status, "healthy")
         self.assertNotIn("Opportunity Card", response.message)
