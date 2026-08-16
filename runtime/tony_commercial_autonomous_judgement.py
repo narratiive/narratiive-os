@@ -316,11 +316,17 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         if ready:
             recipient = contact or "the lead"
             recommendation = f"Send the reviewed discovery reply to {recipient} via Gmail."
-            execution_next_action = recommendation
+            execution_next_action = (
+                f"Send the following reviewed discovery reply to {recipient} via Gmail exactly as reviewed.\n\n"
+                f"{draft}\n\n"
+                "Do not alter the verified times or add new content before sending."
+            )
             evidence["recommended_next_action"] = recommendation
             evidence["execution_next_action"] = execution_next_action
+            evidence["reviewed_meeting_draft"] = draft
         else:
             evidence.pop("execution_next_action", None)
+            evidence.pop("reviewed_meeting_draft", None)
 
         failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]
         evidence["meeting_draft_review_status"] = "ready_for_approval" if ready else "revision_required"
