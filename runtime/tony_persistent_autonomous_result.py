@@ -123,6 +123,25 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
         next_worker = str(handoff.get("worker") or "the appropriate worker")
         approval_required = bool(handoff.get("approval_required"))
 
+        # Human-readable routing text is deliberately bounded downstream. When Tony
+        # has already reviewed an outreach package, preserve the exact approved copy
+        # separately as structured execution payload so Gmail never has to reconstruct
+        # or send a truncated version from the display instruction.
+        if next_worker == "Gmail":
+            subject = str(evidence.get("reviewed_outreach_subject") or "").strip()
+            body = str(evidence.get("reviewed_outreach_body") or "").strip()
+            if subject and body:
+                dispatch = handoff.get("dispatch") if isinstance(handoff.get("dispatch"), dict) else {}
+                dispatch["payload"] = {
+                    "kind": "reviewed_outreach_email",
+                    "subject": subject,
+                    "body": body,
+                }
+                creative = str(evidence.get("reviewed_outreach_creative_brief") or "").strip()
+                if creative:
+                    dispatch["payload"]["creative_brief"] = creative
+                handoff["dispatch"] = dispatch
+
         # The user reached this branch by explicitly saying "do that", "go ahead",
         # or equivalent against a verified, grounded recommendation. That utterance is
         # scoped approval for this exact handoff. Preserve the platform risk policy, but
