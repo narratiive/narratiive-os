@@ -34,10 +34,7 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         "we'll pass",
         "we will pass",
     )
-    _POSITIVE_MARKERS = (
-        "interested",
-        "sounds good",
-        "tell me more",
+    _MEETING_MARKERS = (
         "let's talk",
         "lets talk",
         "book a call",
@@ -45,9 +42,23 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         "schedule a call",
         "happy to chat",
         "worth a conversation",
-        "send over",
-        "would love to",
         "availability next week",
+        "when are you free",
+        "when can you talk",
+    )
+    _INFORMATION_MARKERS = (
+        "tell me more",
+        "send over",
+        "more information",
+        "more info",
+        "can you explain",
+        "what would this involve",
+        "what does this involve",
+    )
+    _POSITIVE_MARKERS = (
+        "interested",
+        "sounds good",
+        "would love to",
     )
     _COMMERCIAL_TEXT_KEYS = (
         "content",
@@ -85,7 +96,11 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         disposition = str(judgement.get("disposition") or "").strip()
         recommendation = str(judgement.get("recommended_next_action") or "").strip()
 
-        if disposition == "positive_intent":
+        if disposition == "meeting_intent":
+            suffix = f" My judgement: they are signalling a conversation. I recommend: {recommendation}"
+        elif disposition == "information_request":
+            suffix = f" My judgement: they want more substance before a meeting. I recommend: {recommendation}"
+        elif disposition == "positive_intent":
             suffix = f" My judgement: this is positive commercial intent. I recommend: {recommendation}"
         elif disposition == "declined":
             suffix = f" My judgement: this is a decline. I recommend: {recommendation}"
@@ -132,9 +147,15 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         elif any(marker in text for marker in cls._DECLINE_MARKERS):
             disposition = "declined"
             recommendation = "Update the lead record to closed or declined and stop active follow-up."
+        elif any(marker in text for marker in cls._MEETING_MARKERS):
+            disposition = "meeting_intent"
+            recommendation = "Check calendar availability for the next five business days, then prepare a concise discovery reply with two suitable times."
+        elif any(marker in text for marker in cls._INFORMATION_MARKERS):
+            disposition = "information_request"
+            recommendation = "Prepare a concise, tailored answer to the lead's question using the verified thread; do not force a meeting before answering what they asked."
         elif any(marker in text for marker in cls._POSITIVE_MARKERS):
             disposition = "positive_intent"
-            recommendation = "Reply to the lead and propose a discovery conversation, using the verified thread as context."
+            recommendation = "Reply to the lead, acknowledge the interest, and suggest a discovery conversation as the next option."
         else:
             disposition = "reply_received"
             recommendation = ""
