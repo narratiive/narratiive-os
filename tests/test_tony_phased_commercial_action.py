@@ -67,6 +67,54 @@ class TonyPhasedCommercialActionTests(unittest.TestCase):
         self.assertNotIn("reply", handoff["action"].casefold())
         self.assertFalse(response.data["external_action_taken"])
 
+    def test_verified_calendar_availability_advances_meeting_sequence_without_inventing_times(self):
+        context = {
+            "worker": "Google Calendar",
+            "dispatch": {
+                "worker": "Google Calendar",
+                "execution_mode": "autonomous_read",
+                "instruction": "prepare the required scheduling action without inventing availability: Check calendar availability for the next five business days.",
+                "target": {"lead_id": "lesley", "contact": "Lesley Harman", "area": "commercial"},
+            },
+            "evidence": {
+                "summary": "Available Tuesday 10:00-11:00 and Thursday 14:00-16:00.",
+                "event_ids": ["calendar-window-1"],
+                "read_only": True,
+            },
+            "executive_result": "Google Calendar completed the read-only check.",
+            "verified_at": self.NOW.isoformat(),
+        }
+
+        self.assertTrue(TonyCommercialAutonomousJudgementCommandService._enrich_context(context))
+        judgement = context["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "availability_verified")
+        self.assertIn("Lesley Harman", judgement["recommended_next_action"])
+        self.assertIn("verified Calendar result", judgement["recommended_next_action"])
+        self.assertIn("Tuesday 10:00-11:00", context["evidence"]["verified_availability_summary"])
+        self.assertNotIn("Tuesday 10:00-11:00", judgement["recommended_next_action"])
+
+    def test_calendar_read_without_commercial_lead_context_does_not_create_reply_recommendation(self):
+        context = {
+            "worker": "Google Calendar",
+            "dispatch": {
+                "worker": "Google Calendar",
+                "execution_mode": "autonomous_read",
+                "instruction": "check calendar availability for next week",
+                "target": {"area": "operations"},
+            },
+            "evidence": {
+                "summary": "Available Tuesday morning.",
+                "event_ids": ["calendar-window-1"],
+                "read_only": True,
+            },
+            "executive_result": "Google Calendar completed the read-only check.",
+            "verified_at": self.NOW.isoformat(),
+        }
+
+        self.assertFalse(TonyCommercialAutonomousJudgementCommandService._enrich_context(context))
+        self.assertNotIn("commercial_judgement", context)
+        self.assertNotIn("recommended_next_action", context["evidence"])
+
     def test_non_composite_recommendation_keeps_existing_action_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "result.json"
