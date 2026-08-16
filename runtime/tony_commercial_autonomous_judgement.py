@@ -94,10 +94,12 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
         response = super().execute(command, objects)
         context = self._last_verified_result
-        if context is None or not self._enrich_context(context):
+        if context is None:
             return response
 
-        self._persist_context(context)
+        changed = self._enrich_context(context)
+        if changed:
+            self._persist_context(context)
         judgement = context.get("commercial_judgement")
         if not isinstance(judgement, dict):
             return response
