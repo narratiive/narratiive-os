@@ -88,8 +88,28 @@ class TonyExecutiveLearningTests(unittest.TestCase):
             self.assertEqual(response.data["execution_status"], "ready_for_handoff")
             self.assertEqual(response.data["learning_guard"]["status"], "evidence_supported_repeat")
             self.assertEqual(response.data["learning_guard"]["prior_outcome"], "positive")
+            self.assertEqual(response.data["learning_guard"]["positive_evidence_count"], 1)
             self.assertIn("last verified outcome", response.message)
             self.assertIn("preserve the elements", response.message.lower())
+            self.assertFalse(response.data["external_action_taken"])
+
+    def test_repeated_positive_outcomes_raise_confidence_without_premature_scaling(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service_stub = StubCommandService()
+            service_stub.outcome_status = "positive"
+            service = TonyExecutiveLearningCommandService(service_stub, store_path=Path(tmp) / "learning.json")
+            service.execute("outcome_result", [])
+            service.execute("outcome_result", [])
+
+            response = service.execute("do_first", [])
+
+            self.assertEqual(response.status, "healthy")
+            self.assertEqual(response.data["execution_status"], "ready_for_handoff")
+            self.assertEqual(response.data["learning_guard"]["status"], "positive_pattern_emerging")
+            self.assertEqual(response.data["learning_guard"]["positive_evidence_count"], 2)
+            self.assertIn("emerging pattern", response.message.lower())
+            self.assertIn("controlled repeat", response.message.lower())
+            self.assertIn("before materially scaling", response.message.lower())
             self.assertFalse(response.data["external_action_taken"])
 
     def test_learning_is_scoped_to_matching_priority(self):

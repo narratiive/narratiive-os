@@ -125,9 +125,25 @@ class TonyExecutiveLearningCommandService:
 
         if state == "positive":
             guidance = str(lesson.get("guidance") or self._guidance_for(state))
+            positive_run = self._consecutive_positive_count(key)
+            if positive_run >= 2:
+                data["learning_guard"] = {
+                    "status": "positive_pattern_emerging",
+                    "prior_outcome": state,
+                    "positive_evidence_count": positive_run,
+                    "lesson": dict(lesson),
+                }
+                message = (
+                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority. "
+                    "That is an emerging pattern rather than a one-off, so I would preserve the elements that appear to be working "
+                    "and run a controlled repeat before materially scaling the approach."
+                )
+                return CommandResponse(response.command, response.status, message, data)
+
             data["learning_guard"] = {
                 "status": "evidence_supported_repeat",
                 "prior_outcome": state,
+                "positive_evidence_count": positive_run,
                 "lesson": dict(lesson),
             }
             message = (
@@ -169,6 +185,16 @@ class TonyExecutiveLearningCommandService:
             if str(lesson.get("priority_key") or "") == priority_key:
                 return lesson
         return None
+
+    def _consecutive_positive_count(self, priority_key: str) -> int:
+        count = 0
+        for lesson in reversed(self._lessons):
+            if str(lesson.get("priority_key") or "") != priority_key:
+                continue
+            if str(lesson.get("outcome_status") or "").casefold() != "positive":
+                break
+            count += 1
+        return count
 
     @staticmethod
     def _guidance_for(state: str) -> str:
