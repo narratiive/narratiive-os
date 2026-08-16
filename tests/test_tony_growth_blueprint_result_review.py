@@ -29,7 +29,8 @@ class TonyGrowthBlueprintResultReviewTests(unittest.TestCase):
         self.assertEqual(judgement["disposition"], "growth_blueprint_ready")
         self.assertEqual(judgement["review_status"], "ready_for_approval")
         self.assertTrue(all(judgement["review_checks"].values()))
-        self.assertEqual(judgement["execution_next_action"], "")
+        self.assertIn("Prepare a tailored outreach package", judgement["execution_next_action"])
+        self.assertIn("Do not send the email", judgement["execution_next_action"])
         self.assertIn("ready for your approval", response.message)
         self.assertIn("Nothing has been sent externally", response.message)
 
