@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime.tony_command_service import CommandResponse
@@ -24,7 +25,7 @@ class PositiveOutcomeStub:
                         "action_id": "a-1",
                         "outcome_status": "positive",
                         "summary": "The matched business signal improved.",
-                        "recorded_at": "2026-08-16T03:00:00+00:00",
+                        "recorded_at": datetime.now(timezone.utc).isoformat(),
                         "priority": {"key": "growth:outreach", "label": "Founder outreach"},
                     },
                 },

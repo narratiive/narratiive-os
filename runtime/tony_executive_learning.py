@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 from runtime.tony_command_service import CommandResponse
 
@@ -28,11 +28,20 @@ class TonyExecutiveLearningCommandService:
     _BLOCKING_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
     _SCALE_READY_POSITIVE_RUN = 4
+    _SCALE_EVIDENCE_MAX_AGE_DAYS = 30
 
-    def __init__(self, command_service, *, store_path: Path | None = None, max_lessons: int = 50) -> None:
+    def __init__(
+        self,
+        command_service,
+        *,
+        store_path: Path | None = None,
+        max_lessons: int = 50,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         self.command_service = command_service
         self.store_path = store_path or Path(".runtime/executive-learning.json")
         self.max_lessons = max(1, max_lessons)
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
         self._lessons = self._load_lessons()
 
     @property
@@ -80,7 +89,7 @@ class TonyExecutiveLearningCommandService:
             "priority_label": str(priority.get("label") or key).strip(),
             "outcome_status": state,
             "outcome_summary": str(outcome.get("summary") or "").strip(),
-            "recorded_at": str(outcome.get("recorded_at") or datetime.now(timezone.utc).isoformat()),
+            "recorded_at": str(outcome.get("recorded_at") or self.clock().isoformat()),
             "guidance": self._guidance_for(state),
         }
         self._lessons.append(lesson)
@@ -126,6 +135,21 @@ class TonyExecutiveLearningCommandService:
 
         if state == "positive":
             guidance = str(lesson.get("guidance") or self._guidance_for(state))
+            evidence_age_days = self._lesson_age_days(lesson)
+            if evidence_age_days is None or evidence_age_days > self._SCALE_EVIDENCE_MAX_AGE_DAYS:
+                data["learning_guard"] = {
+                    "status": "historical_positive_evidence",
+                    "prior_outcome": state,
+                    "evidence_age_days": evidence_age_days,
+                    "max_scale_evidence_age_days": self._SCALE_EVIDENCE_MAX_AGE_DAYS,
+                    "lesson": dict(lesson),
+                }
+                message = (
+                    f"{response.message} The last verified positive outcome for this priority is historical rather than current evidence. "
+                    "I would preserve it as context, but revalidate the approach under current conditions before treating it as a repeat or scale signal."
+                )
+                return CommandResponse(response.command, response.status, message, data)
+
             positive_run = self._consecutive_positive_count(key)
             if positive_run >= self._SCALE_READY_POSITIVE_RUN:
                 scale_guardrails = {
@@ -144,13 +168,14 @@ class TonyExecutiveLearningCommandService:
                     "positive_evidence_count": positive_run,
                     "recommended_scale_mode": "incremental",
                     "preserve_success_signal": True,
+                    "evidence_freshness_days": self._SCALE_EVIDENCE_MAX_AGE_DAYS,
                     "scale_guardrails": scale_guardrails,
                     "lesson": dict(lesson),
                 }
                 data["scale_guardrails"] = dict(scale_guardrails)
                 data["external_action_taken"] = False
                 message = (
-                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority. "
+                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority within the current evidence window. "
                     "That is enough evidence to treat this as a measured scale candidate rather than another simple repeat. "
                     "I would increase exposure by one controlled increment only, preserve the elements that appear to be working and keep the same success signal. "
                     "We should review the next matched outcome before increasing exposure again, and stop or adapt if the effect materially weakens. "
@@ -163,10 +188,11 @@ class TonyExecutiveLearningCommandService:
                     "status": "positive_pattern_emerging",
                     "prior_outcome": state,
                     "positive_evidence_count": positive_run,
+                    "evidence_freshness_days": self._SCALE_EVIDENCE_MAX_AGE_DAYS,
                     "lesson": dict(lesson),
                 }
                 message = (
-                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority. "
+                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority within the current evidence window. "
                     "That is an emerging pattern rather than a one-off, so I would preserve the elements that appear to be working "
                     "and run a controlled repeat before materially scaling the approach."
                 )
@@ -176,6 +202,7 @@ class TonyExecutiveLearningCommandService:
                 "status": "evidence_supported_repeat",
                 "prior_outcome": state,
                 "positive_evidence_count": positive_run,
+                "evidence_freshness_days": self._SCALE_EVIDENCE_MAX_AGE_DAYS,
                 "lesson": dict(lesson),
             }
             message = (
@@ -225,8 +252,27 @@ class TonyExecutiveLearningCommandService:
                 continue
             if str(lesson.get("outcome_status") or "").casefold() != "positive":
                 break
+            age_days = self._lesson_age_days(lesson)
+            if age_days is None or age_days > self._SCALE_EVIDENCE_MAX_AGE_DAYS:
+                break
             count += 1
         return count
+
+    def _lesson_age_days(self, lesson: dict[str, Any]) -> int | None:
+        raw = str(lesson.get("recorded_at") or "").strip()
+        if not raw:
+            return None
+        try:
+            recorded = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if recorded.tzinfo is None:
+            recorded = recorded.replace(tzinfo=timezone.utc)
+        now = self.clock()
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        seconds = max(0.0, (now.astimezone(timezone.utc) - recorded.astimezone(timezone.utc)).total_seconds())
+        return int(seconds // 86400)
 
     @staticmethod
     def _guidance_for(state: str) -> str:

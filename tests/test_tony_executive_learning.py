@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from runtime.tony_command_service import CommandResponse
@@ -27,7 +29,7 @@ class StubCommandService:
                         "action_id": "a-1",
                         "outcome_status": self.outcome_status,
                         "summary": "The follow-up produced no discovery conversation.",
-                        "recorded_at": "2026-08-14T21:00:00+00:00",
+                        "recorded_at": datetime.now(timezone.utc).isoformat(),
                         "priority": {"key": "lead:lesley", "label": "Lesley Harman"},
                     },
                 },
@@ -132,6 +134,37 @@ class TonyExecutiveLearningTests(unittest.TestCase):
             self.assertIn("measured scale candidate", response.message.lower())
             self.assertIn("one controlled increment", response.message.lower())
             self.assertIn("stop or adapt", response.message.lower())
+            self.assertFalse(response.data["external_action_taken"])
+
+    def test_historical_positive_evidence_must_be_revalidated_before_repeat_or_scale(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            store = Path(tmp) / "learning.json"
+            store.write_text(
+                json.dumps(
+                    [
+                        {
+                            "priority_key": "lead:lesley",
+                            "priority_label": "Lesley Harman",
+                            "outcome_status": "positive",
+                            "outcome_summary": "The approach worked under old market conditions.",
+                            "recorded_at": "2025-01-10T10:00:00+00:00",
+                            "guidance": "Preserve what worked.",
+                        }
+                        for _ in range(4)
+                    ]
+                ),
+                encoding="utf-8",
+            )
+            service = TonyExecutiveLearningCommandService(StubCommandService(), store_path=store)
+
+            response = service.execute("do_first", [])
+
+            guard = response.data["learning_guard"]
+            self.assertEqual(guard["status"], "historical_positive_evidence")
+            self.assertGreater(guard["evidence_age_days"], 30)
+            self.assertNotIn("scale_guardrails", response.data)
+            self.assertIn("revalidate", response.message.lower())
+            self.assertIn("current conditions", response.message.lower())
             self.assertFalse(response.data["external_action_taken"])
 
     def test_learning_is_scoped_to_matching_priority(self):
