@@ -167,7 +167,7 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
         else:
             message += " This is reversible internal/read-only work and is eligible for autonomous execution by the configured runtime."
 
-        return CommandResponse(
+        prepared = CommandResponse(
             command="autonomous_result_action",
             status="healthy",
             message=message,
@@ -180,6 +180,20 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                 "external_action_taken": False,
             },
         )
+
+        # A grounded action reached through an explicit user instruction should not
+        # stop at a prepared handoff when a live dispatcher is already configured.
+        # Reuse the same evidence-verification boundary as every other dispatch: safe
+        # work runs autonomously; consequential writes run only after the scoped
+        # approval above. Persist only a verified returned result so conversational
+        # continuity survives a restart without ever equating intent with execution.
+        before_dispatch = self._last_verified_result
+        executed = self._dispatch_if_eligible(prepared)
+        if self._last_verified_result is not None and self._last_verified_result != before_dispatch:
+            if not self._last_verified_result.get("verified_at"):
+                self._last_verified_result["verified_at"] = self._now().isoformat()
+            self._persist_context(self._last_verified_result)
+        return executed
 
     @classmethod
     def _is_action_query(cls, lowered: str) -> bool:
