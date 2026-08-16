@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Any, Iterable, Mapping
 
 from runtime.tony_autonomous_dispatch import DispatchHandler
@@ -8,13 +9,14 @@ from runtime.tony_persistent_autonomous_result import TonyPersistentAutonomousRe
 
 
 class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousResultCommandService):
-    """Turn verified commercial worker reads into Tony-owned executive judgement.
+    """Turn verified commercial worker results into Tony-owned executive judgement.
 
-    Worker evidence proves what was read. Tony, not the worker, owns the commercial
-    disposition and consequential recommendation. The judgement stays conservative:
-    automatic replies and ambiguous messages do not create an executable next action,
-    and calendar availability only advances a meeting sequence when the read is clearly
-    tied to a commercial lead and returns substantive availability evidence.
+    Worker evidence proves what was read or prepared. Tony, not the worker, owns the
+    commercial disposition and consequential recommendation. The judgement stays
+    conservative: automatic replies and ambiguous messages do not create an executable
+    next action, calendar availability only advances a meeting sequence when the read is
+    clearly tied to a commercial lead, and returned meeting drafts must match verified
+    availability before Tony recommends an external send.
     """
 
     _AUTO_REPLY_MARKERS = (
@@ -80,6 +82,13 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         "analysis",
         "result",
     )
+    _DRAFT_RESULT_KEYS = (
+        "draft",
+        "work_product",
+        "content",
+        "artifact",
+        "result",
+    )
 
     def __init__(
         self,
@@ -116,6 +125,17 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
                 " The Calendar check returned verified availability for this commercial lead. "
                 f"I recommend: {recommendation}"
             )
+        elif disposition == "meeting_draft_ready":
+            suffix = (
+                " I reviewed the returned meeting draft against the verified Calendar availability and lead context. "
+                f"It is ready for approval. I recommend: {recommendation} Nothing has been sent externally."
+            )
+        elif disposition == "meeting_draft_revision_required":
+            failed = ", ".join(str(item) for item in judgement.get("failed_checks", ()))
+            suffix = (
+                " I reviewed the returned meeting draft and would not send it yet. "
+                f"It needs revision on: {failed or 'the verified meeting-draft requirements'}. Nothing has been sent externally."
+            )
         elif disposition == "information_request":
             suffix = f" My judgement: they want more substance before a meeting. I recommend: {recommendation}"
         elif disposition == "positive_intent":
@@ -142,6 +162,8 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         worker = str(context.get("worker") or "").strip().casefold()
         if worker in {"google calendar", "calendar"}:
             return cls._enrich_calendar_context(context)
+        if worker == "claude":
+            return cls._enrich_meeting_draft_context(context)
         if worker != "gmail":
             return False
 
@@ -241,6 +263,94 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             "evidence_basis": "verified_calendar_read",
         }
         return True
+
+    @classmethod
+    def _enrich_meeting_draft_context(cls, context: dict[str, Any]) -> bool:
+        dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
+        evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
+        instruction = str(dispatch.get("instruction") or dispatch.get("action") or "").strip()
+        lowered_instruction = instruction.casefold()
+
+        if str(dispatch.get("execution_mode") or "") != "autonomous_prepare":
+            return False
+        if str(target.get("area") or "").strip().casefold() != "commercial":
+            return False
+        if "verified calendar availability is:" not in lowered_instruction:
+            return False
+        if "do not send" not in lowered_instruction:
+            return False
+
+        draft = cls._first_rendered(evidence, cls._DRAFT_RESULT_KEYS)
+        if not draft:
+            return False
+        availability = cls._availability_from_instruction(instruction)
+        if not availability:
+            return False
+
+        worker_recommendation = str(
+            evidence.get("recommended_next_action") or evidence.get("next_action") or evidence.get("recommendation") or ""
+        ).strip()
+        if worker_recommendation:
+            evidence["worker_recommended_next_action"] = worker_recommendation
+            evidence.pop("recommended_next_action", None)
+            evidence.pop("next_action", None)
+            evidence.pop("recommendation", None)
+
+        contact = str(target.get("contact") or "").strip()
+        first_name = contact.split()[0].casefold() if contact else ""
+        draft_folded = draft.casefold()
+        allowed_times = cls._time_tokens(availability)
+        draft_times = cls._time_tokens(draft)
+        used_verified_times = draft_times.intersection(allowed_times)
+        invented_times = draft_times.difference(allowed_times)
+        checks = {
+            "contact_specific": bool(first_name and first_name in draft_folded),
+            "substantive": len(draft.split()) >= 20,
+            "uses_exactly_two_verified_times": len(used_verified_times) == 2,
+            "does_not_invent_times": not invented_times,
+        }
+        ready = all(checks.values())
+        recommendation = ""
+        execution_next_action = ""
+        if ready:
+            recipient = contact or "the lead"
+            recommendation = f"Send the reviewed discovery reply to {recipient} via Gmail."
+            execution_next_action = recommendation
+            evidence["recommended_next_action"] = recommendation
+            evidence["execution_next_action"] = execution_next_action
+        else:
+            evidence.pop("execution_next_action", None)
+
+        failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]
+        evidence["meeting_draft_review_status"] = "ready_for_approval" if ready else "revision_required"
+        evidence["meeting_draft_review_checks"] = checks
+        evidence["verified_availability_summary"] = availability
+        context["evidence"] = evidence
+        context["commercial_judgement"] = {
+            "disposition": "meeting_draft_ready" if ready else "meeting_draft_revision_required",
+            "recommended_next_action": recommendation,
+            "execution_next_action": execution_next_action,
+            "review_status": "ready_for_approval" if ready else "revision_required",
+            "review_checks": checks,
+            "failed_checks": failed_checks,
+            "judgement_owner": "Tony",
+            "evidence_basis": "verified_claude_meeting_draft",
+        }
+        return True
+
+    @staticmethod
+    def _availability_from_instruction(instruction: str) -> str:
+        match = re.search(
+            r"verified calendar availability is:\s*(.+?)\.\s*use exactly two suitable times",
+            instruction,
+            flags=re.IGNORECASE | re.DOTALL,
+        )
+        return match.group(1).strip() if match else ""
+
+    @staticmethod
+    def _time_tokens(value: str) -> set[str]:
+        return set(re.findall(r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b", value))
 
     @classmethod
     def _commercial_text(cls, evidence: dict[str, Any]) -> str:
