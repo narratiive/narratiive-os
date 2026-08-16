@@ -27,6 +27,7 @@ class TonyExecutiveLearningCommandService:
     )
     _BLOCKING_OUTCOMES = {"negative", "no_change"}
     _PROVISIONAL_OUTCOMES = {"mixed", "inconclusive"}
+    _SCALE_READY_POSITIVE_RUN = 4
 
     def __init__(self, command_service, *, store_path: Path | None = None, max_lessons: int = 50) -> None:
         self.command_service = command_service
@@ -126,6 +127,23 @@ class TonyExecutiveLearningCommandService:
         if state == "positive":
             guidance = str(lesson.get("guidance") or self._guidance_for(state))
             positive_run = self._consecutive_positive_count(key)
+            if positive_run >= self._SCALE_READY_POSITIVE_RUN:
+                data["learning_guard"] = {
+                    "status": "measured_scale_candidate",
+                    "prior_outcome": state,
+                    "positive_evidence_count": positive_run,
+                    "recommended_scale_mode": "incremental",
+                    "preserve_success_signal": True,
+                    "lesson": dict(lesson),
+                }
+                message = (
+                    f"{response.message} We now have {positive_run} consecutive verified positive outcomes for this same priority. "
+                    "That is enough evidence to treat this as a measured scale candidate rather than another simple repeat. "
+                    "I would increase exposure incrementally, preserve the elements that appear to be working, and keep the same success signal "
+                    "so we can stop or adapt quickly if the effect weakens."
+                )
+                return CommandResponse(response.command, response.status, message, data)
+
             if positive_run >= 2:
                 data["learning_guard"] = {
                     "status": "positive_pattern_emerging",
