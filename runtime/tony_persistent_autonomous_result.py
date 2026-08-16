@@ -91,7 +91,10 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
         context = dict(self._last_verified_result or {})
         worker = str(context.get("worker") or "the worker").strip()
         evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
-        proposal = self._first_rendered(evidence, ("recommended_next_action", "next_action", "recommendation"))
+        proposal = self._first_rendered(
+            evidence,
+            ("execution_next_action", "recommended_next_action", "next_action", "recommendation"),
+        )
         if not proposal:
             return CommandResponse(
                 command="autonomous_result_action",
