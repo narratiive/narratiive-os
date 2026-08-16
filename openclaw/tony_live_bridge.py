@@ -13,6 +13,7 @@ from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
+from runtime.tony_commercial_autonomous_judgement import TonyCommercialAutonomousJudgementCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_executive_commands import TonyExecutiveCommandService
@@ -21,7 +22,6 @@ from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
-from runtime.tony_persistent_autonomous_result import TonyPersistentAutonomousResultCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
@@ -270,7 +270,7 @@ def build_app() -> LeadAwareTonyApplication:
             str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"),
         )
     )
-    dispatch_service = TonyPersistentAutonomousResultCommandService(
+    dispatch_service = TonyCommercialAutonomousJudgementCommandService(
         memory_service,
         dispatchers=build_http_dispatchers(),
         store_path=autonomous_result_context_path,
