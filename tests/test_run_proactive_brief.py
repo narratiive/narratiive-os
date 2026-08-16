@@ -54,6 +54,7 @@ class _ProactiveBriefTestEnvironment:
                 "NARRATIIVE_RUNTIME_ROOT": str(self.runtime_root),
                 "TONY_OBJECTS_ROOT": str(objects_root),
                 "TONY_EXECUTIVE_WORKSPACE_ID": "test-workspace",
+                "TONY_INBOUND_LEADS_PATH": str(root / "isolated-inbound-leads.json"),
                 "TONY_TELEGRAM_BOT_TOKEN": "test-token",
                 "TONY_TELEGRAM_CHAT_ID": "12345",
                 "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT": "http://127.0.0.1:1/health",
