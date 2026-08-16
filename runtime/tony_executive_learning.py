@@ -123,6 +123,19 @@ class TonyExecutiveLearningCommandService:
             message = f"{response.message} Previous evidence on this priority was {state}; {guidance}"
             return CommandResponse(response.command, response.status, message, data)
 
+        if state == "positive":
+            guidance = str(lesson.get("guidance") or self._guidance_for(state))
+            data["learning_guard"] = {
+                "status": "evidence_supported_repeat",
+                "prior_outcome": state,
+                "lesson": dict(lesson),
+            }
+            message = (
+                f"{response.message} The last verified outcome for this same priority was positive. "
+                f"{guidance} I would preserve the elements that appear to have worked while still treating this as scoped evidence, not a guarantee."
+            )
+            return CommandResponse(response.command, response.status, message, data)
+
         return response
 
     def _learning_summary(self) -> CommandResponse:
