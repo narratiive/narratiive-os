@@ -55,7 +55,7 @@ class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
             store_path=Path(tmp.name) / "result.json",
         )
 
-    def test_positive_reply_becomes_tony_owned_discovery_recommendation(self):
+    def test_meeting_intent_recommends_calendar_check_before_reply(self):
         service = self.service(
             {
                 "thread_id": "thread-1",
@@ -68,15 +68,49 @@ class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
         response = service.execute("do the first one", [])
 
         judgement = response.data["commercial_judgement"]
-        self.assertEqual(judgement["disposition"], "positive_intent")
+        self.assertEqual(judgement["disposition"], "meeting_intent")
         self.assertEqual(judgement["judgement_owner"], "Tony")
-        self.assertIn("propose a discovery conversation", judgement["recommended_next_action"])
+        self.assertIn("Check calendar availability", judgement["recommended_next_action"])
+        self.assertIn("two suitable times", judgement["recommended_next_action"])
         self.assertNotIn("Discount", judgement["recommended_next_action"])
-        self.assertIn("positive commercial intent", response.message)
+        self.assertIn("signalling a conversation", response.message)
 
         follow_up = service.execute("What do you recommend?", [])
-        self.assertIn("propose a discovery conversation", follow_up.message)
+        self.assertIn("Check calendar availability", follow_up.message)
         self.assertNotIn("Discount", follow_up.message)
+
+    def test_information_request_answers_question_before_forcing_meeting(self):
+        service = self.service(
+            {
+                "thread_id": "thread-info",
+                "read_only": True,
+                "summary": "This sounds interesting. Can you tell me more about what the first phase would involve?",
+            }
+        )
+
+        response = service.execute("do the first one", [])
+
+        judgement = response.data["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "information_request")
+        self.assertIn("tailored answer", judgement["recommended_next_action"])
+        self.assertIn("do not force a meeting", judgement["recommended_next_action"])
+        self.assertIn("want more substance before a meeting", response.message)
+
+    def test_general_positive_interest_keeps_discovery_as_option(self):
+        service = self.service(
+            {
+                "thread_id": "thread-positive",
+                "read_only": True,
+                "summary": "Thanks, I'm interested. This sounds good.",
+            }
+        )
+
+        response = service.execute("do the first one", [])
+
+        judgement = response.data["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "positive_intent")
+        self.assertIn("suggest a discovery conversation", judgement["recommended_next_action"])
+        self.assertIn("positive commercial intent", response.message)
 
     def test_decline_produces_close_record_recommendation(self):
         service = self.service(
