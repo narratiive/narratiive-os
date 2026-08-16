@@ -225,8 +225,10 @@ class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
         self.assertEqual(handoff["worker"], "Gmail")
         self.assertTrue(handoff["approval_required"])
         self.assertTrue(handoff["approval_granted"])
-        self.assertEqual(handoff["dispatch"]["state"], "approved_pending_execution")
+        self.assertEqual(handoff["dispatch"]["state"], "dispatcher_unavailable")
+        self.assertEqual(handoff["dispatch"]["execution_truth"], "not_dispatched")
         self.assertFalse(approval.data["external_action_taken"])
+        self.assertIn("no live dispatcher is configured", approval.message)
 
     def test_meeting_draft_with_invented_time_is_sent_back_for_revision(self):
         service = self.meeting_draft_service(
