@@ -22,6 +22,7 @@ from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
+from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
@@ -270,12 +271,24 @@ def build_app() -> LeadAwareTonyApplication:
             str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"),
         )
     )
+    live_dispatchers = build_http_dispatchers()
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(
         memory_service,
-        dispatchers=build_http_dispatchers(),
+        dispatchers=live_dispatchers,
         store_path=autonomous_result_context_path,
     )
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(dispatch_service)
+    post_send_notion_sync_path = Path(
+        os.getenv(
+            "TONY_POST_SEND_NOTION_SYNC_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "post-send-notion-sync.json"),
+        )
+    )
+    post_send_sync_service = TonyPostSendNotionSyncCommandService(
+        dispatch_service,
+        dispatchers=live_dispatchers,
+        store_path=post_send_notion_sync_path,
+    )
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(post_send_sync_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 

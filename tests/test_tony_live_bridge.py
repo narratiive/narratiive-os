@@ -18,6 +18,7 @@ from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
+from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
@@ -40,6 +41,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
                 "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
                 "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
+                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
             },
             clear=True,
         ):
@@ -49,7 +51,10 @@ class TonyLiveBridgeTests(unittest.TestCase):
         self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         execution_status = app.command_service.command_service
         self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        dispatch = execution_status.command_service
+        post_send_sync = execution_status.command_service
+        self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService)
+        self.assertEqual(post_send_sync.dispatchers, {})
+        dispatch = post_send_sync.command_service
         self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
         self.assertEqual(dispatch.dispatchers, {})
         memory = dispatch.command_service
@@ -88,6 +93,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
                 "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
                 "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
+                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
                 "TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9999/gmail/read",
             },
             clear=True,
@@ -96,7 +102,10 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
         execution_status = app.command_service.command_service
         self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        dispatch = execution_status.command_service
+        post_send_sync = execution_status.command_service
+        self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService)
+        self.assertEqual(set(post_send_sync.dispatchers), {"Gmail"})
+        dispatch = post_send_sync.command_service
         self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
         self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
 
@@ -117,6 +126,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
                 "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
                 "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
+                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
             },
             clear=True,
         ):
