@@ -75,11 +75,13 @@ class TonyResultActionContinuityTests(unittest.TestCase):
         self.assertTrue(handoff["approval_granted"])
         self.assertEqual(handoff["approval_scope"], "grounded_next_action")
         self.assertEqual(handoff["execution_mode"], "approval_gated_write")
-        self.assertEqual(handoff["dispatch"]["state"], "approved_pending_execution")
+        self.assertEqual(handoff["dispatch"]["state"], "dispatcher_unavailable")
+        self.assertEqual(handoff["dispatch"]["execution_truth"], "not_dispatched")
         self.assertTrue(handoff["dispatch"]["approval_granted"])
         self.assertEqual(handoff["dispatch"]["approval_scope"], "grounded_next_action")
         self.assertFalse(response.data["external_action_taken"])
         self.assertIn("instruction is the approval", response.message)
+        self.assertIn("no live dispatcher is configured", response.message)
         self.assertNotIn("remains behind your approval", response.message)
         self.assertEqual(stub.calls, [])
 
@@ -100,9 +102,11 @@ class TonyResultActionContinuityTests(unittest.TestCase):
         self.assertFalse(handoff["approval_required"])
         self.assertNotIn("approval_granted", handoff)
         self.assertEqual(handoff["execution_mode"], "autonomous_prepare")
-        self.assertEqual(handoff["execution_truth"], "handoff_prepared_only")
+        self.assertEqual(handoff["dispatch"]["state"], "dispatcher_unavailable")
+        self.assertEqual(handoff["execution_truth"], "not_dispatched")
         self.assertFalse(response.data["external_action_taken"])
         self.assertIn("eligible for autonomous execution", response.message)
+        self.assertIn("no live dispatcher is configured", response.message)
 
     def test_action_request_refuses_to_invent_next_move_when_worker_return_has_none(self):
         service, stub = self._service(
