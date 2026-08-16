@@ -306,6 +306,8 @@ class TonyAutonomousDispatchCommandService:
                 return False, "read-only execution was not demonstrated"
             if not cls._has_source_identifier(evidence):
                 return False, "source identifiers are missing"
+            if cls._requires_decision_grade_read(dispatch) and not cls._has_work_product(evidence):
+                return False, "decision-grade commercial read content is missing"
             return True, "verified read evidence"
 
         if mode == "autonomous_prepare":
@@ -366,6 +368,17 @@ class TonyAutonomousDispatchCommandService:
     @classmethod
     def _has_source_identifier(cls, evidence: dict[str, Any]) -> bool:
         return any(cls._meaningful(evidence.get(key)) for key in cls._SOURCE_ID_KEYS)
+
+    @classmethod
+    def _requires_decision_grade_read(cls, dispatch: dict[str, Any]) -> bool:
+        worker = str(dispatch.get("worker") or "").strip().casefold()
+        if worker != "gmail":
+            return False
+        action = str(dispatch.get("action") or "").strip().casefold()
+        target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
+        commercial_target = bool(str(target.get("lead_id") or "").strip() or str(target.get("contact") or "").strip())
+        commercial_action = any(marker in action for marker in ("reply", "email thread", "commercial", "lead"))
+        return commercial_target or commercial_action
 
     @classmethod
     def _has_work_product(cls, evidence: dict[str, Any]) -> bool:
