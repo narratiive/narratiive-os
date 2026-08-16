@@ -54,10 +54,20 @@ def snapshot() -> MissionControlSnapshot:
     )
 
 
+def executive_service(base, **kwargs) -> TonyExecutiveCommandService:
+    """Build an isolated executive-command service for unit tests.
+
+    These tests exercise command behaviour, not the machine's live inbound-lead
+    store. Supplying an explicit empty lead loader keeps local runtime data from
+    changing deterministic unit-test outcomes.
+    """
+    return TonyExecutiveCommandService(base, inbound_lead_loader=lambda: (), **kwargs)
+
+
 class TonyExecutiveCommandServiceTests(unittest.TestCase):
     def test_morning_command_builds_agency_first_brief(self):
         base = StubCommandService(snapshot)
-        service = TonyExecutiveCommandService(base)
+        service = executive_service(base)
 
         response = service.execute("/morning", [])
 
@@ -72,7 +82,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertEqual(base.calls, [])
 
     def test_evening_command_uses_agency_renderer(self):
-        service = TonyExecutiveCommandService(StubCommandService(snapshot))
+        service = executive_service(StubCommandService(snapshot))
 
         response = service.execute("/evening", [])
 
@@ -82,7 +92,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertIn("Commercial:", response.message)
 
     def test_command_aliases_resolve_to_canonical_periods(self):
-        service = TonyExecutiveCommandService(StubCommandService(snapshot))
+        service = executive_service(StubCommandService(snapshot))
 
         morning = service.execute("/standup", [])
         evening = service.execute("/end_of_day", [])
@@ -92,7 +102,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
 
     def test_non_executive_commands_delegate_without_duplication(self):
         base = StubCommandService(snapshot)
-        service = TonyExecutiveCommandService(base)
+        service = executive_service(base)
 
         response = service.execute("/health", [{"id": "one"}])
 
@@ -100,7 +110,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertEqual(base.calls, [("/health", [{"id": "one"}])])
 
     def test_missing_mission_control_fails_closed(self):
-        service = TonyExecutiveCommandService(StubCommandService())
+        service = executive_service(StubCommandService())
 
         response = service.execute("/morning", [])
 
@@ -111,7 +121,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         def broken_loader():
             raise ValueError("invalid snapshot")
 
-        service = TonyExecutiveCommandService(StubCommandService(broken_loader))
+        service = executive_service(StubCommandService(broken_loader))
         response = service.execute("/evening", [])
 
         self.assertEqual(response.status, "error")
@@ -127,7 +137,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
                 self.briefs.append(brief)
 
         archive = RecordingArchive()
-        service = TonyExecutiveCommandService(
+        service = executive_service(
             StubCommandService(snapshot),
             brief_archive=archive,
         )
@@ -143,7 +153,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
             def store(self, brief):
                 raise ValueError("archive integrity failure")
 
-        service = TonyExecutiveCommandService(
+        service = executive_service(
             StubCommandService(snapshot),
             brief_archive=BrokenArchive(),
         )
@@ -156,7 +166,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
     def test_github_unavailable_does_not_replace_agency_brief(self):
         base = StubCommandService(snapshot)
         base.github_configured = True
-        service = TonyExecutiveCommandService(base)
+        service = executive_service(base)
 
         response = service.execute("/morning", [])
 
