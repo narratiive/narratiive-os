@@ -45,6 +45,42 @@ def commercial_read_response() -> CommandResponse:
     )
 
 
+def meeting_draft_response() -> CommandResponse:
+    availability = "Tuesday 10:00-10:30 or Wednesday 14:00-14:30"
+    instruction = (
+        "Prepare a concise discovery response for Lesley Harman. "
+        f"The verified Calendar availability is: {availability}. "
+        "Use exactly two suitable times from that evidence. Do not send it, create a calendar event, or invent any availability."
+    )
+    return CommandResponse(
+        command="autonomous_result_action",
+        status="healthy",
+        message="Meeting draft preparation ready.",
+        data={
+            "execution_handoff": {
+                "worker": "Claude",
+                "approval_required": False,
+                "execution_truth": "handoff_prepared_only",
+                "dispatch": {
+                    "eligible": True,
+                    "state": "ready_for_autonomous_dispatch",
+                    "worker": "Claude",
+                    "instruction": instruction,
+                    "target": {
+                        "lead_id": "lesley",
+                        "contact": "Lesley Harman",
+                        "area": "commercial",
+                    },
+                    "execution_mode": "autonomous_prepare",
+                    "expected_evidence": "returned draft",
+                    "return_to": "Tony",
+                    "execution_truth": "not_dispatched",
+                },
+            }
+        },
+    )
+
+
 class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
     def service(self, evidence):
         tmp = tempfile.TemporaryDirectory()
@@ -52,6 +88,15 @@ class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
         return TonyCommercialAutonomousJudgementCommandService(
             StubCommandService(commercial_read_response()),
             dispatchers={"Gmail": lambda contract: evidence},
+            store_path=Path(tmp.name) / "result.json",
+        )
+
+    def meeting_draft_service(self, evidence):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        return TonyCommercialAutonomousJudgementCommandService(
+            StubCommandService(meeting_draft_response()),
+            dispatchers={"Claude": lambda contract: evidence},
             store_path=Path(tmp.name) / "result.json",
         )
 
@@ -149,6 +194,62 @@ class TonyCommercialAutonomousJudgementTests(unittest.TestCase):
         self.assertEqual(ambiguous.data["commercial_judgement"]["disposition"], "reply_received")
         self.assertEqual(ambiguous.data["commercial_judgement"]["recommended_next_action"], "")
         recommendation = ambiguous_service.execute("What do you recommend?", [])
+        self.assertIn("not enough grounded next-action evidence", recommendation.message)
+
+    def test_returned_meeting_draft_is_reviewed_against_verified_times_before_send(self):
+        service = self.meeting_draft_service(
+            {
+                "draft": (
+                    "Hi Lesley, thanks for getting back to me. It would be great to talk. "
+                    "I can do Tuesday at 10:00 or Wednesday at 14:00. If either works for you, "
+                    "I’ll make sure we have the time set aside and we can pick up the growth challenge from there."
+                )
+            }
+        )
+
+        response = service.execute("OK, do that", [])
+
+        judgement = response.data["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "meeting_draft_ready")
+        self.assertEqual(judgement["review_status"], "ready_for_approval")
+        self.assertTrue(all(judgement["review_checks"].values()))
+        self.assertIn("Send the reviewed discovery reply", judgement["recommended_next_action"])
+        self.assertIn("ready for approval", response.message)
+        self.assertIn("Nothing has been sent externally", response.message)
+
+        recommendation = service.execute("What do you recommend?", [])
+        self.assertIn("Send the reviewed discovery reply", recommendation.message)
+
+        approval = service.execute("OK, do that", [])
+        handoff = approval.data["execution_handoff"]
+        self.assertEqual(handoff["worker"], "Gmail")
+        self.assertTrue(handoff["approval_required"])
+        self.assertTrue(handoff["approval_granted"])
+        self.assertEqual(handoff["dispatch"]["state"], "approved_pending_execution")
+        self.assertFalse(approval.data["external_action_taken"])
+
+    def test_meeting_draft_with_invented_time_is_sent_back_for_revision(self):
+        service = self.meeting_draft_service(
+            {
+                "draft": (
+                    "Hi Lesley, thanks for getting back to me. It would be great to talk. "
+                    "I can do Tuesday at 10:00 or Thursday at 16:00. If either works for you, "
+                    "I’ll set aside the time and we can pick up the commercial challenge properly."
+                ),
+                "recommended_next_action": "Send this now.",
+            }
+        )
+
+        response = service.execute("OK, do that", [])
+
+        judgement = response.data["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "meeting_draft_revision_required")
+        self.assertEqual(judgement["review_status"], "revision_required")
+        self.assertFalse(judgement["review_checks"]["does_not_invent_times"])
+        self.assertEqual(judgement["recommended_next_action"], "")
+        self.assertIn("would not send it yet", response.message)
+
+        recommendation = service.execute("What do you recommend?", [])
         self.assertIn("not enough grounded next-action evidence", recommendation.message)
 
 
