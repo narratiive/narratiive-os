@@ -135,12 +135,12 @@ class TonyExecutiveCommandService:
                 lead_source_available=lead_source_available,
             )
             brief = self.agency_brief_service.build(state, period)
-            message = brief.render_compact()
+            message = policy.rewrite(brief.render_compact())
             violations = policy.scan(message)
             if violations:
                 terms = ", ".join(sorted({item.term for item in violations}))
                 raise ValueError(
-                    f"executive brief uses retired terminology under policy {policy.version}: {terms}"
+                    f"executive brief uses retired terminology after rewrite under policy {policy.version}: {terms}"
                 )
 
             if self.brief_archive is not None:
