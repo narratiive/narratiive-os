@@ -19,6 +19,7 @@ from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
+from runtime.tony_meeting_reply_preparation import TonyMeetingReplyPreparationCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
@@ -122,7 +123,8 @@ def build_app() -> LeadAwareTonyApplication:
         dispatchers=live_dispatchers,
         store_path=Path(os.getenv("TONY_COMMERCIAL_FOLLOWUP_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-followup.json"))),
     )
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(followup_service)
+    meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers)
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(meeting_reply_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
