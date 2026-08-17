@@ -17,6 +17,7 @@ from runtime.tony_commercial_autonomous_judgement import TonyCommercialAutonomou
 from runtime.tony_commercial_followup import TonyCommercialFollowupCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCommandService
+from runtime.tony_discovery_outcome_tracking import TonyDiscoveryOutcomeTrackingCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
@@ -119,7 +120,8 @@ def build_app() -> LeadAwareTonyApplication:
     meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers, verified_result_sink=accept_verified_commercial_result)
     meeting_booking_service = TonyConfirmedMeetingBookingCommandService(meeting_reply_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))))
     booking_sync_service = TonyPostBookingNotionSyncCommandService(meeting_booking_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_BOOKING_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-booking-notion-sync.json"))))
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(booking_sync_service)
+    discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(booking_sync_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(discovery_outcome_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 

@@ -8,6 +8,7 @@ from urllib import request
 
 SUPPORTED_DISPATCH_WORKERS = (
     "Claude",
+    "Fireflies",
     "Gmail",
     "Google Calendar",
     "GitHub",

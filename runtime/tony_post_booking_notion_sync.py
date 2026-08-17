@@ -87,7 +87,19 @@ class TonyPostBookingNotionSyncCommandService:
             completed.append(event_id)
         self.state = {"pending": None, "completed": completed[-100:]}
         self._persist()
-        return CommandResponse("post_booking_notion_sync", "healthy", f"Confirmed. Notion is now Discovery booked against Calendar event {event_id} and record {notion_id}.", {"execution_status": "discovery_commercial_state_sync_verified", "calendar_event_id": event_id, "notion_receipt": notion_id, "notion_evidence": dict(evidence), "external_action_taken": True})
+        return CommandResponse(
+            "post_booking_notion_sync",
+            "healthy",
+            f"Confirmed. Notion is now Discovery booked against Calendar event {event_id} and record {notion_id}.",
+            {
+                "execution_status": "discovery_commercial_state_sync_verified",
+                "calendar_event_id": event_id,
+                "notion_receipt": notion_id,
+                "notion_evidence": dict(evidence),
+                "discovery_tracking": dict(pending),
+                "external_action_taken": True,
+            },
+        )
 
     def _load(self) -> dict[str, Any]:
         try:
