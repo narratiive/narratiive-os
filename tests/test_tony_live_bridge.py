@@ -15,6 +15,7 @@ from runtime.tony_commercial_followup import TonyCommercialFollowupCommandServic
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
+from runtime.tony_meeting_reply_preparation import TonyMeetingReplyPreparationCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
@@ -36,7 +37,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp: app, base_app, base_service = self._build(tmp)
         self.assertIs(app.base, base_app); self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         execution_status = app.command_service.command_service; self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        followup = execution_status.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
+        meeting = execution_status.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(meeting.dispatchers, {})
+        followup = meeting.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
         post_send_sync = followup.command_service; self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService); self.assertEqual(post_send_sync.dispatchers, {})
         dispatch = post_send_sync.command_service; self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService); self.assertEqual(dispatch.dispatchers, {})
         memory = dispatch.command_service; self.assertIsInstance(memory, TonyMemoryCommandService)
@@ -51,7 +53,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
     def test_build_app_configures_explicit_live_dispatchers(self):
         with tempfile.TemporaryDirectory() as tmp: app, _, _ = self._build(tmp, {"TONY_DISPATCH_GMAIL_URL":"http://127.0.0.1:9999/gmail/read"})
-        execution_status = app.command_service.command_service; followup = execution_status.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
+        execution_status = app.command_service.command_service; meeting = execution_status.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(set(meeting.dispatchers), {"Gmail"})
+        followup = meeting.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
         post_send_sync = followup.command_service; self.assertEqual(set(post_send_sync.dispatchers), {"Gmail"}); dispatch = post_send_sync.command_service; self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
 
     def test_build_app_preserves_mission_control_health_configuration(self):
