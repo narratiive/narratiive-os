@@ -16,7 +16,17 @@ DRAFT = (
 )
 
 
-class BaseStub:
+class NeutralStub:
+    mission_control_loader = None
+    github_configured = False
+
+    def execute(self, command, objects):
+        return CommandResponse("delegated", "healthy", "delegated", {})
+
+
+class MeetingHandoffStub:
+    """Mirrors the live outer follow-up layer that creates the Calendar handoff."""
+
     mission_control_loader = None
     github_configured = False
 
@@ -85,8 +95,13 @@ class TonyMeetingReplyReviewHandoffTests(unittest.TestCase):
             }
 
         dispatchers = {"Google Calendar": calendar, "Claude": claude, "Gmail": gmail}
+        # In the live bridge the judgement/dispatch service is an inner layer. The
+        # commercial follow-up layer outside it creates the Calendar handoff, and
+        # the meeting-reply service consumes that handoff. Reproduce that shape
+        # here so the test does not make the generic dispatcher execute Calendar
+        # before the meeting-reply orchestration layer receives it.
         judgement = TonyCommercialAutonomousJudgementCommandService(
-            BaseStub(),
+            NeutralStub(),
             dispatchers=dispatchers,
             store_path=Path(tmp.name) / "autonomous-result.json",
         )
@@ -107,7 +122,7 @@ class TonyMeetingReplyReviewHandoffTests(unittest.TestCase):
             return dict(context)
 
         service = TonyMeetingReplyPreparationCommandService(
-            judgement,
+            MeetingHandoffStub(),
             dispatchers=dispatchers,
             verified_result_sink=sink,
         )
@@ -122,7 +137,10 @@ class TonyMeetingReplyReviewHandoffTests(unittest.TestCase):
         self.assertIn("ready for your approval", prepared.message)
         self.assertIn("Nothing has been sent", prepared.message)
 
-        sent = service.execute("OK, send it", ())
+        # The next Telegram turn reaches the inner persistent judgement service,
+        # where the reviewed context is already stored. Only this explicit approval
+        # may turn the grounded recommendation into a Gmail write.
+        sent = judgement.execute("OK, send it", ())
 
         self.assertEqual([name for name, _ in calls], ["calendar", "claude", "gmail"])
         self.assertEqual(sent.data["autonomous_dispatch_state"], "dispatch_verified")
