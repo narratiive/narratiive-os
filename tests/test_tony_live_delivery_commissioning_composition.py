@@ -6,13 +6,14 @@ from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
+from runtime.tony_delivery_blueprint_review import TonyDeliveryBlueprintReviewCommandService
 from runtime.tony_delivery_commissioning import TonyDeliveryCommissioningCommandService
 from runtime.tony_drive_delivery_workspace import TonyDriveDeliveryWorkspaceCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
 
 class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
-    def test_live_bridge_composes_delivery_commissioning_after_drive_workspace(self):
+    def test_live_bridge_composes_delivery_blueprint_review_after_commissioning(self):
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
@@ -35,6 +36,7 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
                 "TONY_DELIVERY_BOOTSTRAP_PATH": str(Path(tmp) / "delivery.json"),
                 "TONY_DRIVE_DELIVERY_WORKSPACE_PATH": str(Path(tmp) / "drive.json"),
                 "TONY_DELIVERY_COMMISSIONING_PATH": str(Path(tmp) / "commission.json"),
+                "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.dict(
                 "os.environ", env, clear=True
@@ -43,12 +45,15 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
 
         execution_status = app.command_service.command_service
         self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        commissioning = execution_status.command_service
+        blueprint_review = execution_status.command_service
+        self.assertIsInstance(blueprint_review, TonyDeliveryBlueprintReviewCommandService)
+        self.assertEqual(blueprint_review.dispatchers, {})
+        commissioning = blueprint_review.command_service
         self.assertIsInstance(commissioning, TonyDeliveryCommissioningCommandService)
         self.assertEqual(commissioning.dispatchers, {})
         self.assertIsInstance(commissioning.command_service, TonyDriveDeliveryWorkspaceCommandService)
 
-    def test_live_bridge_passes_configured_claude_dispatcher_to_delivery_commissioning(self):
+    def test_live_bridge_passes_configured_claude_dispatcher_to_delivery_layers(self):
         base_app = mock.Mock()
         base_service = mock.Mock()
         base_app.command_service = base_service
@@ -59,13 +64,16 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
             env = {
                 "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
                 "TONY_DELIVERY_COMMISSIONING_PATH": str(Path(tmp) / "commission.json"),
+                "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.object(
                 tony_live_bridge, "build_http_dispatchers", return_value={"Claude": fake_dispatcher}
             ), mock.patch.dict("os.environ", env, clear=True):
                 app = tony_live_bridge.build_app()
 
-        commissioning = app.command_service.command_service.command_service
+        blueprint_review = app.command_service.command_service.command_service
+        self.assertIs(blueprint_review.dispatchers["Claude"], fake_dispatcher)
+        commissioning = blueprint_review.command_service
         self.assertIs(commissioning.dispatchers["Claude"], fake_dispatcher)
 
 
