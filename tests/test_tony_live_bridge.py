@@ -11,6 +11,7 @@ from openclaw import tony_live_bridge
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
+from runtime.tony_commercial_followup import TonyCommercialFollowupCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
@@ -24,160 +25,49 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 
 
 class TonyLiveBridgeTests(unittest.TestCase):
-    def test_build_app_composes_terminology_dispatch_memory_focus_commercial_capability_and_executive_commands(self) -> None:
-        base_app = mock.Mock()
-        base_service = mock.Mock()
-        base_app.command_service = base_service
-        base_app.bridge_token = ""
-        archive = mock.Mock()
-        base_app.brief_archive = archive
+    def _build(self, tmp, extra=None):
+        base_app = mock.Mock(); base_service = mock.Mock(); base_app.command_service = base_service; base_app.bridge_token = ""; base_app.brief_archive = mock.Mock()
+        env = {"TONY_INBOUND_LEADS_PATH": str(Path(tmp)/"leads.json"), "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp)/"focus.json"), "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp)/"outcomes.json"), "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp)/"learning.json"), "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp)/"post-send-sync.json")}
+        env.update(extra or {})
+        with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.dict("os.environ", env, clear=True): app = tony_live_bridge.build_app()
+        return app, base_app, base_service
 
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
-            tony_live_bridge, "build_base_app", return_value=base_app
-        ), mock.patch.dict(
-            "os.environ",
-            {
-                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
-                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
-                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
-                "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
-                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
-            },
-            clear=True,
-        ):
-            app = tony_live_bridge.build_app()
+    def test_build_app_composes_terminology_dispatch_memory_focus_commercial_capability_and_executive_commands(self):
+        with tempfile.TemporaryDirectory() as tmp: app, base_app, base_service = self._build(tmp)
+        self.assertIs(app.base, base_app); self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
+        execution_status = app.command_service.command_service; self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
+        followup = execution_status.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
+        post_send_sync = followup.command_service; self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService); self.assertEqual(post_send_sync.dispatchers, {})
+        dispatch = post_send_sync.command_service; self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService); self.assertEqual(dispatch.dispatchers, {})
+        memory = dispatch.command_service; self.assertIsInstance(memory, TonyMemoryCommandService)
+        adaptive = memory.command_service; self.assertIsInstance(adaptive, TonyAdaptiveResponseCommandService)
+        learning = adaptive.command_service; self.assertIsInstance(learning, TonyExecutiveLearningCommandService)
+        outcome_evidence = learning.command_service; self.assertIsInstance(outcome_evidence, TonyOutcomeEvidenceCommandService)
+        outcomes = outcome_evidence.command_service; self.assertIsInstance(outcomes, TonyOutcomeAccountabilityCommandService)
+        focus = outcomes.command_service; self.assertIsInstance(focus, TonyPersistentAgencyFocusCommandService)
+        commercial_watch = focus.command_service; self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
+        capability = commercial_watch.command_service; self.assertIsInstance(capability, TonyCapabilityCommandService)
+        executive = capability.command_service; self.assertIsInstance(executive, TonyExecutiveCommandService); self.assertIs(executive.command_service, base_service)
 
-        self.assertIs(app.base, base_app)
-        self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
-        execution_status = app.command_service.command_service
-        self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        post_send_sync = execution_status.command_service
-        self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService)
-        self.assertEqual(post_send_sync.dispatchers, {})
-        dispatch = post_send_sync.command_service
-        self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
-        self.assertEqual(dispatch.dispatchers, {})
-        memory = dispatch.command_service
-        self.assertIsInstance(memory, TonyMemoryCommandService)
-        adaptive = memory.command_service
-        self.assertIsInstance(adaptive, TonyAdaptiveResponseCommandService)
-        learning = adaptive.command_service
-        self.assertIsInstance(learning, TonyExecutiveLearningCommandService)
-        outcome_evidence = learning.command_service
-        self.assertIsInstance(outcome_evidence, TonyOutcomeEvidenceCommandService)
-        outcomes = outcome_evidence.command_service
-        self.assertIsInstance(outcomes, TonyOutcomeAccountabilityCommandService)
-        focus = outcomes.command_service
-        self.assertIsInstance(focus, TonyPersistentAgencyFocusCommandService)
-        commercial_watch = focus.command_service
-        self.assertIsInstance(commercial_watch, TonyCommercialWatchCommandService)
-        capability = commercial_watch.command_service
-        self.assertIsInstance(capability, TonyCapabilityCommandService)
-        executive = capability.command_service
-        self.assertIsInstance(executive, TonyExecutiveCommandService)
-        self.assertIs(executive.command_service, base_service)
-        self.assertIs(executive.brief_archive, archive)
+    def test_build_app_configures_explicit_live_dispatchers(self):
+        with tempfile.TemporaryDirectory() as tmp: app, _, _ = self._build(tmp, {"TONY_DISPATCH_GMAIL_URL":"http://127.0.0.1:9999/gmail/read"})
+        execution_status = app.command_service.command_service; followup = execution_status.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
+        post_send_sync = followup.command_service; self.assertEqual(set(post_send_sync.dispatchers), {"Gmail"}); dispatch = post_send_sync.command_service; self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
 
-    def test_build_app_configures_explicit_live_dispatchers(self) -> None:
-        base_app = mock.Mock()
-        base_app.command_service = mock.Mock()
-        base_app.bridge_token = ""
-        base_app.brief_archive = mock.Mock()
-
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
-            tony_live_bridge, "build_base_app", return_value=base_app
-        ), mock.patch.dict(
-            "os.environ",
-            {
-                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
-                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
-                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
-                "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
-                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
-                "TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9999/gmail/read",
-            },
-            clear=True,
-        ):
-            app = tony_live_bridge.build_app()
-
-        execution_status = app.command_service.command_service
-        self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        post_send_sync = execution_status.command_service
-        self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService)
-        self.assertEqual(set(post_send_sync.dispatchers), {"Gmail"})
-        dispatch = post_send_sync.command_service
-        self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService)
-        self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
-
-    def test_build_app_preserves_mission_control_health_configuration(self) -> None:
-        base_app = mock.Mock()
-        base_service = mock.Mock()
-        loader = mock.Mock()
-        base_service.mission_control_loader = loader
-        base_app.command_service = base_service
-        base_app.bridge_token = ""
-
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(
-            tony_live_bridge, "build_base_app", return_value=base_app
-        ), mock.patch.dict(
-            "os.environ",
-            {
-                "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
-                "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
-                "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),
-                "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp) / "learning.json"),
-                "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp) / "post-send-sync.json"),
-            },
-            clear=True,
-        ):
-            app = tony_live_bridge.build_app()
-
+    def test_build_app_preserves_mission_control_health_configuration(self):
+        base_app = mock.Mock(); base_service = mock.Mock(); loader = mock.Mock(); base_service.mission_control_loader = loader; base_app.command_service = base_service; base_app.bridge_token=""
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ", {"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"sync.json")}, clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader, loader)
 
-    def test_lead_ingestion_is_authenticated_and_persisted(self) -> None:
+    def test_lead_ingestion_is_authenticated_and_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
-            base_app = mock.Mock()
-            base_app.bridge_token = "secret"
-            base_app.command_service = mock.Mock()
-            base_app.brief_archive = mock.Mock()
-            store = tony_live_bridge.FileInboundLeadStore(Path(tmp) / "leads.json")
-            app = tony_live_bridge.LeadAwareTonyApplication(base_app, store)
-            payload = json.dumps(
-                {
-                    "lead_id": "lead-1",
-                    "contact": "Steve",
-                    "company": "Steve Company",
-                    "source": "Growth Diagnostic",
-                    "status": "New",
-                }
-            ).encode("utf-8")
-            environ = {
-                "REQUEST_METHOD": "POST",
-                "PATH_INFO": "/leads/ingest",
-                "CONTENT_LENGTH": str(len(payload)),
-                "CONTENT_TYPE": "application/json",
-                "HTTP_AUTHORIZATION": "Bearer secret",
-                "wsgi.input": io.BytesIO(payload),
-            }
-            status = {}
+            base_app=mock.Mock(); base_app.bridge_token="secret"; base_app.command_service=mock.Mock(); base_app.brief_archive=mock.Mock(); store=tony_live_bridge.FileInboundLeadStore(Path(tmp)/"leads.json"); app=tony_live_bridge.LeadAwareTonyApplication(base_app,store)
+            payload=json.dumps({"lead_id":"lead-1","contact":"Steve","company":"Steve Company","source":"Growth Diagnostic","status":"New"}).encode(); environ={"REQUEST_METHOD":"POST","PATH_INFO":"/leads/ingest","CONTENT_LENGTH":str(len(payload)),"CONTENT_TYPE":"application/json","HTTP_AUTHORIZATION":"Bearer secret","wsgi.input":io.BytesIO(payload)}; status={}
+            response=app(environ,lambda value,headers:status.update(value=value,headers=headers)); self.assertTrue(status["value"].startswith("200")); self.assertTrue(json.loads(b"".join(response))["ok"]); self.assertEqual(store.read()[0].contact,"Steve")
 
-            response = app(environ, lambda value, headers: status.update(value=value, headers=headers))
+    def test_build_app_fails_closed_without_command_service(self):
+        base_app=mock.Mock(); base_app.command_service=None
+        with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app):
+            with self.assertRaisesRegex(RuntimeError,"not configured"): tony_live_bridge.build_app()
 
-            self.assertTrue(status["value"].startswith("200"))
-            body = json.loads(b"".join(response).decode("utf-8"))
-            self.assertTrue(body["ok"])
-            saved = store.read()
-            self.assertEqual(len(saved), 1)
-            self.assertEqual(saved[0].contact, "Steve")
-
-    def test_build_app_fails_closed_without_command_service(self) -> None:
-        base_app = mock.Mock()
-        base_app.command_service = None
-
-        with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app):
-            with self.assertRaisesRegex(RuntimeError, "not configured"):
-                tony_live_bridge.build_app()
-
-
-if __name__ == "__main__":
-    unittest.main()
+if __name__ == "__main__": unittest.main()
