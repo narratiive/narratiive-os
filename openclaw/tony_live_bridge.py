@@ -25,19 +25,16 @@ from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
+from runtime.tony_post_booking_notion_sync import TonyPostBookingNotionSyncCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
-
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _REQUIRED_FRIDAY_FIELDS = {"record_id", "occurred_at", "record_type", "summary", "evidence", "workspace_id"}
 
-
 class LeadAwareTonyApplication:
-    """Add lead ingestion and conversational Telegram ingress to Tony's live bridge."""
-    def __init__(self, base: TonyHTTPBridge, lead_store: FileInboundLeadStore) -> None:
-        self.base = base; self.lead_store = lead_store
+    def __init__(self, base: TonyHTTPBridge, lead_store: FileInboundLeadStore) -> None: self.base = base; self.lead_store = lead_store
     def __getattr__(self, name: str): return getattr(self.base, name)
     def __call__(self, environ, start_response):
         method = str(environ.get("REQUEST_METHOD", "")).upper(); path = str(environ.get("PATH_INFO", "/")) or "/"
@@ -45,8 +42,7 @@ class LeadAwareTonyApplication:
         if method == "POST" and path == "/telegram/inbound": return self._telegram_inbound(environ, start_response)
         return self.base(environ, start_response)
     @staticmethod
-    def _is_loopback(environ) -> bool:
-        return str(environ.get("REMOTE_ADDR", "")).strip().casefold() in {"127.0.0.1", "::1", "localhost"}
+    def _is_loopback(environ) -> bool: return str(environ.get("REMOTE_ADDR", "")).strip().casefold() in {"127.0.0.1", "::1", "localhost"}
     def _authorize(self, environ, start_response, *, allow_loopback: bool = False):
         if allow_loopback and self._is_loopback(environ): return None
         if not self.base.bridge_token: return None
@@ -63,23 +59,19 @@ class LeadAwareTonyApplication:
             request = self._read_json(environ); text = str(request.get("text") or request.get("message") or "").strip()
             if not text: raise ValueError("text is required")
             status, payload = self.base._handle_telegram_command(text)
-        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_telegram_message", "message": str(exc)}})
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc: return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_telegram_message", "message": str(exc)}})
         return self._respond(start_response, status, payload)
     def _ingest(self, environ, start_response):
         denied = self._authorize(environ, start_response, allow_loopback=True)
         if denied is not None: return denied
         try:
             request = self._read_json(environ); payload = request.get("lead") if isinstance(request.get("lead"), dict) else request; lead = InboundLead.from_mapping(payload); self.lead_store.upsert(lead)
-        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_lead", "message": str(exc)}})
-        except Exception:
-            return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc: return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_lead", "message": str(exc)}})
+        except Exception: return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
         return self._respond(start_response, HTTPStatus.OK, {"ok": True, "status": "lead_ingested", "lead_id": lead.lead_id, "contact": lead.contact, "source": lead.source})
     @staticmethod
     def _respond(start_response, status: HTTPStatus, payload: dict[str, Any]):
         body = json.dumps(payload, sort_keys=True).encode("utf-8"); start_response(f"{status.value} {status.phrase}", [("Content-Type", "application/json"), ("Content-Length", str(len(body)))]); return [body]
-
 
 def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
     if not root.is_dir(): raise FileNotFoundError("Friday Review evidence store is unavailable")
@@ -96,7 +88,6 @@ def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
             records.append(candidate)
     if not records: raise ValueError("Friday Review evidence store contains no records")
     return records
-
 
 def build_app() -> LeadAwareTonyApplication:
     app = build_base_app()
@@ -115,52 +106,25 @@ def build_app() -> LeadAwareTonyApplication:
     learning_service = TonyExecutiveLearningCommandService(outcome_evidence_service, store_path=executive_learning_path)
     adaptive_service = TonyAdaptiveResponseCommandService(learning_service, learning_store_path=executive_learning_path)
     memory_service = TonyMemoryCommandService(adaptive_service, ExecutiveMemoryStore(Path(os.getenv("TONY_EXECUTIVE_MEMORY_PATH", str(REPOSITORY_ROOT / ".runtime" / "executive-memory.jsonl")))), agency_id=workspace_id)
-    autonomous_result_context_path = Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json")))
     live_dispatchers = build_http_dispatchers()
-    dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=autonomous_result_context_path)
-
+    dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))))
     def accept_verified_commercial_result(worker: str, dispatch: dict[str, Any], evidence: dict[str, Any], executive_result: str) -> dict[str, Any]:
         verified, reason = dispatch_service._verify_evidence(dispatch, evidence)
-        if not verified:
-            raise ValueError(f"returned evidence is not verified: {reason}")
-        context: dict[str, Any] = {
-            "worker": worker,
-            "dispatch": dict(dispatch),
-            "evidence": dict(evidence),
-            "executive_result": executive_result,
-            "verified_at": dispatch_service._now().isoformat(),
-        }
-        if not dispatch_service._enrich_context(context):
-            raise ValueError("verified result is not recognised as a commercial judgement context")
-        dispatch_service._last_verified_result = context
-        dispatch_service._persist_context(context)
-        return dict(context)
-
+        if not verified: raise ValueError(f"returned evidence is not verified: {reason}")
+        context: dict[str, Any] = {"worker": worker, "dispatch": dict(dispatch), "evidence": dict(evidence), "executive_result": executive_result, "verified_at": dispatch_service._now().isoformat()}
+        if not dispatch_service._enrich_context(context): raise ValueError("verified result is not recognised as a commercial judgement context")
+        dispatch_service._last_verified_result = context; dispatch_service._persist_context(context); return dict(context)
     post_send_sync_service = TonyPostSendNotionSyncCommandService(dispatch_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_SEND_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-send-notion-sync.json"))))
-    followup_service = TonyCommercialFollowupCommandService(
-        post_send_sync_service,
-        dispatchers=live_dispatchers,
-        store_path=Path(os.getenv("TONY_COMMERCIAL_FOLLOWUP_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-followup.json"))),
-    )
-    meeting_reply_service = TonyMeetingReplyPreparationCommandService(
-        followup_service,
-        dispatchers=live_dispatchers,
-        verified_result_sink=accept_verified_commercial_result,
-    )
-    meeting_booking_service = TonyConfirmedMeetingBookingCommandService(
-        meeting_reply_service,
-        dispatchers=live_dispatchers,
-        store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))),
-    )
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(meeting_booking_service)
+    followup_service = TonyCommercialFollowupCommandService(post_send_sync_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_FOLLOWUP_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-followup.json"))))
+    meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers, verified_result_sink=accept_verified_commercial_result)
+    meeting_booking_service = TonyConfirmedMeetingBookingCommandService(meeting_reply_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))))
+    booking_sync_service = TonyPostBookingNotionSyncCommandService(meeting_booking_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_BOOKING_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-booking-notion-sync.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(booking_sync_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
-
 def main() -> None:
     host = os.getenv("TONY_BRIDGE_HOST", "127.0.0.1"); port = int(os.getenv("TONY_BRIDGE_PORT", "8790"))
-    with make_server(host, port, build_app()) as server:
-        print(f"Tony bridge listening on http://{host}:{port}"); server.serve_forever()
-
+    with make_server(host, port, build_app()) as server: print(f"Tony bridge listening on http://{host}:{port}"); server.serve_forever()
 
 if __name__ == "__main__": main()
