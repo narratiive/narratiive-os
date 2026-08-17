@@ -86,8 +86,10 @@ class TonyConfirmedMeetingBookingTests(unittest.TestCase):
             calls.append(("gmail", contract))
             self.assertEqual(contract["execution_mode"], "autonomous_read")
             return {
+                "read_only": True,
                 "reply_found": True,
                 "body": "Tuesday at 10:00 works perfectly for me, thanks.",
+                "summary": "Alex explicitly confirmed the offered Tuesday 10:00 discovery slot in the verified Gmail thread.",
                 "message_id": "recipient-confirmation-456",
                 "thread_id": "thread-123",
             }
@@ -117,7 +119,7 @@ class TonyConfirmedMeetingBookingTests(unittest.TestCase):
 
         sent = service.execute("send meeting reply", ())
         self.assertEqual(sent.data["execution_status"], "meeting_reply_sent_confirmation_monitor_active")
-        self.assertFalse(sent.data["meeting_confirmation_monitor"]["approval_required_for_booking"] is False)
+        self.assertTrue(sent.data["meeting_confirmation_monitor"]["approval_required_for_booking"])
         self.assertEqual(calls, [])
 
         confirmed = service.execute("check replies", ())
@@ -140,8 +142,10 @@ class TonyConfirmedMeetingBookingTests(unittest.TestCase):
 
         def gmail(contract):
             return {
+                "read_only": True,
                 "reply_found": True,
                 "body": "Thursday afternoon would be better for me.",
+                "summary": "Alex replied in the verified Gmail thread asking for Thursday afternoon instead of either proposed slot.",
                 "message_id": "recipient-other-456",
                 "thread_id": "thread-123",
             }
