@@ -117,7 +117,11 @@ def build_app() -> LeadAwareTonyApplication:
     live_dispatchers = build_http_dispatchers()
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=autonomous_result_context_path)
     post_send_sync_service = TonyPostSendNotionSyncCommandService(dispatch_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_SEND_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-send-notion-sync.json"))))
-    followup_service = TonyCommercialFollowupCommandService(post_send_sync_service)
+    followup_service = TonyCommercialFollowupCommandService(
+        post_send_sync_service,
+        dispatchers=live_dispatchers,
+        store_path=Path(os.getenv("TONY_COMMERCIAL_FOLLOWUP_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-followup.json"))),
+    )
     execution_status_service = TonyVerifiedExecutionStatusCommandService(followup_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
