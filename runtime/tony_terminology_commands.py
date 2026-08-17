@@ -13,11 +13,11 @@ class TonyTerminologyCommandService:
     VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
     def __init__(self, command_service, policy: TerminologyPolicy | None = None) -> None:
-        self.command_service = (
-            command_service
-            if isinstance(command_service, TonyConversationalIntentCommandService)
-            else TonyConversationalIntentCommandService(command_service)
-        )
+        # Preserve `command_service` as the canonical composition link because the
+        # runtime and regression suite inspect that chain directly. Conversation
+        # routing is an input boundary, not a new business-state layer.
+        self.command_service = command_service
+        self.conversation_router = TonyConversationalIntentCommandService(command_service)
         self.policy = policy or TerminologyPolicy.from_path()
 
     @property
@@ -34,7 +34,7 @@ class TonyTerminologyCommandService:
         if name in self.VOCABULARY_COMMANDS:
             return self._vocabulary()
 
-        response = self.command_service.execute(command, objects)
+        response = self.conversation_router.execute(command, objects)
         violations = self.policy.scan_many(self._strings(response.message, response.data))
         if not violations:
             return response
