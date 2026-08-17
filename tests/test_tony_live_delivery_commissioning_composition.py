@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest import mock
 
 from openclaw import tony_live_bridge
+from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
 from runtime.tony_delivery_blueprint_review import TonyDeliveryBlueprintReviewCommandService
 from runtime.tony_delivery_commissioning import TonyDeliveryCommissioningCommandService
 from runtime.tony_drive_delivery_workspace import TonyDriveDeliveryWorkspaceCommandService
@@ -37,6 +38,7 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
                 "TONY_DRIVE_DELIVERY_WORKSPACE_PATH": str(Path(tmp) / "drive.json"),
                 "TONY_DELIVERY_COMMISSIONING_PATH": str(Path(tmp) / "commission.json"),
                 "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
+                "TONY_BLUEPRINT_CLIENT_DELIVERY_PATH": str(Path(tmp) / "blueprint-delivery.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.dict(
                 "os.environ", env, clear=True
@@ -45,7 +47,10 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
 
         execution_status = app.command_service.command_service
         self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        blueprint_review = execution_status.command_service
+        client_delivery = execution_status.command_service
+        self.assertIsInstance(client_delivery, TonyBlueprintClientDeliveryCommandService)
+        self.assertEqual(client_delivery.dispatchers, {})
+        blueprint_review = client_delivery.command_service
         self.assertIsInstance(blueprint_review, TonyDeliveryBlueprintReviewCommandService)
         self.assertEqual(blueprint_review.dispatchers, {})
         commissioning = blueprint_review.command_service
@@ -65,13 +70,16 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
                 "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
                 "TONY_DELIVERY_COMMISSIONING_PATH": str(Path(tmp) / "commission.json"),
                 "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
+                "TONY_BLUEPRINT_CLIENT_DELIVERY_PATH": str(Path(tmp) / "blueprint-delivery.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.object(
                 tony_live_bridge, "build_http_dispatchers", return_value={"Claude": fake_dispatcher}
             ), mock.patch.dict("os.environ", env, clear=True):
                 app = tony_live_bridge.build_app()
 
-        blueprint_review = app.command_service.command_service.command_service
+        client_delivery = app.command_service.command_service.command_service
+        self.assertIsInstance(client_delivery, TonyBlueprintClientDeliveryCommandService)
+        blueprint_review = client_delivery.command_service
         self.assertIs(blueprint_review.dispatchers["Claude"], fake_dispatcher)
         commissioning = blueprint_review.command_service
         self.assertIs(commissioning.dispatchers["Claude"], fake_dispatcher)
