@@ -21,6 +21,7 @@ from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCo
 from runtime.tony_delivery_bootstrap import TonyDeliveryBootstrapCommandService
 from runtime.tony_discovery_outcome_tracking import TonyDiscoveryOutcomeTrackingCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
+from runtime.tony_drive_delivery_workspace import TonyDriveDeliveryWorkspaceCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
 from runtime.tony_meeting_reply_preparation import TonyMeetingReplyPreparationCommandService
@@ -131,7 +132,8 @@ def build_app() -> LeadAwareTonyApplication:
     proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
     delivery_bootstrap_service = TonyDeliveryBootstrapCommandService(commercial_close_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BOOTSTRAP_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-bootstrap.json"))))
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(delivery_bootstrap_service)
+    drive_workspace_service = TonyDriveDeliveryWorkspaceCommandService(delivery_bootstrap_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DRIVE_DELIVERY_WORKSPACE_PATH", str(REPOSITORY_ROOT / ".runtime" / "drive-delivery-workspace.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(drive_workspace_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
