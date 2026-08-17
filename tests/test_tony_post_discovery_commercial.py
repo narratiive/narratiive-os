@@ -31,7 +31,8 @@ class TonyPostDiscoveryCommercialTests(unittest.TestCase):
                 calls.append(dispatch)
                 self.assertTrue(dispatch["approval_granted"])
                 self.assertIn("Do not send", dispatch["instruction"])
-                return {"work_product": "Proposal draft: positioning sprint, outcomes, assumptions and next step.", "summary": "Evidence-grounded proposal draft prepared for Tony review."}
+                draft = "Proposal draft for Example Co. Diagnosed problem: the growth story is not yet clear enough to support confident commercial choice. Recommended scope: a focused positioning and narrative sprint grounded in the discovery evidence. Intended outcomes: sharper strategic clarity, a stronger market story and a practical activation plan. Assumptions and evidence gaps: budget and final decision timing still need confirmation. Next step: Matt reviews this draft before any client-facing send."
+                return {"work_product": draft, "summary": "Evidence-grounded proposal draft prepared for Tony review.", "result": draft}
             service = TonyPostDiscoveryCommercialCommandService(DiscoveryReviewStub(), {"Claude": claude}, store_path=Path(tmp)/"state.json")
             routed = service.execute("check discovery", ())
             self.assertEqual(routed.data["execution_status"], "post_discovery_proposal_approval_required")
