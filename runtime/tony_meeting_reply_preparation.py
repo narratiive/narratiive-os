@@ -58,8 +58,8 @@ class TonyMeetingReplyPreparationCommandService:
             "state": "ready_for_autonomous_dispatch",
             "worker": "Claude",
             "instruction": (
-                f"Prepare a concise discovery reply to {contact} using only this verified Calendar availability: {rendered}. "
-                "Offer exactly two suitable times from the verified evidence. Do not invent or extend a slot. "
+                f"Prepare a concise discovery reply to {contact}. The verified Calendar availability is: {rendered}. "
+                "Use exactly two suitable times from that evidence. Do not invent or extend a slot. "
                 "Do not send the email, create a Calendar event, update Notion, or change external state."
             ),
             "target": dict(target),
