@@ -23,6 +23,7 @@ from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommand
 from runtime.tony_outcome_evidence import TonyOutcomeEvidenceCommandService
 from runtime.tony_persistent_agency_focus import TonyPersistentAgencyFocusCommandService
 from runtime.tony_post_booking_notion_sync import TonyPostBookingNotionSyncCommandService
+from runtime.tony_post_discovery_commercial import TonyPostDiscoveryCommercialCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
@@ -30,7 +31,7 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 class TonyLiveBridgeTests(unittest.TestCase):
     def _build(self, tmp, extra=None):
         base_app=mock.Mock(); base_service=mock.Mock(); base_app.command_service=base_service; base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
-        env={"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"post-send-sync.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting-booking.json"),"TONY_POST_BOOKING_NOTION_SYNC_PATH":str(Path(tmp)/"post-booking-sync.json"),"TONY_DISCOVERY_OUTCOME_TRACKING_PATH":str(Path(tmp)/"discovery-outcome.json")}; env.update(extra or {})
+        env={"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"post-send-sync.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting-booking.json"),"TONY_POST_BOOKING_NOTION_SYNC_PATH":str(Path(tmp)/"post-booking-sync.json"),"TONY_DISCOVERY_OUTCOME_TRACKING_PATH":str(Path(tmp)/"discovery-outcome.json"),"TONY_POST_DISCOVERY_COMMERCIAL_PATH":str(Path(tmp)/"post-discovery.json")}; env.update(extra or {})
         with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ",env,clear=True): app=tony_live_bridge.build_app()
         return app,base_app,base_service
 
@@ -38,7 +39,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp: app,base_app,base_service=self._build(tmp)
         self.assertIs(app.base,base_app); self.assertIsInstance(app.command_service,TonyTerminologyCommandService)
         execution_status=app.command_service.command_service; self.assertIsInstance(execution_status,TonyVerifiedExecutionStatusCommandService)
-        discovery=execution_status.command_service; self.assertIsInstance(discovery,TonyDiscoveryOutcomeTrackingCommandService); self.assertEqual(discovery.dispatchers,{})
+        post_discovery=execution_status.command_service; self.assertIsInstance(post_discovery,TonyPostDiscoveryCommercialCommandService); self.assertEqual(post_discovery.dispatchers,{})
+        discovery=post_discovery.command_service; self.assertIsInstance(discovery,TonyDiscoveryOutcomeTrackingCommandService); self.assertEqual(discovery.dispatchers,{})
         booking_sync=discovery.command_service; self.assertIsInstance(booking_sync,TonyPostBookingNotionSyncCommandService); self.assertEqual(booking_sync.dispatchers,{})
         booking=booking_sync.command_service; self.assertIsInstance(booking,TonyConfirmedMeetingBookingCommandService); self.assertEqual(booking.dispatchers,{})
         meeting=booking.command_service; self.assertIsInstance(meeting,TonyMeetingReplyPreparationCommandService); self.assertEqual(meeting.dispatchers,{})
@@ -58,7 +60,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
     def test_build_app_configures_explicit_live_dispatchers(self):
         with tempfile.TemporaryDirectory() as tmp: app,_,_=self._build(tmp,{"TONY_DISPATCH_GMAIL_URL":"http://127.0.0.1:9999/gmail/read","TONY_DISPATCH_FIREFLIES_URL":"http://127.0.0.1:9999/fireflies/read"})
         execution_status=app.command_service.command_service
-        discovery=execution_status.command_service; self.assertIsInstance(discovery,TonyDiscoveryOutcomeTrackingCommandService); self.assertEqual(set(discovery.dispatchers),{"Gmail","Fireflies"})
+        post_discovery=execution_status.command_service; self.assertIsInstance(post_discovery,TonyPostDiscoveryCommercialCommandService); self.assertEqual(set(post_discovery.dispatchers),{"Gmail","Fireflies"})
+        discovery=post_discovery.command_service; self.assertIsInstance(discovery,TonyDiscoveryOutcomeTrackingCommandService); self.assertEqual(set(discovery.dispatchers),{"Gmail","Fireflies"})
         booking_sync=discovery.command_service; self.assertIsInstance(booking_sync,TonyPostBookingNotionSyncCommandService); self.assertEqual(set(booking_sync.dispatchers),{"Gmail","Fireflies"})
         booking=booking_sync.command_service; self.assertIsInstance(booking,TonyConfirmedMeetingBookingCommandService); self.assertEqual(set(booking.dispatchers),{"Gmail","Fireflies"})
         meeting=booking.command_service; self.assertIsInstance(meeting,TonyMeetingReplyPreparationCommandService); self.assertEqual(set(meeting.dispatchers),{"Gmail","Fireflies"})
@@ -67,7 +70,7 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
     def test_build_app_preserves_mission_control_health_configuration(self):
         base_app=mock.Mock(); base_service=mock.Mock(); loader=mock.Mock(); base_service.mission_control_loader=loader; base_app.command_service=base_service; base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ",{"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"sync.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting-booking.json"),"TONY_POST_BOOKING_NOTION_SYNC_PATH":str(Path(tmp)/"post-booking.json"),"TONY_DISCOVERY_OUTCOME_TRACKING_PATH":str(Path(tmp)/"discovery.json")},clear=True): app=tony_live_bridge.build_app()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ",{"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"sync.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting-booking.json"),"TONY_POST_BOOKING_NOTION_SYNC_PATH":str(Path(tmp)/"post-booking.json"),"TONY_DISCOVERY_OUTCOME_TRACKING_PATH":str(Path(tmp)/"discovery.json"),"TONY_POST_DISCOVERY_COMMERCIAL_PATH":str(Path(tmp)/"post-discovery.json")},clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader,loader)
 
     def test_lead_ingestion_is_authenticated_and_persisted(self):
