@@ -4,6 +4,7 @@ from typing import Any, Iterable
 
 from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse
+from runtime.tony_conversational_intent import TonyConversationalIntentCommandService
 
 
 class TonyTerminologyCommandService:
@@ -12,7 +13,11 @@ class TonyTerminologyCommandService:
     VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
     def __init__(self, command_service, policy: TerminologyPolicy | None = None) -> None:
-        self.command_service = command_service
+        self.command_service = (
+            command_service
+            if isinstance(command_service, TonyConversationalIntentCommandService)
+            else TonyConversationalIntentCommandService(command_service)
+        )
         self.policy = policy or TerminologyPolicy.from_path()
 
     @property
