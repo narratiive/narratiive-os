@@ -46,11 +46,13 @@ class TonyProposalOutcomeTrackingTests(unittest.TestCase):
             def gmail(dispatch):
                 calls.append(dispatch)
                 self.assertEqual(dispatch["execution_mode"], "autonomous_read")
+                reply = "Thanks Alex. We'd like to proceed. Please send over the next steps."
                 return {
                     "reply_found": True,
                     "message_id": "reply-1",
                     "thread_id": "thread-1",
-                    "body": "Thanks Alex. We'd like to proceed. Please send over the next steps.",
+                    "body": reply,
+                    "summary": reply,
                     "read_only": True,
                 }
 
@@ -74,11 +76,13 @@ class TonyProposalOutcomeTrackingTests(unittest.TestCase):
 
             def gmail(dispatch):
                 calls.append(("gmail", dispatch))
+                reply = "We like the direction but have a question about budget and scope."
                 return {
                     "reply_found": True,
                     "message_id": "reply-2",
                     "thread_id": "thread-1",
-                    "body": "We like the direction but have a question about budget and scope.",
+                    "body": reply,
+                    "summary": reply,
                     "read_only": True,
                 }
 
@@ -87,9 +91,8 @@ class TonyProposalOutcomeTrackingTests(unittest.TestCase):
                 self.assertEqual(dispatch["execution_mode"], "autonomous_prepare")
                 self.assertNotIn("send", dispatch.get("approval_scope", ""))
                 return {
-                    "work_product": "A concise response addressing the budget and scope question without changing the offer.",
-                    "message_id": "claude-1",
-                    "model": "claude-test",
+                    "email_subject": "Re: Example Co proposal",
+                    "email_body": "Thanks for raising the budget and scope question. The proposal is deliberately focused on the strategic work required to resolve the growth problem first. I can clarify the scope boundaries and commercial assumptions before any commitment is made.",
                 }
 
             service = TonyProposalOutcomeTrackingCommandService(
@@ -111,11 +114,20 @@ class TonyProposalOutcomeTrackingTests(unittest.TestCase):
 
             def gmail(dispatch):
                 calls.append(("gmail", dispatch))
-                return {"reply_found": False, "thread_id": "thread-1", "message_id": "proposal-msg-1", "read_only": True}
+                return {
+                    "reply_found": False,
+                    "thread_id": "thread-1",
+                    "message_id": "proposal-msg-1",
+                    "read_only": True,
+                    "summary": "No new inbound reply is present in the verified proposal thread.",
+                }
 
             def claude(dispatch):
                 calls.append(("claude", dispatch))
-                return {"work_product": "Subject: Quick follow-up\n\nUseful proposal follow-up draft.", "message_id": "claude-2", "model": "claude-test"}
+                return {
+                    "email_subject": "Quick follow-up on the proposal",
+                    "email_body": "Hi Alex, one useful point to add to the proposal: the first phase is designed to turn the growth diagnosis into a practical decision framework quickly. If timing or scope is the blocker, I can clarify that directly. Nothing further is assumed until you are ready.",
+                }
 
             service = TonyProposalOutcomeTrackingCommandService(
                 ProposalSentStub(),
