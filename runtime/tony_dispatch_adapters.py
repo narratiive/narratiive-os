@@ -5,6 +5,8 @@ import os
 from typing import Any, Mapping
 from urllib import request
 
+from runtime.tony_claude_api_dispatcher import build_claude_api_dispatcher
+
 
 SUPPORTED_DISPATCH_WORKERS = (
     "Claude",
@@ -25,11 +27,12 @@ def _env_key(worker: str) -> str:
 def build_http_dispatchers(
     environ: Mapping[str, str] | None = None,
 ) -> dict[str, callable]:
-    """Build live dispatch handlers only for explicitly configured worker endpoints.
+    """Build explicitly configured live dispatch handlers.
 
-    Each endpoint receives Tony's pre-authorised dispatch contract as JSON and must
-    return a non-empty JSON object containing evidence. No endpoint is inferred or
-    enabled by default, so the autonomy decision remains fail-closed.
+    HTTP worker endpoints remain the default integration surface. Claude can also be
+    explicitly enabled as a direct Anthropic Messages API preparation worker with
+    TONY_DISPATCH_CLAUDE_MODE=anthropic_api. Nothing is inferred or enabled merely
+    because credentials exist, so Tony remains fail-closed by default.
     """
     env = environ or os.environ
     handlers: dict[str, callable] = {}
@@ -40,6 +43,10 @@ def build_http_dispatchers(
             continue
         token = str(env.get(f"TONY_DISPATCH_{key}_TOKEN", "")).strip()
         handlers[worker] = _http_handler(url, token)
+
+    claude_mode = str(env.get("TONY_DISPATCH_CLAUDE_MODE", "")).strip().casefold()
+    if "Claude" not in handlers and claude_mode == "anthropic_api":
+        handlers["Claude"] = build_claude_api_dispatcher(env)
     return handlers
 
 
