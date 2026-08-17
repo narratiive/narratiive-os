@@ -117,13 +117,35 @@ def build_app() -> LeadAwareTonyApplication:
     autonomous_result_context_path = Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json")))
     live_dispatchers = build_http_dispatchers()
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=autonomous_result_context_path)
+
+    def accept_verified_commercial_result(worker: str, dispatch: dict[str, Any], evidence: dict[str, Any], executive_result: str) -> dict[str, Any]:
+        verified, reason = dispatch_service._verify_evidence(dispatch, evidence)
+        if not verified:
+            raise ValueError(f"returned evidence is not verified: {reason}")
+        context: dict[str, Any] = {
+            "worker": worker,
+            "dispatch": dict(dispatch),
+            "evidence": dict(evidence),
+            "executive_result": executive_result,
+            "verified_at": dispatch_service._now().isoformat(),
+        }
+        if not dispatch_service._enrich_context(context):
+            raise ValueError("verified result is not recognised as a commercial judgement context")
+        dispatch_service._last_verified_result = context
+        dispatch_service._persist_context(context)
+        return dict(context)
+
     post_send_sync_service = TonyPostSendNotionSyncCommandService(dispatch_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_SEND_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-send-notion-sync.json"))))
     followup_service = TonyCommercialFollowupCommandService(
         post_send_sync_service,
         dispatchers=live_dispatchers,
         store_path=Path(os.getenv("TONY_COMMERCIAL_FOLLOWUP_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-followup.json"))),
     )
-    meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers)
+    meeting_reply_service = TonyMeetingReplyPreparationCommandService(
+        followup_service,
+        dispatchers=live_dispatchers,
+        verified_result_sink=accept_verified_commercial_result,
+    )
     execution_status_service = TonyVerifiedExecutionStatusCommandService(meeting_reply_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
