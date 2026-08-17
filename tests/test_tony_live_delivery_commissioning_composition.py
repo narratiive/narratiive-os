@@ -7,6 +7,7 @@ from unittest import mock
 
 from openclaw import tony_live_bridge
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
+from runtime.tony_blueprint_client_feedback import TonyBlueprintClientFeedbackCommandService
 from runtime.tony_blueprint_delivery_notion_sync import TonyBlueprintDeliveryNotionSyncCommandService
 from runtime.tony_delivery_blueprint_review import TonyDeliveryBlueprintReviewCommandService
 from runtime.tony_delivery_commissioning import TonyDeliveryCommissioningCommandService
@@ -41,6 +42,7 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
                 "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
                 "TONY_BLUEPRINT_CLIENT_DELIVERY_PATH": str(Path(tmp) / "blueprint-delivery.json"),
                 "TONY_BLUEPRINT_DELIVERY_NOTION_SYNC_PATH": str(Path(tmp) / "blueprint-delivery-sync.json"),
+                "TONY_BLUEPRINT_CLIENT_FEEDBACK_PATH": str(Path(tmp) / "blueprint-feedback.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.dict(
                 "os.environ", env, clear=True
@@ -49,7 +51,10 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
 
         execution_status = app.command_service.command_service
         self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        notion_sync = execution_status.command_service
+        feedback = execution_status.command_service
+        self.assertIsInstance(feedback, TonyBlueprintClientFeedbackCommandService)
+        self.assertEqual(feedback.dispatchers, {})
+        notion_sync = feedback.command_service
         self.assertIsInstance(notion_sync, TonyBlueprintDeliveryNotionSyncCommandService)
         self.assertEqual(notion_sync.dispatchers, {})
         client_delivery = notion_sync.command_service
@@ -77,13 +82,17 @@ class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
                 "TONY_DELIVERY_BLUEPRINT_REVIEW_PATH": str(Path(tmp) / "blueprint-review.json"),
                 "TONY_BLUEPRINT_CLIENT_DELIVERY_PATH": str(Path(tmp) / "blueprint-delivery.json"),
                 "TONY_BLUEPRINT_DELIVERY_NOTION_SYNC_PATH": str(Path(tmp) / "blueprint-delivery-sync.json"),
+                "TONY_BLUEPRINT_CLIENT_FEEDBACK_PATH": str(Path(tmp) / "blueprint-feedback.json"),
             }
             with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.object(
                 tony_live_bridge, "build_http_dispatchers", return_value={"Claude": fake_dispatcher}
             ), mock.patch.dict("os.environ", env, clear=True):
                 app = tony_live_bridge.build_app()
 
-        notion_sync = app.command_service.command_service.command_service
+        feedback = app.command_service.command_service.command_service
+        self.assertIsInstance(feedback, TonyBlueprintClientFeedbackCommandService)
+        self.assertIs(feedback.dispatchers["Claude"], fake_dispatcher)
+        notion_sync = feedback.command_service
         self.assertIsInstance(notion_sync, TonyBlueprintDeliveryNotionSyncCommandService)
         client_delivery = notion_sync.command_service
         self.assertIsInstance(client_delivery, TonyBlueprintClientDeliveryCommandService)
