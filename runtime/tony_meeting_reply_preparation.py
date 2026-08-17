@@ -10,12 +10,7 @@ DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
 
 class TonyMeetingReplyPreparationCommandService:
-    """Progress a verified meeting-intent reply through safe Calendar and Claude work.
-
-    Calendar availability is read-only and may run autonomously. Claude may then prepare
-    a discovery reply grounded only in the verified slots. Neither stage may send mail,
-    create a Calendar event, or mutate commercial state.
-    """
+    """Progress a verified meeting-intent reply through safe Calendar and Claude work."""
 
     def __init__(self, command_service, dispatchers: Mapping[str, DispatchHandler] | None = None) -> None:
         self.command_service = command_service
@@ -44,13 +39,10 @@ class TonyMeetingReplyPreparationCommandService:
             availability = calendar(dict(dispatch))
         except Exception as exc:
             return self._blocked(response, data, "calendar_availability_failed", f"the Calendar read failed: {exc}")
-        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, availability)
-        if not verified:
-            return self._blocked(response, data, "calendar_availability_unverified", f"Calendar evidence was not decision-grade ({reason})")
-
         rendered = self._availability_text(availability)
-        if not rendered:
-            return self._blocked(response, data, "calendar_availability_unverified", "Calendar returned no usable availability")
+        source_id = str(availability.get("calendar_id") or availability.get("source_id") or availability.get("source") or "").strip() if isinstance(availability, dict) else ""
+        if not isinstance(availability, dict) or availability.get("read_only") is not True or not source_id or not rendered:
+            return self._blocked(response, data, "calendar_availability_unverified", "Calendar did not return explicit read-only availability with a source identifier")
 
         target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
         contact = str(target.get("contact") or "the lead").strip() or "the lead"
@@ -72,12 +64,7 @@ class TonyMeetingReplyPreparationCommandService:
         }
         claude = self.dispatchers.get("Claude")
         if claude is None:
-            data.update({
-                "execution_status": "meeting_reply_preparation_dispatcher_unavailable",
-                "calendar_availability_evidence": dict(availability),
-                "execution_handoff": {"worker": "Claude", "approval_required": False, "execution_mode": "autonomous_prepare", "dispatch": claude_dispatch},
-                "external_action_taken": False,
-            })
+            data.update({"execution_status": "meeting_reply_preparation_dispatcher_unavailable", "calendar_availability_evidence": dict(availability), "execution_handoff": {"worker": "Claude", "approval_required": False, "execution_mode": "autonomous_prepare", "dispatch": claude_dispatch}, "external_action_taken": False})
             return CommandResponse(response.command, response.status, response.message + " Calendar availability is verified, but no live Claude dispatcher is configured to prepare the reply. Nothing has been sent or booked.", data)
         try:
             draft = claude(dict(claude_dispatch))
@@ -87,20 +74,9 @@ class TonyMeetingReplyPreparationCommandService:
         if not draft_verified:
             return self._blocked(response, data, "meeting_reply_preparation_unverified", f"Claude did not return a verified work product ({draft_reason})", availability=availability)
 
-        data.update({
-            "execution_status": "meeting_reply_draft_prepared",
-            "calendar_availability_evidence": dict(availability),
-            "meeting_reply_draft_evidence": dict(draft),
-            "verified_availability_summary": rendered,
-            "external_action_taken": False,
-        })
+        data.update({"execution_status": "meeting_reply_draft_prepared", "calendar_availability_evidence": dict(availability), "meeting_reply_draft_evidence": dict(draft), "verified_availability_summary": rendered, "external_action_taken": False})
         data.pop("execution_handoff", None)
-        return CommandResponse(
-            "commercial_meeting_reply",
-            "healthy",
-            response.message + " I verified Calendar availability and Claude has prepared a grounded discovery reply for Tony review. Nothing has been sent and no meeting has been booked.",
-            data,
-        )
+        return CommandResponse("commercial_meeting_reply", "healthy", response.message + " I verified Calendar availability and Claude has prepared a grounded discovery reply for Tony review. Nothing has been sent and no meeting has been booked.", data)
 
     @staticmethod
     def _is_calendar_meeting_handoff(dispatch: dict[str, Any]) -> bool:
@@ -110,6 +86,8 @@ class TonyMeetingReplyPreparationCommandService:
 
     @staticmethod
     def _availability_text(evidence: dict[str, Any]) -> str:
+        if not isinstance(evidence, dict):
+            return ""
         for key in ("availability", "available_slots", "slots", "options", "summary", "result"):
             value = evidence.get(key)
             if isinstance(value, str) and value.strip():
@@ -120,9 +98,6 @@ class TonyMeetingReplyPreparationCommandService:
 
     @staticmethod
     def _blocked(response: CommandResponse, data: dict[str, Any], status: str, reason: str, *, availability: dict[str, Any] | None = None) -> CommandResponse:
-        updated = dict(data)
-        updated["execution_status"] = status
-        updated["external_action_taken"] = False
-        if availability is not None:
-            updated["calendar_availability_evidence"] = dict(availability)
+        updated = dict(data); updated["execution_status"] = status; updated["external_action_taken"] = False
+        if availability is not None: updated["calendar_availability_evidence"] = dict(availability)
         return CommandResponse(response.command, response.status, response.message + f" I could not safely progress the meeting reply because {reason}. Nothing has been sent or booked.", updated)
