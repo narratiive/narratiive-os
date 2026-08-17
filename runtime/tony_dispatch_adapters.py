@@ -13,6 +13,7 @@ SUPPORTED_DISPATCH_WORKERS = (
     "Fireflies",
     "Gmail",
     "Google Calendar",
+    "Google Drive",
     "GitHub",
     "Notion",
     "Replit",
