@@ -18,6 +18,7 @@ from runtime.tony_commercial_close import TonyCommercialCloseCommandService
 from runtime.tony_commercial_followup import TonyCommercialFollowupCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCommandService
+from runtime.tony_delivery_blueprint_review import TonyDeliveryBlueprintReviewCommandService
 from runtime.tony_delivery_bootstrap import TonyDeliveryBootstrapCommandService
 from runtime.tony_delivery_commissioning import TonyDeliveryCommissioningCommandService
 from runtime.tony_discovery_outcome_tracking import TonyDiscoveryOutcomeTrackingCommandService
@@ -135,7 +136,8 @@ def build_app() -> LeadAwareTonyApplication:
     delivery_bootstrap_service = TonyDeliveryBootstrapCommandService(commercial_close_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BOOTSTRAP_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-bootstrap.json"))))
     drive_workspace_service = TonyDriveDeliveryWorkspaceCommandService(delivery_bootstrap_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DRIVE_DELIVERY_WORKSPACE_PATH", str(REPOSITORY_ROOT / ".runtime" / "drive-delivery-workspace.json"))))
     delivery_commissioning_service = TonyDeliveryCommissioningCommandService(drive_workspace_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_COMMISSIONING_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-commissioning.json"))))
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(delivery_commissioning_service)
+    delivery_blueprint_review_service = TonyDeliveryBlueprintReviewCommandService(delivery_commissioning_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BLUEPRINT_REVIEW_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-blueprint-review.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(delivery_blueprint_review_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
