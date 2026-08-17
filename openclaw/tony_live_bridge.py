@@ -30,6 +30,7 @@ from runtime.tony_post_booking_notion_sync import TonyPostBookingNotionSyncComma
 from runtime.tony_post_discovery_commercial import TonyPostDiscoveryCommercialCommandService
 from runtime.tony_post_discovery_proposal_execution import TonyPostDiscoveryProposalExecutionCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
+from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
@@ -125,7 +126,8 @@ def build_app() -> LeadAwareTonyApplication:
     discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(booking_sync_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))))
     post_discovery_service = TonyPostDiscoveryCommercialCommandService(discovery_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json"))))
     proposal_execution_service = TonyPostDiscoveryProposalExecutionCommandService(post_discovery_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-proposal-execution.json"))))
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(proposal_execution_service)
+    proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(proposal_outcome_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
