@@ -16,6 +16,7 @@ from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_autonomous_judgement import TonyCommercialAutonomousJudgementCommandService
 from runtime.tony_commercial_followup import TonyCommercialFollowupCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
+from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
@@ -146,7 +147,12 @@ def build_app() -> LeadAwareTonyApplication:
         dispatchers=live_dispatchers,
         verified_result_sink=accept_verified_commercial_result,
     )
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(meeting_reply_service)
+    meeting_booking_service = TonyConfirmedMeetingBookingCommandService(
+        meeting_reply_service,
+        dispatchers=live_dispatchers,
+        store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))),
+    )
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(meeting_booking_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
