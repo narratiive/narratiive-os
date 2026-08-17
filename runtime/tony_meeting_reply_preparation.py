@@ -7,14 +7,21 @@ from runtime.tony_command_service import CommandResponse
 
 
 DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
+VerifiedResultSink = Callable[[str, dict[str, Any], dict[str, Any], str], dict[str, Any]]
 
 
 class TonyMeetingReplyPreparationCommandService:
     """Progress a verified meeting-intent reply through safe Calendar and Claude work."""
 
-    def __init__(self, command_service, dispatchers: Mapping[str, DispatchHandler] | None = None) -> None:
+    def __init__(
+        self,
+        command_service,
+        dispatchers: Mapping[str, DispatchHandler] | None = None,
+        verified_result_sink: VerifiedResultSink | None = None,
+    ) -> None:
         self.command_service = command_service
         self.dispatchers = dict(dispatchers or {})
+        self.verified_result_sink = verified_result_sink
 
     @property
     def mission_control_loader(self):
@@ -74,8 +81,40 @@ class TonyMeetingReplyPreparationCommandService:
         if not draft_verified:
             return self._blocked(response, data, "meeting_reply_preparation_unverified", f"Claude did not return a verified work product ({draft_reason})", availability=availability)
 
-        data.update({"execution_status": "meeting_reply_draft_prepared", "calendar_availability_evidence": dict(availability), "meeting_reply_draft_evidence": dict(draft), "verified_availability_summary": rendered, "external_action_taken": False})
+        review_context: dict[str, Any] = {}
+        if self.verified_result_sink is not None:
+            try:
+                review_context = self.verified_result_sink(
+                    "Claude",
+                    dict(claude_dispatch),
+                    dict(draft),
+                    "Claude returned a verified discovery reply grounded in Calendar availability.",
+                )
+            except Exception as exc:
+                return self._blocked(response, data, "meeting_reply_review_failed", f"Tony could not persist and review the verified draft: {exc}", availability=availability)
+
+        judgement = review_context.get("commercial_judgement") if isinstance(review_context.get("commercial_judgement"), dict) else {}
+        disposition = str(judgement.get("disposition") or "").strip()
+        data.update({
+            "calendar_availability_evidence": dict(availability),
+            "meeting_reply_draft_evidence": dict(draft),
+            "verified_availability_summary": rendered,
+            "external_action_taken": False,
+        })
         data.pop("execution_handoff", None)
+        if judgement:
+            data["commercial_judgement"] = dict(judgement)
+        if disposition == "meeting_draft_ready":
+            data["execution_status"] = "meeting_reply_ready_for_approval"
+            message = response.message + " I verified Calendar availability and reviewed Claude's grounded discovery reply against those exact times. It is ready for your approval. Nothing has been sent and no meeting has been booked."
+            return CommandResponse("commercial_meeting_reply", "healthy", message, data)
+        if disposition == "meeting_draft_revision_required":
+            data["execution_status"] = "meeting_reply_revision_required"
+            failed = ", ".join(str(item) for item in judgement.get("failed_checks", ()))
+            message = response.message + f" I verified Calendar availability, but I would not send Claude's draft yet. It needs revision on: {failed or 'the verified meeting-draft requirements'}. Nothing has been sent and no meeting has been booked."
+            return CommandResponse("commercial_meeting_reply", "healthy", message, data)
+
+        data["execution_status"] = "meeting_reply_draft_prepared"
         return CommandResponse("commercial_meeting_reply", "healthy", response.message + " I verified Calendar availability and Claude has prepared a grounded discovery reply for Tony review. Nothing has been sent and no meeting has been booked.", data)
 
     @staticmethod
