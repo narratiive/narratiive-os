@@ -24,17 +24,7 @@ def onboarding_response():
         "client_onboarding",
         "healthy",
         "Onboarding kickoff verified.",
-        {
-            "execution_status": "onboarding_started_verified",
-            "onboarding": {
-                "onboarding_record_id": "onb-123",
-                "opportunity_record_id": "opp-123",
-                "lead_id": "lead-1",
-                "contact": "Alex",
-                "company": "Acme",
-                "started": True,
-            },
-        },
+        {"execution_status": "onboarding_started_verified", "onboarding": {"onboarding_record_id": "onb-123", "opportunity_record_id": "opp-123", "lead_id": "lead-1", "contact": "Alex", "company": "Acme", "started": True}},
     )
 
 
@@ -58,7 +48,7 @@ class TonyDeliveryBootstrapTests(unittest.TestCase):
 
     def test_scoped_approval_requires_verified_notion_evidence(self):
         def notion(dispatch):
-            return {"verified": True, "executed": True, "mutation_applied": True, "record_id": "delivery-1", "delivery_status": "Ready"}
+            return {"verified": True, "mutation_count": 1, "record_id": "delivery-1", "delivery_status": "Ready"}
         with tempfile.TemporaryDirectory() as tmp:
             service = TonyDeliveryBootstrapCommandService(StubService(onboarding_response()), dispatchers={"Notion": notion}, store_path=Path(tmp) / "delivery.json")
             service.execute("status", [])
