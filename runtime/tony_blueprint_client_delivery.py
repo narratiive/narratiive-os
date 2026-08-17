@@ -103,7 +103,20 @@ class TonyBlueprintClientDeliveryCommandService:
             evidence = drive(dict(dispatch))
         except Exception as exc:
             return CommandResponse("blueprint_client_delivery", "healthy", f"The approved Growth Blueprint delivery failed: {exc}. Tony is not treating it as delivered.", {"execution_status": "blueprint_client_delivery_failed", "external_action_taken": False})
-        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, evidence)
+
+        # The shared dispatcher contract recognises `url` as a canonical write-result
+        # identifier. Drive delivery adapters commonly return the more specific
+        # `share_url`/`delivery_url`; map that returned evidence into the canonical
+        # verifier shape without inventing any execution evidence.
+        verification_evidence: Any = evidence
+        if isinstance(evidence, dict):
+            verification_evidence = dict(evidence)
+            if not str(verification_evidence.get("url") or "").strip():
+                returned_url = str(verification_evidence.get("delivery_url") or verification_evidence.get("share_url") or "").strip()
+                if returned_url:
+                    verification_evidence["url"] = returned_url
+
+        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, verification_evidence)
         file_id = str(evidence.get("file_id") or evidence.get("document_id") or "").strip() if isinstance(evidence, dict) else ""
         delivery_url = str(evidence.get("delivery_url") or evidence.get("share_url") or evidence.get("url") or "").strip() if isinstance(evidence, dict) else ""
         externally_accessible = bool(evidence.get("externally_accessible") or evidence.get("shared")) if isinstance(evidence, dict) else False
