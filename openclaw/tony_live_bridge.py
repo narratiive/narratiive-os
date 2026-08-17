@@ -19,6 +19,7 @@ from runtime.tony_commercial_followup import TonyCommercialFollowupCommandServic
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
 from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCommandService
 from runtime.tony_delivery_bootstrap import TonyDeliveryBootstrapCommandService
+from runtime.tony_delivery_commissioning import TonyDeliveryCommissioningCommandService
 from runtime.tony_discovery_outcome_tracking import TonyDiscoveryOutcomeTrackingCommandService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_drive_delivery_workspace import TonyDriveDeliveryWorkspaceCommandService
@@ -133,7 +134,8 @@ def build_app() -> LeadAwareTonyApplication:
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
     delivery_bootstrap_service = TonyDeliveryBootstrapCommandService(commercial_close_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BOOTSTRAP_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-bootstrap.json"))))
     drive_workspace_service = TonyDriveDeliveryWorkspaceCommandService(delivery_bootstrap_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DRIVE_DELIVERY_WORKSPACE_PATH", str(REPOSITORY_ROOT / ".runtime" / "drive-delivery-workspace.json"))))
-    execution_status_service = TonyVerifiedExecutionStatusCommandService(drive_workspace_service)
+    delivery_commissioning_service = TonyDeliveryCommissioningCommandService(drive_workspace_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_COMMISSIONING_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-commissioning.json"))))
+    execution_status_service = TonyVerifiedExecutionStatusCommandService(delivery_commissioning_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
     return LeadAwareTonyApplication(app, lead_store)
 
