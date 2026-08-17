@@ -65,8 +65,10 @@ class TonyCommercialCloseCommandService:
 
         completed = set(str(item) for item in self.state.get("completed", []) if item)
         existing = self.state.get("pending") if isinstance(self.state.get("pending"), dict) else {}
-        if reply_id in completed or existing.get("acceptance_message_id") == reply_id:
+        if reply_id in completed:
             return response
+        if existing.get("acceptance_message_id") == reply_id:
+            return self._pending_close_response(response, data, existing, repeated=True)
 
         pending = {
             "acceptance_message_id": reply_id,
@@ -78,7 +80,16 @@ class TonyCommercialCloseCommandService:
         }
         self.state["pending"] = pending
         self._persist()
+        return self._pending_close_response(response, data, pending, repeated=False)
 
+    def _pending_close_response(
+        self,
+        response: CommandResponse,
+        data: dict[str, Any],
+        pending: dict[str, Any],
+        *,
+        repeated: bool,
+    ) -> CommandResponse:
         data["execution_status"] = "commercial_close_approval_required"
         data["commercial_close"] = {
             "state": "awaiting_matt_attestation_and_approval",
@@ -90,15 +101,22 @@ class TonyCommercialCloseCommandService:
                 "contract_requirement_satisfied_or_not_required": "required",
                 "payment_or_purchase_order_requirement_satisfied_or_not_required": "required",
             },
-            **{key: value for key, value in pending.items() if key != "acceptance_evidence"},
+            **self._public_pending(pending),
         }
-        label = pending["company"] or pending["contact"] or "the opportunity"
-        message = (
-            response.message
-            + f" Acceptance intent is verified for {label}, but I am not calling the deal won yet. "
-            "Before I change the authoritative commercial state, confirm that the agreed scope and deliverables are settled, the commercial terms are accepted, any contract requirement is satisfied or explicitly not required, and any payment or purchase-order requirement is satisfied or explicitly not required. "
-            "When those are genuinely true, say 'confirm commercial close'. That phrase is a scoped attestation and approval for the Notion Won update only; it does not start onboarding automatically."
-        )
+        label = str(pending.get("company") or pending.get("contact") or "the opportunity")
+        if repeated:
+            message = (
+                response.message
+                + f" Acceptance intent for {label} is already verified and the commercial close is still pending. "
+                "A generic approval will not mark it won. Say 'confirm commercial close' only when the agreed scope and deliverables are settled, the commercial terms are accepted, any contract requirement is satisfied or explicitly not required, and any payment or purchase-order requirement is satisfied or explicitly not required."
+            )
+        else:
+            message = (
+                response.message
+                + f" Acceptance intent is verified for {label}, but I am not calling the deal won yet. "
+                "Before I change the authoritative commercial state, confirm that the agreed scope and deliverables are settled, the commercial terms are accepted, any contract requirement is satisfied or explicitly not required, and any payment or purchase-order requirement is satisfied or explicitly not required. "
+                "When those are genuinely true, say 'confirm commercial close'. That phrase is a scoped attestation and approval for the Notion Won update only; it does not start onboarding automatically."
+            )
         return CommandResponse(response.command, response.status, message, data)
 
     def _close(self, pending: dict[str, Any]) -> CommandResponse:
