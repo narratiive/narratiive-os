@@ -80,12 +80,14 @@ class TonyCommercialFollowupTests(unittest.TestCase):
         now = [datetime(2026, 8, 17, 9, 0, tzinfo=timezone.utc)]
 
         def gmail(_):
+            reply = "Hi Matt, this sounds interesting. Happy to chat next week — when are you free?"
             return {
                 "read_only": True,
                 "thread_id": "thread-123",
                 "message_id": "reply-456",
                 "reply_found": True,
-                "body": "Hi Matt, this sounds interesting. Happy to chat next week — when are you free?",
+                "body": reply,
+                "summary": reply,
             }
 
         service = self._service(now=now, gmail=gmail)
