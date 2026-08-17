@@ -39,13 +39,21 @@ class TonyMeetingReplyPreparationCommandService:
         if not self._is_calendar_meeting_handoff(dispatch):
             return response
 
-        calendar = self.dispatchers.get("Google Calendar")
-        if calendar is None:
-            return self._blocked(response, data, "calendar_dispatcher_unavailable", "no live Google Calendar read dispatcher is configured")
-        try:
-            availability = calendar(dict(dispatch))
-        except Exception as exc:
-            return self._blocked(response, data, "calendar_availability_failed", f"the Calendar read failed: {exc}")
+        # The inner autonomous-dispatch layer may already have executed this
+        # read-only Calendar contract. Reuse its verified evidence rather than
+        # issuing the same Calendar read a second time from this orchestration
+        # layer. If no verified result is present, this service can still run
+        # the Calendar read directly for standalone composition/tests.
+        availability = self._verified_calendar_result(data)
+        if availability is None:
+            calendar = self.dispatchers.get("Google Calendar")
+            if calendar is None:
+                return self._blocked(response, data, "calendar_dispatcher_unavailable", "no live Google Calendar read dispatcher is configured")
+            try:
+                availability = calendar(dict(dispatch))
+            except Exception as exc:
+                return self._blocked(response, data, "calendar_availability_failed", f"the Calendar read failed: {exc}")
+
         rendered = self._availability_text(availability)
         source_id = str(availability.get("calendar_id") or availability.get("source_id") or availability.get("source") or "").strip() if isinstance(availability, dict) else ""
         if not isinstance(availability, dict) or availability.get("read_only") is not True or not source_id or not rendered:
@@ -116,6 +124,15 @@ class TonyMeetingReplyPreparationCommandService:
 
         data["execution_status"] = "meeting_reply_draft_prepared"
         return CommandResponse("commercial_meeting_reply", "healthy", response.message + " I verified Calendar availability and Claude has prepared a grounded discovery reply for Tony review. Nothing has been sent and no meeting has been booked.", data)
+
+    @staticmethod
+    def _verified_calendar_result(data: dict[str, Any]) -> dict[str, Any] | None:
+        result = data.get("dispatch_result") if isinstance(data.get("dispatch_result"), dict) else {}
+        worker = str(result.get("worker") or "").strip().casefold()
+        evidence = result.get("evidence") if isinstance(result.get("evidence"), dict) else None
+        if worker in {"google calendar", "calendar"} and result.get("status") == "verified" and evidence:
+            return dict(evidence)
+        return None
 
     @staticmethod
     def _is_calendar_meeting_handoff(dispatch: dict[str, Any]) -> bool:
