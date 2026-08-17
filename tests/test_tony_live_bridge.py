@@ -13,6 +13,7 @@ from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandServic
 from runtime.tony_capability_commands import TonyCapabilityCommandService
 from runtime.tony_commercial_followup import TonyCommercialFollowupCommandService
 from runtime.tony_commercial_watch import TonyCommercialWatchCommandService
+from runtime.tony_confirmed_meeting_booking import TonyConfirmedMeetingBookingCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
 from runtime.tony_meeting_reply_preparation import TonyMeetingReplyPreparationCommandService
@@ -28,7 +29,7 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 class TonyLiveBridgeTests(unittest.TestCase):
     def _build(self, tmp, extra=None):
         base_app = mock.Mock(); base_service = mock.Mock(); base_app.command_service = base_service; base_app.bridge_token = ""; base_app.brief_archive = mock.Mock()
-        env = {"TONY_INBOUND_LEADS_PATH": str(Path(tmp)/"leads.json"), "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp)/"focus.json"), "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp)/"outcomes.json"), "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp)/"learning.json"), "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp)/"post-send-sync.json")}
+        env = {"TONY_INBOUND_LEADS_PATH": str(Path(tmp)/"leads.json"), "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp)/"focus.json"), "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp)/"outcomes.json"), "TONY_EXECUTIVE_LEARNING_PATH": str(Path(tmp)/"learning.json"), "TONY_POST_SEND_NOTION_SYNC_PATH": str(Path(tmp)/"post-send-sync.json"), "TONY_MEETING_BOOKING_PATH": str(Path(tmp)/"meeting-booking.json")}
         env.update(extra or {})
         with mock.patch.object(tony_live_bridge, "build_base_app", return_value=base_app), mock.patch.dict("os.environ", env, clear=True): app = tony_live_bridge.build_app()
         return app, base_app, base_service
@@ -37,7 +38,8 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp: app, base_app, base_service = self._build(tmp)
         self.assertIs(app.base, base_app); self.assertIsInstance(app.command_service, TonyTerminologyCommandService)
         execution_status = app.command_service.command_service; self.assertIsInstance(execution_status, TonyVerifiedExecutionStatusCommandService)
-        meeting = execution_status.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(meeting.dispatchers, {})
+        booking = execution_status.command_service; self.assertIsInstance(booking, TonyConfirmedMeetingBookingCommandService); self.assertEqual(booking.dispatchers, {})
+        meeting = booking.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(meeting.dispatchers, {})
         followup = meeting.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
         post_send_sync = followup.command_service; self.assertIsInstance(post_send_sync, TonyPostSendNotionSyncCommandService); self.assertEqual(post_send_sync.dispatchers, {})
         dispatch = post_send_sync.command_service; self.assertIsInstance(dispatch, TonyAutonomousDispatchCommandService); self.assertEqual(dispatch.dispatchers, {})
@@ -53,13 +55,15 @@ class TonyLiveBridgeTests(unittest.TestCase):
 
     def test_build_app_configures_explicit_live_dispatchers(self):
         with tempfile.TemporaryDirectory() as tmp: app, _, _ = self._build(tmp, {"TONY_DISPATCH_GMAIL_URL":"http://127.0.0.1:9999/gmail/read"})
-        execution_status = app.command_service.command_service; meeting = execution_status.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(set(meeting.dispatchers), {"Gmail"})
+        execution_status = app.command_service.command_service
+        booking = execution_status.command_service; self.assertIsInstance(booking, TonyConfirmedMeetingBookingCommandService); self.assertEqual(set(booking.dispatchers), {"Gmail"})
+        meeting = booking.command_service; self.assertIsInstance(meeting, TonyMeetingReplyPreparationCommandService); self.assertEqual(set(meeting.dispatchers), {"Gmail"})
         followup = meeting.command_service; self.assertIsInstance(followup, TonyCommercialFollowupCommandService)
         post_send_sync = followup.command_service; self.assertEqual(set(post_send_sync.dispatchers), {"Gmail"}); dispatch = post_send_sync.command_service; self.assertEqual(set(dispatch.dispatchers), {"Gmail"})
 
     def test_build_app_preserves_mission_control_health_configuration(self):
         base_app = mock.Mock(); base_service = mock.Mock(); loader = mock.Mock(); base_service.mission_control_loader = loader; base_app.command_service = base_service; base_app.bridge_token=""
-        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ", {"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"sync.json")}, clear=True): app=tony_live_bridge.build_app()
+        with tempfile.TemporaryDirectory() as tmp, mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app), mock.patch.dict("os.environ", {"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"sync.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting-booking.json")}, clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader, loader)
 
     def test_lead_ingestion_is_authenticated_and_persisted(self):
