@@ -20,6 +20,12 @@ class TonyBlueprintRevisionPersistenceTests(unittest.TestCase):
         dispatchers = {} if drive is None else {"Google Drive": drive}
         return TonyBlueprintRevisionPersistenceCommandService(_Base(), dispatchers, store_path=Path(tmp) / "state.json")
 
+    def _persisted_service(self, tmp, drive):
+        service = self._service(tmp, drive)
+        service.execute("revision status", ())
+        persisted = service.execute("approve Growth Blueprint revision", ())
+        return service, persisted
+
     def test_generic_approval_does_not_write_revision(self):
         calls=[]
         with tempfile.TemporaryDirectory() as tmp:
@@ -30,18 +36,57 @@ class TonyBlueprintRevisionPersistenceTests(unittest.TestCase):
         self.assertEqual(response.data["execution_status"], "blueprint_revision_persistence_approval_required")
         self.assertEqual(calls, [])
 
-    def test_scoped_approval_creates_distinct_revision_without_overwrite(self):
+    def test_scoped_approval_creates_distinct_revision_then_requires_redelivery_approval(self):
         calls=[]
         def drive(dispatch):
             calls.append(dispatch); return {"verified": True, "created": True, "mutation_count": 1, "file_id": "revision-2", "url": "https://drive.google.com/revision-2"}
         with tempfile.TemporaryDirectory() as tmp:
             service=self._service(tmp, drive); service.execute("revision status", ()); response=service.execute("approve Growth Blueprint revision", ())
-        self.assertEqual(response.data["execution_status"], "blueprint_revision_persisted_verified")
-        self.assertTrue(response.data["external_action_taken"])
+        self.assertEqual(response.data["execution_status"], "blueprint_revision_client_delivery_approval_required")
+        self.assertFalse(response.data["external_action_taken"])
         self.assertEqual(calls[0]["payload"]["original_delivered_file_id"], "delivered-1")
         self.assertIn("Do not overwrite", calls[0]["instruction"])
         self.assertEqual(response.data["blueprint_revision"]["revision_file_id"], "revision-2")
-        self.assertIn("separate client-redelivery approval", response.message)
+        self.assertEqual(response.data["drive_revision_evidence"]["file_id"], "revision-2")
+        self.assertIn("separate scoped approval", response.message)
+
+    def test_generic_approval_after_persistence_does_not_redeliver(self):
+        calls=[]
+        def drive(dispatch):
+            calls.append(dispatch)
+            return {"verified": True, "created": True, "mutation_count": 1, "file_id": "revision-2", "url": "https://drive.google.com/revision-2"}
+        with tempfile.TemporaryDirectory() as tmp:
+            service,_=self._persisted_service(tmp, drive)
+            response=service.execute("do that", ())
+        self.assertEqual(response.data["execution_status"], "blueprint_revision_client_delivery_approval_required")
+        self.assertEqual(len(calls), 1)
+
+    def test_scoped_redelivery_shares_exact_revision_and_preserves_original(self):
+        calls=[]
+        def drive(dispatch):
+            calls.append(dispatch)
+            if dispatch["payload"]["kind"] == "growth_blueprint_revision":
+                return {"verified": True, "created": True, "mutation_count": 1, "file_id": "revision-2", "url": "https://drive.google.com/revision-2"}
+            return {"verified": True, "mutation_count": 1, "file_id": "revision-2", "share_url": "https://drive.google.com/shared/revision-2", "shared": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            service,_=self._persisted_service(tmp, drive)
+            response=service.execute("redeliver Growth Blueprint revision", ())
+        self.assertEqual(response.data["execution_status"], "blueprint_revision_client_delivery_verified")
+        self.assertTrue(response.data["external_action_taken"])
+        self.assertEqual(calls[1]["payload"]["revision_file_id"], "revision-2")
+        self.assertEqual(calls[1]["payload"]["original_delivered_file_id"], "delivered-1")
+        self.assertIn("previously delivered Blueprint remains untouched", response.message)
+
+    def test_wrong_file_redelivery_evidence_is_rejected(self):
+        def drive(dispatch):
+            if dispatch["payload"]["kind"] == "growth_blueprint_revision":
+                return {"verified": True, "created": True, "mutation_count": 1, "file_id": "revision-2", "url": "https://drive.google.com/revision-2"}
+            return {"verified": True, "mutation_count": 1, "file_id": "delivered-1", "share_url": "https://x", "shared": True}
+        with tempfile.TemporaryDirectory() as tmp:
+            service,_=self._persisted_service(tmp, drive)
+            response=service.execute("deliver Growth Blueprint revision", ())
+        self.assertEqual(response.data["execution_status"], "blueprint_revision_client_delivery_unverified")
+        self.assertFalse(response.data["external_action_taken"])
 
     def test_same_file_identity_is_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:
