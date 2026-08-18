@@ -96,10 +96,21 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
     def _prepare_first_priority_action(self) -> CommandResponse:
         priority = dict(self._last_priorities[0])
         priority_key = str(priority.get("key") or "")
+        pending_status = str((self._pending_action or {}).get("status") or "")
+        retryable_stall = (
+            self._pending_action is not None
+            and self._pending_action_is_stalled()
+            and pending_status != "awaiting_matt"
+        )
+
         if self._pending_action and str(self._pending_action.get("priority_key") or "") == priority_key:
+            if retryable_stall:
+                return self._reissue_stalled_action()
             return self._pending_action_status(duplicate_request=True)
 
         if priority.get("reason") == "stalled_delegated_action":
+            if retryable_stall:
+                return self._reissue_stalled_action()
             return self._pending_action_status(duplicate_request=True)
 
         response = super()._prepare_first_priority_action()
@@ -119,6 +130,43 @@ class TonyPersistentAgencyFocusCommandService(TonyAgencyFocusCommandService):
         }
         self._persist_state()
         return response
+
+    def _reissue_stalled_action(self) -> CommandResponse:
+        pending = dict(self._pending_action or {})
+        original_priority = pending.get("priority") if isinstance(pending.get("priority"), dict) else {}
+        handoff = pending.get("execution_handoff") if isinstance(pending.get("execution_handoff"), dict) else {}
+        superseded_action_id = str(pending.get("action_id") or "")
+        worker = str(handoff.get("worker") or "the assigned worker")
+        label = str(original_priority.get("label") or "the stalled priority")
+
+        self._pending_action = None
+        self._last_priorities = (dict(original_priority),) + tuple(
+            dict(item)
+            for item in self._last_priorities
+            if str(item.get("reason") or "") != "stalled_delegated_action"
+            and str(item.get("key") or "") != str(original_priority.get("key") or "")
+        )
+        self._last_priorities = self._last_priorities[:3]
+        self._persist_state()
+
+        return CommandResponse(
+            command="agency_focus_action_retry",
+            status="attention",
+            message=(
+                f"That handoff for {label} had stalled without execution evidence. "
+                f"I am reissuing the same bounded step to {worker} now rather than suppressing it as a duplicate. "
+                "I will still only treat it as complete if the worker returns verified evidence."
+            ),
+            data={
+                "intent": "retry_stalled_top_agency_priority",
+                "priority": dict(original_priority),
+                "execution_handoff": dict(handoff),
+                "execution_status": "ready_for_handoff_retry",
+                "superseded_action_id": superseded_action_id,
+                "stale_action_reissued": True,
+                "external_action_taken": False,
+            },
+        )
 
     def _record_action_result(self, objects: tuple[dict[str, Any], ...]) -> CommandResponse:
         if not self._pending_action:
