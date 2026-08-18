@@ -43,10 +43,11 @@ class TonyBlueprintRevisionPersistenceTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             service=self._service(tmp, drive); service.execute("revision status", ()); response=service.execute("approve Growth Blueprint revision", ())
         self.assertEqual(response.data["execution_status"], "blueprint_revision_client_delivery_approval_required")
-        self.assertTrue(response.data["external_action_taken"])
+        self.assertFalse(response.data["external_action_taken"])
         self.assertEqual(calls[0]["payload"]["original_delivered_file_id"], "delivered-1")
         self.assertIn("Do not overwrite", calls[0]["instruction"])
         self.assertEqual(response.data["blueprint_revision"]["revision_file_id"], "revision-2")
+        self.assertEqual(response.data["drive_revision_evidence"]["file_id"], "revision-2")
         self.assertIn("separate scoped approval", response.message)
 
     def test_generic_approval_after_persistence_does_not_redeliver(self):
