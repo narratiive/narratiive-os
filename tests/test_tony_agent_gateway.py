@@ -49,11 +49,88 @@ class TonyAgentGatewayTests(unittest.TestCase):
         with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
             self.assertEqual(gateway.converse("What did they say?"), "Jimmy replied. I'd handle that first.")
 
-        self.assertEqual(captured["body"], {"model": "openclaw/tony", "input": "What did they say?"})
+        self.assertEqual(captured["body"]["model"], "openclaw/tony")
+        self.assertEqual(captured["body"]["input"], "What did they say?")
+        self.assertEqual({tool["name"] for tool in captured["body"]["tools"]}, {"get_executive_brief", "get_current_leads"})
+        self.assertIn("current Narratiive state", captured["body"]["instructions"])
         headers = {key.casefold(): value for key, value in captured["headers"].items()}
         self.assertEqual(headers["x-openclaw-agent-id"], "tony")
         self.assertEqual(headers["x-openclaw-session-key"], "narratiive:tony:telegram")
         self.assertEqual(headers["authorization"], "Bearer secret")
+
+    def test_agent_can_ground_natural_language_in_executive_brief_tool(self):
+        requests = []
+        responses = iter(
+            [
+                {
+                    "id": "resp-1",
+                    "output": [
+                        {
+                            "type": "function_call",
+                            "call_id": "call-1",
+                            "name": "get_executive_brief",
+                            "arguments": json.dumps({"period": "morning"}),
+                        }
+                    ],
+                },
+                {
+                    "ok": True,
+                    "reply": "Priority one is the live positive reply from Jimmy.",
+                    "command": "morning",
+                    "status": "attention",
+                    "data": {"agency_state": {"executive_items": [{"company": "Jimmy Co"}]}},
+                },
+                {"id": "resp-2", "output_text": "Jimmy's positive reply is the first thing I'd handle today."},
+            ]
+        )
+
+        def fake_urlopen(request, timeout):
+            requests.append((request.full_url, json.loads(request.data), dict(request.header_items())))
+            return _Response(next(responses))
+
+        gateway = TonyAgentGateway(
+            TonyAgentGatewayConfig(
+                responses_url="http://openclaw/v1/responses",
+                control_plane_url="http://tony/telegram/inbound",
+                control_plane_token="bridge-secret",
+            )
+        )
+        with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
+            reply = gateway.converse("Morning Tony, anything important?")
+
+        self.assertEqual(reply, "Jimmy's positive reply is the first thing I'd handle today.")
+        self.assertEqual([item[0] for item in requests], ["http://openclaw/v1/responses", "http://tony/telegram/inbound", "http://openclaw/v1/responses"])
+        self.assertEqual(requests[1][1], {"text": "/morning", "source": "openclaw_agent_tool"})
+        control_headers = {key.casefold(): value for key, value in requests[1][2].items()}
+        self.assertEqual(control_headers["authorization"], "Bearer bridge-secret")
+        continuation = requests[2][1]
+        self.assertEqual(continuation["previous_response_id"], "resp-1")
+        self.assertEqual(continuation["input"][0]["type"], "function_call_output")
+        self.assertEqual(continuation["input"][0]["call_id"], "call-1")
+        tool_output = json.loads(continuation["input"][0]["output"])
+        self.assertEqual(tool_output["command"], "morning")
+        self.assertIn("Jimmy", tool_output["reply"])
+
+    def test_agent_can_read_current_leads_without_user_phrase_matching(self):
+        captured = []
+
+        def fake_post_json(url, body, *, headers, label):
+            captured.append((url, body, label))
+            return {"ok": True, "command": "leads", "reply": "Inbound leads — current: 1"}
+
+        gateway = TonyAgentGateway(TonyAgentGatewayConfig())
+        with mock.patch.object(gateway, "_post_json", side_effect=fake_post_json):
+            result = gateway._execute_tool("get_current_leads", {})
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(captured[0][1]["text"], "/leads")
+        self.assertEqual(captured[0][2], "Narratiive control plane")
+
+    def test_control_plane_failure_is_returned_as_evidence_not_invented_success(self):
+        gateway = TonyAgentGateway(TonyAgentGatewayConfig())
+        with mock.patch.object(gateway, "_post_json", side_effect=TonyAgentGatewayError("bridge unavailable")):
+            result = gateway._execute_tool("get_executive_brief", {"period": "morning"})
+        self.assertEqual(result, {"ok": False, "error": "bridge unavailable"})
 
     def test_acceptance_language_never_requires_phrase_matching(self):
         messages = (
