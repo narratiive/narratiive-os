@@ -66,7 +66,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 content = (config_dir / f"workspace-{agent_id}" / "AGENTS.md").read_text(encoding="utf-8")
                 self.assertIn("bounded specialist", content)
-                self.assertIn("do not mean an external action occurred", content)
+                self.assertIn("does not mean an external action occurred", content)
 
     def test_tony_workspace_contract_supports_plain_english_status_and_followups(self):
         with tempfile.TemporaryDirectory() as tmp:
