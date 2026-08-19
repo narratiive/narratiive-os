@@ -51,8 +51,12 @@ class TonyAgentGatewayTests(unittest.TestCase):
 
         self.assertEqual(captured["body"]["model"], "openclaw/tony")
         self.assertEqual(captured["body"]["input"], "What did they say?")
-        self.assertEqual({tool["name"] for tool in captured["body"]["tools"]}, {"get_executive_brief", "get_current_leads"})
+        self.assertEqual(
+            {tool["name"] for tool in captured["body"]["tools"]},
+            {"get_executive_brief", "get_current_leads", "get_open_work_status", "get_recent_execution_status"},
+        )
         self.assertIn("current Narratiive state", captured["body"]["instructions"])
+        self.assertIn("recent-execution status", captured["body"]["instructions"])
         headers = {key.casefold(): value for key, value in captured["headers"].items()}
         self.assertEqual(headers["x-openclaw-agent-id"], "tony")
         self.assertEqual(headers["x-openclaw-session-key"], "narratiive:tony:telegram")
@@ -125,6 +129,41 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertTrue(result["ok"])
         self.assertEqual(captured[0][1]["text"], "/leads")
         self.assertEqual(captured[0][2], "Narratiive control plane")
+
+    def test_agent_can_read_open_work_status_without_user_phrase_matching(self):
+        captured = []
+
+        def fake_post_json(url, body, *, headers, label):
+            captured.append(body)
+            return {"ok": True, "command": "agency_focus_action_status", "reply": "Research is still awaiting worker confirmation."}
+
+        gateway = TonyAgentGateway(TonyAgentGatewayConfig())
+        with mock.patch.object(gateway, "_post_json", side_effect=fake_post_json):
+            result = gateway._execute_tool("get_open_work_status", {})
+
+        self.assertTrue(result["ok"])
+        self.assertEqual(captured[0], {"text": "what's the status", "source": "openclaw_agent_tool"})
+
+    def test_agent_can_verify_recent_execution_and_outcome_separately(self):
+        captured = []
+
+        def fake_post_json(url, body, *, headers, label):
+            captured.append(body["text"])
+            return {"ok": True, "command": "verified_execution_status", "reply": "Verified evidence exists."}
+
+        gateway = TonyAgentGateway(TonyAgentGatewayConfig())
+        with mock.patch.object(gateway, "_post_json", side_effect=fake_post_json):
+            execution = gateway._execute_tool("get_recent_execution_status", {"scope": "execution"})
+            outcome = gateway._execute_tool("get_recent_execution_status", {"scope": "outcome"})
+
+        self.assertTrue(execution["ok"])
+        self.assertTrue(outcome["ok"])
+        self.assertEqual(captured, ["did that happen", "did that work"])
+
+    def test_recent_execution_tool_rejects_unknown_scope(self):
+        gateway = TonyAgentGateway(TonyAgentGatewayConfig())
+        result = gateway._execute_tool("get_recent_execution_status", {"scope": "something-else"})
+        self.assertEqual(result, {"ok": False, "error": "scope must be execution or outcome"})
 
     def test_control_plane_failure_is_returned_as_evidence_not_invented_success(self):
         gateway = TonyAgentGateway(TonyAgentGatewayConfig())

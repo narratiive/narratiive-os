@@ -83,6 +83,34 @@ class TonyAgentGateway:
             ),
             "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
         },
+        {
+            "type": "function",
+            "name": "get_open_work_status",
+            "description": (
+                "Read the current evidence-backed status of Tony's open or most recently completed executive action. "
+                "Use this for questions about what is waiting, blocked, stalled, delegated, completed, or currently in progress."
+            ),
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+        {
+            "type": "function",
+            "name": "get_recent_execution_status",
+            "description": (
+                "Check verified evidence for the most recent consequential action. Use this when Matt asks whether "
+                "something actually sent, happened, completed, or worked. Execution proof and business outcome proof are separate."
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "scope": {
+                        "type": "string",
+                        "enum": ["execution", "outcome"],
+                        "description": "Use execution to verify that the action happened; outcome to assess whether it worked.",
+                    }
+                },
+                "additionalProperties": False,
+            },
+        },
     )
 
     def __init__(self, config: TonyAgentGatewayConfig) -> None:
@@ -104,8 +132,10 @@ class TonyAgentGateway:
             "input": message,
             "instructions": (
                 "You are Tony, Narratiive's Chief of Staff. Converse naturally. When a question depends on current "
-                "Narratiive state, use the supplied read tools instead of guessing. Treat tool output as evidence, "
-                "separate verified facts from judgement, and never claim an external action happened without returned evidence."
+                "Narratiive state, use the supplied read tools instead of guessing. Use open-work status for live delegated "
+                "or stalled work, and recent-execution status before claiming that an external action happened or worked. "
+                "Treat tool output as evidence, separate verified facts from judgement, and never claim an external action "
+                "happened without returned evidence."
             ),
             "tools": list(self._TOOLS),
             "tool_choice": "auto",
@@ -167,6 +197,15 @@ class TonyAgentGateway:
             command = f"/{period}"
         elif name == "get_current_leads":
             command = "/leads"
+        elif name == "get_open_work_status":
+            # Compatibility read against the existing deterministic status layer. The user's wording
+            # is interpreted by OpenClaw; this fixed canonical query is never derived by phrase matching.
+            command = "what's the status"
+        elif name == "get_recent_execution_status":
+            scope = str(arguments.get("scope") or "execution").strip().casefold()
+            if scope not in {"execution", "outcome"}:
+                return {"ok": False, "error": "scope must be execution or outcome"}
+            command = "did that happen" if scope == "execution" else "did that work"
         else:
             return {"ok": False, "error": f"unsupported tool: {name}"}
 
