@@ -11,10 +11,11 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from openclaw.telegram_outbound import TelegramConfig, TelegramDeliveryError, TelegramSender
+from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayConfig, TonyAgentGatewayError
 
 
 class TelegramInboundError(RuntimeError):
-    """Raised when inbound Telegram polling or bridge dispatch fails."""
+    """Raised when inbound Telegram polling or dispatch fails."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -33,48 +34,35 @@ class TelegramInboundConfig:
         bot_token = str(env.get("TONY_TELEGRAM_BOT_TOKEN", "")).strip()
         chat_id = str(env.get("TONY_TELEGRAM_CHAT_ID", "")).strip()
         if not bot_token or not chat_id:
-            raise TelegramInboundError(
-                "TONY_TELEGRAM_BOT_TOKEN and TONY_TELEGRAM_CHAT_ID are required for inbound Telegram"
-            )
-        bridge_url = (
-            str(env.get("TONY_TELEGRAM_BRIDGE_URL", "")).strip()
-            or "http://127.0.0.1:8790/telegram/inbound"
-        )
+            raise TelegramInboundError("TONY_TELEGRAM_BOT_TOKEN and TONY_TELEGRAM_CHAT_ID are required for inbound Telegram")
+        bridge_url = str(env.get("TONY_TELEGRAM_BRIDGE_URL", "")).strip() or "http://127.0.0.1:8790/telegram/inbound"
         bridge_url = bridge_url.rstrip("/")
         if bridge_url in {"http://127.0.0.1:8790", "http://localhost:8790"}:
             bridge_url += "/telegram/inbound"
-        bridge_token = str(env.get("TONY_BRIDGE_TOKEN", "")).strip()
-        api_base = str(env.get("TONY_TELEGRAM_API_BASE", "")).strip() or "https://api.telegram.org"
         offset_raw = str(env.get("TONY_TELEGRAM_OFFSET_PATH", "")).strip()
         offset_path = Path(offset_raw).expanduser() if offset_raw else repository_root / ".runtime" / "telegram-inbound-offset.json"
         return cls(
             bot_token=bot_token,
             allowed_chat_id=chat_id,
             bridge_url=bridge_url,
-            bridge_token=bridge_token,
-            api_base=api_base.rstrip("/"),
+            bridge_token=str(env.get("TONY_BRIDGE_TOKEN", "")).strip(),
+            api_base=(str(env.get("TONY_TELEGRAM_API_BASE", "")).strip() or "https://api.telegram.org").rstrip("/"),
             offset_path=offset_path.resolve(),
         )
 
 
 class TelegramInboundService:
-    """Receive Matt's Telegram messages, execute them through Tony, and reply.
+    """Receive Telegram messages and preserve one human conversational surface.
 
-    The service uses Telegram long polling so the Mac runtime does not require a
-    public inbound webhook. Update offsets are persisted atomically to prevent
-    old messages being replayed after restarts.
+    Ordinary language goes to OpenClaw's agent runtime, which owns semantic
+    interpretation and durable conversation context. Only explicit slash
+    commands use Narratiive OS's legacy deterministic command surface.
     """
 
-    def __init__(self, config: TelegramInboundConfig) -> None:
+    def __init__(self, config: TelegramInboundConfig, *, agent_gateway: TonyAgentGateway | None = None) -> None:
         self.config = config
-        self.sender = TelegramSender(
-            TelegramConfig(
-                bot_token=config.bot_token,
-                default_chat_id=config.allowed_chat_id,
-                api_base=config.api_base,
-                timeout_seconds=10.0,
-            )
-        )
+        self.agent_gateway = agent_gateway or TonyAgentGateway(TonyAgentGatewayConfig.from_env(os.environ))
+        self.sender = TelegramSender(TelegramConfig(bot_token=config.bot_token, default_chat_id=config.allowed_chat_id, api_base=config.api_base, timeout_seconds=10.0))
 
     def run_forever(self) -> None:
         while True:
@@ -91,24 +79,16 @@ class TelegramInboundService:
             update_id = int(update.get("update_id", -1))
             if update_id < 0:
                 continue
-            next_offset = update_id + 1
             try:
                 self._process_update(update)
                 processed += 1
             finally:
-                self._write_offset(next_offset)
+                self._write_offset(update_id + 1)
         return processed
 
     def _fetch_updates(self, offset: int) -> list[dict[str, Any]]:
-        query = urlencode(
-            {
-                "offset": offset,
-                "timeout": self.config.poll_timeout_seconds,
-                "allowed_updates": json.dumps(["message"]),
-            }
-        )
-        url = f"{self.config.api_base}/bot{self.config.bot_token}/getUpdates?{query}"
-        request = Request(url, headers={"Accept": "application/json"}, method="GET")
+        query = urlencode({"offset": offset, "timeout": self.config.poll_timeout_seconds, "allowed_updates": json.dumps(["message"])})
+        request = Request(f"{self.config.api_base}/bot{self.config.bot_token}/getUpdates?{query}", headers={"Accept": "application/json"}, method="GET")
         try:
             with urlopen(request, timeout=self.config.request_timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
@@ -131,18 +111,23 @@ class TelegramInboundService:
         if not isinstance(message, dict):
             return
         chat = message.get("chat")
-        if not isinstance(chat, dict):
-            return
-        chat_id = str(chat.get("id", "")).strip()
-        if chat_id != self.config.allowed_chat_id:
+        if not isinstance(chat, dict) or str(chat.get("id", "")).strip() != self.config.allowed_chat_id:
             return
         text = str(message.get("text", "")).strip()
         if not text:
             return
         reply = self._execute_tony(text)
-        self.sender.send(chat_id, reply)
+        self.sender.send(self.config.allowed_chat_id, reply)
 
     def _execute_tony(self, text: str) -> str:
+        if not TonyAgentGateway.is_system_command(text):
+            try:
+                return self._sanitize_user_reply(self.agent_gateway.converse(text))[:3500]
+            except TonyAgentGatewayError as exc:
+                raise TelegramInboundError(str(exc)) from exc
+        return self._execute_legacy_command(text)
+
+    def _execute_legacy_command(self, text: str) -> str:
         body = json.dumps({"text": text, "source": "telegram"}).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.config.bridge_token:
@@ -166,12 +151,10 @@ class TelegramInboundService:
         if not reply:
             error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
             reply = str(error.get("message") or "Tony couldn't complete that request reliably.").strip()
-        reply = self._sanitize_user_reply(reply)
-        return reply[:3500]
+        return self._sanitize_user_reply(reply)[:3500]
 
     @staticmethod
     def _sanitize_user_reply(reply: str) -> str:
-        """Keep developer diagnostics out of Matt-facing Telegram replies."""
         lines = []
         for line in reply.splitlines():
             lowered = line.strip().casefold()
