@@ -1,0 +1,82 @@
+{
+  "agents": {
+    "ownership": "explicit",
+    "defaults": {
+      "subagents": {
+        "requireAgentId": true,
+        "maxConcurrent": 4,
+        "maxChildrenPerAgent": 4,
+        "maxSpawnDepth": 1,
+        "archiveAfterMinutes": 1440
+      }
+    },
+    "entries": {
+      "tony": {
+        "workspace": "~/.openclaw/workspace-tony",
+        "subagents": {
+          "delegationMode": "prefer",
+          "allowAgents": ["research", "strategy", "creative-director", "production", "operations"],
+          "requireAgentId": true
+        },
+        "tools": {
+          "allow": ["read", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "session_status"],
+          "deny": ["exec", "process", "gateway", "cron", "nodes"]
+        }
+      },
+      "research": {
+        "workspace": "~/.openclaw/workspace-research",
+        "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch", "browser"],
+          "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+        }
+      },
+      "strategy": {
+        "workspace": "~/.openclaw/workspace-strategy",
+        "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch"],
+          "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+        }
+      },
+      "creative-director": {
+        "workspace": "~/.openclaw/workspace-creative-director",
+        "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch", "browser"],
+          "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+        }
+      },
+      "production": {
+        "workspace": "~/.openclaw/workspace-production",
+        "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
+        "tools": {
+          "allow": ["read", "write", "edit", "apply_patch"],
+          "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+        }
+      },
+      "operations": {
+        "workspace": "~/.openclaw/workspace-operations",
+        "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
+        "tools": {
+          "allow": ["read"],
+          "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+        }
+      }
+    }
+  },
+  "tools": {
+    "sessions": {"visibility": "tree"},
+    "agentToAgent": {"enabled": false}
+  },
+  "session": {
+    "scope": "per-sender",
+    "dmScope": "per-channel-peer",
+    "maintenance": {
+      "mode": "enforce",
+      "pruneAfter": "30d",
+      "maxEntries": 500,
+      "resetArchiveRetention": "30d"
+    }
+  }
+}
