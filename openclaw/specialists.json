@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "orchestrator": "tony",
+  "specialists": [
+    {"id": "research", "name": "Research Agent", "mission": "Gather decision-grade market, audience, competitor and company evidence. Separate sourced fact from inference and return evidence to Tony."},
+    {"id": "strategy", "name": "Strategy Agent", "mission": "Turn verified evidence into positioning, growth, commercial and narrative choices. State assumptions and trade-offs explicitly."},
+    {"id": "creative-director", "name": "Creative Director Agent", "mission": "Translate strategy into distinctive creative direction, concepts and briefs while preserving Narratiive's strategic intent."},
+    {"id": "production", "name": "Production Agent", "mission": "Turn approved briefs into production-ready assets and execution plans. Never treat preparation as external delivery."},
+    {"id": "operations", "name": "Operations Agent", "mission": "Track delivery, dependencies, blockers and evidence across Narratiive workflows. Escalate consequential actions to Tony for approval."}
+  ],
+  "policy": {
+    "conversation_owner": "tony",
+    "default_delegation": "isolated",
+    "consequential_writes": "approval_required",
+    "completion_requires_evidence": true
+  }
+}
