@@ -50,6 +50,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
             self.assertEqual(gateway.converse("What did they say?"), "Jimmy replied. I'd handle that first.")
 
         self.assertEqual(captured["body"]["model"], "openclaw/tony")
+        self.assertEqual(captured["body"]["user"], "narratiive:tony:telegram")
         self.assertEqual(captured["body"]["input"], "What did they say?")
         self.assertEqual(
             {tool["name"] for tool in captured["body"]["tools"]},
@@ -61,6 +62,39 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertEqual(headers["x-openclaw-agent-id"], "tony")
         self.assertEqual(headers["x-openclaw-session-key"], "narratiive:tony:telegram")
         self.assertEqual(headers["authorization"], "Bearer secret")
+
+    def test_independent_telegram_turns_share_the_same_openresponses_user(self):
+        bodies = []
+
+        def fake_urlopen(request, timeout):
+            bodies.append(json.loads(request.data))
+            return _Response({"output_text": "Understood."})
+
+        gateway = TonyAgentGateway(
+            TonyAgentGatewayConfig(session_key="narratiive:tony:telegram", user_id="matt:telegram")
+        )
+        with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
+            gateway.converse("Jimmy replied yesterday.")
+            gateway.converse("What did he say?")
+
+        self.assertEqual(len(bodies), 2)
+        self.assertEqual([body["user"] for body in bodies], ["matt:telegram", "matt:telegram"])
+        self.assertNotIn("previous_response_id", bodies[0])
+        self.assertNotIn("previous_response_id", bodies[1])
+
+    def test_environment_defaults_openresponses_user_to_session_key(self):
+        config = TonyAgentGatewayConfig.from_env({"TONY_OPENCLAW_SESSION_KEY": "agent:tony:telegram:matt"})
+        self.assertEqual(config.session_key, "agent:tony:telegram:matt")
+        self.assertEqual(config.user_id, "agent:tony:telegram:matt")
+
+    def test_environment_can_isolate_openresponses_user_explicitly(self):
+        config = TonyAgentGatewayConfig.from_env(
+            {
+                "TONY_OPENCLAW_SESSION_KEY": "agent:tony:telegram:matt",
+                "TONY_OPENCLAW_USER_ID": "matt",
+            }
+        )
+        self.assertEqual(config.user_id, "matt")
 
     def test_agent_can_ground_natural_language_in_executive_brief_tool(self):
         requests = []
@@ -97,6 +131,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
                 responses_url="http://openclaw/v1/responses",
                 control_plane_url="http://tony/telegram/inbound",
                 control_plane_token="bridge-secret",
+                user_id="matt",
             )
         )
         with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
@@ -104,10 +139,12 @@ class TonyAgentGatewayTests(unittest.TestCase):
 
         self.assertEqual(reply, "Jimmy's positive reply is the first thing I'd handle today.")
         self.assertEqual([item[0] for item in requests], ["http://openclaw/v1/responses", "http://tony/telegram/inbound", "http://openclaw/v1/responses"])
+        self.assertEqual(requests[0][1]["user"], "matt")
         self.assertEqual(requests[1][1], {"text": "/morning", "source": "openclaw_agent_tool"})
         control_headers = {key.casefold(): value for key, value in requests[1][2].items()}
         self.assertEqual(control_headers["authorization"], "Bearer bridge-secret")
         continuation = requests[2][1]
+        self.assertEqual(continuation["user"], "matt")
         self.assertEqual(continuation["previous_response_id"], "resp-1")
         self.assertEqual(continuation["input"][0]["type"], "function_call_output")
         self.assertEqual(continuation["input"][0]["call_id"], "call-1")
