@@ -32,17 +32,20 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("proactive Chief of Staff", prompt)
         self.assertIn("stalled/failed/blocked", prompt)
         self.assertIn("HEARTBEAT_OK", prompt)
-        self.assertIn("never claim external execution without Narratiive evidence", prompt)
+        self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
+        self.assertIn("narratiive_executive_brief", prompt)
+        self.assertIn("narratiive_open_work_status", prompt)
         self.assertNotIn("heartbeat", self.config["agents"]["defaults"])
         for agent_id in SPECIALISTS:
             with self.subTest(agent_id=agent_id):
                 self.assertNotIn("heartbeat", self.entries[agent_id])
 
-    def test_heartbeat_uses_existing_read_only_session_tools_not_consequential_tools(self):
+    def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         allowed = set(self.entries["tony"]["tools"]["allow"])
         denied = set(self.entries["tony"]["tools"]["deny"])
         for required in {"sessions_list", "sessions_history", "sessions_yield", "subagents", "session_status"}:
             self.assertIn(required, allowed)
+        self.assertIn("narratiive-control-plane", allowed)
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))
         prompt = self.entries["tony"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
