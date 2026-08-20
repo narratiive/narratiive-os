@@ -2,6 +2,7 @@ import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { buildActionProposal } from "./action-policy.js";
 import { buildNativeApprovalRequirement } from "./approval-policy.js";
 import { executeApprovedAction } from "./execution-client.js";
+import { executeSafeRead } from "./safe-read-client.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/telegram/inbound";
 
@@ -13,6 +14,13 @@ const ACTION_SCHEMA = {
   action: { type: "string", minLength: 1, maxLength: 4000 },
   surface: { type: "string", enum: ["research", "strategy", "creative", "production", "gmail", "calendar", "notion", "drive", "github", "n8n", "replit", "other"] },
   kind: { type: "string", enum: ["read", "prepare", "write"] },
+  target: { type: "object", additionalProperties: true },
+};
+
+const SAFE_READ_SCHEMA = {
+  action: { type: "string", minLength: 1, maxLength: 4000 },
+  surface: { type: "string", enum: ["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"] },
+  kind: { type: "string", enum: ["read"] },
   target: { type: "object", additionalProperties: true },
 };
 
@@ -88,6 +96,30 @@ function proposalTool() {
   };
 }
 
+function safeReadTool() {
+  return {
+    name: "narratiive_execute_safe_read",
+    description: "Execute one bounded read-only inspection through Narratiive OS without approval. This tool refuses writes or preparation, requires evidence proving no mutation occurred, and returns verified source evidence or a fail-closed result.",
+    parameters: schema(SAFE_READ_SCHEMA, ["action", "surface", "kind"]),
+    async execute(_id, params) {
+      try {
+        const proposal = buildActionProposal(params || {});
+        if (proposal.proposal.approval_required || proposal.proposal.effective_kind !== "read") {
+          return renderToolResult({
+            ok: false,
+            status: "safe_read_rejected",
+            proposal: proposal.proposal,
+            execution_truth: "not_dispatched",
+          });
+        }
+        return renderToolResult(await executeSafeRead(params || {}));
+      } catch (error) {
+        return renderToolResult({ ok: false, error: String(error?.message || error), execution_truth: "not_dispatched" });
+      }
+    },
+  };
+}
+
 function approvalTool() {
   return {
     name: "narratiive_request_action_approval",
@@ -115,7 +147,7 @@ function approvalTool() {
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
-  description: "Authoritative Narratiive OS evidence plus bounded action proposal, native approval and verified consequence execution for Tony.",
+  description: "Authoritative Narratiive OS evidence plus bounded autonomous reads, action proposal, native approval and verified consequence execution for Tony.",
   register(api) {
     api.on("before_tool_call", async (event) => {
       if (event.toolName !== "narratiive_request_action_approval") return;
@@ -145,6 +177,7 @@ export default definePluginEntry({
       schema({ scope: { type: "string", enum: ["execution", "outcome"] } }),
     ));
     api.registerTool(proposalTool());
+    api.registerTool(safeReadTool());
     api.registerTool(approvalTool());
   },
 });
