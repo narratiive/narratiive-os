@@ -44,7 +44,9 @@ class TonyAgentGateway:
     bounded control-plane plugin, where permissions, approvals and evidence are enforced.
 
     This adapter deliberately does not mirror Narratiive tools as client-side function
-    definitions and does not translate model-selected tools back into legacy commands.
+    definitions, translate model-selected tools back into legacy commands, or inject a
+    second per-request behaviour prompt. Tony's workspace bootstrap files are the canonical
+    agent contract and are loaded by OpenClaw for every agent run.
     """
 
     def __init__(self, config: TonyAgentGatewayConfig) -> None:
@@ -72,13 +74,6 @@ class TonyAgentGateway:
             "model": f"openclaw/{self.config.agent_id}",
             "user": self.stable_user_id,
             "input": message,
-            "instructions": (
-                "You are Tony, Narratiive's Chief of Staff. Converse naturally and preserve conversational context. "
-                "Use your native OpenClaw tools, specialist agents and Narratiive control-plane plugin whenever current "
-                "business state, delegated work, preparation, approval or execution evidence is required. Investigate safe "
-                "questions yourself before asking Matt. Keep consequential external actions behind the native approval boundary. "
-                "Treat returned evidence as authoritative and never claim that an external action happened or worked without it."
-            ),
         }
 
         payload = self._post_openclaw(request_body)
