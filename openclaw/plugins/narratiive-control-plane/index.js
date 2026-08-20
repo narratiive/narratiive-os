@@ -22,13 +22,17 @@ function commandFor(name, params) {
   throw new Error(`unsupported Narratiive tool: ${name}`);
 }
 
-async function readControlPlane(api, name, params) {
-  const configured = api?.config?.controlPlaneUrl;
-  const url = String(configured || process.env.TONY_AGENT_CONTROL_PLANE_URL || process.env.TONY_TELEGRAM_BRIDGE_URL || DEFAULT_URL).replace(/\/$/, "");
+function controlPlaneUrl() {
+  let url = String(process.env.TONY_AGENT_CONTROL_PLANE_URL || process.env.TONY_TELEGRAM_BRIDGE_URL || DEFAULT_URL).replace(/\/$/, "");
+  if (url === "http://127.0.0.1:8790" || url === "http://localhost:8790") url += "/telegram/inbound";
+  return url;
+}
+
+async function readControlPlane(name, params) {
   const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
-  const response = await fetch(url, {
+  const response = await fetch(controlPlaneUrl(), {
     method: "POST",
     headers,
     body: JSON.stringify({ text: commandFor(name, params), source: "openclaw_native_tool" }),
@@ -41,15 +45,20 @@ async function readControlPlane(api, name, params) {
 }
 
 function tool(name, description, parameters) {
-  return { name, description, parameters, async execute(_id, params, ctx) {
-    try {
-      const payload = await readControlPlane(ctx?.api, name, params || {});
-      return { content: [{ type: "text", text: JSON.stringify(payload) }], details: payload };
-    } catch (error) {
-      const failure = { ok: false, error: String(error?.message || error) };
-      return { content: [{ type: "text", text: JSON.stringify(failure) }], details: failure };
-    }
-  }};
+  return {
+    name,
+    description,
+    parameters,
+    async execute(_id, params) {
+      try {
+        const payload = await readControlPlane(name, params || {});
+        return { content: [{ type: "text", text: JSON.stringify(payload) }], details: payload };
+      } catch (error) {
+        const failure = { ok: false, error: String(error?.message || error) };
+        return { content: [{ type: "text", text: JSON.stringify(failure) }], details: failure };
+      }
+    },
+  };
 }
 
 export default definePluginEntry({
