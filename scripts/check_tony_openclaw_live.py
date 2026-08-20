@@ -29,7 +29,13 @@ SCENARIOS = (
         "Ask the Research Agent to inspect its current mission and return one concise sentence about what it is responsible for. This is internal, read-only work.",
     ),
     Scenario("specialist_status", "How's the Research Agent getting on?"),
+    Scenario("strategy_status", "And how is the Strategy Agent doing?"),
+    Scenario("creative_status", "What about the Creative Director Agent?"),
+    Scenario("production_status", "Is the Production Agent blocked on anything?"),
     Scenario("context_followup", "What did they say?"),
+    Scenario("contextual_action", "Sort that out for me, but don't send or change anything externally in this test."),
+    Scenario("context_revision", "Use Thursday instead. Still don't send or change anything externally."),
+    Scenario("execution_truth", "Did it go? Answer only from verified execution evidence; if nothing was sent, say so."),
 )
 
 _REJECTION_MARKERS = (
@@ -155,8 +161,10 @@ def run_live_probe(
             "model": f"openclaw/{agent_id}",
             "input": scenario.text,
             "instructions": (
-                "You are Tony, Narratiive's Chief of Staff. Respond naturally. Use native OpenClaw specialist/session tools when the request requires them. "
-                "Do not perform consequential external writes in this acceptance probe and do not invent execution evidence."
+                "You are Tony, Narratiive's Chief of Staff. Respond naturally and preserve conversational context across turns. "
+                "Use native OpenClaw specialist/session tools and bounded Narratiive read tools when the request requires them. "
+                "This is a non-destructive acceptance probe: do not perform consequential external writes. If a turn sounds like an external action, reason about or prepare it without sending, mutating, booking or publishing. "
+                "Never invent execution evidence; when asked whether something happened, distinguish prepared/approved from verified execution."
             ),
         }
         if previous_response_id:
