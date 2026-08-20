@@ -10,6 +10,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FLEET_PATH = REPOSITORY_ROOT / "openclaw" / "openclaw.fleet.json"
 ROSTER_PATH = REPOSITORY_ROOT / "openclaw" / "specialists.json"
 TONY_TEMPLATE_PATH = REPOSITORY_ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md"
+CONTROL_PLANE_PLUGIN_PATH = REPOSITORY_ROOT / "openclaw" / "plugins" / "narratiive-control-plane"
+CONTROL_PLANE_PLUGIN_ID = "narratiive-control-plane"
 
 
 def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -22,6 +24,28 @@ def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
         else:
             merged[key] = value
     return merged
+
+
+def _enable_control_plane_plugin(config: dict[str, Any]) -> None:
+    plugins = config.setdefault("plugins", {})
+    load = plugins.setdefault("load", {})
+    paths = list(load.get("paths") or [])
+    plugin_path = str(CONTROL_PLANE_PLUGIN_PATH)
+    if plugin_path not in paths:
+        paths.append(plugin_path)
+    load["paths"] = paths
+
+    entries = plugins.setdefault("entries", {})
+    entry = entries.setdefault(CONTROL_PLANE_PLUGIN_ID, {})
+    entry["enabled"] = True
+
+    # OpenClaw's plugins.allow is exclusive when present. Preserve every existing
+    # trusted plugin and add Narratiive's local plugin rather than replacing policy.
+    if isinstance(plugins.get("allow"), list):
+        allowed = list(plugins["allow"])
+        if CONTROL_PLANE_PLUGIN_ID not in allowed:
+            allowed.append(CONTROL_PLANE_PLUGIN_ID)
+        plugins["allow"] = allowed
 
 
 def build_specialist_agents_file(agent: dict[str, Any]) -> str:
@@ -41,6 +65,7 @@ def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dic
     fleet = json.loads(FLEET_PATH.read_text(encoding="utf-8"))
     roster = json.loads(ROSTER_PATH.read_text(encoding="utf-8"))
     merged_config = deep_merge(existing_config, fleet)
+    _enable_control_plane_plugin(merged_config)
 
     workspace_files: dict[Path, str] = {
         home / ".openclaw" / "workspace-tony" / "AGENTS.md": TONY_TEMPLATE_PATH.read_text(encoding="utf-8")
@@ -64,6 +89,7 @@ def install(*, home: Path, apply: bool) -> dict[str, Any]:
     result = {
         "config_path": str(config_path),
         "workspace_files": [str(path) for path in sorted(workspace_files)],
+        "control_plane_plugin_path": str(CONTROL_PLANE_PLUGIN_PATH),
         "apply": apply,
         "preserved_top_level_keys": sorted(set(existing) - set(json.loads(FLEET_PATH.read_text(encoding="utf-8")))),
     }

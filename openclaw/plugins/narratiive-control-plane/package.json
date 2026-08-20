@@ -1,0 +1,11 @@
+{
+  "name": "@narratiive/openclaw-control-plane",
+  "version": "1.0.0",
+  "type": "module",
+  "peerDependencies": {
+    "openclaw": ">=2026.5.17"
+  },
+  "openclaw": {
+    "extensions": ["./index.js"]
+  }
+}
