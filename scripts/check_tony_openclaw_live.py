@@ -80,6 +80,50 @@ def load_openclaw_config(path: Path) -> dict[str, Any]:
     return value
 
 
+def _model_ref(value: Any) -> str:
+    if isinstance(value, str):
+        return value.strip()
+    if isinstance(value, Mapping):
+        return str(value.get("primary") or "").strip()
+    return ""
+
+
+def configured_primary_model(config: Mapping[str, Any], agent_id: str = "tony") -> tuple[str, str]:
+    """Resolve Tony's configured model without guessing provider/catalog fallbacks."""
+    agents = config.get("agents")
+    if not isinstance(agents, Mapping):
+        return "", "unset"
+
+    raw_list = agents.get("list")
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            if isinstance(item, Mapping) and str(item.get("id") or "").strip() == agent_id:
+                model = _model_ref(item.get("model"))
+                if model:
+                    return model, f"agents.list[{agent_id}].model"
+
+    raw_entries = agents.get("entries")
+    if isinstance(raw_entries, Mapping):
+        item = raw_entries.get(agent_id)
+        if isinstance(item, Mapping):
+            model = _model_ref(item.get("model"))
+            if model:
+                return model, f"agents.entries.{agent_id}.model"
+
+    defaults = agents.get("defaults")
+    if isinstance(defaults, Mapping):
+        model = _model_ref(defaults.get("model"))
+        if model:
+            return model, "agents.defaults.model"
+    return "", "unset"
+
+
+def is_explicit_provider_model(model_ref: str) -> bool:
+    """OpenClaw recommends an explicit provider/model ref for deterministic selection."""
+    provider, separator, model = model_ref.strip().partition("/")
+    return bool(separator and provider.strip() and model.strip())
+
+
 def extract_configured_models(config: Mapping[str, Any]) -> list[str]:
     models: set[str] = set()
 
@@ -281,9 +325,14 @@ def build_report(
 ) -> dict[str, Any]:
     config = load_openclaw_config(config_path)
     configured_agent_ids = extract_configured_agent_ids(config)
+    primary_model, primary_source = configured_primary_model(config, agent_id)
+    model_selection_ready = is_explicit_provider_model(primary_model)
     report: dict[str, Any] = {
         "config_path": str(config_path),
         "configured_models": extract_configured_models(config),
+        "configured_primary_model": primary_model or None,
+        "configured_primary_source": primary_source,
+        "model_selection_ready": model_selection_ready,
         "configured_agent_ids": configured_agent_ids,
         "responses_url": responses_url,
         "agent_id": agent_id,
@@ -304,6 +353,15 @@ def build_report(
         report["ollama_models"] = []
         report["ollama_reachable"] = False
         report["ollama_error"] = str(exc)
+
+    if live and not model_selection_ready:
+        report["scenarios"] = []
+        report["live_passed"] = False
+        report["live_error"] = (
+            "Tony has no explicit provider/model selection. Configure agents.list[tony].model or "
+            "agents.defaults.model.primary as provider/model before running conversational acceptance."
+        )
+        return report
 
     if live:
         try:
