@@ -5,6 +5,7 @@ import json
 import os
 import sys
 from pathlib import Path
+from typing import Any, Mapping
 
 
 # This script is intentionally supported as a direct path invocation from any cwd.
@@ -20,7 +21,22 @@ from scripts.check_tony_openclaw_live import (
     DEFAULT_RESPONSES_URL,
     DEFAULT_SESSION_KEY,
     build_report,
+    http_json,
 )
+
+
+def workspace_only_transport(
+    url: str,
+    body: dict[str, Any] | None = None,
+    *,
+    headers: Mapping[str, str] | None = None,
+    timeout: float = 120.0,
+) -> Any:
+    """Mirror production ingress: OpenClaw workspace files own Tony's behaviour."""
+    clean_body = dict(body) if body is not None else None
+    if clean_body is not None:
+        clean_body.pop("instructions", None)
+    return http_json(url, clean_body, headers=headers, timeout=timeout)
 
 
 def main() -> None:
@@ -50,9 +66,11 @@ def main() -> None:
         gateway_token=gateway_token,
         ollama_tags_url=args.ollama_tags_url,
         live=not args.inventory_only,
+        transport=workspace_only_transport,
     )
     report["gateway_auth_present"] = bool(gateway_token)
     report["gateway_auth_source"] = auth_source
+    report["behaviour_contract"] = "openclaw-workspace"
     print(json.dumps(report, indent=2, sort_keys=True))
     if not args.inventory_only and not report.get("live_passed", False):
         raise SystemExit(1)
