@@ -97,6 +97,12 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             )
         )
         self.assertFalse(scenario_passes("No active Research Agent session.", "specialist_status"))
+        self.assertFalse(
+            scenario_passes(
+                "I can spawn one to check its mission. Want me to spawn a Research sub-agent?",
+                "specialist_delegation",
+            )
+        )
 
     def test_live_probe_preserves_one_response_chain_across_all_followups(self) -> None:
         calls = []

@@ -24,6 +24,13 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(set(self.agents["tony"]["subagents"]["allowAgents"]), set(SPECIALISTS))
         self.assertTrue(self.agents["tony"]["subagents"]["requireAgentId"])
         self.assertEqual(self.agents["tony"]["subagents"]["delegationMode"], "prefer")
+        self.assertIn("agents_list", self.agents["tony"]["tools"]["allow"])
+
+    def test_tony_workspace_requires_runtime_agent_discovery_before_spawning(self):
+        contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("call `agents_list`", contract)
+        self.assertIn("Use the exact returned `agentId` in `sessions_spawn`", contract)
+        self.assertIn("runtime configuration blocker", contract)
 
     def test_tony_heartbeat_is_bounded_proactive_and_only_tony_runs_it(self):
         heartbeat = self.agents["tony"]["heartbeat"]
@@ -47,7 +54,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
         denied = set(self.agents["tony"]["tools"]["deny"])
-        for required in {"sessions_list", "sessions_history", "sessions_yield", "subagents", "session_status"}:
+        for required in {"agents_list", "sessions_list", "sessions_history", "sessions_yield", "subagents", "session_status"}:
             self.assertIn(required, allowed)
         self.assertIn("narratiive-control-plane", allowed)
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))

@@ -63,6 +63,13 @@ _SPECIALIST_FAILURE_MARKERS = (
     "nothing has been spawned",
 )
 
+_DELEGATION_NOT_EXECUTED_MARKERS = (
+    "want me to spawn",
+    "would you like me to spawn",
+    "i can spawn",
+    "can spawn one",
+)
+
 
 def load_openclaw_config(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -194,6 +201,8 @@ def scenario_passes(text: str, scenario_name: str = "") -> bool:
             return False
         if "research" not in normalized:
             return False
+    if scenario_name == "specialist_delegation" and any(marker in normalized for marker in _DELEGATION_NOT_EXECUTED_MARKERS):
+        return False
     return True
 
 
