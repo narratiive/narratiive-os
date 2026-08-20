@@ -18,6 +18,7 @@ class TonyAgentGatewayConfig:
     agent_id: str = "tony"
     gateway_token: str = ""
     session_key: str = "narratiive:tony:telegram"
+    user_id: str = ""
     control_plane_url: str = "http://127.0.0.1:8790/telegram/inbound"
     control_plane_token: str = ""
     timeout_seconds: float = 120.0
@@ -33,11 +34,13 @@ class TonyAgentGatewayConfig:
         control_plane_url = control_plane_url.rstrip("/")
         if control_plane_url in {"http://127.0.0.1:8790", "http://localhost:8790"}:
             control_plane_url += "/telegram/inbound"
+        session_key = str(env.get("TONY_OPENCLAW_SESSION_KEY", "")).strip() or "narratiive:tony:telegram"
         return cls(
             responses_url=responses_url,
             agent_id=str(env.get("TONY_OPENCLAW_AGENT_ID", "")).strip() or "tony",
             gateway_token=str(env.get("OPENCLAW_GATEWAY_TOKEN", "")).strip(),
-            session_key=str(env.get("TONY_OPENCLAW_SESSION_KEY", "")).strip() or "narratiive:tony:telegram",
+            session_key=session_key,
+            user_id=str(env.get("TONY_OPENCLAW_USER_ID", "")).strip() or session_key,
             control_plane_url=control_plane_url,
             control_plane_token=str(env.get("TONY_BRIDGE_TOKEN", "")).strip(),
             timeout_seconds=float(env.get("TONY_OPENCLAW_TIMEOUT_SECONDS", "120")),
@@ -116,6 +119,17 @@ class TonyAgentGateway:
     def __init__(self, config: TonyAgentGatewayConfig) -> None:
         self.config = config
 
+    @property
+    def stable_user_id(self) -> str:
+        """Return the OpenResponses user key that makes independent turns share one agent session.
+
+        OpenClaw's /v1/responses endpoint is stateless by default. The `user` field is
+        therefore required on every request if separate Telegram messages are expected to
+        share durable conversational context. Keep the explicit OpenClaw session header as
+        a second scoping boundary for response continuations and operator inspection.
+        """
+        return self.config.user_id.strip() or self.config.session_key.strip()
+
     @staticmethod
     def is_system_command(text: str) -> bool:
         return text.lstrip().startswith("/")
@@ -126,9 +140,12 @@ class TonyAgentGateway:
             raise TonyAgentGatewayError("message is required")
         if self.is_system_command(message):
             raise TonyAgentGatewayError("slash commands belong to the deterministic command surface")
+        if not self.stable_user_id:
+            raise TonyAgentGatewayError("a stable OpenClaw user/session key is required")
 
         request_body: dict[str, Any] = {
             "model": f"openclaw/{self.config.agent_id}",
+            "user": self.stable_user_id,
             "input": message,
             "instructions": (
                 "You are Tony, Narratiive's Chief of Staff. Converse naturally. When a question depends on current "
@@ -166,6 +183,7 @@ class TonyAgentGateway:
                 )
             request_body = {
                 "model": f"openclaw/{self.config.agent_id}",
+                "user": self.stable_user_id,
                 "input": outputs,
                 "previous_response_id": response_id,
                 "tools": list(self._TOOLS),
@@ -198,8 +216,6 @@ class TonyAgentGateway:
         elif name == "get_current_leads":
             command = "/leads"
         elif name == "get_open_work_status":
-            # Compatibility read against the existing deterministic status layer. The user's wording
-            # is interpreted by OpenClaw; this fixed canonical query is never derived by phrase matching.
             command = "what's the status"
         elif name == "get_recent_execution_status":
             scope = str(arguments.get("scope") or "execution").strip().casefold()
