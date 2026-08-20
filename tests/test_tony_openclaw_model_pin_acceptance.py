@@ -44,7 +44,8 @@ class TonyOpenClawModelPinAcceptanceTests(unittest.TestCase):
             )
 
         self.assertTrue(report["model_selection_ready"])
-        self.assertEqual(report["model_selection"], "anthropic/claude-sonnet-4-6")
+        self.assertEqual(report["configured_primary_model"], "anthropic/claude-sonnet-4-6")
+        self.assertEqual(report["configured_primary_source"], "agents.defaults.model")
         self.assertTrue(report["runtime_fleet_ready"])
         self.assertTrue(report["live_passed"])
         self.assertEqual(len(report["scenarios"]), len(SCENARIOS))
