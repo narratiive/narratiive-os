@@ -5,17 +5,18 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.install_openclaw_fleet import build_install_plan, install
+from scripts.install_openclaw_fleet import CONTROL_PLANE_PLUGIN_ID, CONTROL_PLANE_PLUGIN_PATH, build_install_plan, install
 
 
 class OpenClawFleetInstallTests(unittest.TestCase):
-    def test_install_plan_preserves_unrelated_provider_and_channel_config(self):
+    def test_install_plan_preserves_unrelated_provider_channel_and_plugin_policy(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             existing = {
                 "models": {"providers": {"ollama": {"baseUrl": "http://127.0.0.1:11434"}}},
                 "channels": {"telegram": {"enabled": True}},
                 "agents": {"entries": {"tony": {"model": "ollama/qwen3.5"}}},
+                "plugins": {"allow": ["existing-safe-plugin"], "load": {"paths": ["/tmp/existing-plugin"]}},
             }
             merged, workspace_files = build_install_plan(home, existing)
 
@@ -26,6 +27,10 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 set(merged["agents"]["entries"]["tony"]["subagents"]["allowAgents"]),
                 {"research", "strategy", "creative-director", "production", "operations"},
             )
+            self.assertEqual(set(merged["plugins"]["allow"]), {"existing-safe-plugin", CONTROL_PLANE_PLUGIN_ID})
+            self.assertIn("/tmp/existing-plugin", merged["plugins"]["load"]["paths"])
+            self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), merged["plugins"]["load"]["paths"])
+            self.assertTrue(merged["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn(home / ".openclaw" / "workspace-tony" / "AGENTS.md", workspace_files)
             self.assertIn(home / ".openclaw" / "workspace-research" / "AGENTS.md", workspace_files)
 
@@ -35,6 +40,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             result = install(home=home, apply=False)
             self.assertFalse((home / ".openclaw").exists())
             self.assertFalse(result["apply"])
+            self.assertEqual(result["control_plane_plugin_path"], str(CONTROL_PLANE_PLUGIN_PATH))
 
     def test_apply_backs_up_existing_config_and_writes_tony_and_specialists(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -55,6 +61,8 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertEqual(written["models"], original["models"])
             self.assertEqual(written["channels"], original["channels"])
             self.assertEqual(written["tools"]["sessions"]["visibility"], "tree")
+            self.assertTrue(written["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
+            self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), written["plugins"]["load"]["paths"])
             self.assertTrue((config_dir / "openclaw.json.narratiive-backup").exists())
 
             tony = (config_dir / "workspace-tony" / "AGENTS.md").read_text(encoding="utf-8")
