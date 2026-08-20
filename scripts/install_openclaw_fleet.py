@@ -26,6 +26,45 @@ def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
     return merged
 
 
+def _agent_list(agents: dict[str, Any]) -> list[dict[str, Any]]:
+    raw = agents.get("list")
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("OpenClaw agents.list must be a list")
+    result: list[dict[str, Any]] = []
+    for item in raw:
+        if not isinstance(item, dict) or not str(item.get("id") or "").strip():
+            raise ValueError("every OpenClaw agents.list entry must be an object with an id")
+        result.append(dict(item))
+    return result
+
+
+def _merge_agents(existing_agents: dict[str, Any], managed_agents: dict[str, Any]) -> dict[str, Any]:
+    """Merge the managed fleet by agent id while preserving local model/provider choices."""
+    existing_without_list = {key: value for key, value in existing_agents.items() if key not in {"list", "entries", "ownership"}}
+    managed_without_list = {key: value for key, value in managed_agents.items() if key != "list"}
+    merged = deep_merge(existing_without_list, managed_without_list)
+
+    existing_list = _agent_list(existing_agents)
+    managed_list = _agent_list(managed_agents)
+    existing_by_id = {str(agent["id"]): agent for agent in existing_list}
+    managed_ids: set[str] = set()
+    merged_list: list[dict[str, Any]] = []
+
+    for managed_agent in managed_list:
+        agent_id = str(managed_agent["id"])
+        managed_ids.add(agent_id)
+        merged_list.append(deep_merge(existing_by_id.get(agent_id, {}), managed_agent))
+
+    for existing_agent in existing_list:
+        if str(existing_agent["id"]) not in managed_ids:
+            merged_list.append(existing_agent)
+
+    merged["list"] = merged_list
+    return merged
+
+
 def _enable_control_plane_plugin(config: dict[str, Any]) -> None:
     plugins = config.setdefault("plugins", {})
     load = plugins.setdefault("load", {})
@@ -64,7 +103,14 @@ def build_specialist_agents_file(agent: dict[str, Any]) -> str:
 def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dict[str, Any], dict[Path, str]]:
     fleet = json.loads(FLEET_PATH.read_text(encoding="utf-8"))
     roster = json.loads(ROSTER_PATH.read_text(encoding="utf-8"))
-    merged_config = deep_merge(existing_config, fleet)
+
+    existing_agents = existing_config.get("agents") or {}
+    managed_agents = fleet.get("agents") or {}
+    if not isinstance(existing_agents, dict) or not isinstance(managed_agents, dict):
+        raise ValueError("OpenClaw agents config must be an object")
+
+    merged_config = deep_merge(existing_config, {key: value for key, value in fleet.items() if key != "agents"})
+    merged_config["agents"] = _merge_agents(existing_agents, managed_agents)
     _enable_control_plane_plugin(merged_config)
 
     workspace_files: dict[Path, str] = {
