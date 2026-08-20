@@ -1,11 +1,19 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { buildActionProposal } from "./action-policy.js";
+import { approvedActionResult, buildNativeApprovalRequirement } from "./approval-policy.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/telegram/inbound";
 
 function schema(properties = {}, required = []) {
   return { type: "object", properties, required, additionalProperties: false };
 }
+
+const ACTION_SCHEMA = {
+  action: { type: "string", minLength: 1, maxLength: 4000 },
+  surface: { type: "string", enum: ["research", "strategy", "creative", "production", "gmail", "calendar", "notion", "drive", "github", "n8n", "replit", "other"] },
+  kind: { type: "string", enum: ["read", "prepare", "write"] },
+  target: { type: "object", additionalProperties: true },
+};
 
 function commandFor(name, params) {
   if (name === "narratiive_executive_brief") {
@@ -68,12 +76,7 @@ function proposalTool() {
   return {
     name: "narratiive_propose_action",
     description: "Convert Tony's interpreted next action into a bounded Narratiive execution proposal. This tool never executes, sends, mutates, or grants approval; it only classifies the consequence boundary and returns what may happen next.",
-    parameters: schema({
-      action: { type: "string", minLength: 1, maxLength: 4000 },
-      surface: { type: "string", enum: ["research", "strategy", "creative", "production", "gmail", "calendar", "notion", "drive", "github", "n8n", "replit", "other"] },
-      kind: { type: "string", enum: ["read", "prepare", "write"] },
-      target: { type: "object", additionalProperties: true },
-    }, ["action", "surface", "kind"]),
+    parameters: schema(ACTION_SCHEMA, ["action", "surface", "kind"]),
     async execute(_id, params) {
       try {
         return renderToolResult(buildActionProposal(params || {}));
@@ -84,11 +87,33 @@ function proposalTool() {
   };
 }
 
+function approvalTool() {
+  return {
+    name: "narratiive_request_action_approval",
+    description: "Request a native single-use OpenClaw approval for one bounded Narratiive action. OpenClaw pauses the tool call before it runs. Approval authorises only the exact proposed action; it does not itself dispatch or prove execution.",
+    parameters: schema(ACTION_SCHEMA, ["action", "surface", "kind"]),
+    async execute(_id, params) {
+      try {
+        return renderToolResult(approvedActionResult(params || {}));
+      } catch (error) {
+        return renderToolResult({ ok: false, error: String(error?.message || error), approval_granted: false, execution_truth: "not_dispatched" });
+      }
+    },
+  };
+}
+
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
-  description: "Authoritative Narratiive OS evidence plus bounded action-proposal policy for Tony.",
+  description: "Authoritative Narratiive OS evidence plus bounded action proposal and native approval policy for Tony.",
   register(api) {
+    api.on("before_tool_call", async (event) => {
+      if (event.toolName !== "narratiive_request_action_approval") return;
+      const requirement = buildNativeApprovalRequirement(event.params || {});
+      if (!requirement.required) return;
+      return { requireApproval: requirement.requireApproval };
+    });
+
     api.registerTool(remoteTool(
       "narratiive_executive_brief",
       "Read the current evidence-backed Narratiive executive brief before advising what matters or needs attention.",
@@ -110,5 +135,6 @@ export default definePluginEntry({
       schema({ scope: { type: "string", enum: ["execution", "outcome"] } }),
     ));
     api.registerTool(proposalTool());
+    api.registerTool(approvalTool());
   },
 });
