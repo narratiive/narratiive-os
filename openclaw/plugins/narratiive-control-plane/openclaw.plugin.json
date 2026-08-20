@@ -1,13 +1,14 @@
 {
   "id": "narratiive-control-plane",
   "name": "Narratiive Control Plane",
-  "description": "Read-only evidence tools exposing Narratiive OS state to Tony inside OpenClaw.",
+  "description": "Authoritative Narratiive evidence tools plus bounded action-proposal policy for Tony inside OpenClaw.",
   "contracts": {
     "tools": [
       "narratiive_executive_brief",
       "narratiive_current_leads",
       "narratiive_open_work_status",
-      "narratiive_recent_execution_status"
+      "narratiive_recent_execution_status",
+      "narratiive_propose_action"
     ]
   },
   "activation": {
