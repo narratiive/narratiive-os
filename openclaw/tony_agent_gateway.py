@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -12,11 +13,77 @@ class TonyAgentGatewayError(RuntimeError):
     """Raised when Tony cannot obtain a trustworthy agent response."""
 
 
+def openclaw_config_path(env: Mapping[str, str]) -> Path:
+    explicit = str(env.get("OPENCLAW_CONFIG_PATH", "")).strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    state_dir = str(env.get("OPENCLAW_STATE_DIR", "")).strip()
+    if state_dir:
+        return Path(state_dir).expanduser() / "openclaw.json"
+    openclaw_home = str(env.get("OPENCLAW_HOME", "")).strip()
+    if openclaw_home:
+        return Path(openclaw_home).expanduser() / ".openclaw" / "openclaw.json"
+    return Path.home() / ".openclaw" / "openclaw.json"
+
+
+def _resolve_secret_value(value: Any, env: Mapping[str, str]) -> str:
+    if isinstance(value, str):
+        raw = value.strip()
+        if raw.startswith("${") and raw.endswith("}") and len(raw) > 3:
+            return str(env.get(raw[2:-1], "")).strip()
+        return raw
+    if isinstance(value, Mapping) and str(value.get("source") or "").strip().casefold() == "env":
+        key = str(value.get("id") or "").strip()
+        return str(env.get(key, "")).strip() if key else ""
+    return ""
+
+
+def resolve_gateway_bearer(env: Mapping[str, str], config_path: Path | None = None) -> tuple[str, str]:
+    """Resolve the shared bearer credential used by OpenClaw's HTTP gateway.
+
+    OpenClaw accepts the configured token or password as an Authorization bearer value.
+    Process environment wins, then the active OpenClaw config. The returned source is safe
+    diagnostic metadata and never contains the secret itself.
+    """
+    token = str(env.get("OPENCLAW_GATEWAY_TOKEN", "")).strip()
+    if token:
+        return token, "env:OPENCLAW_GATEWAY_TOKEN"
+    password = str(env.get("OPENCLAW_GATEWAY_PASSWORD", "")).strip()
+    if password:
+        return password, "env:OPENCLAW_GATEWAY_PASSWORD"
+
+    path = config_path or openclaw_config_path(env)
+    try:
+        config = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return "", "none"
+    if not isinstance(config, Mapping):
+        return "", "none"
+    gateway = config.get("gateway")
+    if not isinstance(gateway, Mapping):
+        return "", "none"
+    auth = gateway.get("auth")
+    if not isinstance(auth, Mapping):
+        return "", "none"
+
+    mode = str(auth.get("mode") or "").strip().casefold()
+    if mode == "none":
+        return "", "config:none"
+    if mode == "password":
+        value = _resolve_secret_value(auth.get("password"), env)
+        return (value, "config:gateway.auth.password") if value else ("", "none")
+    if mode in {"", "token"}:
+        value = _resolve_secret_value(auth.get("token"), env)
+        return (value, "config:gateway.auth.token") if value else ("", "none")
+    return "", "none"
+
+
 @dataclass(frozen=True, slots=True)
 class TonyAgentGatewayConfig:
     responses_url: str = "http://127.0.0.1:18789/v1/responses"
     agent_id: str = "tony"
     gateway_token: str = ""
+    gateway_auth_source: str = "none"
     session_key: str = "narratiive:tony:telegram"
     user_id: str = ""
     timeout_seconds: float = 120.0
@@ -26,10 +93,12 @@ class TonyAgentGatewayConfig:
         base = str(env.get("OPENCLAW_GATEWAY_URL", "")).strip().rstrip("/") or "http://127.0.0.1:18789"
         responses_url = str(env.get("TONY_OPENCLAW_RESPONSES_URL", "")).strip() or f"{base}/v1/responses"
         session_key = str(env.get("TONY_OPENCLAW_SESSION_KEY", "")).strip() or "narratiive:tony:telegram"
+        gateway_token, gateway_auth_source = resolve_gateway_bearer(env)
         return cls(
             responses_url=responses_url,
             agent_id=str(env.get("TONY_OPENCLAW_AGENT_ID", "")).strip() or "tony",
-            gateway_token=str(env.get("OPENCLAW_GATEWAY_TOKEN", "")).strip(),
+            gateway_token=gateway_token,
+            gateway_auth_source=gateway_auth_source,
             session_key=session_key,
             user_id=str(env.get("TONY_OPENCLAW_USER_ID", "")).strip() or session_key,
             timeout_seconds=float(env.get("TONY_OPENCLAW_TIMEOUT_SECONDS", "120")),
