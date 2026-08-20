@@ -89,9 +89,9 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             user = (config_dir / "workspace-tony" / "USER.md").read_text(encoding="utf-8")
             soul = (config_dir / "workspace-tony" / "SOUL.md").read_text(encoding="utf-8")
             self.assertIn("single conversational interface", identity)
+            self.assertIn("not a generic chatbot", identity)
             self.assertIn("Matt is the founder", user)
             self.assertIn("OpenClaw for conversation", soul)
-            self.assertNotIn("blank workspace", identity.casefold())
 
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 content = (config_dir / f"workspace-{agent_id}" / "AGENTS.md").read_text(encoding="utf-8")
