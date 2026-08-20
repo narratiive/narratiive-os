@@ -9,24 +9,33 @@ from scripts.install_openclaw_fleet import CONTROL_PLANE_PLUGIN_ID, CONTROL_PLAN
 
 
 class OpenClawFleetInstallTests(unittest.TestCase):
-    def test_install_plan_preserves_unrelated_provider_channel_and_plugin_policy(self):
+    def test_install_plan_preserves_unrelated_provider_channel_plugin_and_agent_settings(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
             existing = {
                 "models": {"providers": {"ollama": {"baseUrl": "http://127.0.0.1:11434"}}},
                 "channels": {"telegram": {"enabled": True}},
-                "agents": {"entries": {"tony": {"model": "ollama/qwen3.5"}}},
+                "agents": {
+                    "list": [
+                        {"id": "tony", "model": "ollama/qwen3.5"},
+                        {"id": "personal", "workspace": "~/.openclaw/workspace-personal"},
+                    ]
+                },
                 "plugins": {"allow": ["existing-safe-plugin"], "load": {"paths": ["/tmp/existing-plugin"]}},
             }
             merged, workspace_files = build_install_plan(home, existing)
 
             self.assertEqual(merged["models"], existing["models"])
             self.assertEqual(merged["channels"], existing["channels"])
-            self.assertEqual(merged["agents"]["entries"]["tony"]["model"], "ollama/qwen3.5")
+            self.assertNotIn("entries", merged["agents"])
+            self.assertNotIn("ownership", merged["agents"])
+            agents = {agent["id"]: agent for agent in merged["agents"]["list"]}
+            self.assertEqual(agents["tony"]["model"], "ollama/qwen3.5")
             self.assertEqual(
-                set(merged["agents"]["entries"]["tony"]["subagents"]["allowAgents"]),
+                set(agents["tony"]["subagents"]["allowAgents"]),
                 {"research", "strategy", "creative-director", "production", "operations"},
             )
+            self.assertEqual(agents["personal"]["workspace"], "~/.openclaw/workspace-personal")
             self.assertEqual(set(merged["plugins"]["allow"]), {"existing-safe-plugin", CONTROL_PLANE_PLUGIN_ID})
             self.assertIn("/tmp/existing-plugin", merged["plugins"]["load"]["paths"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), merged["plugins"]["load"]["paths"])
@@ -64,6 +73,10 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertTrue(written["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), written["plugins"]["load"]["paths"])
             self.assertTrue((config_dir / "openclaw.json.narratiive-backup").exists())
+            self.assertEqual(
+                {agent["id"] for agent in written["agents"]["list"]},
+                {"tony", "research", "strategy", "creative-director", "production", "operations"},
+            )
 
             tony = (config_dir / "workspace-tony" / "AGENTS.md").read_text(encoding="utf-8")
             self.assertIn("sessions_list", tony)

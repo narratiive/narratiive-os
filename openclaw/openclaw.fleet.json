@@ -1,6 +1,5 @@
 {
   "agents": {
-    "ownership": "explicit",
     "defaults": {
       "subagents": {
         "requireAgentId": true,
@@ -10,8 +9,9 @@
         "archiveAfterMinutes": 1440
       }
     },
-    "entries": {
-      "tony": {
+    "list": [
+      {
+        "id": "tony",
         "workspace": "~/.openclaw/workspace-tony",
         "heartbeat": {
           "every": "1h",
@@ -36,7 +36,8 @@
           "deny": ["exec", "process", "gateway", "cron", "nodes"]
         }
       },
-      "research": {
+      {
+        "id": "research",
         "workspace": "~/.openclaw/workspace-research",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -44,7 +45,8 @@
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
-      "strategy": {
+      {
+        "id": "strategy",
         "workspace": "~/.openclaw/workspace-strategy",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -52,7 +54,8 @@
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
-      "creative-director": {
+      {
+        "id": "creative-director",
         "workspace": "~/.openclaw/workspace-creative-director",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -60,7 +63,8 @@
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
-      "production": {
+      {
+        "id": "production",
         "workspace": "~/.openclaw/workspace-production",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -68,7 +72,8 @@
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
-      "operations": {
+      {
+        "id": "operations",
         "workspace": "~/.openclaw/workspace-operations",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
         "tools": {
@@ -76,7 +81,7 @@
           "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       }
-    }
+    ]
   },
   "tools": {
     "sessions": {"visibility": "tree"},
