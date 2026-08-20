@@ -7,9 +7,17 @@ const WRITE_MARKERS = [
 
 const SAFE_READ_SURFACES = new Set(["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"]);
 const INTERNAL_PREP_SURFACES = new Set(["research", "strategy", "creative", "production", "other"]);
+const PREP_MARKERS = ["prepare", "draft"];
+const NO_SEND_MARKERS = ["do not send", "don't send", "without sending", "without send", "not send"];
 
 function normalise(value) {
   return String(value || "").trim();
+}
+
+function isExplicitDraftOnly(action) {
+  const lowered = normalise(action).toLowerCase();
+  return PREP_MARKERS.some((marker) => lowered.includes(marker))
+    && NO_SEND_MARKERS.some((marker) => lowered.includes(marker));
 }
 
 function containsWriteIntent(action) {
@@ -32,7 +40,10 @@ export function buildActionProposal(params = {}) {
 
   // The model's classification is advisory only. Obvious mutation language always
   // wins so conversational interpretation can never silently downgrade a write.
-  const effectiveKind = containsWriteIntent(action) ? "write" : requestedKind;
+  // Explicit draft-only wording is the narrow exception: mentioning sending only to
+  // prohibit it must not turn reversible internal preparation into a write.
+  const draftOnly = isExplicitDraftOnly(action);
+  const effectiveKind = containsWriteIntent(action) && !draftOnly ? "write" : requestedKind;
   let approvalRequired = true;
   let executionMode = "approval_gated_write";
   let approvalReason = "the action could change external or persisted state";
