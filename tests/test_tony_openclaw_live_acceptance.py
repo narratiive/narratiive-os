@@ -129,8 +129,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         self.assertEqual(calls[0][2]["x-openclaw-agent-id"], "tony")
         self.assertEqual(calls[0][2]["x-openclaw-session-key"], "acceptance-session")
         self.assertEqual(calls[0][2]["Authorization"], "Bearer token")
-        self.assertIn("non-destructive acceptance probe", calls[-1][1]["instructions"])
-        self.assertIn("Never invent execution evidence", calls[-1][1]["instructions"])
+        self.assertTrue(all("instructions" not in call[1] for call in calls))
+        self.assertTrue(all(set(call[1]).issubset({"model", "input", "previous_response_id"}) for call in calls))
 
     def test_report_requires_runtime_fleet_not_just_conversation(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:

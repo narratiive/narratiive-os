@@ -234,6 +234,7 @@ def run_live_probe(
     gateway_token: str,
     transport: Callable[..., Any] = http_json,
 ) -> list[dict[str, Any]]:
+    """Exercise Tony exactly like production: behaviour comes only from the OpenClaw workspace."""
     headers = {
         "x-openclaw-agent-id": agent_id,
         "x-openclaw-session-key": session_key,
@@ -248,12 +249,6 @@ def run_live_probe(
         body: dict[str, Any] = {
             "model": f"openclaw/{agent_id}",
             "input": scenario.text,
-            "instructions": (
-                "You are Tony, Narratiive's Chief of Staff. Respond naturally and preserve conversational context across turns. "
-                "Use native OpenClaw specialist/session tools and bounded Narratiive read tools when the request requires them. "
-                "This is a non-destructive acceptance probe: do not perform consequential external writes. If a turn sounds like an external action, reason about or prepare it without sending, mutating, booking or publishing. "
-                "Never invent execution evidence; when asked whether something happened, distinguish prepared/approved from verified execution."
-            ),
         }
         if previous_response_id:
             body["previous_response_id"] = previous_response_id

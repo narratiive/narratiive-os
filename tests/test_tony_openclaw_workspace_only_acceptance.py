@@ -1,42 +1,65 @@
 from __future__ import annotations
 
 import unittest
-from unittest.mock import patch
 
-from scripts.check_tony_openclaw_live_authenticated import workspace_only_transport
+from scripts.check_tony_openclaw_live import SCENARIOS, run_live_probe
 
 
 class TonyOpenClawWorkspaceOnlyAcceptanceTests(unittest.TestCase):
-    def test_transport_removes_per_request_behaviour_instructions(self) -> None:
-        body = {
-            "model": "openclaw/tony",
-            "input": "Morning Tony, anything important?",
-            "instructions": "duplicate behaviour contract",
-            "previous_response_id": "resp-1",
-        }
-        with patch("scripts.check_tony_openclaw_live_authenticated.http_json") as http_json:
-            http_json.return_value = {"id": "resp-2", "output_text": "Morning."}
-            result = workspace_only_transport(
-                "http://127.0.0.1:18789/v1/responses",
-                body,
-                headers={"Authorization": "Bearer secret"},
-                timeout=120.0,
+    def test_shared_live_probe_never_injects_behaviour_instructions(self) -> None:
+        calls = []
+
+        def transport(url, body=None, *, headers=None, timeout=0):
+            calls.append((url, dict(body or {}), dict(headers or {}), timeout))
+            index = len(calls)
+            text = (
+                "Research inspected its mission and is responsible for evidence-backed market intelligence."
+                if index in {3, 4}
+                else f"natural reply {index}"
             )
+            return {"id": f"resp-{index}", "output_text": text}
 
-        self.assertEqual(result["id"], "resp-2")
-        sent_body = http_json.call_args.args[1]
-        self.assertNotIn("instructions", sent_body)
-        self.assertEqual(sent_body["model"], "openclaw/tony")
-        self.assertEqual(sent_body["input"], "Morning Tony, anything important?")
-        self.assertEqual(sent_body["previous_response_id"], "resp-1")
-        self.assertEqual(body["instructions"], "duplicate behaviour contract")
+        results = run_live_probe(
+            responses_url="http://127.0.0.1:18789/v1/responses",
+            agent_id="tony",
+            session_key="acceptance-session",
+            gateway_token="token",
+            transport=transport,
+        )
 
-    def test_transport_leaves_inventory_get_unchanged(self) -> None:
-        with patch("scripts.check_tony_openclaw_live_authenticated.http_json") as http_json:
-            http_json.return_value = {"models": []}
-            workspace_only_transport("http://127.0.0.1:11434/api/tags", None, headers={}, timeout=10.0)
+        self.assertEqual(len(results), len(SCENARIOS))
+        self.assertTrue(all(item["passed"] for item in results))
+        self.assertTrue(all("instructions" not in body for _, body, _, _ in calls))
+        self.assertEqual(calls[0][1]["model"], "openclaw/tony")
+        self.assertEqual(calls[0][1]["input"], "Morning Tony, anything important?")
+        self.assertEqual(calls[0][2]["x-openclaw-message-channel"], "telegram")
+        self.assertEqual(calls[0][2]["Authorization"], "Bearer token")
 
-        self.assertIsNone(http_json.call_args.args[1])
+    def test_shared_live_probe_preserves_response_chain_without_prompt_shim(self) -> None:
+        calls = []
+
+        def transport(url, body=None, *, headers=None, timeout=0):
+            calls.append(dict(body or {}))
+            index = len(calls)
+            text = (
+                "Research completed its read-only mission inspection."
+                if index in {3, 4}
+                else f"natural reply {index}"
+            )
+            return {"id": f"resp-{index}", "output_text": text}
+
+        run_live_probe(
+            responses_url="http://127.0.0.1:18789/v1/responses",
+            agent_id="tony",
+            session_key="acceptance-session",
+            gateway_token="",
+            transport=transport,
+        )
+
+        self.assertNotIn("previous_response_id", calls[0])
+        for index in range(1, len(calls)):
+            self.assertEqual(calls[index]["previous_response_id"], f"resp-{index}")
+        self.assertTrue(all(set(body).issubset({"model", "input", "previous_response_id"}) for body in calls))
 
 
 if __name__ == "__main__":
