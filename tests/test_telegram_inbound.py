@@ -29,6 +29,15 @@ class FakeBase:
         raise AssertionError("base should not be called for /telegram/inbound")
 
 
+class FakeAgentGateway:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def converse(self, text: str) -> str:
+        self.messages.append(text)
+        return f"answered:{text}"
+
+
 class DummyLeadStore:
     def upsert(self, lead):
         raise AssertionError("lead store should not be called")
@@ -91,7 +100,9 @@ class TelegramInboundTests(unittest.TestCase):
             self.assertEqual(service._read_offset(), 42)
 
     def test_live_bridge_accepts_plain_telegram_text(self):
-        app = LeadAwareTonyApplication(FakeBase(), DummyLeadStore())
+        gateway = FakeAgentGateway()
+        base = FakeBase()
+        app = LeadAwareTonyApplication(base, DummyLeadStore(), agent_gateway=gateway)
         body = json.dumps({"text": "What inbound leads did we get today?"}).encode("utf-8")
         environ = {
             "REQUEST_METHOD": "POST",
@@ -110,6 +121,8 @@ class TelegramInboundTests(unittest.TestCase):
         payload = json.loads(response.decode("utf-8"))
         self.assertEqual(captured["status"], "200 OK")
         self.assertEqual(payload["reply"], "answered:What inbound leads did we get today?")
+        self.assertEqual(payload["data"]["runtime"], "openclaw")
+        self.assertEqual(gateway.messages, ["What inbound leads did we get today?"])
 
 
 if __name__ == "__main__":
