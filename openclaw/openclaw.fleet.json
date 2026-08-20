@@ -24,7 +24,7 @@
             "end": "22:00",
             "timezone": "Europe/London"
           },
-          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect only live OpenClaw session/subagent state you can actually see. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, or there is a concrete next decision for Matt. Use sessions_list, sessions_history, sessions_yield, subagents or session_status as needed. Never infer status from old chat memory and never claim external execution without Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
+          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect live OpenClaw specialist/session state and use Narratiive control-plane read tools when current business truth matters. Check narratiive_executive_brief and narratiive_open_work_status before deciding whether there is a material business priority or stalled executive action; use narratiive_current_leads for pipeline claims and narratiive_recent_execution_status before claiming a consequential action happened or worked. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, an evidence-backed business priority materially needs attention, or there is a concrete next decision for Matt. Never infer status from old chat memory and never claim external execution without returned Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
         },
         "subagents": {
           "delegationMode": "prefer",
@@ -32,7 +32,7 @@
           "requireAgentId": true
         },
         "tools": {
-          "allow": ["read", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "session_status"],
+          "allow": ["read", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "session_status", "narratiive-control-plane"],
           "deny": ["exec", "process", "gateway", "cron", "nodes"]
         }
       },
