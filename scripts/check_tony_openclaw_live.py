@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -13,6 +14,7 @@ from urllib.request import Request, urlopen
 DEFAULT_RESPONSES_URL = "http://127.0.0.1:18789/v1/responses"
 DEFAULT_OLLAMA_TAGS_URL = "http://127.0.0.1:11434/api/tags"
 DEFAULT_SESSION_KEY = "narratiive:tony:live-acceptance"
+EXPECTED_AGENT_IDS = ("tony", "research", "strategy", "creative-director", "production", "operations")
 
 
 @dataclass(frozen=True, slots=True)
@@ -46,6 +48,21 @@ _REJECTION_MARKERS = (
     "unsupported command",
 )
 
+_SPECIALIST_FAILURE_MARKERS = (
+    "can't spawn",
+    "cannot spawn",
+    "unable to spawn",
+    "only `tony` exists",
+    "only tony exists",
+    "requireagentid restriction",
+    "blocked by the `requireagentid`",
+    "specialists aren't deployed",
+    "specialists are not deployed",
+    "no active research agent session",
+    "nothing's spawned yet",
+    "nothing has been spawned",
+)
+
 
 def load_openclaw_config(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -75,6 +92,24 @@ def extract_configured_models(config: Mapping[str, Any]) -> list[str]:
     return sorted(models)
 
 
+def extract_configured_agent_ids(config: Mapping[str, Any]) -> list[str]:
+    agents = config.get("agents")
+    if not isinstance(agents, Mapping):
+        return []
+    ids: set[str] = set()
+    raw_list = agents.get("list")
+    if isinstance(raw_list, list):
+        for item in raw_list:
+            if isinstance(item, Mapping):
+                agent_id = str(item.get("id") or "").strip()
+                if agent_id:
+                    ids.add(agent_id)
+    raw_entries = agents.get("entries")
+    if isinstance(raw_entries, Mapping):
+        ids.update(str(key).strip() for key in raw_entries if str(key).strip())
+    return sorted(ids)
+
+
 def extract_ollama_models(payload: Any) -> list[str]:
     if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
         return []
@@ -86,6 +121,43 @@ def extract_ollama_models(payload: Any) -> list[str]:
         if name:
             names.add(name)
     return sorted(names)
+
+
+def extract_runtime_agent_ids(payload: Any) -> list[str]:
+    items = payload
+    if isinstance(payload, dict):
+        items = payload.get("agents") or payload.get("items") or payload.get("data") or []
+    if not isinstance(items, list):
+        return []
+    ids: set[str] = set()
+    for item in items:
+        if not isinstance(item, Mapping):
+            continue
+        agent_id = str(item.get("id") or item.get("agentId") or "").strip()
+        if agent_id:
+            ids.add(agent_id)
+    return sorted(ids)
+
+
+def runtime_agent_ids() -> list[str]:
+    try:
+        completed = subprocess.run(
+            ["openclaw", "agents", "list", "--json"],
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError(f"openclaw agents list failed: {exc}") from exc
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout or "").strip()[:500]
+        raise RuntimeError(f"openclaw agents list exited {completed.returncode}: {detail}")
+    try:
+        payload = json.loads(completed.stdout)
+    except json.JSONDecodeError as exc:
+        raise RuntimeError("openclaw agents list returned invalid JSON") from exc
+    return extract_runtime_agent_ids(payload)
 
 
 def response_text(payload: Any) -> str:
@@ -113,9 +185,16 @@ def response_text(payload: Any) -> str:
     return "\n".join(parts).strip()
 
 
-def scenario_passes(text: str) -> bool:
+def scenario_passes(text: str, scenario_name: str = "") -> bool:
     normalized = text.strip().casefold()
-    return bool(normalized) and not any(marker in normalized for marker in _REJECTION_MARKERS)
+    if not normalized or any(marker in normalized for marker in _REJECTION_MARKERS):
+        return False
+    if scenario_name in {"specialist_delegation", "specialist_status"}:
+        if any(marker in normalized for marker in _SPECIALIST_FAILURE_MARKERS):
+            return False
+        if "research" not in normalized:
+            return False
+    return True
 
 
 def http_json(url: str, body: dict[str, Any] | None = None, *, headers: Mapping[str, str] | None = None, timeout: float = 120.0) -> Any:
@@ -178,7 +257,7 @@ def run_live_probe(
                 "input": scenario.text,
                 "response": text,
                 "response_id": previous_response_id,
-                "passed": scenario_passes(text),
+                "passed": scenario_passes(text, scenario.name),
             }
         )
     return results
@@ -194,14 +273,26 @@ def build_report(
     ollama_tags_url: str,
     live: bool,
     transport: Callable[..., Any] = http_json,
+    agent_inventory: Callable[[], list[str]] = runtime_agent_ids,
 ) -> dict[str, Any]:
     config = load_openclaw_config(config_path)
+    configured_agent_ids = extract_configured_agent_ids(config)
     report: dict[str, Any] = {
         "config_path": str(config_path),
         "configured_models": extract_configured_models(config),
+        "configured_agent_ids": configured_agent_ids,
         "responses_url": responses_url,
         "agent_id": agent_id,
     }
+    try:
+        runtime_ids = sorted(set(agent_inventory()))
+        report["runtime_agent_ids"] = runtime_ids
+        report["runtime_fleet_ready"] = set(EXPECTED_AGENT_IDS).issubset(runtime_ids)
+    except (RuntimeError, TypeError, ValueError) as exc:
+        report["runtime_agent_ids"] = []
+        report["runtime_fleet_ready"] = False
+        report["runtime_agent_error"] = str(exc)
+
     try:
         report["ollama_models"] = extract_ollama_models(transport(ollama_tags_url, None, headers={}, timeout=10.0))
         report["ollama_reachable"] = True
@@ -220,7 +311,7 @@ def build_report(
                 transport=transport,
             )
             report["scenarios"] = scenarios
-            report["live_passed"] = all(item["passed"] for item in scenarios)
+            report["live_passed"] = bool(report["runtime_fleet_ready"]) and all(item["passed"] for item in scenarios)
         except (RuntimeError, json.JSONDecodeError, TypeError, ValueError) as exc:
             report["scenarios"] = []
             report["live_passed"] = False

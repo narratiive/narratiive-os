@@ -40,7 +40,8 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("/tmp/existing-plugin", merged["plugins"]["load"]["paths"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), merged["plugins"]["load"]["paths"])
             self.assertTrue(merged["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
-            self.assertIn(home / ".openclaw" / "workspace-tony" / "AGENTS.md", workspace_files)
+            for filename in ("AGENTS.md", "IDENTITY.md", "USER.md", "SOUL.md"):
+                self.assertIn(home / ".openclaw" / "workspace-tony" / filename, workspace_files)
             self.assertIn(home / ".openclaw" / "workspace-research" / "AGENTS.md", workspace_files)
 
     def test_dry_run_does_not_mutate_home(self):
@@ -83,6 +84,14 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("sessions_history", tony)
             self.assertIn("sessions_yield", tony)
             self.assertIn("Do not infer completion from elapsed time", tony)
+
+            identity = (config_dir / "workspace-tony" / "IDENTITY.md").read_text(encoding="utf-8")
+            user = (config_dir / "workspace-tony" / "USER.md").read_text(encoding="utf-8")
+            soul = (config_dir / "workspace-tony" / "SOUL.md").read_text(encoding="utf-8")
+            self.assertIn("single conversational interface", identity)
+            self.assertIn("not a generic chatbot", identity)
+            self.assertIn("Matt is the founder", user)
+            self.assertIn("OpenClaw for conversation", soul)
 
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 content = (config_dir / f"workspace-{agent_id}" / "AGENTS.md").read_text(encoding="utf-8")

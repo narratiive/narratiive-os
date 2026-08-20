@@ -9,7 +9,8 @@ from typing import Any
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 FLEET_PATH = REPOSITORY_ROOT / "openclaw" / "openclaw.fleet.json"
 ROSTER_PATH = REPOSITORY_ROOT / "openclaw" / "specialists.json"
-TONY_TEMPLATE_PATH = REPOSITORY_ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md"
+TONY_TEMPLATE_DIR = REPOSITORY_ROOT / "openclaw" / "workspace-templates" / "tony"
+TONY_WORKSPACE_FILES = ("AGENTS.md", "IDENTITY.md", "USER.md", "SOUL.md")
 CONTROL_PLANE_PLUGIN_PATH = REPOSITORY_ROOT / "openclaw" / "plugins" / "narratiive-control-plane"
 CONTROL_PLANE_PLUGIN_ID = "narratiive-control-plane"
 
@@ -113,9 +114,13 @@ def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dic
     merged_config["agents"] = _merge_agents(existing_agents, managed_agents)
     _enable_control_plane_plugin(merged_config)
 
-    workspace_files: dict[Path, str] = {
-        home / ".openclaw" / "workspace-tony" / "AGENTS.md": TONY_TEMPLATE_PATH.read_text(encoding="utf-8")
-    }
+    workspace_files: dict[Path, str] = {}
+    for filename in TONY_WORKSPACE_FILES:
+        source = TONY_TEMPLATE_DIR / filename
+        if not source.exists():
+            raise ValueError(f"missing managed Tony workspace template: {filename}")
+        workspace_files[home / ".openclaw" / "workspace-tony" / filename] = source.read_text(encoding="utf-8")
+
     for agent in roster["specialists"]:
         agent_id = str(agent["id"]).strip()
         workspace_files[home / ".openclaw" / f"workspace-{agent_id}" / "AGENTS.md"] = build_specialist_agents_file(agent)
