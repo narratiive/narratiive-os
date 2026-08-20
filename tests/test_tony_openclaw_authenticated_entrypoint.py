@@ -30,7 +30,7 @@ class TonyAuthenticatedEntrypointTests(unittest.TestCase):
                 timeout=30,
             )
         self.assertEqual(completed.returncode, 0, completed.stderr)
-        self.assertIn("active Gateway auth configuration", completed.stdout)
+        self.assertIn("Run Tony's live OpenClaw acceptance probe", completed.stdout)
         self.assertNotIn("ModuleNotFoundError", completed.stderr)
 
 
