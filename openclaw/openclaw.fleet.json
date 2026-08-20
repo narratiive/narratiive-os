@@ -13,6 +13,19 @@
     "entries": {
       "tony": {
         "workspace": "~/.openclaw/workspace-tony",
+        "heartbeat": {
+          "every": "1h",
+          "target": "last",
+          "lightContext": false,
+          "isolatedSession": false,
+          "timeoutSeconds": 120,
+          "activeHours": {
+            "start": "07:00",
+            "end": "22:00",
+            "timezone": "Europe/London"
+          },
+          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect only live OpenClaw session/subagent state you can actually see. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, or there is a concrete next decision for Matt. Use sessions_list, sessions_history, sessions_yield, subagents or session_status as needed. Never infer status from old chat memory and never claim external execution without Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
+        },
         "subagents": {
           "delegationMode": "prefer",
           "allowAgents": ["research", "strategy", "creative-director", "production", "operations"],
