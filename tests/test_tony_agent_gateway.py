@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import unittest
+from pathlib import Path
 from unittest import mock
 
 from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayConfig, TonyAgentGatewayError
@@ -30,7 +31,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertFalse(TonyAgentGateway.is_system_command("sort that out"))
         self.assertFalse(TonyAgentGateway.is_system_command("how is the research agent getting on?"))
 
-    def test_gateway_is_thin_and_leaves_tool_loop_to_native_openclaw_agent(self):
+    def test_gateway_is_thin_and_leaves_prompt_and_tool_loop_to_native_openclaw_agent(self):
         captured = {}
 
         def fake_urlopen(request, timeout):
@@ -56,14 +57,21 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertNotIn("tools", body)
         self.assertNotIn("tool_choice", body)
         self.assertNotIn("previous_response_id", body)
-        self.assertIn("native OpenClaw tools", body["instructions"])
-        self.assertIn("Narratiive control-plane plugin", body["instructions"])
-        self.assertIn("native approval boundary", body["instructions"])
+        self.assertNotIn("instructions", body)
         headers = {key.casefold(): value for key, value in captured["headers"].items()}
         self.assertEqual(headers["x-openclaw-agent-id"], "tony")
         self.assertEqual(headers["x-openclaw-session-key"], "narratiive:tony:telegram")
         self.assertEqual(headers["x-openclaw-message-channel"], "telegram")
         self.assertEqual(headers["authorization"], "Bearer secret")
+
+    def test_workspace_bootstrap_is_the_single_tony_behaviour_contract(self):
+        agents_path = Path(__file__).resolve().parents[1] / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md"
+        contract = agents_path.read_text(encoding="utf-8")
+        self.assertIn("Speak naturally and interpret ordinary English, including typos", contract)
+        self.assertIn("Use Narratiive OS read tools whenever a claim depends on current business state", contract)
+        self.assertIn("Never claim that an external action happened unless the control plane returns decision-grade evidence", contract)
+        self.assertIn("You orchestrate five specialists", contract)
+        self.assertIn("Do not make Matt restate a magic approval phrase", contract)
 
     def test_independent_telegram_turns_share_the_same_openresponses_user(self):
         bodies = []
@@ -82,6 +90,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertEqual(len(bodies), 2)
         self.assertEqual([body["user"] for body in bodies], ["matt:telegram", "matt:telegram"])
         self.assertTrue(all("tools" not in body for body in bodies))
+        self.assertTrue(all("instructions" not in body for body in bodies))
         self.assertTrue(all("previous_response_id" not in body for body in bodies))
 
     def test_environment_defaults_openresponses_user_to_session_key(self):
