@@ -1,6 +1,7 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { buildActionProposal } from "./action-policy.js";
-import { approvedActionResult, buildNativeApprovalRequirement } from "./approval-policy.js";
+import { buildNativeApprovalRequirement } from "./approval-policy.js";
+import { executeApprovedAction } from "./execution-client.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/telegram/inbound";
 
@@ -90,11 +91,20 @@ function proposalTool() {
 function approvalTool() {
   return {
     name: "narratiive_request_action_approval",
-    description: "Request a native single-use OpenClaw approval for one bounded Narratiive action. OpenClaw pauses the tool call before it runs. Approval authorises only the exact proposed action; it does not itself dispatch or prove execution.",
+    description: "Request native single-use approval for one bounded consequential Narratiive action. If Matt allows it once, the same approved tool call dispatches only that exact action through Narratiive OS and returns verified execution evidence or a fail-closed result.",
     parameters: schema(ACTION_SCHEMA, ["action", "surface", "kind"]),
     async execute(_id, params) {
       try {
-        return renderToolResult(approvedActionResult(params || {}));
+        const requirement = buildNativeApprovalRequirement(params || {});
+        if (!requirement.required) {
+          return renderToolResult({
+            ok: false,
+            status: "approval_not_required",
+            proposal: requirement.proposal,
+            execution_truth: "not_dispatched",
+          });
+        }
+        return renderToolResult(await executeApprovedAction(params || {}));
       } catch (error) {
         return renderToolResult({ ok: false, error: String(error?.message || error), approval_granted: false, execution_truth: "not_dispatched" });
       }
@@ -105,7 +115,7 @@ function approvalTool() {
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
-  description: "Authoritative Narratiive OS evidence plus bounded action proposal and native approval policy for Tony.",
+  description: "Authoritative Narratiive OS evidence plus bounded action proposal, native approval and verified consequence execution for Tony.",
   register(api) {
     api.on("before_tool_call", async (event) => {
       if (event.toolName !== "narratiive_request_action_approval") return;
