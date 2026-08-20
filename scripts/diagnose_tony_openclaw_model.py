@@ -50,10 +50,10 @@ def configured_primary(config: Mapping[str, Any], agent_id: str = "tony") -> tup
     return "", "unset"
 
 
-def runtime_model_status() -> dict[str, Any]:
+def runtime_model_status(agent_id: str = "tony") -> dict[str, Any]:
     try:
         completed = subprocess.run(
-            ["openclaw", "models", "status", "--json"],
+            ["openclaw", "models", "status", "--agent", agent_id, "--json"],
             check=False,
             capture_output=True,
             text=True,
@@ -74,7 +74,7 @@ def runtime_model_status() -> dict[str, Any]:
     # Keep diagnostics credential-safe: expose only model/provider selection fields.
     allowed = ("model", "primary", "defaultModel", "resolvedModel", "provider", "fallbacks")
     safe = {key: payload[key] for key in allowed if key in payload}
-    return {"available": True, "status": safe}
+    return {"available": True, "status": safe, "agent_id": agent_id}
 
 
 def build_report(config_path: Path, agent_id: str = "tony") -> dict[str, Any]:
@@ -90,7 +90,7 @@ def build_report(config_path: Path, agent_id: str = "tony") -> dict[str, Any]:
         "agent_id": agent_id,
         "configured_primary_model": primary or None,
         "configured_primary_source": source,
-        "runtime_model_status": runtime_model_status(),
+        "runtime_model_status": runtime_model_status(agent_id),
     }
     try:
         payload = http_json("http://127.0.0.1:11434/api/tags", None, headers={}, timeout=10.0)
@@ -105,7 +105,7 @@ def build_report(config_path: Path, agent_id: str = "tony") -> dict[str, Any]:
     report["diagnosis"] = (
         "Tony has an explicit configured model. Diagnose provider latency before changing model selection."
         if primary
-        else "Tony has no explicit configured primary model. OpenClaw may be falling back to provider/catalog order; set provider/model explicitly before tuning timeouts or switching to local Ollama."
+        else "Tony has no explicit configured primary model. OpenClaw may be falling back to provider/catalog order; pin Tony's resolved provider/model explicitly before tuning timeouts or switching to local Ollama."
     )
     return report
 
