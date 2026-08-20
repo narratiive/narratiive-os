@@ -3,7 +3,16 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import sys
 from pathlib import Path
+
+
+# This script is intentionally supported as a direct path invocation from any cwd.
+# Python otherwise places only scripts/ on sys.path, which makes repository packages
+# such as openclaw unavailable when Matt runs the documented command directly.
+REPO_ROOT = Path(__file__).resolve().parents[1]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 from openclaw.tony_agent_gateway import openclaw_config_path, resolve_gateway_bearer
 from scripts.check_tony_openclaw_live import (
