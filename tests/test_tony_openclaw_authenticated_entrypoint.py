@@ -6,6 +6,8 @@ import sys
 import tempfile
 import unittest
 
+from scripts.check_tony_openclaw_live_authenticated import diagnose_timeout_boundary
+
 
 class TonyAuthenticatedEntrypointTests(unittest.TestCase):
     def test_entrypoint_uses_shared_gateway_auth_resolver_without_printing_secret(self):
@@ -32,6 +34,76 @@ class TonyAuthenticatedEntrypointTests(unittest.TestCase):
         self.assertEqual(completed.returncode, 0, completed.stderr)
         self.assertIn("Run Tony's live OpenClaw acceptance probe", completed.stdout)
         self.assertNotIn("ModuleNotFoundError", completed.stderr)
+
+    def test_agent_timeout_with_healthy_raw_model_is_classified_after_model_boundary(self):
+        report = {
+            "live_passed": False,
+            "model_selection_ready": True,
+            "live_error": "timed out",
+        }
+        calls: list[tuple[str, int]] = []
+
+        def resolver(agent_id: str) -> tuple[str, str]:
+            self.assertEqual(agent_id, "tony")
+            return "ollama/qwen3.5:latest", "runtime:tony"
+
+        def smoke(model_ref: str, timeout_seconds: int):
+            calls.append((model_ref, timeout_seconds))
+            return {
+                "model": model_ref,
+                "model_inference_ready": True,
+                "failure_stage": None,
+                "elapsed_seconds": 4.2,
+                "response_json_valid": True,
+                "error": "must not leak",
+            }
+
+        diagnose_timeout_boundary(
+            report,
+            "tony",
+            timeout_seconds=45,
+            resolver=resolver,
+            smoke=smoke,
+        )
+        self.assertEqual(calls, [("ollama/qwen3.5:latest", 45)])
+        self.assertEqual(report["failure_boundary"], "agent_tool_session")
+        self.assertTrue(report["model_smoke"]["model_inference_ready"])
+        self.assertNotIn("error", report["model_smoke"])
+
+    def test_agent_timeout_with_failed_raw_model_is_classified_as_provider_boundary(self):
+        report = {
+            "live_passed": False,
+            "model_selection_ready": True,
+            "live_error": "request timeout",
+        }
+
+        diagnose_timeout_boundary(
+            report,
+            "tony",
+            resolver=lambda agent_id: ("anthropic/claude-sonnet-4-6", "runtime:tony"),
+            smoke=lambda model_ref, timeout_seconds: {
+                "model": model_ref,
+                "model_inference_ready": False,
+                "failure_stage": "model_inference_timeout",
+                "timeout_seconds": timeout_seconds,
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "model_provider")
+        self.assertEqual(report["model_smoke"]["failure_stage"], "model_inference_timeout")
+
+    def test_non_timeout_failure_does_not_run_model_smoke(self):
+        report = {
+            "live_passed": False,
+            "model_selection_ready": True,
+            "live_error": "HTTP 401: Unauthorized",
+        }
+
+        def unexpected_resolver(agent_id: str):
+            raise AssertionError("resolver should not run for non-timeout failures")
+
+        diagnose_timeout_boundary(report, "tony", resolver=unexpected_resolver)
+        self.assertNotIn("failure_boundary", report)
+        self.assertNotIn("model_smoke", report)
 
 
 if __name__ == "__main__":
