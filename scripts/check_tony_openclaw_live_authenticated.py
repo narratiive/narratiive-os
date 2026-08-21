@@ -22,6 +22,7 @@ from scripts.check_tony_openclaw_live import (
 from scripts.inspect_tony_control_plane_runtime import inspect_runtime
 from scripts.pin_tony_openclaw_model import resolved_runtime_model
 from scripts.probe_tony_openclaw_agent_stage import run_agent_stage_probe
+from scripts.probe_tony_openclaw_specialist_stage import run_specialist_stage_probe
 from scripts.smoke_tony_openclaw_model import smoke_model
 
 
@@ -98,6 +99,42 @@ def refine_agent_timeout_boundary(
     return report
 
 
+def refine_context_specialist_boundary(
+    report: dict[str, Any],
+    *,
+    responses_url: str,
+    agent_id: str,
+    session_key: str,
+    gateway_token: str,
+    timeout_seconds: float = 45.0,
+    specialist_probe: Callable[..., dict[str, Any]] = run_specialist_stage_probe,
+) -> dict[str, Any]:
+    if report.get("failure_boundary") != "later_acceptance_or_specialist_path":
+        return report
+
+    stage = specialist_probe(
+        responses_url=responses_url,
+        agent_id=agent_id,
+        session_key=f"{session_key}:specialist-stage",
+        gateway_token=gateway_token,
+        timeout_seconds=timeout_seconds,
+    )
+    safe_keys = ("specialist_stage_ready", "failure_stage", "context_passed", "specialist_passed")
+    report["specialist_stage_probe"] = {key: stage.get(key) for key in safe_keys if key in stage}
+
+    failure_stage = stage.get("failure_stage")
+    if failure_stage == "durable_context":
+        report["failure_boundary"] = "durable_context"
+        report["failure_diagnosis"] = "Tony can answer a live business-state turn, but chained conversational context fails before any specialist work; inspect OpenClaw response/session continuity."
+    elif failure_stage == "specialist_delegation":
+        report["failure_boundary"] = "specialist_delegation"
+        report["failure_diagnosis"] = "Tony's conversation and durable context are healthy; the failure is isolated to native specialist delegation or specialist completion."
+    elif stage.get("specialist_stage_ready"):
+        report["failure_boundary"] = "later_contextual_or_execution_truth"
+        report["failure_diagnosis"] = "Tony's conversation, live state, durable context and Research delegation are healthy; the remaining failure is later contextual revision/status or execution-truth acceptance."
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Tony's live OpenClaw acceptance probe using the active Gateway auth configuration.")
     parser.add_argument("--config", type=Path, default=None)
@@ -109,11 +146,14 @@ def main() -> None:
     parser.add_argument("--inventory-only", action="store_true")
     parser.add_argument("--model-smoke-timeout-seconds", type=int, default=90, help="Bounded raw-model diagnostic used only when the full Tony agent run times out")
     parser.add_argument("--agent-stage-timeout-seconds", type=float, default=45.0, help="Bounded two-stage Tony diagnostic used only after raw model inference is proven healthy")
+    parser.add_argument("--specialist-stage-timeout-seconds", type=float, default=45.0, help="Bounded context/specialist diagnostic used only after Tony conversation and live state are proven healthy")
     args = parser.parse_args()
     if args.model_smoke_timeout_seconds < 1:
         parser.error("--model-smoke-timeout-seconds must be positive")
     if args.agent_stage_timeout_seconds <= 0:
         parser.error("--agent-stage-timeout-seconds must be positive")
+    if args.specialist_stage_timeout_seconds <= 0:
+        parser.error("--specialist-stage-timeout-seconds must be positive")
 
     config_path = (args.config or openclaw_config_path(os.environ)).expanduser().resolve()
     gateway_token = str(args.gateway_token).strip()
@@ -150,6 +190,14 @@ def main() -> None:
                 session_key=args.session_key,
                 gateway_token=gateway_token,
                 timeout_seconds=args.agent_stage_timeout_seconds,
+            )
+            refine_context_specialist_boundary(
+                report,
+                responses_url=args.responses_url,
+                agent_id=args.agent_id,
+                session_key=args.session_key,
+                gateway_token=gateway_token,
+                timeout_seconds=args.specialist_stage_timeout_seconds,
             )
     report["gateway_auth_present"] = bool(gateway_token)
     report["gateway_auth_source"] = auth_source
