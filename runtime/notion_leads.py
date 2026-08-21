@@ -89,23 +89,28 @@ class NotionLeadSource:
                 except ValueError:
                     continue
                 results.append(lead)
-                if self.cache is not None:
-                    self.cache.upsert(lead)
             if payload.get("has_more") is not True:
                 break
             next_cursor = payload.get("next_cursor")
             if not isinstance(next_cursor, str) or not next_cursor.strip():
                 raise NotionLeadSourceError("Notion pagination was incomplete")
             cursor = next_cursor
+        else:
+            raise NotionLeadSourceError(
+                f"Notion leads query exceeded the {self.config.max_pages}-page safety limit"
+            )
 
         deduped = {lead.lead_id: lead for lead in results}
-        return tuple(
+        snapshot = tuple(
             sorted(
                 deduped.values(),
                 key=lambda item: (item.created_at, item.lead_id),
                 reverse=True,
             )
         )
+        if self.cache is not None:
+            self.cache.replace(snapshot)
+        return snapshot
 
     def _query_page(self, cursor: str | None) -> dict[str, Any]:
         body: dict[str, Any] = {

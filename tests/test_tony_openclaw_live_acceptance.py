@@ -28,6 +28,7 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 "natural_priority",
                 "typo_tolerance",
                 "business_and_specialist_status",
+                "specialist_roster",
                 "specialist_delegation",
                 "specialist_status",
                 "strategy_status",
@@ -44,6 +45,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         broad_status = next(item for item in SCENARIOS if item.name == "business_and_specialist_status")
         self.assertIn("across Narratiive", broad_status.text)
         self.assertIn("specialist team", broad_status.text)
+        roster = next(item for item in SCENARIOS if item.name == "specialist_roster")
+        self.assertIn("list the sub-agents and their job roles", roster.text)
         for name, agent in (
             ("specialist_status", "Research Agent"),
             ("strategy_status", "Strategy Agent"),
@@ -130,6 +133,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "list the sub-agents" in prompt:
+                text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
             elif "Research Agent" in prompt:
                 text = "Research inspected its mission and is responsible for evidence-backed market intelligence."
             else:
@@ -169,6 +174,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 prompt = str(body.get("input") or "")
                 if "across Narratiive" in prompt:
                     text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
+                elif "list the sub-agents" in prompt:
+                    text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
                 elif "Research Agent" in prompt:
                     text = "Research is active and returned its mission."
                 else:
@@ -212,6 +219,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 prompt = str(body.get("input") or "")
                 if "across Narratiive" in prompt:
                     text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
+                elif "list the sub-agents" in prompt:
+                    text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
                 elif "Research Agent" in prompt:
                     text = "Research completed its read-only mission inspection."
                 else:

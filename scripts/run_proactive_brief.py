@@ -28,7 +28,9 @@ from openclaw.telegram_outbound import (  # noqa: E402
     TelegramSender,
 )
 from runtime.composition import RuntimeComponents  # noqa: E402
+from runtime.inbound_leads import FileInboundLeadStore  # noqa: E402
 from runtime.mission_control import MissionControlSnapshot  # noqa: E402
+from runtime.notion_leads import build_authoritative_lead_loader  # noqa: E402
 from runtime.proactive_executive_delivery import (  # noqa: E402
     DeliveryStatusRecord,
     FileDeliveryKeyStore,
@@ -138,7 +140,18 @@ def build_components(
         mission_control_loader=mission_control_loader,
         github_configured=github_work_loader is not None,
     )
-    executive_service = TonyExecutiveCommandService(command_service, brief_archive=brief_archive)
+    lead_path = Path(
+        os.getenv(
+            "TONY_INBOUND_LEADS_PATH",
+            str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"),
+        )
+    ).resolve()
+    authoritative_lead_loader = build_authoritative_lead_loader(FileInboundLeadStore(lead_path))
+    executive_service = TonyExecutiveCommandService(
+        command_service,
+        brief_archive=brief_archive,
+        inbound_lead_loader=authoritative_lead_loader,
+    )
     return workspace_runtime, executive_service, mission_control_loader
 
 

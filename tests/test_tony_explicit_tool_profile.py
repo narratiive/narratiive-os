@@ -6,14 +6,11 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_TONY_ALLOW = {
+EXPECTED_TONY_ADDITIONS = {
     "agents_list",
-    "sessions_list",
-    "sessions_history",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
-    "narratiive-control-plane",
 }
 EXPECTED_NARRATIIVE_TOOLS = {
     "narratiive_read_state",
@@ -30,14 +27,15 @@ class TonyExplicitToolProfileTests(unittest.TestCase):
             (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "openclaw.plugin.json").read_text(encoding="utf-8")
         )
 
-    def test_tony_owns_explicit_messaging_profile_instead_of_inheriting_global_profile(self) -> None:
+    def test_tony_adds_native_orchestration_above_explicit_messaging_profile(self) -> None:
         tools = self.tony["tools"]
         self.assertEqual(tools["profile"], "messaging")
-        self.assertEqual(set(tools["allow"]), EXPECTED_TONY_ALLOW)
-        self.assertIn("sessions_list", tools["allow"])
-        self.assertNotIn("session_status", tools["allow"])
-        self.assertNotIn("read", tools["allow"])
-        self.assertNotIn("exec", tools["allow"])
+        self.assertNotIn("allow", tools)
+        self.assertEqual(set(tools["alsoAllow"]), EXPECTED_TONY_ADDITIONS)
+        self.assertNotIn("sessions_list", tools["deny"])
+        self.assertTrue({"sessions_send", "session_status", "message"}.issubset(tools["deny"]))
+        self.assertNotIn("read", tools["alsoAllow"])
+        self.assertNotIn("exec", tools["alsoAllow"])
 
     def test_all_control_plane_tools_are_members_of_messaging_profile(self) -> None:
         metadata = self.manifest["toolMetadata"]

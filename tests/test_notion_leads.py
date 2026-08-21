@@ -7,7 +7,7 @@ import unittest
 from pathlib import Path
 from urllib.error import HTTPError
 
-from runtime.inbound_leads import FileInboundLeadStore
+from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import (
     NotionLeadConfig,
     NotionLeadSource,
@@ -100,6 +100,42 @@ class NotionLeadSourceTests(unittest.TestCase):
         source = NotionLeadSource(NotionLeadConfig(token="bad"), opener=opener)
         with self.assertRaises(NotionLeadSourceError):
             source.read()
+
+    def test_successful_empty_notion_snapshot_removes_deleted_cached_leads(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = FileInboundLeadStore(Path(tmp) / "leads.json")
+            cache.upsert(InboundLead(lead_id="deleted-page", contact="Deleted Test Lead"))
+            source = NotionLeadSource(
+                NotionLeadConfig(token="secret"),
+                cache=cache,
+                opener=lambda request, timeout: FakeResponse(
+                    {"object": "list", "has_more": False, "next_cursor": None, "results": []}
+                ),
+            )
+
+            self.assertEqual(source.read(), ())
+            self.assertEqual(cache.read(), ())
+
+    def test_incomplete_notion_snapshot_does_not_replace_cache(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = FileInboundLeadStore(Path(tmp) / "leads.json")
+            cache.upsert(InboundLead(lead_id="existing-page", contact="Existing Lead"))
+            source = NotionLeadSource(
+                NotionLeadConfig(token="secret", max_pages=1),
+                cache=cache,
+                opener=lambda request, timeout: FakeResponse(
+                    {
+                        "object": "list",
+                        "has_more": True,
+                        "next_cursor": "page-2",
+                        "results": [],
+                    }
+                ),
+            )
+
+            with self.assertRaises(NotionLeadSourceError):
+                source.read()
+            self.assertEqual(cache.read()[0].lead_id, "existing-page")
 
 
 if __name__ == "__main__":

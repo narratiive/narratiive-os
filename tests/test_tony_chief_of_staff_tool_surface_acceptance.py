@@ -8,14 +8,11 @@ from scripts.check_tony_openclaw_live import SCENARIOS, run_live_probe
 
 
 ROOT = Path(__file__).resolve().parents[1]
-EXPECTED_TONY_TOOLS = {
+EXPECTED_TONY_ADDITIONS = {
     "agents_list",
-    "sessions_list",
-    "sessions_history",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
-    "narratiive-control-plane",
 }
 EXPECTED_CONTROL_PLANE_TOOLS = {
     "narratiive_read_state",
@@ -40,6 +37,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; persistent specialist assignments are tracked separately, and no child job is currently running. Mission Control shows the current commercial priority."
+            elif "list the sub-agents" in prompt:
+                text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
             elif "Ask the Research Agent" in prompt:
                 text = "Research assignment started and is working in a visible specialist session."
             elif "Research Agent" in prompt:
@@ -67,11 +66,12 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         config = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in config["agents"]["list"]}
         self.assertEqual(agents["tony"]["tools"]["profile"], "messaging")
-        allowed = set(agents["tony"]["tools"]["allow"])
-        self.assertEqual(allowed, EXPECTED_TONY_TOOLS)
-        self.assertIn("sessions_list", allowed)
-        self.assertNotIn("session_status", allowed)
-        self.assertNotIn("read", allowed)
+        tools = agents["tony"]["tools"]
+        self.assertNotIn("allow", tools)
+        self.assertEqual(set(tools["alsoAllow"]), EXPECTED_TONY_ADDITIONS)
+        self.assertNotIn("sessions_list", tools["deny"])
+        self.assertTrue({"sessions_send", "session_status", "message"}.issubset(tools["deny"]))
+        self.assertNotIn("read", tools["alsoAllow"])
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
         self.assertIn("read", agents["operations"]["tools"]["allow"])
@@ -103,7 +103,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             set(agents["tony"]["subagents"]["allowAgents"]),
             {"research", "strategy", "creative-director", "production", "operations"},
         )
-        self.assertEqual(agents["tony"]["tools"]["sessions"]["visibility"], "all")
+        self.assertEqual(fleet["tools"]["sessions"]["visibility"], "all")
+        self.assertNotIn("sessions", agents["tony"]["tools"])
         self.assertTrue(fleet["tools"]["agentToAgent"]["enabled"])
         self.assertEqual(
             set(fleet["tools"]["agentToAgent"]["allow"]),
