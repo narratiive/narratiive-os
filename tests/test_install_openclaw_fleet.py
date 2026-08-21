@@ -111,7 +111,9 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 with self.subTest(phrase=phrase):
                     self.assertIn(phrase, tony)
             self.assertIn("When Matt asks how a specialist is getting on", tony)
-            self.assertIn("inspect live OpenClaw session state first", tony)
+            self.assertIn("use `subagents` as the canonical live registry", tony)
+            self.assertIn("do not broaden the search with `sessions_list`", tony)
+            self.assertIn("bounded transcript with `sessions_history`", tony)
 
 
 if __name__ == "__main__":
