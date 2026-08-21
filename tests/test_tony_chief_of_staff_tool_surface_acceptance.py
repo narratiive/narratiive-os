@@ -61,6 +61,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
     def test_openclaw_owns_a_small_tony_tool_surface_while_specialists_keep_workspace_tools(self) -> None:
         config = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in config["agents"]["list"]}
+        self.assertEqual(agents["tony"]["tools"]["profile"], "messaging")
         allowed = set(agents["tony"]["tools"]["allow"])
         self.assertEqual(allowed, EXPECTED_TONY_TOOLS)
         self.assertNotIn("sessions_list", allowed)
@@ -84,6 +85,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         )
         tools = set(manifest["contracts"]["tools"])
         self.assertEqual(tools, EXPECTED_CONTROL_PLANE_TOOLS)
+        self.assertEqual(set(manifest["toolMetadata"]), EXPECTED_CONTROL_PLANE_TOOLS)
+        for tool in EXPECTED_CONTROL_PLANE_TOOLS:
+            self.assertIn("messaging", manifest["toolMetadata"][tool]["profiles"])
         self.assertTrue(LEGACY_STATE_TOOLS.isdisjoint(tools))
         self.assertNotIn("narratiive_propose_action", tools)
 
