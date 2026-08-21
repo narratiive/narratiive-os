@@ -39,7 +39,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             index = len(calls)
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
-                text = "Research, Strategy, Creative, Production and Operations are configured and available; persistent specialist assignments and current child activity are tracked separately. Mission Control shows the current commercial priority."
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; persistent specialist assignments are tracked separately, and no child job is currently running. Mission Control shows the current commercial priority."
             elif "Ask the Research Agent" in prompt:
                 text = "Research assignment started and is working in a visible specialist session."
             elif "Research Agent" in prompt:
