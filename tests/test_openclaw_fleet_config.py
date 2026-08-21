@@ -10,6 +10,7 @@ SPECIALISTS = ["research", "strategy", "creative-director", "production", "opera
 CONSEQUENTIAL_TOOLS = {"message", "gateway", "cron", "nodes", "exec", "process"}
 TONY_TOOLS = {
     "agents_list",
+    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
@@ -55,6 +56,9 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(heartbeat["activeHours"], {"start": "07:00", "end": "22:00", "timezone": "Europe/London"})
         prompt = heartbeat["prompt"]
         self.assertIn("proactive Chief of Staff", prompt)
+        self.assertIn("sessions_list", prompt)
+        self.assertIn("persistent OpenClaw specialist assignments", prompt)
+        self.assertIn("subagents", prompt)
         self.assertIn("stalled/failed/blocked", prompt)
         self.assertIn("HEARTBEAT_OK", prompt)
         self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
@@ -71,7 +75,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_tony_tool_surface_is_only_orchestration_and_narratiive_control_plane(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
         self.assertEqual(allowed, TONY_TOOLS)
-        self.assertNotIn("sessions_list", allowed)
+        self.assertIn("sessions_list", allowed)
         self.assertNotIn("session_status", allowed)
         self.assertNotIn("read", allowed)
         self.assertNotIn("write", allowed)
@@ -84,9 +88,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
         denied = set(self.agents["tony"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_history", "sessions_yield", "subagents"}:
+        for required in {"agents_list", "sessions_list", "sessions_history", "sessions_yield", "subagents"}:
             self.assertIn(required, allowed)
-        self.assertNotIn("sessions_list", allowed)
         self.assertNotIn("session_status", allowed)
         self.assertIn("narratiive-control-plane", allowed)
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))
@@ -94,20 +97,31 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
 
-    def test_specialist_status_uses_subagents_and_bounded_child_history(self):
+    def test_specialist_status_combines_persistent_sessions_with_current_tree_activity(self):
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("`agents_list` is the authoritative discovery view", contract)
-        self.assertIn("`subagents` is a separate live/recent run ledger", contract)
-        self.assertIn("call `agents_list` for configured availability and `subagents`", contract)
-        self.assertIn("Do not broaden the search with `sessions_list`", contract)
+        self.assertIn("`subagents` is the live/recent task ledger", contract)
+        self.assertIn("`sessions_list` is the durable discovery view", contract)
+        self.assertIn("across Telegram resets, restarts, isolated heartbeat sessions", contract)
+        self.assertIn("category `Narratiive specialists`", contract)
         self.assertIn("bounded transcript with `sessions_history`", contract)
         self.assertIn("no child job currently running", contract)
 
-    def test_broad_status_combines_business_state_with_roster_and_child_runs(self):
+    def test_broad_status_combines_business_state_with_roster_persistent_sessions_and_child_runs(self):
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("configured roster, persistent visible specialist assignments, current-tree child-job ledger", contract)
         self.assertIn("read `executive_brief`, `open_work` and `current_leads`", contract)
-        self.assertIn("Open work is wider than spawned child jobs", contract)
+        self.assertIn("Open work is wider than spawned child jobs or visible specialist sessions", contract)
         self.assertIn("before asking Matt for outreach targets, goals, contacts, leads", contract)
+
+    def test_tony_has_bounded_cross_session_visibility_only_for_canonical_specialists(self):
+        self.assertEqual(self.config["tools"]["sessions"]["visibility"], "tree")
+        self.assertEqual(self.agents["tony"]["tools"]["sessions"]["visibility"], "all")
+        agent_to_agent = self.config["tools"]["agentToAgent"]
+        self.assertTrue(agent_to_agent["enabled"])
+        self.assertEqual(set(agent_to_agent["allow"]), set(SPECIALISTS))
+        self.assertEqual(self.config["session"]["scope"], "per-sender")
+        self.assertEqual(self.config["session"]["dmScope"], "per-channel-peer")
 
     def test_specialists_are_isolated_and_cannot_spawn_or_execute_consequential_actions(self):
         for agent_id in SPECIALISTS:
@@ -126,12 +140,6 @@ class OpenClawFleetConfigTests(unittest.TestCase):
             with self.subTest(agent_id=agent_id):
                 self.assertEqual(self.agents[agent_id]["sandbox"]["workspaceAccess"], "rw")
                 self.assertIn("write", self.agents[agent_id]["tools"]["allow"])
-
-    def test_session_visibility_is_limited_to_tonys_spawn_tree_and_direct_messages_are_isolated(self):
-        self.assertEqual(self.config["tools"]["sessions"]["visibility"], "tree")
-        self.assertFalse(self.config["tools"]["agentToAgent"]["enabled"])
-        self.assertEqual(self.config["session"]["scope"], "per-sender")
-        self.assertEqual(self.config["session"]["dmScope"], "per-channel-peer")
 
 
 if __name__ == "__main__":
