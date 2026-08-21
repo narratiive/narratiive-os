@@ -34,9 +34,8 @@
         },
         "tools": {
           "profile": "messaging",
-          "sessions": {"visibility": "all"},
-          "allow": ["agents_list", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "narratiive-control-plane"],
-          "deny": ["exec", "process", "gateway", "cron", "nodes"]
+          "alsoAllow": ["agents_list", "sessions_spawn", "sessions_yield", "subagents"],
+          "deny": ["sessions_send", "session_status", "message", "exec", "process", "gateway", "cron", "nodes"]
         }
       },
       {
@@ -92,7 +91,7 @@
     ]
   },
   "tools": {
-    "sessions": {"visibility": "tree"},
+    "sessions": {"visibility": "all"},
     "agentToAgent": {
       "enabled": true,
       "allow": ["research", "strategy", "creative-director", "production", "operations"]

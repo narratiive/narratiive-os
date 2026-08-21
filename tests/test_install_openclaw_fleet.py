@@ -106,7 +106,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertTrue(result["apply"])
             self.assertEqual(written["models"], original["models"])
             self.assertEqual(written["channels"], original["channels"])
-            self.assertEqual(written["tools"]["sessions"]["visibility"], "tree")
+            self.assertEqual(written["tools"]["sessions"]["visibility"], "all")
             self.assertTrue(written["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), written["plugins"]["load"]["paths"])
             self.assertIn({"agentId": "tony", "match": {"channel": "telegram"}}, written["bindings"])

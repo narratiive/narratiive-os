@@ -8,14 +8,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SPECIALISTS = ["research", "strategy", "creative-director", "production", "operations"]
 CONSEQUENTIAL_TOOLS = {"message", "gateway", "cron", "nodes", "exec", "process"}
-TONY_TOOLS = {
+TONY_PROFILE_ADDITIONS = {
     "agents_list",
-    "sessions_list",
-    "sessions_history",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
-    "narratiive-control-plane",
 }
 LEGACY_STATE_TOOLS = {
     "narratiive_executive_brief",
@@ -39,7 +36,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(set(self.agents["tony"]["subagents"]["allowAgents"]), set(SPECIALISTS))
         self.assertTrue(self.agents["tony"]["subagents"]["requireAgentId"])
         self.assertEqual(self.agents["tony"]["subagents"]["delegationMode"], "prefer")
-        self.assertIn("agents_list", self.agents["tony"]["tools"]["allow"])
+        self.assertIn("agents_list", self.agents["tony"]["tools"]["alsoAllow"])
 
     def test_tony_workspace_requires_runtime_agent_discovery_before_spawning(self):
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
@@ -73,25 +70,25 @@ class OpenClawFleetConfigTests(unittest.TestCase):
                 self.assertNotIn("heartbeat", self.agents[agent_id])
 
     def test_tony_tool_surface_is_only_orchestration_and_narratiive_control_plane(self):
-        allowed = set(self.agents["tony"]["tools"]["allow"])
-        self.assertEqual(allowed, TONY_TOOLS)
-        self.assertIn("sessions_list", allowed)
-        self.assertNotIn("session_status", allowed)
-        self.assertNotIn("read", allowed)
-        self.assertNotIn("write", allowed)
-        self.assertNotIn("edit", allowed)
-        self.assertNotIn("browser", allowed)
+        tools = self.agents["tony"]["tools"]
+        additions = set(tools["alsoAllow"])
+        denied = set(tools["deny"])
+        self.assertNotIn("allow", tools)
+        self.assertEqual(additions, TONY_PROFILE_ADDITIONS)
+        self.assertNotIn("sessions_list", denied)
+        self.assertTrue({"sessions_send", "session_status", "message"}.issubset(denied))
+        self.assertTrue({"read", "write", "edit", "browser"}.isdisjoint(additions))
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("direct tool surface is intentionally limited", contract)
         self.assertIn("bounded workspace research belongs with the specialist agents", contract)
 
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
-        allowed = set(self.agents["tony"]["tools"]["allow"])
+        additions = set(self.agents["tony"]["tools"]["alsoAllow"])
         denied = set(self.agents["tony"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_list", "sessions_history", "sessions_yield", "subagents"}:
-            self.assertIn(required, allowed)
-        self.assertNotIn("session_status", allowed)
-        self.assertIn("narratiive-control-plane", allowed)
+        for required in {"agents_list", "sessions_yield", "subagents"}:
+            self.assertIn(required, additions)
+        self.assertNotIn("sessions_list", denied)
+        self.assertIn("session_status", denied)
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))
         prompt = self.agents["tony"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
@@ -115,8 +112,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("before asking Matt for outreach targets, goals, contacts, leads", contract)
 
     def test_tony_has_bounded_cross_session_visibility_only_for_canonical_specialists(self):
-        self.assertEqual(self.config["tools"]["sessions"]["visibility"], "tree")
-        self.assertEqual(self.agents["tony"]["tools"]["sessions"]["visibility"], "all")
+        self.assertEqual(self.config["tools"]["sessions"]["visibility"], "all")
+        self.assertNotIn("sessions", self.agents["tony"]["tools"])
         agent_to_agent = self.config["tools"]["agentToAgent"]
         self.assertTrue(agent_to_agent["enabled"])
         self.assertEqual(set(agent_to_agent["allow"]), set(SPECIALISTS))

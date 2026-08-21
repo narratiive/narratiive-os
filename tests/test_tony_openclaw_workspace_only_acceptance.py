@@ -15,6 +15,8 @@ class TonyOpenClawWorkspaceOnlyAcceptanceTests(unittest.TestCase):
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "list the sub-agents" in prompt:
+                text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
             elif "Research Agent" in prompt:
                 text = "Research inspected its mission and is responsible for evidence-backed market intelligence."
             else:
@@ -46,6 +48,8 @@ class TonyOpenClawWorkspaceOnlyAcceptanceTests(unittest.TestCase):
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "list the sub-agents" in prompt:
+                text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
             elif "Research Agent" in prompt:
                 text = "Research completed its read-only mission inspection."
             else:

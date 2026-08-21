@@ -70,6 +70,13 @@ class _ProactiveBriefTestEnvironment:
         self.mock_urlopen.return_value = _FakeTelegramResponse({"ok": True})
         self.addCleanup(self._telegram_patch.stop)
 
+        self._lead_loader_patch = patch(
+            "scripts.run_proactive_brief.build_authoritative_lead_loader",
+            return_value=lambda: (),
+        )
+        self.mock_lead_loader_factory = self._lead_loader_patch.start()
+        self.addCleanup(self._lead_loader_patch.stop)
+
     def status_state(self) -> str | None:
         loader = build_proactive_delivery_status_loader(
             runtime_root=self.runtime_root, repository_root=REPOSITORY_ROOT
@@ -79,6 +86,15 @@ class _ProactiveBriefTestEnvironment:
 
 
 class RunProactiveBriefTests(_ProactiveBriefTestEnvironment, unittest.TestCase):
+    def test_scheduled_brief_uses_authoritative_lead_loader(self):
+        run_proactive_brief.build_components(
+            runtime_root=self.runtime_root,
+            workspace_id="test-workspace",
+        )
+
+        cache = self.mock_lead_loader_factory.call_args.args[0]
+        self.assertEqual(cache.path, Path(os.environ["TONY_INBOUND_LEADS_PATH"]).resolve())
+
     def test_first_run_delivers_brief_and_records_success_evidence(self):
         exit_code = run_proactive_brief.main(["--mode", "brief", "--command", "morning"])
 

@@ -31,6 +31,10 @@ SCENARIOS = (
         "What's happening across Narratiive right now, and what are the specialist team doing?",
     ),
     Scenario(
+        "specialist_roster",
+        "Could you list the sub-agents and their job roles, and say whether any are working right now?",
+    ),
+    Scenario(
         "specialist_delegation",
         "Ask the Research Agent to inspect its current mission and return one concise sentence about what it is responsible for. This is internal, read-only work.",
     ),
@@ -255,6 +259,10 @@ def scenario_passes(text: str, scenario_name: str = "") -> bool:
         if any(marker in normalized for marker in _SPECIALIST_FAILURE_MARKERS):
             return False
         if "research" not in normalized:
+            return False
+    if scenario_name == "specialist_roster":
+        required = ("research", "strategy", "creative director", "production", "operations")
+        if not all(name in normalized for name in required):
             return False
     if scenario_name == "specialist_delegation" and any(marker in normalized for marker in _DELEGATION_NOT_EXECUTED_MARKERS):
         return False

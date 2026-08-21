@@ -169,6 +169,11 @@ class FileInboundLeadStore:
         items[lead.lead_id] = lead
         self._write(tuple(items.values()))
 
+    def replace(self, leads: Iterable[InboundLead]) -> None:
+        """Replace the cache with one complete authoritative snapshot."""
+        items = {item.lead_id: item for item in leads}
+        self._write(tuple(items.values()))
+
     def read(self) -> tuple[InboundLead, ...]:
         if not self.path.exists():
             return ()
