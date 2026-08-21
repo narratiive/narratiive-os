@@ -10,6 +10,7 @@ from scripts.check_tony_openclaw_live import SCENARIOS, run_live_probe
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TONY_TOOLS = {
     "agents_list",
+    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
@@ -38,7 +39,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             index = len(calls)
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
-                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is currently running. Mission Control shows the current commercial priority."
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; persistent specialist assignments are tracked separately, and no child job is currently running. Mission Control shows the current commercial priority."
             elif "Ask the Research Agent" in prompt:
                 text = "Research assignment started and is working in a visible specialist session."
             elif "Research Agent" in prompt:
@@ -68,20 +69,20 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertEqual(agents["tony"]["tools"]["profile"], "messaging")
         allowed = set(agents["tony"]["tools"]["allow"])
         self.assertEqual(allowed, EXPECTED_TONY_TOOLS)
-        self.assertNotIn("sessions_list", allowed)
+        self.assertIn("sessions_list", allowed)
         self.assertNotIn("session_status", allowed)
         self.assertNotIn("read", allowed)
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
         self.assertIn("read", agents["operations"]["tools"]["allow"])
 
-    def test_specialist_status_uses_subagent_registry_then_bounded_history(self) -> None:
+    def test_specialist_status_uses_persistent_sessions_current_tree_and_bounded_history(self) -> None:
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("`agents_list` is the authoritative discovery view", prompt)
-        self.assertIn("`subagents` is a separate live/recent run ledger", prompt)
-        self.assertIn("call `agents_list` for configured availability and `subagents`", prompt)
-        self.assertIn("Do not broaden the search with `sessions_list`", prompt)
-        self.assertIn("use `session_status` for specialist tracking", prompt)
+        self.assertIn("`subagents` is the live/recent task ledger", prompt)
+        self.assertIn("`sessions_list` is the durable discovery view", prompt)
+        self.assertIn("across Telegram resets, restarts, isolated heartbeat sessions", prompt)
+        self.assertIn("restrict attention to the canonical specialist agent IDs", prompt)
         self.assertIn("bounded transcript with `sessions_history`", prompt)
         self.assertIn("no child job currently running", prompt)
         self.assertIn("never turn `no child job currently running` into `no specialists` or `no active projects`", prompt)
@@ -100,6 +101,12 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertEqual(agents["tony"]["subagents"]["delegationMode"], "prefer")
         self.assertEqual(
             set(agents["tony"]["subagents"]["allowAgents"]),
+            {"research", "strategy", "creative-director", "production", "operations"},
+        )
+        self.assertEqual(agents["tony"]["tools"]["sessions"]["visibility"], "all")
+        self.assertTrue(fleet["tools"]["agentToAgent"]["enabled"])
+        self.assertEqual(
+            set(fleet["tools"]["agentToAgent"]["allow"]),
             {"research", "strategy", "creative-director", "production", "operations"},
         )
 
@@ -148,6 +155,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
         heartbeat = agents["tony"]["heartbeat"]["prompt"]
+        self.assertIn("sessions_list", heartbeat)
+        self.assertIn("persistent OpenClaw specialist assignments", heartbeat)
+        self.assertIn("subagents", heartbeat)
         self.assertIn("narratiive_read_state", heartbeat)
         self.assertTrue(all(tool not in heartbeat for tool in LEGACY_STATE_TOOLS))
         self.assertIn("view executive_brief", heartbeat)

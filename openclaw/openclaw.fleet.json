@@ -25,7 +25,7 @@
             "end": "22:00",
             "timezone": "Europe/London"
           },
-          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect live OpenClaw specialist/session state and use Narratiive control-plane state reads when current business truth matters. Check narratiive_read_state with view executive_brief and view open_work before deciding whether there is a material business priority or stalled executive action; use view current_leads for pipeline claims and view recent_execution before claiming a consequential action happened or worked. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, an evidence-backed business priority materially needs attention, or there is a concrete next decision for Matt. Never infer status from old chat memory and never claim external execution without returned Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
+          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect persistent OpenClaw specialist assignments with sessions_list and current requester-tree child activity with subagents; these are different views, and an empty subagents result does not mean persistent specialist work is absent. For persistent work, keep only sessions owned by the canonical Research, Strategy, Creative Director, Production and Operations agents or in category Narratiive specialists, and use bounded sessions_history only when you need the latest evidence or blocker. Use Narratiive control-plane state reads when current business truth matters. Check narratiive_read_state with view executive_brief and view open_work before deciding whether there is a material business priority or stalled executive action; use view current_leads for pipeline claims and view recent_execution before claiming a consequential action happened or worked. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, an evidence-backed business priority materially needs attention, or there is a concrete next decision for Matt. Never infer status from old chat memory and never claim external execution without returned Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
         },
         "subagents": {
           "delegationMode": "prefer",
@@ -34,7 +34,8 @@
         },
         "tools": {
           "profile": "messaging",
-          "allow": ["agents_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "narratiive-control-plane"],
+          "sessions": {"visibility": "all"},
+          "allow": ["agents_list", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "narratiive-control-plane"],
           "deny": ["exec", "process", "gateway", "cron", "nodes"]
         }
       },
@@ -92,7 +93,10 @@
   },
   "tools": {
     "sessions": {"visibility": "tree"},
-    "agentToAgent": {"enabled": false}
+    "agentToAgent": {
+      "enabled": true,
+      "allow": ["research", "strategy", "creative-director", "production", "operations"]
+    }
   },
   "session": {
     "scope": "per-sender",
