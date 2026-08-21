@@ -9,6 +9,7 @@ import unittest
 from scripts.check_tony_openclaw_live_authenticated import (
     diagnose_timeout_boundary,
     refine_agent_timeout_boundary,
+    refine_context_specialist_boundary,
 )
 
 
@@ -136,6 +137,65 @@ class TonyAuthenticatedEntrypointTests(unittest.TestCase):
         )
         self.assertEqual(report["failure_boundary"], "later_acceptance_or_specialist_path")
         self.assertTrue(report["agent_stage_probe"]["business_state_passed"])
+
+    def test_later_failure_with_broken_context_is_narrowed_to_durable_context(self):
+        report = {"failure_boundary": "later_acceptance_or_specialist_path"}
+
+        refine_context_specialist_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="secret",
+            specialist_probe=lambda **kwargs: {
+                "specialist_stage_ready": False,
+                "failure_stage": "durable_context",
+                "context_passed": False,
+                "specialist_passed": False,
+                "context_error": "must not leak",
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "durable_context")
+        self.assertFalse(report["specialist_stage_probe"]["context_passed"])
+        self.assertNotIn("context_error", report["specialist_stage_probe"])
+
+    def test_later_failure_with_context_but_no_research_is_narrowed_to_specialist(self):
+        report = {"failure_boundary": "later_acceptance_or_specialist_path"}
+
+        refine_context_specialist_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="",
+            specialist_probe=lambda **kwargs: {
+                "specialist_stage_ready": False,
+                "failure_stage": "specialist_delegation",
+                "context_passed": True,
+                "specialist_passed": False,
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "specialist_delegation")
+        self.assertTrue(report["specialist_stage_probe"]["context_passed"])
+
+    def test_healthy_context_and_research_move_boundary_to_later_execution_acceptance(self):
+        report = {"failure_boundary": "later_acceptance_or_specialist_path"}
+
+        refine_context_specialist_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="",
+            specialist_probe=lambda **kwargs: {
+                "specialist_stage_ready": True,
+                "failure_stage": None,
+                "context_passed": True,
+                "specialist_passed": True,
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "later_contextual_or_execution_truth")
+        self.assertTrue(report["specialist_stage_probe"]["specialist_passed"])
 
     def test_agent_timeout_with_failed_raw_model_is_classified_as_provider_boundary(self):
         report = {
