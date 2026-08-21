@@ -4,7 +4,7 @@ import { buildNativeApprovalRequirement } from "./approval-policy.js";
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 
-const DEFAULT_URL = "http://127.0.0.1:8790/telegram/inbound";
+const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 
 function schema(properties = {}, required = []) {
   return { type: "object", properties, required, additionalProperties: false };
@@ -31,8 +31,8 @@ function commandFor(name, params) {
     return `/${period}`;
   }
   if (name === "narratiive_current_leads") return "/leads";
-  // These are internal control-plane reads. Keep them on the deterministic slash-command
-  // surface so /telegram/inbound never routes a native tool call back into OpenClaw.
+  // Internal control-plane reads use a dedicated non-conversational HTTP path.
+  // Slash commands remain only as the deterministic machine protocol understood by Narratiive OS.
   if (name === "narratiive_open_work_status") return "/what's the status";
   if (name === "narratiive_recent_execution_status") {
     const scope = String(params?.scope || "execution").toLowerCase();
@@ -44,7 +44,7 @@ function commandFor(name, params) {
 
 function controlPlaneUrl() {
   let url = String(process.env.TONY_AGENT_CONTROL_PLANE_URL || process.env.TONY_TELEGRAM_BRIDGE_URL || DEFAULT_URL).replace(/\/$/, "");
-  if (url === "http://127.0.0.1:8790" || url === "http://localhost:8790") url += "/telegram/inbound";
+  if (url === "http://127.0.0.1:8790" || url === "http://localhost:8790") url += "/control-plane";
   return url;
 }
 
