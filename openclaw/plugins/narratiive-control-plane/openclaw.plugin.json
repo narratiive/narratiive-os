@@ -9,6 +9,11 @@
       "narratiive_request_action_approval"
     ]
   },
+  "toolMetadata": {
+    "narratiive_read_state": {"profiles": ["messaging"]},
+    "narratiive_execute_safe_read": {"profiles": ["messaging"]},
+    "narratiive_request_action_approval": {"profiles": ["messaging"]}
+  },
   "activation": {
     "onStartup": true
   },
