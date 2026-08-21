@@ -1,13 +1,10 @@
 {
   "id": "narratiive-control-plane",
   "name": "Narratiive Control Plane",
-  "description": "Authoritative Narratiive evidence tools plus bounded autonomous reads and native approval policy for Tony inside OpenClaw.",
+  "description": "Authoritative Narratiive state and evidence tools plus bounded autonomous reads and native approval policy for Tony inside OpenClaw.",
   "contracts": {
     "tools": [
-      "narratiive_executive_brief",
-      "narratiive_current_leads",
-      "narratiive_open_work_status",
-      "narratiive_recent_execution_status",
+      "narratiive_read_state",
       "narratiive_execute_safe_read",
       "narratiive_request_action_approval"
     ]
