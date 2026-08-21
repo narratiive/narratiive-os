@@ -12,6 +12,7 @@ EXPECTED_NARRATIIVE_TOOLS = {
 }
 REQUIRED_ORCHESTRATION_TOOLS = {
     "agents_list",
+    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
