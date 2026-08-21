@@ -18,6 +18,14 @@ EXPECTED_TONY_TOOLS = {
     "session_status",
     "narratiive-control-plane",
 }
+EXPECTED_CONTROL_PLANE_TOOLS = {
+    "narratiive_executive_brief",
+    "narratiive_current_leads",
+    "narratiive_open_work_status",
+    "narratiive_recent_execution_status",
+    "narratiive_execute_safe_read",
+    "narratiive_request_action_approval",
+}
 
 
 class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
@@ -57,6 +65,20 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
         self.assertIn("read", agents["operations"]["tools"]["allow"])
+
+    def test_control_plane_contract_has_no_redundant_model_proposal_round_trip(self) -> None:
+        manifest = json.loads(
+            (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "openclaw.plugin.json").read_text(encoding="utf-8")
+        )
+        self.assertEqual(set(manifest["contracts"]["tools"]), EXPECTED_CONTROL_PLANE_TOOLS)
+        self.assertNotIn("narratiive_propose_action", manifest["contracts"]["tools"])
+
+        prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("For a verified read-only inspection", prompt)
+        self.assertIn("For reversible internal preparation", prompt)
+        self.assertIn("For any external or persisted write", prompt)
+        self.assertIn("native single-use approval gate", prompt)
+        self.assertIn("execution_truth", prompt)
 
 
 if __name__ == "__main__":
