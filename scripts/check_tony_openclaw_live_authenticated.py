@@ -23,6 +23,7 @@ from scripts.check_tony_openclaw_live import (
     build_report,
 )
 from scripts.pin_tony_openclaw_model import resolved_runtime_model
+from scripts.probe_tony_openclaw_agent_stage import run_agent_stage_probe
 from scripts.smoke_tony_openclaw_model import smoke_model
 
 
@@ -81,6 +82,49 @@ def diagnose_timeout_boundary(
     return report
 
 
+def refine_agent_timeout_boundary(
+    report: dict[str, Any],
+    *,
+    responses_url: str,
+    agent_id: str,
+    session_key: str,
+    gateway_token: str,
+    timeout_seconds: float = 45.0,
+    stage_probe: Callable[..., dict[str, Any]] = run_agent_stage_probe,
+) -> dict[str, Any]:
+    """Narrow a healthy-model timeout to Tony's bare agent path or business-state/tool path."""
+    if report.get("failure_boundary") != "agent_tool_session":
+        return report
+
+    stage = stage_probe(
+        responses_url=responses_url,
+        agent_id=agent_id,
+        session_key=f"{session_key}:stage",
+        gateway_token=gateway_token,
+        timeout_seconds=timeout_seconds,
+    )
+    safe_keys = ("agent_stage_ready", "failure_stage", "baseline_passed", "business_state_passed")
+    report["agent_stage_probe"] = {key: stage.get(key) for key in safe_keys if key in stage}
+
+    failure_stage = stage.get("failure_stage")
+    if failure_stage == "agent_workspace_or_session":
+        report["failure_boundary"] = "agent_workspace_or_session"
+        report["failure_diagnosis"] = (
+            "Raw model inference is healthy, but even a no-tools Tony conversation fails; inspect Tony workspace/session/runtime before Narratiive business tools."
+        )
+    elif failure_stage == "business_state_or_tool_path":
+        report["failure_boundary"] = "business_state_or_tool_path"
+        report["failure_diagnosis"] = (
+            "Tony can converse through OpenClaw, but the live-business-state turn fails; inspect Narratiive control-plane/tool execution rather than the model or conversation router."
+        )
+    elif stage.get("agent_stage_ready"):
+        report["failure_boundary"] = "later_acceptance_or_specialist_path"
+        report["failure_diagnosis"] = (
+            "Tony's bare conversation and business-state turn are healthy; the timeout occurs later in contextual or specialist orchestration acceptance."
+        )
+    return report
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(
         description="Run Tony's live OpenClaw acceptance probe using the active Gateway auth configuration."
@@ -98,9 +142,17 @@ def main() -> None:
         default=90,
         help="Bounded raw-model diagnostic used only when the full Tony agent run times out",
     )
+    parser.add_argument(
+        "--agent-stage-timeout-seconds",
+        type=float,
+        default=45.0,
+        help="Bounded two-stage Tony diagnostic used only after raw model inference is proven healthy",
+    )
     args = parser.parse_args()
     if args.model_smoke_timeout_seconds < 1:
         parser.error("--model-smoke-timeout-seconds must be positive")
+    if args.agent_stage_timeout_seconds <= 0:
+        parser.error("--agent-stage-timeout-seconds must be positive")
 
     config_path = (args.config or openclaw_config_path(os.environ)).expanduser().resolve()
     gateway_token = str(args.gateway_token).strip()
@@ -122,6 +174,14 @@ def main() -> None:
             report,
             args.agent_id,
             timeout_seconds=args.model_smoke_timeout_seconds,
+        )
+        refine_agent_timeout_boundary(
+            report,
+            responses_url=args.responses_url,
+            agent_id=args.agent_id,
+            session_key=args.session_key,
+            gateway_token=gateway_token,
+            timeout_seconds=args.agent_stage_timeout_seconds,
         )
     report["gateway_auth_present"] = bool(gateway_token)
     report["gateway_auth_source"] = auth_source

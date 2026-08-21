@@ -6,7 +6,10 @@ import sys
 import tempfile
 import unittest
 
-from scripts.check_tony_openclaw_live_authenticated import diagnose_timeout_boundary
+from scripts.check_tony_openclaw_live_authenticated import (
+    diagnose_timeout_boundary,
+    refine_agent_timeout_boundary,
+)
 
 
 class TonyAuthenticatedEntrypointTests(unittest.TestCase):
@@ -69,6 +72,70 @@ class TonyAuthenticatedEntrypointTests(unittest.TestCase):
         self.assertEqual(report["failure_boundary"], "agent_tool_session")
         self.assertTrue(report["model_smoke"]["model_inference_ready"])
         self.assertNotIn("error", report["model_smoke"])
+
+    def test_healthy_model_but_baseline_agent_failure_is_narrowed_to_workspace_session(self):
+        report = {"failure_boundary": "agent_tool_session"}
+
+        def stage_probe(**kwargs):
+            self.assertEqual(kwargs["agent_id"], "tony")
+            self.assertTrue(kwargs["session_key"].endswith(":stage"))
+            return {
+                "agent_stage_ready": False,
+                "failure_stage": "agent_workspace_or_session",
+                "baseline_passed": False,
+                "business_state_passed": False,
+                "baseline_error": "must not leak",
+            }
+
+        refine_agent_timeout_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="secret",
+            stage_probe=stage_probe,
+        )
+        self.assertEqual(report["failure_boundary"], "agent_workspace_or_session")
+        self.assertFalse(report["agent_stage_probe"]["baseline_passed"])
+        self.assertNotIn("baseline_error", report["agent_stage_probe"])
+
+    def test_healthy_baseline_but_business_state_failure_is_narrowed_to_tool_path(self):
+        report = {"failure_boundary": "agent_tool_session"}
+
+        refine_agent_timeout_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="",
+            stage_probe=lambda **kwargs: {
+                "agent_stage_ready": False,
+                "failure_stage": "business_state_or_tool_path",
+                "baseline_passed": True,
+                "business_state_passed": False,
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "business_state_or_tool_path")
+        self.assertTrue(report["agent_stage_probe"]["baseline_passed"])
+
+    def test_healthy_two_stage_agent_probe_moves_boundary_to_later_acceptance(self):
+        report = {"failure_boundary": "agent_tool_session"}
+
+        refine_agent_timeout_boundary(
+            report,
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="acceptance",
+            gateway_token="",
+            stage_probe=lambda **kwargs: {
+                "agent_stage_ready": True,
+                "failure_stage": None,
+                "baseline_passed": True,
+                "business_state_passed": True,
+            },
+        )
+        self.assertEqual(report["failure_boundary"], "later_acceptance_or_specialist_path")
+        self.assertTrue(report["agent_stage_probe"]["business_state_passed"])
 
     def test_agent_timeout_with_failed_raw_model_is_classified_as_provider_boundary(self):
         report = {
