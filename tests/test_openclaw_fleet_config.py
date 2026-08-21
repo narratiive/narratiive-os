@@ -10,12 +10,10 @@ SPECIALISTS = ["research", "strategy", "creative-director", "production", "opera
 CONSEQUENTIAL_TOOLS = {"message", "gateway", "cron", "nodes", "exec", "process"}
 TONY_TOOLS = {
     "agents_list",
-    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
-    "session_status",
     "narratiive-control-plane",
 }
 LEGACY_STATE_TOOLS = {
@@ -73,6 +71,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_tony_tool_surface_is_only_orchestration_and_narratiive_control_plane(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
         self.assertEqual(allowed, TONY_TOOLS)
+        self.assertNotIn("sessions_list", allowed)
+        self.assertNotIn("session_status", allowed)
         self.assertNotIn("read", allowed)
         self.assertNotIn("write", allowed)
         self.assertNotIn("edit", allowed)
@@ -84,13 +84,21 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
         denied = set(self.agents["tony"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_list", "sessions_history", "sessions_yield", "subagents", "session_status"}:
+        for required in {"agents_list", "sessions_history", "sessions_yield", "subagents"}:
             self.assertIn(required, allowed)
+        self.assertNotIn("sessions_list", allowed)
+        self.assertNotIn("session_status", allowed)
         self.assertIn("narratiive-control-plane", allowed)
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))
         prompt = self.agents["tony"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
+
+    def test_specialist_status_uses_subagents_and_bounded_child_history(self):
+        contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("use `subagents` as the canonical live registry", contract)
+        self.assertIn("do not broaden the search with `sessions_list`", contract)
+        self.assertIn("bounded transcript with `sessions_history`", contract)
 
     def test_specialists_are_isolated_and_cannot_spawn_or_execute_consequential_actions(self):
         for agent_id in SPECIALISTS:
