@@ -39,8 +39,10 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             prompt = str((body or {}).get("input") or "")
             if "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is currently running. Mission Control shows the current commercial priority."
+            elif "Ask the Research Agent" in prompt:
+                text = "Research assignment started and is working in a visible specialist session."
             elif "Research Agent" in prompt:
-                text = "Research completed its read-only mission inspection."
+                text = "Research is working in its delegated specialist session."
             else:
                 text = f"natural Chief of Staff reply {index}"
             return {"id": f"resp-{index}", "output_text": text}
@@ -83,6 +85,23 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("bounded transcript with `sessions_history`", prompt)
         self.assertIn("no child job currently running", prompt)
         self.assertIn("never turn `no child job currently running` into `no specialists` or `no active projects`", prompt)
+
+    def test_material_specialist_work_uses_openclaw_persistent_sessions(self) -> None:
+        prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("spawn it with `visible: true`", prompt)
+        self.assertIn('`category: "Narratiive specialists"`', prompt)
+        self.assertIn("native persistent specialist-session mode", prompt)
+        self.assertIn("default hidden sub-agent mode only for short internal work", prompt)
+        self.assertIn("sessionUrl", prompt)
+        self.assertIn("Do not create a second Narratiive-side specialist registry", prompt)
+
+        fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
+        agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
+        self.assertEqual(agents["tony"]["subagents"]["delegationMode"], "prefer")
+        self.assertEqual(
+            set(agents["tony"]["subagents"]["allowAgents"]),
+            {"research", "strategy", "creative-director", "production", "operations"},
+        )
 
     def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
         manifest = json.loads(
