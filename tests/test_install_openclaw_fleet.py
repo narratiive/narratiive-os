@@ -121,7 +121,8 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("sessions_history", tony)
             self.assertIn("sessions_yield", tony)
             self.assertIn("`agents_list` is the authoritative discovery view", tony)
-            self.assertIn("`subagents` is a separate live/recent run ledger", tony)
+            self.assertIn("`subagents` is the live/recent task ledger", tony)
+            self.assertIn("`sessions_list` is the durable discovery view", tony)
             self.assertIn("Do not infer completion from elapsed time", tony)
             self.assertIn("Treat `sessions_spawn` as a non-blocking handoff", tony)
             self.assertIn("Specialist completion is push-based", tony)
@@ -197,8 +198,9 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 with self.subTest(phrase=phrase):
                     self.assertIn(phrase, tony)
             self.assertIn("When Matt asks how the team or a specialist is getting on", tony)
-            self.assertIn("call `agents_list` for configured availability and `subagents`", tony)
-            self.assertIn("Do not broaden the search with `sessions_list`", tony)
+            self.assertIn("first call `agents_list` for configured availability", tony)
+            self.assertIn("Use `sessions_list` to recover persistent visible specialist assignments", tony)
+            self.assertIn("Use `subagents` for current/recent child-job activity", tony)
             self.assertIn("bounded transcript with `sessions_history`", tony)
             self.assertIn("read `executive_brief`, `open_work` and `current_leads`", tony)
 
