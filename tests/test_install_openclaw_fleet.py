@@ -84,6 +84,10 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("sessions_history", tony)
             self.assertIn("sessions_yield", tony)
             self.assertIn("Do not infer completion from elapsed time", tony)
+            self.assertIn("Treat `sessions_spawn` as a non-blocking handoff", tony)
+            self.assertIn("Specialist completion is push-based", tony)
+            self.assertIn("do not poll `subagents`, `sessions_list`, or `sessions_history` in a loop", tony)
+            self.assertIn("An accepted spawn proves delegation started, not that the specialist completed the work", tony)
 
             identity = (config_dir / "workspace-tony" / "IDENTITY.md").read_text(encoding="utf-8")
             user = (config_dir / "workspace-tony" / "USER.md").read_text(encoding="utf-8")
