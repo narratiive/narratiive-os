@@ -19,12 +19,15 @@ EXPECTED_TONY_TOOLS = {
     "narratiive-control-plane",
 }
 EXPECTED_CONTROL_PLANE_TOOLS = {
+    "narratiive_read_state",
+    "narratiive_execute_safe_read",
+    "narratiive_request_action_approval",
+}
+LEGACY_STATE_TOOLS = {
     "narratiive_executive_brief",
     "narratiive_current_leads",
     "narratiive_open_work_status",
     "narratiive_recent_execution_status",
-    "narratiive_execute_safe_read",
-    "narratiive_request_action_approval",
 }
 
 
@@ -66,19 +69,44 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("write", agents["research"]["tools"]["allow"])
         self.assertIn("read", agents["operations"]["tools"]["allow"])
 
-    def test_control_plane_contract_has_no_redundant_model_proposal_round_trip(self) -> None:
+    def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
         manifest = json.loads(
             (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "openclaw.plugin.json").read_text(encoding="utf-8")
         )
-        self.assertEqual(set(manifest["contracts"]["tools"]), EXPECTED_CONTROL_PLANE_TOOLS)
-        self.assertNotIn("narratiive_propose_action", manifest["contracts"]["tools"])
+        tools = set(manifest["contracts"]["tools"])
+        self.assertEqual(tools, EXPECTED_CONTROL_PLANE_TOOLS)
+        self.assertTrue(LEGACY_STATE_TOOLS.isdisjoint(tools))
+        self.assertNotIn("narratiive_propose_action", tools)
 
+        source = (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "index.js").read_text(encoding="utf-8")
+        self.assertIn('name: "narratiive_read_state"', source)
+        self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
+        for legacy_tool in LEGACY_STATE_TOOLS:
+            self.assertNotIn(f'"{legacy_tool}"', source)
+
+    def test_workspace_and_heartbeat_use_consolidated_state_view_without_phrase_routing(self) -> None:
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("narratiive_read_state", prompt)
+        self.assertIn("executive_brief", prompt)
+        self.assertIn("current_leads", prompt)
+        self.assertIn("open_work", prompt)
+        self.assertIn("recent_execution", prompt)
         self.assertIn("For a verified read-only inspection", prompt)
         self.assertIn("For reversible internal preparation", prompt)
         self.assertIn("For any external or persisted write", prompt)
         self.assertIn("native single-use approval gate", prompt)
         self.assertIn("execution_truth", prompt)
+        self.assertIn("contextual turns, not commands to phrase-match", prompt)
+
+        fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
+        agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
+        heartbeat = agents["tony"]["heartbeat"]["prompt"]
+        self.assertIn("narratiive_read_state", heartbeat)
+        self.assertTrue(all(tool not in heartbeat for tool in LEGACY_STATE_TOOLS))
+        self.assertIn("view executive_brief", heartbeat)
+        self.assertIn("view open_work", heartbeat)
+        self.assertIn("view current_leads", heartbeat)
+        self.assertIn("view recent_execution", heartbeat)
 
 
 if __name__ == "__main__":

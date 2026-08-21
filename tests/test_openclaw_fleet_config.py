@@ -18,6 +18,12 @@ TONY_TOOLS = {
     "session_status",
     "narratiive-control-plane",
 }
+LEGACY_STATE_TOOLS = {
+    "narratiive_executive_brief",
+    "narratiive_current_leads",
+    "narratiive_open_work_status",
+    "narratiive_recent_execution_status",
+}
 
 
 class OpenClawFleetConfigTests(unittest.TestCase):
@@ -55,8 +61,10 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("HEARTBEAT_OK", prompt)
         self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
         self.assertIn("Never infer status from old chat memory", prompt)
-        self.assertIn("narratiive_executive_brief", prompt)
-        self.assertIn("narratiive_open_work_status", prompt)
+        self.assertIn("narratiive_read_state", prompt)
+        self.assertIn("view executive_brief", prompt)
+        self.assertIn("view open_work", prompt)
+        self.assertTrue(all(tool not in prompt for tool in LEGACY_STATE_TOOLS))
         self.assertNotIn("heartbeat", self.config["agents"]["defaults"])
         for agent_id in SPECIALISTS:
             with self.subTest(agent_id=agent_id):

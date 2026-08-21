@@ -24,22 +24,27 @@ const SAFE_READ_SCHEMA = {
   target: { type: "object", additionalProperties: true },
 };
 
-function commandFor(name, params) {
-  if (name === "narratiive_executive_brief") {
+const STATE_READ_SCHEMA = {
+  view: { type: "string", enum: ["executive_brief", "current_leads", "open_work", "recent_execution"] },
+  period: { type: "string", enum: ["morning", "evening"] },
+  scope: { type: "string", enum: ["execution", "outcome"] },
+};
+
+function commandForStateRead(params) {
+  const view = String(params?.view || "").toLowerCase();
+  if (view === "executive_brief") {
     const period = String(params?.period || "morning").toLowerCase();
     if (!new Set(["morning", "evening"]).has(period)) throw new Error("period must be morning or evening");
     return `/${period}`;
   }
-  if (name === "narratiive_current_leads") return "/leads";
-  // Internal control-plane reads use a dedicated non-conversational HTTP path.
-  // Slash commands remain only as the deterministic machine protocol understood by Narratiive OS.
-  if (name === "narratiive_open_work_status") return "/what's the status";
-  if (name === "narratiive_recent_execution_status") {
+  if (view === "current_leads") return "/leads";
+  if (view === "open_work") return "/what's the status";
+  if (view === "recent_execution") {
     const scope = String(params?.scope || "execution").toLowerCase();
     if (!new Set(["execution", "outcome"]).has(scope)) throw new Error("scope must be execution or outcome");
     return scope === "execution" ? "/did that happen" : "/did that work";
   }
-  throw new Error(`unsupported Narratiive tool: ${name}`);
+  throw new Error(`unsupported Narratiive state view: ${view || "missing"}`);
 }
 
 function controlPlaneUrl() {
@@ -48,14 +53,14 @@ function controlPlaneUrl() {
   return url;
 }
 
-async function readControlPlane(name, params) {
+async function readControlPlane(params) {
   const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
   const response = await fetch(controlPlaneUrl(), {
     method: "POST",
     headers,
-    body: JSON.stringify({ text: commandFor(name, params), source: "openclaw_native_tool" }),
+    body: JSON.stringify({ text: commandForStateRead(params), source: "openclaw_native_tool" }),
   });
   const raw = await response.text();
   let payload;
@@ -68,14 +73,14 @@ function renderToolResult(payload) {
   return { content: [{ type: "text", text: JSON.stringify(payload) }], details: payload };
 }
 
-function remoteTool(name, description, parameters) {
+function stateReadTool() {
   return {
-    name,
-    description,
-    parameters,
+    name: "narratiive_read_state",
+    description: "Read one authoritative Narratiive OS state view: executive brief, current leads, open work, or recent execution/outcome evidence. This tool is read-only and never mutates external systems.",
+    parameters: schema(STATE_READ_SCHEMA, ["view"]),
     async execute(_id, params) {
       try {
-        return renderToolResult(await readControlPlane(name, params || {}));
+        return renderToolResult(await readControlPlane(params || {}));
       } catch (error) {
         return renderToolResult({ ok: false, error: String(error?.message || error) });
       }
@@ -134,7 +139,7 @@ function approvalTool() {
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
-  description: "Authoritative Narratiive OS evidence plus bounded autonomous reads, native approval and verified consequence execution for Tony.",
+  description: "Authoritative Narratiive OS state and evidence plus bounded autonomous reads, native approval and verified consequence execution for Tony.",
   register(api) {
     api.on("before_tool_call", async (event) => {
       if (event.toolName !== "narratiive_request_action_approval") return;
@@ -143,26 +148,7 @@ export default definePluginEntry({
       return { requireApproval: requirement.requireApproval };
     });
 
-    api.registerTool(remoteTool(
-      "narratiive_executive_brief",
-      "Read the current evidence-backed Narratiive executive brief before advising what matters or needs attention.",
-      schema({ period: { type: "string", enum: ["morning", "evening"] } }),
-    ));
-    api.registerTool(remoteTool(
-      "narratiive_current_leads",
-      "Read the authoritative current inbound lead and commercial pipeline view.",
-      schema(),
-    ));
-    api.registerTool(remoteTool(
-      "narratiive_open_work_status",
-      "Read current pending, delegated, stalled or most-recent Tony work status from Narratiive OS.",
-      schema(),
-    ));
-    api.registerTool(remoteTool(
-      "narratiive_recent_execution_status",
-      "Read verified evidence that a recent consequential action happened, or separately whether it produced a business outcome.",
-      schema({ scope: { type: "string", enum: ["execution", "outcome"] } }),
-    ));
+    api.registerTool(stateReadTool());
     api.registerTool(safeReadTool());
     api.registerTool(approvalTool());
   },
