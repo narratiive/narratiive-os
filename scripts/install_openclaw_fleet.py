@@ -46,6 +46,19 @@ def _agent_list(agents: dict[str, Any]) -> list[dict[str, Any]]:
     return result
 
 
+def _merge_managed_agent(existing: dict[str, Any], managed: dict[str, Any]) -> dict[str, Any]:
+    """Merge one managed agent and remove obsolete exclusive policy fields."""
+    merged = deep_merge(existing, managed)
+    managed_tools = managed.get("tools")
+    merged_tools = merged.get("tools")
+    if isinstance(managed_tools, dict) and isinstance(merged_tools, dict):
+        if "alsoAllow" in managed_tools and "allow" not in managed_tools:
+            merged_tools.pop("allow", None)
+        if "allow" in managed_tools and "alsoAllow" not in managed_tools:
+            merged_tools.pop("alsoAllow", None)
+    return merged
+
+
 def _merge_agents(existing_agents: dict[str, Any], managed_agents: dict[str, Any]) -> dict[str, Any]:
     """Merge the managed fleet by agent id while preserving local model/provider choices."""
     existing_without_list = {key: value for key, value in existing_agents.items() if key not in {"list", "entries", "ownership"}}
@@ -61,7 +74,7 @@ def _merge_agents(existing_agents: dict[str, Any], managed_agents: dict[str, Any
     for managed_agent in managed_list:
         agent_id = str(managed_agent["id"])
         managed_ids.add(agent_id)
-        merged_list.append(deep_merge(existing_by_id.get(agent_id, {}), managed_agent))
+        merged_list.append(_merge_managed_agent(existing_by_id.get(agent_id, {}), managed_agent))
 
     for existing_agent in existing_list:
         if str(existing_agent["id"]) not in managed_ids:
