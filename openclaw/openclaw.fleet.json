@@ -32,7 +32,7 @@
           "requireAgentId": true
         },
         "tools": {
-          "allow": ["read", "agents_list", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "session_status", "narratiive-control-plane"],
+          "allow": ["agents_list", "sessions_list", "sessions_history", "sessions_spawn", "sessions_yield", "subagents", "session_status", "narratiive-control-plane"],
           "deny": ["exec", "process", "gateway", "cron", "nodes"]
         }
       },
