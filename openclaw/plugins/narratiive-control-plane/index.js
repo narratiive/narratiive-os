@@ -5,6 +5,7 @@ import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
+const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
 
 function schema(properties = {}, required = []) {
   return { type: "object", properties, required, additionalProperties: false };
@@ -53,15 +54,30 @@ function controlPlaneUrl() {
   return url;
 }
 
+function controlPlaneTimeoutMs() {
+  const configured = Number(process.env.TONY_CONTROL_PLANE_TIMEOUT_MS || DEFAULT_CONTROL_PLANE_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_CONTROL_PLANE_TIMEOUT_MS;
+}
+
 async function readControlPlane(params) {
   const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
-  const response = await fetch(controlPlaneUrl(), {
-    method: "POST",
-    headers,
-    body: JSON.stringify({ text: commandForStateRead(params), source: "openclaw_native_tool" }),
-  });
+  const timeoutMs = controlPlaneTimeoutMs();
+  let response;
+  try {
+    response = await fetch(controlPlaneUrl(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ text: commandForStateRead(params), source: "openclaw_native_tool" }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") {
+      throw new Error(`Narratiive control plane timed out after ${timeoutMs}ms`);
+    }
+    throw error;
+  }
   const raw = await response.text();
   let payload;
   try { payload = JSON.parse(raw || "{}"); } catch { throw new Error("Narratiive control plane returned invalid JSON"); }
