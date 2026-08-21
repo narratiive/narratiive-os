@@ -5,7 +5,14 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.install_openclaw_fleet import CONTROL_PLANE_PLUGIN_ID, CONTROL_PLANE_PLUGIN_PATH, build_install_plan, install
+from scripts.install_openclaw_fleet import (
+    CONTROL_PLANE_PLUGIN_ID,
+    CONTROL_PLANE_PLUGIN_PATH,
+    LEGACY_TELEGRAM_INBOUND_LABEL,
+    build_install_plan,
+    install,
+    retire_legacy_telegram_inbound,
+)
 
 
 class OpenClawFleetInstallTests(unittest.TestCase):
@@ -40,9 +47,37 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("/tmp/existing-plugin", merged["plugins"]["load"]["paths"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), merged["plugins"]["load"]["paths"])
             self.assertTrue(merged["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
+            self.assertIn({"agentId": "tony", "match": {"channel": "telegram"}}, merged["bindings"])
             for filename in ("AGENTS.md", "IDENTITY.md", "USER.md", "SOUL.md"):
                 self.assertIn(home / ".openclaw" / "workspace-tony" / filename, workspace_files)
             self.assertIn(home / ".openclaw" / "workspace-research" / "AGENTS.md", workspace_files)
+
+    def test_install_plan_replaces_only_default_telegram_route_with_tony(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            existing = {
+                "bindings": [
+                    {"agentId": "old-default", "match": {"channel": "telegram"}, "session": {"dmScope": "per-channel-peer"}},
+                    {
+                        "agentId": "special",
+                        "match": {"channel": "telegram", "peer": {"kind": "group", "id": "-100123"}},
+                    },
+                    {"agentId": "support", "match": {"channel": "slack"}},
+                ]
+            }
+            merged, _ = build_install_plan(home, existing)
+
+            self.assertNotIn(existing["bindings"][0], merged["bindings"])
+            self.assertIn(existing["bindings"][1], merged["bindings"])
+            self.assertIn(existing["bindings"][2], merged["bindings"])
+            self.assertIn(
+                {
+                    "agentId": "tony",
+                    "match": {"channel": "telegram"},
+                    "session": {"dmScope": "per-channel-peer"},
+                },
+                merged["bindings"],
+            )
 
     def test_dry_run_does_not_mutate_home(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -51,6 +86,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertFalse((home / ".openclaw").exists())
             self.assertFalse(result["apply"])
             self.assertEqual(result["control_plane_plugin_path"], str(CONTROL_PLANE_PLUGIN_PATH))
+            self.assertFalse(result["legacy_telegram_inbound_retired"])
 
     def test_apply_backs_up_existing_config_and_writes_tony_and_specialists(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -73,6 +109,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertEqual(written["tools"]["sessions"]["visibility"], "tree")
             self.assertTrue(written["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), written["plugins"]["load"]["paths"])
+            self.assertIn({"agentId": "tony", "match": {"channel": "telegram"}}, written["bindings"])
             self.assertTrue((config_dir / "openclaw.json.narratiive-backup").exists())
             self.assertEqual(
                 {agent["id"] for agent in written["agents"]["list"]},
@@ -101,6 +138,53 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 content = (config_dir / f"workspace-{agent_id}" / "AGENTS.md").read_text(encoding="utf-8")
                 self.assertIn("bounded specialist", content)
                 self.assertIn("does not mean an external action occurred", content)
+
+    def test_retire_legacy_telegram_poller_boots_out_and_removes_plist_on_mac(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            plist = home / "Library" / "LaunchAgents" / f"{LEGACY_TELEGRAM_INBOUND_LABEL}.plist"
+            plist.parent.mkdir(parents=True)
+            plist.write_text("legacy", encoding="utf-8")
+            calls = []
+
+            def fake_runner(command, **kwargs):
+                calls.append((tuple(command), kwargs))
+                return None
+
+            result = retire_legacy_telegram_inbound(
+                home,
+                apply=True,
+                native_telegram_enabled=True,
+                platform="darwin",
+                uid=501,
+                runner=fake_runner,
+            )
+
+            self.assertTrue(result["legacy_telegram_inbound_retired"])
+            self.assertFalse(plist.exists())
+            self.assertEqual(
+                calls[0][0],
+                ("launchctl", "bootout", f"gui/501/{LEGACY_TELEGRAM_INBOUND_LABEL}"),
+            )
+
+    def test_legacy_poller_is_not_retired_until_native_telegram_is_enabled(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            plist = home / "Library" / "LaunchAgents" / f"{LEGACY_TELEGRAM_INBOUND_LABEL}.plist"
+            plist.parent.mkdir(parents=True)
+            plist.write_text("legacy", encoding="utf-8")
+
+            result = retire_legacy_telegram_inbound(
+                home,
+                apply=True,
+                native_telegram_enabled=False,
+                platform="darwin",
+                uid=501,
+                runner=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("launchctl should not run")),
+            )
+
+            self.assertFalse(result["legacy_telegram_inbound_retired"])
+            self.assertTrue(plist.exists())
 
     def test_tony_workspace_contract_supports_plain_english_status_and_followups(self):
         with tempfile.TemporaryDirectory() as tmp:
