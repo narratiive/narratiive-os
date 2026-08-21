@@ -10,6 +10,7 @@ SPECIALISTS = ["research", "strategy", "creative-director", "production", "opera
 CONSEQUENTIAL_TOOLS = {"message", "gateway", "cron", "nodes", "exec", "process"}
 TONY_PROFILE_ADDITIONS = {
     "agents_list",
+    "sessions_send",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
@@ -76,7 +77,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertNotIn("allow", tools)
         self.assertEqual(additions, TONY_PROFILE_ADDITIONS)
         self.assertNotIn("sessions_list", denied)
-        self.assertTrue({"sessions_send", "session_status", "message"}.issubset(denied))
+        self.assertNotIn("sessions_send", denied)
+        self.assertTrue({"session_status", "message"}.issubset(denied))
         self.assertTrue({"read", "write", "edit", "browser"}.isdisjoint(additions))
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("direct tool surface is intentionally limited", contract)
@@ -103,6 +105,17 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("category `Narratiive specialists`", contract)
         self.assertIn("bounded transcript with `sessions_history`", contract)
         self.assertIn("no child job currently running", contract)
+
+    def test_tony_can_steer_only_discovered_persistent_specialist_assignments(self):
+        contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("continue the existing persistent specialist session instead of spawning a duplicate", contract)
+        self.assertIn("use `sessions_send` with that exact discovered `sessionKey`", contract)
+        self.assertIn("Do not use `sessions_send` to arbitrary sessions", contract)
+        self.assertIn("do not target a specialist's generic main session", contract)
+        self.assertIn("internal specialist instruction was handed off", contract)
+        self.assertIn("never evidence of an external business consequence", contract)
+        self.assertIn("sessions_send", self.agents["tony"]["tools"]["alsoAllow"])
+        self.assertNotIn("sessions_send", self.agents["tony"]["tools"]["deny"])
 
     def test_broad_status_combines_business_state_with_roster_persistent_sessions_and_child_runs(self):
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")

@@ -10,6 +10,7 @@ from scripts.check_tony_openclaw_live import SCENARIOS, run_live_probe
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TONY_ADDITIONS = {
     "agents_list",
+    "sessions_send",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
@@ -70,7 +71,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertNotIn("allow", tools)
         self.assertEqual(set(tools["alsoAllow"]), EXPECTED_TONY_ADDITIONS)
         self.assertNotIn("sessions_list", tools["deny"])
-        self.assertTrue({"sessions_send", "session_status", "message"}.issubset(tools["deny"]))
+        self.assertNotIn("sessions_send", tools["deny"])
+        self.assertTrue({"session_status", "message"}.issubset(tools["deny"]))
         self.assertNotIn("read", tools["alsoAllow"])
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
@@ -110,6 +112,23 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             set(fleet["tools"]["agentToAgent"]["allow"]),
             {"research", "strategy", "creative-director", "production", "operations"},
         )
+
+    def test_persistent_specialist_assignments_can_be_redirected_without_duplicate_spawn(self) -> None:
+        prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("changes, extends or redirects a material specialist assignment", prompt)
+        self.assertIn("continue the existing persistent specialist session instead of spawning a duplicate", prompt)
+        self.assertIn("use `sessions_send` with that exact discovered `sessionKey`", prompt)
+        self.assertIn("Do not use `sessions_send` to arbitrary sessions", prompt)
+        self.assertIn("do not target a specialist's generic main session", prompt)
+        self.assertIn("internal specialist instruction was handed off", prompt)
+        self.assertIn("not evidence that the specialist finished the work", prompt)
+        self.assertIn("never evidence of an external business consequence", prompt)
+
+        fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
+        agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
+        self.assertIn("sessions_send", agents["tony"]["tools"]["alsoAllow"])
+        self.assertNotIn("sessions_send", agents["tony"]["tools"]["deny"])
+        self.assertIn("message", agents["tony"]["tools"]["deny"])
 
     def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
         manifest = json.loads(
