@@ -20,6 +20,7 @@ from scripts.check_tony_openclaw_live import (
     build_report,
 )
 from scripts.inspect_tony_control_plane_runtime import inspect_runtime
+from scripts.inspect_tony_effective_tools import inspect_effective_tools
 from scripts.pin_tony_openclaw_model import resolved_runtime_model
 from scripts.probe_tony_openclaw_agent_stage import run_agent_stage_probe
 from scripts.probe_tony_openclaw_specialist_stage import run_specialist_stage_probe
@@ -162,6 +163,11 @@ def main() -> None:
         gateway_token, auth_source = resolve_gateway_bearer(os.environ, config_path)
 
     runtime_contract = inspect_runtime()
+    effective_tools = (
+        inspect_effective_tools(args.agent_id)
+        if runtime_contract.get("control_plane_runtime_ready") and not args.inventory_only
+        else {}
+    )
     if not runtime_contract.get("control_plane_runtime_ready") and not args.inventory_only:
         report: dict[str, Any] = {
             **runtime_contract,
@@ -169,6 +175,15 @@ def main() -> None:
             "config_path": str(config_path),
             "live_passed": False,
             "live_error": "Narratiive control-plane plugin runtime does not match the repository contract; restart/reinstall before testing Tony conversation.",
+        }
+    elif effective_tools and not effective_tools.get("effective_tool_surface_ready"):
+        report = {
+            **runtime_contract,
+            **effective_tools,
+            "agent_id": args.agent_id,
+            "config_path": str(config_path),
+            "live_passed": False,
+            "live_error": "OpenClaw loaded the Narratiive plugin, but Tony's effective session tool policy is missing required tools; repair the agent/tool policy before testing conversation.",
         }
     else:
         report = build_report(
@@ -181,6 +196,7 @@ def main() -> None:
             live=not args.inventory_only,
         )
         report.update(runtime_contract)
+        report.update(effective_tools)
         if not args.inventory_only:
             diagnose_timeout_boundary(report, args.agent_id, timeout_seconds=args.model_smoke_timeout_seconds)
             refine_agent_timeout_boundary(
