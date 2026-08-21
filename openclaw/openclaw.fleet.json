@@ -17,7 +17,7 @@
           "every": "1h",
           "target": "last",
           "lightContext": false,
-          "isolatedSession": false,
+          "isolatedSession": true,
           "timeoutSeconds": 120,
           "activeHours": {
             "start": "07:00",
