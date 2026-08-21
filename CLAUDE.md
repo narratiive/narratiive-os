@@ -27,6 +27,20 @@ Claude Code must:
 - return failed work to its responsible owner with precise deficiencies;
 - route client-facing work to a human approval gate.
 
+## Canonical knowledge layer
+
+There is one canonical repository: `narratiive/narratiive-os`.
+
+Reusable Narratiive doctrine and strategic IP live under `knowledge/`. Before
+strategic generation, Claude must read `knowledge/README.md`, resolve the
+relevant product canon, and consult the applicable active models under
+`knowledge/handbook/`.
+
+The former `narratiive/narratiive-knowledge` repository is deprecated and must
+not be used to resolve current product, strategy, architecture or runtime
+questions. If historical material exists only there, migrate or reconcile it
+into Narratiive OS before relying on it operationally.
+
 ## Boundaries
 
 Claude Code follows the Constitution's separation of product, architecture,
