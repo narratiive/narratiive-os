@@ -27,6 +27,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertTrue(TonyAgentGateway.is_system_command("/health"))
         self.assertTrue(TonyAgentGateway.is_system_command("  /diagnostics"))
         self.assertFalse(TonyAgentGateway.is_system_command("Morning Tony, anything important?"))
+        self.assertFalse(TonyAgentGateway.is_system_command("Tony - what should I be working on today?"))
         self.assertFalse(TonyAgentGateway.is_system_command("whta shoudl I focus on today?"))
         self.assertFalse(TonyAgentGateway.is_system_command("sort that out"))
         self.assertFalse(TonyAgentGateway.is_system_command("how is the research agent getting on?"))
@@ -119,6 +120,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
     def test_acceptance_language_never_requires_phrase_matching(self):
         messages = (
             "Morning Tony, anything important?",
+            "Tony - what should I be working on today?",
             "whta shoudl I focus on today?",
             "What did they say?",
             "sort that out",
