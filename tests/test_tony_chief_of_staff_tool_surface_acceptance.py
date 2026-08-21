@@ -90,6 +90,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         source = (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "index.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_read_state"', source)
         self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
+        self.assertIn("TONY_CONTROL_PLANE_TIMEOUT_MS", source)
+        self.assertIn("AbortSignal.timeout(timeoutMs)", source)
+        self.assertIn("Narratiive control plane timed out after", source)
         for legacy_tool in LEGACY_STATE_TOOLS:
             self.assertNotIn(f'"{legacy_tool}"', source)
 
@@ -106,6 +109,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("native single-use approval gate", prompt)
         self.assertIn("execution_truth", prompt)
         self.assertIn("contextual turns, not commands to phrase-match", prompt)
+        self.assertIn("call the tool and finish the same conversational turn with the result", prompt)
+        self.assertIn("Do not leave Matt with a standalone progress preamble", prompt)
+        self.assertIn("A progress acknowledgement is not a completed answer", prompt)
 
         fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
