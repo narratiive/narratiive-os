@@ -31,11 +31,13 @@ function commandFor(name, params) {
     return `/${period}`;
   }
   if (name === "narratiive_current_leads") return "/leads";
-  if (name === "narratiive_open_work_status") return "what's the status";
+  // These are internal control-plane reads. Keep them on the deterministic slash-command
+  // surface so /telegram/inbound never routes a native tool call back into OpenClaw.
+  if (name === "narratiive_open_work_status") return "/what's the status";
   if (name === "narratiive_recent_execution_status") {
     const scope = String(params?.scope || "execution").toLowerCase();
     if (!new Set(["execution", "outcome"]).has(scope)) throw new Error("scope must be execution or outcome");
-    return scope === "execution" ? "did that happen" : "did that work";
+    return scope === "execution" ? "/did that happen" : "/did that work";
   }
   throw new Error(`unsupported Narratiive tool: ${name}`);
 }
