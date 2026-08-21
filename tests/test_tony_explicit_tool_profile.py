@@ -8,6 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TONY_ALLOW = {
     "agents_list",
+    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
@@ -33,7 +34,7 @@ class TonyExplicitToolProfileTests(unittest.TestCase):
         tools = self.tony["tools"]
         self.assertEqual(tools["profile"], "messaging")
         self.assertEqual(set(tools["allow"]), EXPECTED_TONY_ALLOW)
-        self.assertNotIn("sessions_list", tools["allow"])
+        self.assertIn("sessions_list", tools["allow"])
         self.assertNotIn("session_status", tools["allow"])
         self.assertNotIn("read", tools["allow"])
         self.assertNotIn("exec", tools["allow"])
