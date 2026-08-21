@@ -36,11 +36,13 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         def transport(url, body=None, *, headers=None, timeout=0):
             calls.append((url, body, dict(headers or {}), timeout))
             index = len(calls)
-            text = (
-                "Research completed its read-only mission inspection."
-                if index in {3, 4}
-                else f"natural Chief of Staff reply {index}"
-            )
+            prompt = str((body or {}).get("input") or "")
+            if "across Narratiive" in prompt:
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is currently running. Mission Control shows the current commercial priority."
+            elif "Research Agent" in prompt:
+                text = "Research completed its read-only mission inspection."
+            else:
+                text = f"natural Chief of Staff reply {index}"
             return {"id": f"resp-{index}", "output_text": text}
 
         results = run_live_probe(
@@ -73,11 +75,14 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
 
     def test_specialist_status_uses_subagent_registry_then_bounded_history(self) -> None:
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("use `subagents` as the canonical live registry", prompt)
-        self.assertIn("do not broaden the search with `sessions_list`", prompt)
+        self.assertIn("`agents_list` is the authoritative discovery view", prompt)
+        self.assertIn("`subagents` is a separate live/recent run ledger", prompt)
+        self.assertIn("call `agents_list` for configured availability and `subagents`", prompt)
+        self.assertIn("Do not broaden the search with `sessions_list`", prompt)
         self.assertIn("use `session_status` for specialist tracking", prompt)
         self.assertIn("bounded transcript with `sessions_history`", prompt)
-        self.assertIn("working, completed, blocked, failed, or no active work", prompt)
+        self.assertIn("no child job currently running", prompt)
+        self.assertIn("never turn `no child job currently running` into `no specialists` or `no active projects`", prompt)
 
     def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
         manifest = json.loads(
@@ -94,6 +99,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         source = (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "index.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_read_state"', source)
         self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
+        self.assertIn('if (view === "open_work") return "/mission";', source)
+        self.assertNotIn('return "/what\'s the status"', source)
         self.assertIn("TONY_CONTROL_PLANE_TIMEOUT_MS", source)
         self.assertIn("AbortSignal.timeout(timeoutMs)", source)
         self.assertIn("Narratiive control plane timed out after", source)
@@ -116,6 +123,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("call the tool and finish the same conversational turn with the result", prompt)
         self.assertIn("Do not leave Matt with a standalone progress preamble", prompt)
         self.assertIn("A progress acknowledgement is not a completed answer", prompt)
+        self.assertIn("read `executive_brief`, `open_work` and `current_leads`", prompt)
+        self.assertIn("before asking Matt for outreach targets, goals, contacts, leads", prompt)
 
         fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}

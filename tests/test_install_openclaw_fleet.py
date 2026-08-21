@@ -120,6 +120,8 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn("sessions_list", tony)
             self.assertIn("sessions_history", tony)
             self.assertIn("sessions_yield", tony)
+            self.assertIn("`agents_list` is the authoritative discovery view", tony)
+            self.assertIn("`subagents` is a separate live/recent run ledger", tony)
             self.assertIn("Do not infer completion from elapsed time", tony)
             self.assertIn("Treat `sessions_spawn` as a non-blocking handoff", tony)
             self.assertIn("Specialist completion is push-based", tony)
@@ -194,10 +196,11 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             for phrase in ("What did they say?", "sort that out", "use Thursday", "send it", "did it go?"):
                 with self.subTest(phrase=phrase):
                     self.assertIn(phrase, tony)
-            self.assertIn("When Matt asks how a specialist is getting on", tony)
-            self.assertIn("use `subagents` as the canonical live registry", tony)
-            self.assertIn("do not broaden the search with `sessions_list`", tony)
+            self.assertIn("When Matt asks how the team or a specialist is getting on", tony)
+            self.assertIn("call `agents_list` for configured availability and `subagents`", tony)
+            self.assertIn("Do not broaden the search with `sessions_list`", tony)
             self.assertIn("bounded transcript with `sessions_history`", tony)
+            self.assertIn("read `executive_brief`, `open_work` and `current_leads`", tony)
 
 
 if __name__ == "__main__":

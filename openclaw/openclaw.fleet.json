@@ -12,6 +12,7 @@
     "list": [
       {
         "id": "tony",
+        "name": "Tony",
         "workspace": "~/.openclaw/workspace-tony",
         "heartbeat": {
           "every": "1h",
@@ -39,6 +40,7 @@
       },
       {
         "id": "research",
+        "name": "Research Agent",
         "workspace": "~/.openclaw/workspace-research",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -48,6 +50,7 @@
       },
       {
         "id": "strategy",
+        "name": "Strategy Agent",
         "workspace": "~/.openclaw/workspace-strategy",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -57,6 +60,7 @@
       },
       {
         "id": "creative-director",
+        "name": "Creative Director Agent",
         "workspace": "~/.openclaw/workspace-creative-director",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -66,6 +70,7 @@
       },
       {
         "id": "production",
+        "name": "Production Agent",
         "workspace": "~/.openclaw/workspace-production",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -75,6 +80,7 @@
       },
       {
         "id": "operations",
+        "name": "Operations Agent",
         "workspace": "~/.openclaw/workspace-operations",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
         "tools": {

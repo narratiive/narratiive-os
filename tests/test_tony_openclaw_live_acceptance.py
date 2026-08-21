@@ -27,6 +27,7 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             [
                 "natural_priority",
                 "typo_tolerance",
+                "business_and_specialist_status",
                 "specialist_delegation",
                 "specialist_status",
                 "strategy_status",
@@ -40,6 +41,9 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         )
         typo = next(item for item in SCENARIOS if item.name == "typo_tolerance")
         self.assertIn("Whta shoudl", typo.text)
+        broad_status = next(item for item in SCENARIOS if item.name == "business_and_specialist_status")
+        self.assertIn("across Narratiive", broad_status.text)
+        self.assertIn("specialist team", broad_status.text)
         for name, agent in (
             ("specialist_status", "Research Agent"),
             ("strategy_status", "Strategy Agent"),
@@ -99,6 +103,19 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         self.assertFalse(scenario_passes("No active Research Agent session.", "specialist_status"))
         self.assertFalse(
             scenario_passes(
+                "There are no active projects or sub-agents running. Who are you trying to reach?",
+                "business_and_specialist_status",
+            )
+        )
+        self.assertTrue(
+            scenario_passes(
+                "Research, Strategy, Creative, Production and Operations are configured and available; "
+                "no child jobs are currently running. Mission Control shows one GitHub blocker and no current leads.",
+                "business_and_specialist_status",
+            )
+        )
+        self.assertFalse(
+            scenario_passes(
                 "I can spawn one to check its mission. Want me to spawn a Research sub-agent?",
                 "specialist_delegation",
             )
@@ -110,7 +127,13 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         def transport(url, body=None, *, headers=None, timeout=0):
             calls.append((url, body, dict(headers or {}), timeout))
             index = len(calls)
-            text = "Research inspected its mission and is responsible for evidence-backed market intelligence." if index in {3, 4} else f"natural reply {index}"
+            prompt = str((body or {}).get("input") or "")
+            if "across Narratiive" in prompt:
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "Research Agent" in prompt:
+                text = "Research inspected its mission and is responsible for evidence-backed market intelligence."
+            else:
+                text = f"natural reply {index}"
             return {"id": f"resp-{index}", "output_text": text}
 
         results = run_live_probe(
@@ -143,7 +166,13 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             def transport(url, body=None, *, headers=None, timeout=0):
                 if body is None:
                     return {"models": [{"name": "qwen3.5:latest"}]}
-                text = "Research is active and returned its mission." if "Research Agent" in str(body.get("input")) else "Natural response with evidence."
+                prompt = str(body.get("input") or "")
+                if "across Narratiive" in prompt:
+                    text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
+                elif "Research Agent" in prompt:
+                    text = "Research is active and returned its mission."
+                else:
+                    text = "Natural response with evidence."
                 return {"id": "r-1", "output_text": text}
 
             report = build_report(
@@ -180,7 +209,13 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 calls.append((url, body))
                 if body is None:
                     return {"models": [{"name": "qwen3.5:latest"}]}
-                text = "Research completed its read-only mission inspection." if "Research Agent" in str(body.get("input")) else "Natural response with evidence."
+                prompt = str(body.get("input") or "")
+                if "across Narratiive" in prompt:
+                    text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
+                elif "Research Agent" in prompt:
+                    text = "Research completed its read-only mission inspection."
+                else:
+                    text = "Natural response with evidence."
                 return {"id": f"r-{len(calls)}", "output_text": text}
 
             inventory = build_report(

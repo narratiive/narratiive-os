@@ -27,6 +27,10 @@ SCENARIOS = (
     Scenario("natural_priority", "Morning Tony, anything important?"),
     Scenario("typo_tolerance", "Whta shoudl I focus on today?"),
     Scenario(
+        "business_and_specialist_status",
+        "What's happening across Narratiive right now, and what are the specialist team doing?",
+    ),
+    Scenario(
         "specialist_delegation",
         "Ask the Research Agent to inspect its current mission and return one concise sentence about what it is responsible for. This is internal, read-only work.",
     ),
@@ -68,6 +72,13 @@ _DELEGATION_NOT_EXECUTED_MARKERS = (
     "would you like me to spawn",
     "i can spawn",
     "can spawn one",
+)
+
+_FALSE_EMPTY_FLEET_MARKERS = (
+    "no active projects or sub-agents",
+    "no active projects or subagents",
+    "no specialists exist",
+    "there are no specialists",
 )
 
 
@@ -247,6 +258,17 @@ def scenario_passes(text: str, scenario_name: str = "") -> bool:
             return False
     if scenario_name == "specialist_delegation" and any(marker in normalized for marker in _DELEGATION_NOT_EXECUTED_MARKERS):
         return False
+    if scenario_name == "business_and_specialist_status":
+        if any(marker in normalized for marker in _FALSE_EMPTY_FLEET_MARKERS):
+            return False
+        if not all(marker in normalized for marker in ("research", "strategy", "creative", "production", "operations")):
+            return False
+        if not any(marker in normalized for marker in ("configured", "available", "five specialists", "specialist team")):
+            return False
+        if not any(marker in normalized for marker in ("child job", "child-job", "delegated", "running", "active work")):
+            return False
+        if not any(marker in normalized for marker in ("lead", "campaign", "commercial", "mission control", "workstream", "github", "priority")):
+            return False
     return True
 
 
