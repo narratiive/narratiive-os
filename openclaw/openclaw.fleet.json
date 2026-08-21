@@ -34,8 +34,8 @@
         },
         "tools": {
           "profile": "messaging",
-          "alsoAllow": ["agents_list", "sessions_spawn", "sessions_yield", "subagents"],
-          "deny": ["sessions_send", "session_status", "message", "exec", "process", "gateway", "cron", "nodes"]
+          "alsoAllow": ["agents_list", "sessions_spawn", "sessions_yield", "sessions_send", "subagents"],
+          "deny": ["session_status", "message", "exec", "process", "gateway", "cron", "nodes"]
         }
       },
       {
