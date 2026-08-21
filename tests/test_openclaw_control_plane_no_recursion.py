@@ -34,15 +34,18 @@ class OpenClawControlPlaneNoRecursionTests(unittest.TestCase):
         self.assertNotIn('return "what\'s the status";', self.plugin_source)
         self.assertNotIn('? "did that happen" : "did that work";', self.plugin_source)
 
-    def test_plugin_calls_cannot_reenter_the_openclaw_conversation_branch(self):
+    def test_plugin_uses_dedicated_control_plane_http_path_not_telegram_ingress(self):
+        self.assertIn('const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";', self.plugin_source)
+        self.assertIn('url += "/control-plane";', self.plugin_source)
+        self.assertNotIn('const DEFAULT_URL = "http://127.0.0.1:8790/telegram/inbound";', self.plugin_source)
+        self.assertNotIn('url += "/telegram/inbound";', self.plugin_source)
         self.assertIn('source: "openclaw_native_tool"', self.plugin_source)
+
+    def test_human_telegram_ingress_remains_the_only_openclaw_conversation_branch(self):
+        self.assertIn('if method == "POST" and path == "/telegram/inbound":', self.bridge_source)
         self.assertIn('if TonyAgentGateway.is_system_command(text):', self.bridge_source)
-        self.assertIn('status, payload = self.base._handle_telegram_command(text)', self.bridge_source)
         self.assertIn('reply = self.agent_gateway.converse(text)', self.bridge_source)
-        self.assertIn(
-            "never routes a native tool call back into OpenClaw",
-            self.plugin_source,
-        )
+        self.assertNotIn('path == "/control-plane"', self.bridge_source)
 
 
 if __name__ == "__main__":
