@@ -83,21 +83,6 @@ function remoteTool(name, description, parameters) {
   };
 }
 
-function proposalTool() {
-  return {
-    name: "narratiive_propose_action",
-    description: "Convert Tony's interpreted next action into a bounded Narratiive execution proposal. This tool never executes, sends, mutates, or grants approval; it only classifies the consequence boundary and returns what may happen next.",
-    parameters: schema(ACTION_SCHEMA, ["action", "surface", "kind"]),
-    async execute(_id, params) {
-      try {
-        return renderToolResult(buildActionProposal(params || {}));
-      } catch (error) {
-        return renderToolResult({ ok: false, error: String(error?.message || error), execution_truth: "not_dispatched" });
-      }
-    },
-  };
-}
-
 function safeReadTool() {
   return {
     name: "narratiive_execute_safe_read",
@@ -149,7 +134,7 @@ function approvalTool() {
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
-  description: "Authoritative Narratiive OS evidence plus bounded autonomous reads, action proposal, native approval and verified consequence execution for Tony.",
+  description: "Authoritative Narratiive OS evidence plus bounded autonomous reads, native approval and verified consequence execution for Tony.",
   register(api) {
     api.on("before_tool_call", async (event) => {
       if (event.toolName !== "narratiive_request_action_approval") return;
@@ -178,7 +163,6 @@ export default definePluginEntry({
       "Read verified evidence that a recent consequential action happened, or separately whether it produced a business outcome.",
       schema({ scope: { type: "string", enum: ["execution", "outcome"] } }),
     ));
-    api.registerTool(proposalTool());
     api.registerTool(safeReadTool());
     api.registerTool(approvalTool());
   },
