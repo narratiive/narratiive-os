@@ -8,6 +8,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 SPECIALISTS = ["research", "strategy", "creative-director", "production", "operations"]
 CONSEQUENTIAL_TOOLS = {"message", "gateway", "cron", "nodes", "exec", "process"}
+TONY_TOOLS = {
+    "agents_list",
+    "sessions_list",
+    "sessions_history",
+    "sessions_spawn",
+    "sessions_yield",
+    "subagents",
+    "session_status",
+    "narratiive-control-plane",
+}
 
 
 class OpenClawFleetConfigTests(unittest.TestCase):
@@ -50,6 +60,17 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         for agent_id in SPECIALISTS:
             with self.subTest(agent_id=agent_id):
                 self.assertNotIn("heartbeat", self.agents[agent_id])
+
+    def test_tony_tool_surface_is_only_orchestration_and_narratiive_control_plane(self):
+        allowed = set(self.agents["tony"]["tools"]["allow"])
+        self.assertEqual(allowed, TONY_TOOLS)
+        self.assertNotIn("read", allowed)
+        self.assertNotIn("write", allowed)
+        self.assertNotIn("edit", allowed)
+        self.assertNotIn("browser", allowed)
+        contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("direct tool surface is intentionally limited", contract)
+        self.assertIn("bounded workspace research belongs with the specialist agents", contract)
 
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         allowed = set(self.agents["tony"]["tools"]["allow"])
