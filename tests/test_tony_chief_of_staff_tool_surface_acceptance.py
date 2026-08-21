@@ -10,12 +10,10 @@ from scripts.check_tony_openclaw_live import SCENARIOS, run_live_probe
 ROOT = Path(__file__).resolve().parents[1]
 EXPECTED_TONY_TOOLS = {
     "agents_list",
-    "sessions_list",
     "sessions_history",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
-    "session_status",
     "narratiive-control-plane",
 }
 EXPECTED_CONTROL_PLANE_TOOLS = {
@@ -63,11 +61,22 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
     def test_openclaw_owns_a_small_tony_tool_surface_while_specialists_keep_workspace_tools(self) -> None:
         config = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in config["agents"]["list"]}
-        self.assertEqual(set(agents["tony"]["tools"]["allow"]), EXPECTED_TONY_TOOLS)
-        self.assertNotIn("read", agents["tony"]["tools"]["allow"])
+        allowed = set(agents["tony"]["tools"]["allow"])
+        self.assertEqual(allowed, EXPECTED_TONY_TOOLS)
+        self.assertNotIn("sessions_list", allowed)
+        self.assertNotIn("session_status", allowed)
+        self.assertNotIn("read", allowed)
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
         self.assertIn("read", agents["operations"]["tools"]["allow"])
+
+    def test_specialist_status_uses_subagent_registry_then_bounded_history(self) -> None:
+        prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("use `subagents` as the canonical live registry", prompt)
+        self.assertIn("do not broaden the search with `sessions_list`", prompt)
+        self.assertIn("use `session_status` for specialist tracking", prompt)
+        self.assertIn("bounded transcript with `sessions_history`", prompt)
+        self.assertIn("working, completed, blocked, failed, or no active work", prompt)
 
     def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
         manifest = json.loads(
