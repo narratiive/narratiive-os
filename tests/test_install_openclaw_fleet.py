@@ -79,6 +79,32 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 merged["bindings"],
             )
 
+    def test_install_plan_replaces_legacy_allow_when_managed_policy_uses_also_allow(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            existing = {
+                "agents": {
+                    "list": [
+                        {
+                            "id": "tony",
+                            "tools": {
+                                "profile": "messaging",
+                                "allow": ["sessions_history", "narratiive-control-plane"],
+                                "deny": ["exec"],
+                            },
+                        }
+                    ]
+                }
+            }
+
+            merged, _ = build_install_plan(Path(tmp), existing)
+            tony = next(agent for agent in merged["agents"]["list"] if agent["id"] == "tony")
+
+            self.assertNotIn("allow", tony["tools"])
+            self.assertEqual(
+                set(tony["tools"]["alsoAllow"]),
+                {"agents_list", "sessions_spawn", "sessions_yield", "sessions_send", "subagents"},
+            )
+
     def test_dry_run_does_not_mutate_home(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
