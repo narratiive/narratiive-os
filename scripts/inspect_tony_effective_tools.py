@@ -14,6 +14,7 @@ REQUIRED_ORCHESTRATION_TOOLS = {
     "agents_list",
     "sessions_list",
     "sessions_history",
+    "sessions_send",
     "sessions_spawn",
     "sessions_yield",
     "subagents",
