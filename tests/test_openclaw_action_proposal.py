@@ -11,20 +11,28 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "openclaw" / "plugins" / "narratiive-control-plane"
 
 
-class OpenClawActionProposalTests(unittest.TestCase):
-    def test_manifest_declares_action_proposal_tool(self):
+class OpenClawActionPolicyTests(unittest.TestCase):
+    def test_manifest_exposes_execution_boundaries_without_model_proposal_tool(self):
         manifest = json.loads((PLUGIN / "openclaw.plugin.json").read_text(encoding="utf-8"))
-        self.assertIn("narratiive_propose_action", manifest["contracts"]["tools"])
+        tools = set(manifest["contracts"]["tools"])
+        self.assertNotIn("narratiive_propose_action", tools)
+        self.assertIn("narratiive_execute_safe_read", tools)
+        self.assertIn("narratiive_request_action_approval", tools)
 
-    def test_tony_workspace_uses_proposal_as_consequence_boundary_not_execution(self):
+        source = (PLUGIN / "index.js").read_text(encoding="utf-8")
+        self.assertNotIn('name: "narratiive_propose_action"', source)
+        self.assertNotIn("api.registerTool(proposalTool())", source)
+
+    def test_tony_workspace_selects_typed_consequence_boundary_directly(self):
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("narratiive_propose_action", prompt)
-        self.assertIn("A proposal is not execution", prompt)
+        self.assertNotIn("narratiive_propose_action", prompt)
+        self.assertIn("narratiive_execute_safe_read", prompt)
         self.assertIn("narratiive_request_action_approval", prompt)
         self.assertIn("native single-use approval gate", prompt)
         self.assertIn("verify returned evidence", prompt)
         self.assertIn("sort that out", prompt)
         self.assertIn("send it", prompt)
+        self.assertIn("contextual turns, not commands to phrase-match", prompt)
 
     def _proposal(self, payload: dict) -> dict:
         node = shutil.which("node")
@@ -43,7 +51,7 @@ class OpenClawActionProposalTests(unittest.TestCase):
         )
         return json.loads(completed.stdout)
 
-    def test_read_only_calendar_check_can_proceed_but_is_never_claimed_as_executed(self):
+    def test_internal_policy_still_allows_verified_read_only_calendar_check(self):
         result = self._proposal({"action": "check my calendar availability on Thursday", "surface": "calendar", "kind": "read"})
         proposal = result["proposal"]
         self.assertFalse(proposal["approval_required"])
@@ -52,7 +60,7 @@ class OpenClawActionProposalTests(unittest.TestCase):
         self.assertFalse(result["external_action_taken"])
         self.assertEqual(result["execution_truth"], "proposal_only_not_dispatched")
 
-    def test_internal_reply_draft_can_be_prepared_without_permission(self):
+    def test_internal_policy_allows_reversible_preparation_without_permission(self):
         result = self._proposal({"action": "prepare a reply for Jimmy without sending it", "surface": "gmail", "kind": "prepare"})
         proposal = result["proposal"]
         self.assertFalse(proposal["approval_required"])
