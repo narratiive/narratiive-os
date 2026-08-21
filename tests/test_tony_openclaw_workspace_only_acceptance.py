@@ -12,11 +12,13 @@ class TonyOpenClawWorkspaceOnlyAcceptanceTests(unittest.TestCase):
         def transport(url, body=None, *, headers=None, timeout=0):
             calls.append((url, dict(body or {}), dict(headers or {}), timeout))
             index = len(calls)
-            text = (
-                "Research inspected its mission and is responsible for evidence-backed market intelligence."
-                if index in {3, 4}
-                else f"natural reply {index}"
-            )
+            prompt = str((body or {}).get("input") or "")
+            if "across Narratiive" in prompt:
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "Research Agent" in prompt:
+                text = "Research inspected its mission and is responsible for evidence-backed market intelligence."
+            else:
+                text = f"natural reply {index}"
             return {"id": f"resp-{index}", "output_text": text}
 
         results = run_live_probe(
@@ -41,11 +43,13 @@ class TonyOpenClawWorkspaceOnlyAcceptanceTests(unittest.TestCase):
         def transport(url, body=None, *, headers=None, timeout=0):
             calls.append(dict(body or {}))
             index = len(calls)
-            text = (
-                "Research completed its read-only mission inspection."
-                if index in {3, 4}
-                else f"natural reply {index}"
-            )
+            prompt = str((body or {}).get("input") or "")
+            if "across Narratiive" in prompt:
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "Research Agent" in prompt:
+                text = "Research completed its read-only mission inspection."
+            else:
+                text = f"natural reply {index}"
             return {"id": f"resp-{index}", "output_text": text}
 
         run_live_probe(

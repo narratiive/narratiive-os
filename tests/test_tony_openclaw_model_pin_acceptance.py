@@ -24,11 +24,13 @@ class TonyOpenClawModelPinAcceptanceTests(unittest.TestCase):
                 calls.append(body)
                 if body is None:
                     return {"models": []}
-                text = (
-                    "Research completed its delegated inspection and returned evidence."
-                    if "Research Agent" in str(body.get("input"))
-                    else "Natural Chief of Staff response grounded in current evidence."
-                )
+                prompt = str(body.get("input") or "")
+                if "across Narratiive" in prompt:
+                    text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+                elif "Research Agent" in prompt:
+                    text = "Research completed its delegated inspection and returned evidence."
+                else:
+                    text = "Natural Chief of Staff response grounded in current evidence."
                 return {"id": f"resp-{len(calls)}", "output_text": text}
 
             report = build_report(

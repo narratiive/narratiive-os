@@ -39,7 +39,7 @@ function commandForStateRead(params) {
     return `/${period}`;
   }
   if (view === "current_leads") return "/leads";
-  if (view === "open_work") return "/what's the status";
+  if (view === "open_work") return "/mission";
   if (view === "recent_execution") {
     const scope = String(params?.scope || "execution").toLowerCase();
     if (!new Set(["execution", "outcome"]).has(scope)) throw new Error("scope must be execution or outcome");

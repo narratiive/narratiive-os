@@ -21,7 +21,7 @@ class OpenClawControlPlaneNoRecursionTests(unittest.TestCase):
             "/morning",
             "/evening",
             "/leads",
-            "/what's the status",
+            "/mission",
             "/did that happen",
             "/did that work",
         )
@@ -29,9 +29,9 @@ class OpenClawControlPlaneNoRecursionTests(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertTrue(TonyAgentGateway.is_system_command(command))
 
-        self.assertIn('return "/what\'s the status";', self.plugin_source)
+        self.assertIn('return "/mission";', self.plugin_source)
         self.assertIn('? "/did that happen" : "/did that work";', self.plugin_source)
-        self.assertNotIn('return "what\'s the status";', self.plugin_source)
+        self.assertNotIn('return "/what\'s the status";', self.plugin_source)
         self.assertNotIn('? "did that happen" : "did that work";', self.plugin_source)
 
     def test_plugin_uses_dedicated_control_plane_http_path_not_telegram_ingress(self):

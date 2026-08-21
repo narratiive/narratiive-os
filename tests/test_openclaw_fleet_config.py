@@ -96,9 +96,18 @@ class OpenClawFleetConfigTests(unittest.TestCase):
 
     def test_specialist_status_uses_subagents_and_bounded_child_history(self):
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
-        self.assertIn("use `subagents` as the canonical live registry", contract)
-        self.assertIn("do not broaden the search with `sessions_list`", contract)
+        self.assertIn("`agents_list` is the authoritative discovery view", contract)
+        self.assertIn("`subagents` is a separate live/recent run ledger", contract)
+        self.assertIn("call `agents_list` for configured availability and `subagents`", contract)
+        self.assertIn("Do not broaden the search with `sessions_list`", contract)
         self.assertIn("bounded transcript with `sessions_history`", contract)
+        self.assertIn("no child job currently running", contract)
+
+    def test_broad_status_combines_business_state_with_roster_and_child_runs(self):
+        contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("read `executive_brief`, `open_work` and `current_leads`", contract)
+        self.assertIn("Open work is wider than spawned child jobs", contract)
+        self.assertIn("before asking Matt for outreach targets, goals, contacts, leads", contract)
 
     def test_specialists_are_isolated_and_cannot_spawn_or_execute_consequential_actions(self):
         for agent_id in SPECIALISTS:
