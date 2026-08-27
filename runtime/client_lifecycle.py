@@ -7,13 +7,21 @@ from enum import Enum
 class ClientLifecycleStage(str, Enum):
     LEAD = "lead"
     RESEARCH = "research"
-    NARRATIVE_SHIFT = "narrative_shift"
+    BLUEPRINT_LITE = "blueprint_lite"
     OUTREACH = "outreach"
     MEETING = "meeting"
     PROPOSAL = "proposal"
     DELIVERY = "delivery"
     INVOICE = "invoice"
     COMPLETE = "complete"
+
+    @classmethod
+    def _missing_(cls, value: object) -> "ClientLifecycleStage | None":
+        # Backwards compatibility for lifecycle records created before
+        # Blueprint Lite became the canonical inbound product name.
+        if value == "narrative_shift":
+            return cls.BLUEPRINT_LITE
+        return None
 
 
 _STAGE_ORDER = tuple(ClientLifecycleStage)
@@ -55,7 +63,7 @@ class ClientLifecycleRecord:
         return self.stage in {
             ClientLifecycleStage.LEAD,
             ClientLifecycleStage.RESEARCH,
-            ClientLifecycleStage.NARRATIVE_SHIFT,
+            ClientLifecycleStage.BLUEPRINT_LITE,
             ClientLifecycleStage.OUTREACH,
             ClientLifecycleStage.MEETING,
             ClientLifecycleStage.PROPOSAL,
