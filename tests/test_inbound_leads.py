@@ -27,14 +27,29 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.status, "New")
         self.assertEqual(lead.pipeline_stage, "New Diagnostic")
         self.assertEqual(lead.lead_temperature, "Warm")
-        self.assertIn("Research thompsons", lead.recommended_next_action)
-        self.assertIn("verified sources", lead.recommended_next_action)
-        self.assertIn("source-backed evidence", lead.recommended_next_action)
-        self.assertIn("Growth Blueprint", lead.recommended_next_action)
-        self.assertIn("assumptions and evidence gaps", lead.recommended_next_action)
+        self.assertIn("completed Growth Diagnostic", lead.recommended_next_action)
+        self.assertIn("verified public sources", lead.recommended_next_action)
+        self.assertIn("Claude", lead.recommended_next_action)
+        self.assertIn("Blueprint Lite", lead.recommended_next_action)
+        self.assertIn("facts, interpretations, and hypotheses", lead.recommended_next_action)
+        self.assertNotIn("first-pass Growth Blueprint", lead.recommended_next_action)
         self.assertNotIn("Opportunity Card", lead.recommended_next_action)
         self.assertIn("thompsons submitted an inbound growth enquiry", lead.ai_summary)
         self.assertEqual(lead.created_at, "2026-08-12T22:35:42.392Z")
+
+    def test_growth_diagnostic_source_routes_to_blueprint_lite(self):
+        lead = InboundLead.from_mapping({
+            "lead_id": "diagnostic-1",
+            "contact": "Test Founder",
+            "company": "Test Company",
+            "source": "Growth Diagnostic",
+            "notes": "Growth feels inconsistent and the story is unclear.",
+        })
+        self.assertEqual(lead.pipeline_stage, "New Diagnostic")
+        self.assertEqual(lead.lead_temperature, "Warm")
+        self.assertIn("Blueprint Lite", lead.recommended_next_action)
+        self.assertIn("human review", lead.recommended_next_action)
+        self.assertIn("execution evidence", lead.recommended_next_action)
 
     def test_explicit_commercial_judgement_is_never_overwritten(self):
         lead = InboundLead.from_mapping({
