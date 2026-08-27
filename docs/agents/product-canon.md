@@ -11,19 +11,23 @@ the canonical files it references.
 | --- | --- |
 | `Narratiive OS` | The repository and operating system |
 | `Growth Specification` | The canonical parent object for the strategy-to-performance lifecycle |
+| `Growth Diagnostic` | The instant self-serve inbound diagnostic result generated from prospect inputs |
+| `Blueprint Lite` | The free personalised inbound follow-up generated from a completed Growth Diagnostic plus outside-in research |
+| `Growth Sprint` | The paid strategic engagement commissioned after Discovery |
 | `Narratiive Growth Blueprint` / `Growth Blueprint` | The premium strategic product and its working short name |
 | `Campaign World` | The campaign-territory artefact downstream of the Growth Blueprint |
 | `Creative Director's Bible` | The creative-direction artefact downstream of Campaign World |
 | `Production Pack` | The asset-level production contract downstream of approved creative direction |
 | `Asset Manifest` | The machine-readable register of asset identity, state, lineage, and delivery |
 | `Performance Feedback` | The governed performance-learning object downstream of delivered assets |
-| `Narratiive Signal` | The external outreach product |
+| `Narratiive Signal` | The external unsolicited outreach product |
 | `Opportunity Card Pipeline` | The internal workflow name for Narratiive Signal |
 
-Do not use `Opportunity Card` as the external product name. Do not rename a
-specialist or collapse the Growth Specification, Growth Blueprint, Campaign
-World, Creative Director's Bible, Production Pack, Asset Manifest, or
-Performance Feedback into one generic “strategy deck.”
+The canonical inbound commercial journey is:
+
+`Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
+
+Do not use `Narratiive Shift` or `Opportunity Card` as external names in this inbound journey. Do not use `Opportunity Card` as an external product name anywhere. `Opportunity Card Pipeline` remains an internal workflow label for Narratiive Signal only. Do not rename a specialist or collapse the Growth Specification, Growth Blueprint, Campaign World, Creative Director's Bible, Production Pack, Asset Manifest, or Performance Feedback into one generic “strategy deck.”
 
 ## Growth Specification
 
@@ -82,6 +86,16 @@ The stable reusable templates are:
 
 Their headings, markers, YAML contracts, tables, order, and placeholders are
 part of the contract.
+
+## Blueprint Lite
+
+`products/blueprint-lite/README.md` is the canonical inbound pre-sales product contract.
+
+Blueprint Lite is generated only after a completed Growth Diagnostic and combines the prospect's own inputs with selective outside-in research. It is deliberately concise and provisional. Its job is to create recognition, useful strategic tension and excitement about potential while preserving a clear curiosity gap for Discovery and the paid Growth Sprint.
+
+It is not the instant diagnostic result, not Narratiive Signal, not a generic lead magnet, and not a shortened paid Growth Blueprint.
+
+Tony orchestrates, stores, validates and routes. Claude researches, reasons and drafts where the approved workflow assigns it. Recipient-facing release requires human approval for the exact artefact version.
 
 ## Narratiive Growth Blueprint
 
