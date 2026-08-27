@@ -18,10 +18,18 @@ class ClientLifecycleTests(unittest.TestCase):
             ClientLifecycleStage.RESEARCH,
             next_action="Create the research brief.",
         )
+        blueprint_lite = research.advance(
+            ClientLifecycleStage.BLUEPRINT_LITE,
+            next_action="Route the evidence package to Claude for Blueprint Lite.",
+        )
 
         self.assertEqual(research.stage, ClientLifecycleStage.RESEARCH)
-        self.assertEqual(research.value_gbp, 5000)
-        self.assertTrue(research.is_commercial)
+        self.assertEqual(blueprint_lite.stage, ClientLifecycleStage.BLUEPRINT_LITE)
+        self.assertEqual(blueprint_lite.value_gbp, 5000)
+        self.assertTrue(blueprint_lite.is_commercial)
+
+    def test_legacy_narrative_shift_state_maps_to_blueprint_lite(self):
+        self.assertIs(ClientLifecycleStage("narrative_shift"), ClientLifecycleStage.BLUEPRINT_LITE)
 
     def test_skipping_a_stage_is_rejected(self):
         lead = ClientLifecycleRecord(

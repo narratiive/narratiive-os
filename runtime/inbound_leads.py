@@ -48,10 +48,11 @@ def _default_summary(contact: str, company: str, notes: str) -> str:
 def _default_inbound_next_action(contact: str, company: str) -> str:
     subject = company or contact or "this lead"
     return (
-        f"Research {subject} and the stated growth challenge using available verified sources. "
-        "Return the source-backed evidence, assess fit for Narratiive, identify the clearest strategic growth opportunity, "
-        "and prepare a first-pass Growth Blueprint grounded only in that evidence. Mark assumptions and evidence gaps explicitly, "
-        "and recommend whether Tony should advance, revise, or stop the opportunity. Do not send anything or change external state."
+        f"Confirm the completed Growth Diagnostic for {subject}, preserve the submitted inputs, and research the business "
+        "using available verified public sources. Route the evidence package to Claude to draft a Blueprint Lite under the "
+        "canonical Blueprint Lite product contract. Distinguish facts, interpretations, and hypotheses; preserve evidence "
+        "lineage; and move the artefact to human review. Do not send anything, book Discovery, or change consequential "
+        "external state without the required approval and execution evidence."
     )
 
 
