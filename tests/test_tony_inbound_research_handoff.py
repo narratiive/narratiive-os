@@ -25,19 +25,20 @@ class StubCommandService:
 
 
 class TonyInboundResearchHandoffTests(unittest.TestCase):
-    def test_new_inbound_lead_research_prepares_evidence_grounded_growth_blueprint(self) -> None:
+    def test_new_inbound_lead_research_prepares_evidence_grounded_blueprint_lite(self) -> None:
         lead = InboundLead.from_mapping({
             "id": "lead-1", "Contact": "Jamie Example", "Company": "Example Co", "Source": "Tally",
             "Notes": "We have grown quickly but our positioning and marketing are fragmented.",
         })
         action = lead.recommended_next_action
-        self.assertIn("Research Example Co", action)
-        self.assertIn("verified sources", action)
-        self.assertIn("source-backed evidence", action)
-        self.assertIn("Growth Blueprint", action)
-        self.assertIn("assumptions and evidence gaps", action)
-        self.assertIn("advance, revise, or stop", action)
+        self.assertIn("completed Growth Diagnostic for Example Co", action)
+        self.assertIn("verified public sources", action)
+        self.assertIn("evidence package", action)
+        self.assertIn("Blueprint Lite", action)
+        self.assertIn("facts, interpretations, and hypotheses", action)
+        self.assertIn("human review", action)
         self.assertNotIn("Opportunity Card", action)
+        self.assertNotIn("first-pass Growth Blueprint", action)
 
         service = TonyAgencyFocusCommandService(StubCommandService(lead))
         focus = service.execute("What should I focus on today?", ())
@@ -51,10 +52,11 @@ class TonyInboundResearchHandoffTests(unittest.TestCase):
         self.assertTrue(handoff["dispatch"]["eligible"])
         self.assertEqual(handoff["dispatch"]["state"], "ready_for_autonomous_dispatch")
         instruction = handoff["dispatch"]["instruction"]
-        self.assertIn("Research Example Co", instruction)
-        self.assertIn("source-backed evidence", instruction)
-        self.assertIn("first-pass Growth Blueprint", instruction)
-        self.assertIn("Do not send anything or change external state", instruction)
+        self.assertIn("completed Growth Diagnostic for Example Co", instruction)
+        self.assertIn("verified public sources", instruction)
+        self.assertIn("Blueprint Lite", instruction)
+        self.assertIn("human review", instruction)
+        self.assertIn("Do not send anything", instruction)
         self.assertFalse(response.data["external_action_taken"])
 
 
