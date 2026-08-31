@@ -70,15 +70,16 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
             service = TonyInboundBlueprintLiteService(store, dispatchers={})
-            result = service.ingest(self._lead(), self._payload())
+            result = service.enqueue(self._lead(), self._payload())
             self.assertEqual(result["state"], "dispatcher_unavailable")
             self.assertEqual(result["blocker"], "claude_dispatcher_not_configured")
             self.assertFalse(result["external_action_taken"])
             persisted = store.get("lead-1")
             self.assertIsNotNone(persisted)
             self.assertEqual(persisted["state"], "dispatcher_unavailable")
-            self.assertEqual(persisted["dispatch"]["worker"], "Claude")
-            self.assertEqual(persisted["dispatch"]["execution_mode"], "autonomous_prepare")
+            replay = service.enqueue(self._lead(), self._payload())
+            self.assertTrue(replay["replay"])
+            self.assertEqual(len(store.read_all()), 1)
 
     def test_verified_blueprint_lite_is_versioned_and_stops_at_human_review(self) -> None:
         calls: list[dict] = []
@@ -90,7 +91,9 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
             service = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": claude})
-            result = service.ingest(self._lead(), self._payload())
+            queued = service.enqueue(self._lead(), self._payload())
+            self.assertEqual(queued["state"], "preparation_queued")
+            result = service.process("lead-1")
             self.assertEqual(result["state"], "awaiting_review")
             self.assertEqual(result["current_version"], 1)
             self.assertTrue(result["approval_required"])
@@ -103,7 +106,7 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(len(persisted["versions"]), 1)
             self.assertEqual(persisted["versions"][0]["evidence"]["blueprint_lite"], self._good_evidence()["blueprint_lite"])
 
-            replay = service.ingest(self._lead(), self._payload())
+            replay = service.enqueue(self._lead(), self._payload())
             self.assertEqual(replay["state"], "awaiting_review")
             self.assertTrue(replay["replay"])
             self.assertEqual(len(calls), 1)
@@ -121,12 +124,28 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
             service = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: evidence})
-            result = service.ingest(self._lead(), self._payload())
+            service.enqueue(self._lead(), self._payload())
+            result = service.process("lead-1")
             self.assertEqual(result["state"], "blocked")
             self.assertEqual(result["blocker"], "blueprint_lite_quality_gate")
             self.assertIn("diagnostic input coverage complete", result["failed_checks"])
             self.assertIsNone(result["current_version"])
             self.assertFalse(result["approval_required"])
+
+    def test_process_contract_routes_to_claude_despite_external_systems_named_in_prohibitions(self) -> None:
+        calls: list[dict] = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: calls.append(dispatch) or self._good_evidence()},
+            )
+            service.enqueue(self._lead(), self._payload())
+            service.process("lead-1")
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0]["worker"], "Claude")
+            self.assertEqual(calls[0]["state"], "ready_for_autonomous_dispatch")
 
 
 if __name__ == "__main__":
