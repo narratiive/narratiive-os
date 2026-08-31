@@ -125,7 +125,7 @@ class LeadAwareTonyApplication:
         return self._respond(start_response, status, payload)
 
     def _ingest(self, environ, start_response):
-        denied = self._authorize(environ, start_response, allow_loopback=True)
+        denied = self._authorize(environ, start_response)
         if denied is not None:
             return denied
         try:
