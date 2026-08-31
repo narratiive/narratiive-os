@@ -42,6 +42,22 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
             "target": {"area": "commercial", "contact": "Lesley", "company": "Acme"},
         }
 
+    def _blueprint_lite_contract(self):
+        contract = self._contract()
+        contract["instruction"] = (
+            "Use the completed Growth Diagnostic and verified public sources to prepare a Blueprint Lite for Acme. "
+            "Preserve evidence lineage, separate facts, interpretations and hypotheses, and move the result only to human review. "
+            "Do not send anything or change external state."
+        )
+        contract["target"] = {
+            "area": "commercial",
+            "lead_id": "lead-1",
+            "contact": "Lesley",
+            "company": "Acme",
+            "source": "Growth Diagnostic",
+        }
+        return contract
+
     def test_direct_claude_dispatch_is_opt_in_even_when_api_key_exists(self):
         handlers = build_http_dispatchers({"ANTHROPIC_API_KEY": "test-key", "TONY_DISPATCH_CLAUDE_MODEL": "model"})
         self.assertNotIn("Claude", handlers)
@@ -92,6 +108,53 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         prompt = sent["messages"][0]["content"]
         self.assertIn("Do not send email", prompt)
         self.assertIn("Growth Blueprint", prompt)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_blueprint_lite_prepare_receives_canonical_inbound_return_contract(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_lite",
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps(
+                            {
+                                "blueprint_lite": "A concise outside-in Blueprint Lite",
+                                "source_backed_evidence": ["https://example.com/source"],
+                                "evidence_gaps": ["Internal customer data is unavailable"],
+                                "fact_interpretation_hypothesis_lineage": {
+                                    "fact": ["Diagnostic input supplied by prospect"],
+                                    "interpretation": ["Positioning appears fragmented"],
+                                    "hypothesis": ["A sharper category position may improve choice"],
+                                },
+                                "growth_tension": "Growth has outpaced message clarity",
+                                "provisional_opportunity": "Test a clearer national growth position",
+                                "questions_to_answer_next": ["Which customer need most strongly predicts choice?"],
+                                "quality_gate": {"human_review_ready": True},
+                                "recommendation": "advance",
+                            }
+                        ),
+                    }
+                ],
+            }
+        )
+
+        evidence = build_http_dispatchers(self._env())["Claude"](self._blueprint_lite_contract())
+        self.assertTrue(evidence["verified"])
+        self.assertIn("blueprint_lite", evidence)
+
+        req = urlopen.call_args.args[0]
+        sent = json.loads(req.data.decode("utf-8"))
+        prompt = sent["messages"][0]["content"]
+        self.assertIn("For Blueprint Lite work", prompt)
+        self.assertIn("facts, interpretations and hypotheses", prompt)
+        self.assertIn("growth_tension", prompt)
+        self.assertIn("provisional_opportunity", prompt)
+        self.assertIn("questions_to_answer_next", prompt)
+        self.assertIn("human-review-ready", prompt)
+        self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)
 
     def test_dispatcher_rejects_any_non_prepare_or_unapproved_contract_shape(self):
         handler = build_claude_api_dispatcher(self._env())
