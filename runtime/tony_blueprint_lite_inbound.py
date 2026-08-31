@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -27,45 +28,46 @@ _FALSE_EXECUTION_MARKERS = (
 
 
 class FileBlueprintLitePreparationStore:
-    """Durable idempotent state for inbound Blueprint Lite preparation.
-
-    The store is an internal runtime projection only. It is not a client-delivery
-    system and never replaces Notion as the commercial source of truth.
-    """
+    """Durable idempotent state for inbound Blueprint Lite preparation."""
 
     def __init__(self, path: Path) -> None:
         self.path = path
+        self._lock = threading.RLock()
 
     def read_all(self) -> dict[str, dict[str, Any]]:
-        if not self.path.exists():
-            return {}
-        try:
-            raw = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
-            raise RuntimeError(f"Blueprint Lite state is unreadable: {exc}") from exc
-        if not isinstance(raw, dict):
-            raise RuntimeError("Blueprint Lite state must be a JSON object")
-        return {str(key): dict(value) for key, value in raw.items() if isinstance(value, dict)}
+        with self._lock:
+            if not self.path.exists():
+                return {}
+            try:
+                raw = json.loads(self.path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise RuntimeError(f"Blueprint Lite state is unreadable: {exc}") from exc
+            if not isinstance(raw, dict):
+                raise RuntimeError("Blueprint Lite state must be a JSON object")
+            return {str(key): dict(value) for key, value in raw.items() if isinstance(value, dict)}
 
     def get(self, lead_id: str) -> dict[str, Any] | None:
         value = self.read_all().get(lead_id)
         return dict(value) if value is not None else None
 
     def put(self, lead_id: str, state: Mapping[str, Any]) -> None:
-        records = self.read_all()
-        records[lead_id] = dict(state)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_suffix(self.path.suffix + ".tmp")
-        tmp.write_text(json.dumps(records, indent=2, sort_keys=True), encoding="utf-8")
-        tmp.replace(self.path)
+        with self._lock:
+            records = self.read_all()
+            records[lead_id] = dict(state)
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            tmp = self.path.with_suffix(self.path.suffix + ".tmp")
+            tmp.write_text(json.dumps(records, indent=2, sort_keys=True), encoding="utf-8")
+            tmp.replace(self.path)
 
 
 class TonyInboundBlueprintLiteService:
-    """Progress an accepted Growth Diagnostic into safe Blueprint Lite preparation.
+    """Queue and execute safe Blueprint Lite preparation after lead ingestion.
 
-    The service consumes Tony's existing deterministic tool router, configured
-    Claude dispatcher and evidence verifier. It does not create a second execution
-    policy. Its only autonomous action is reversible internal preparation.
+    Tony acknowledges the inbound request without waiting for a model call. One
+    durable preparation job is keyed to the stable lead identity and input
+    fingerprint. A daemon worker then consumes Tony's existing router, explicitly
+    configured Claude dispatcher and existing evidence verifier. No external write
+    permission is added here.
     """
 
     def __init__(
@@ -78,8 +80,10 @@ class TonyInboundBlueprintLiteService:
         self.store = store
         self.dispatchers = dict(dispatchers or {})
         self.router = router or TonyExecutiveToolRouter()
+        self._active: set[str] = set()
+        self._active_lock = threading.Lock()
 
-    def ingest(self, lead: InboundLead, raw_payload: Mapping[str, Any]) -> dict[str, Any]:
+    def enqueue(self, lead: InboundLead, raw_payload: Mapping[str, Any]) -> dict[str, Any]:
         source = lead.source.strip().casefold()
         if source not in _BLUEPRINT_LITE_SOURCES:
             return {
@@ -94,6 +98,11 @@ class TonyInboundBlueprintLiteService:
         existing = self.store.get(lead.lead_id)
 
         if existing is not None and existing.get("input_fingerprint") == fingerprint:
+            if existing.get("state") == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+                existing["state"] = "preparation_queued"
+                existing["blocker"] = ""
+                existing["updated_at"] = _now()
+                self.store.put(lead.lead_id, existing)
             return self._public_state(existing, replay=True)
 
         versions = []
@@ -104,6 +113,7 @@ class TonyInboundBlueprintLiteService:
             "lead_id": lead.lead_id,
             "contact": lead.contact,
             "company": lead.company,
+            "email": lead.email,
             "source": lead.source,
             "input_fingerprint": fingerprint,
             "diagnostic_input_package": payload,
@@ -114,7 +124,95 @@ class TonyInboundBlueprintLiteService:
             "external_action_taken": False,
             "updated_at": _now(),
         }
+        if "Claude" not in self.dispatchers:
+            state["state"] = "dispatcher_unavailable"
+            state["blocker"] = "claude_dispatcher_not_configured"
         self.store.put(lead.lead_id, state)
+        return self._public_state(state)
+
+    def enqueue_and_start(self, lead: InboundLead, raw_payload: Mapping[str, Any]) -> dict[str, Any]:
+        result = self.enqueue(lead, raw_payload)
+        if result.get("state") == "preparation_queued":
+            self.start(lead.lead_id)
+        return result
+
+    def start(self, lead_id: str) -> bool:
+        with self._active_lock:
+            if lead_id in self._active:
+                return False
+            state = self.store.get(lead_id)
+            if state is None or state.get("state") != "preparation_queued":
+                return False
+            self._active.add(lead_id)
+        thread = threading.Thread(
+            target=self._run,
+            args=(lead_id,),
+            name=f"blueprint-lite-{lead_id[:24]}",
+            daemon=True,
+        )
+        thread.start()
+        return True
+
+    def recover_pending(self) -> int:
+        recovered = 0
+        for lead_id, state in self.store.read_all().items():
+            current = str(state.get("state") or "")
+            if current == "dispatching":
+                state["state"] = "preparation_queued"
+                state["blocker"] = "recovered_after_runtime_restart"
+                state["updated_at"] = _now()
+                self.store.put(lead_id, state)
+                current = "preparation_queued"
+            if current == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+                state["state"] = "preparation_queued"
+                state["blocker"] = ""
+                state["updated_at"] = _now()
+                self.store.put(lead_id, state)
+                current = "preparation_queued"
+            if current == "preparation_queued" and self.start(lead_id):
+                recovered += 1
+        return recovered
+
+    def process(self, lead_id: str) -> dict[str, Any]:
+        state = self.store.get(lead_id)
+        if state is None:
+            return {"state": "missing", "lead_id": lead_id, "external_action_taken": False}
+        if state.get("state") != "preparation_queued":
+            return self._public_state(state)
+
+        handler = self.dispatchers.get("Claude")
+        if handler is None:
+            state.update(
+                {
+                    "state": "dispatcher_unavailable",
+                    "blocker": "claude_dispatcher_not_configured",
+                    "updated_at": _now(),
+                }
+            )
+            self.store.put(lead_id, state)
+            return self._public_state(state)
+
+        lead = InboundLead.from_mapping(
+            {
+                "lead_id": lead_id,
+                "contact": state.get("contact"),
+                "company": state.get("company"),
+                "email": state.get("email"),
+                "source": state.get("source"),
+                "status": "New",
+            }
+        )
+        payload = state.get("diagnostic_input_package")
+        if not isinstance(payload, dict):
+            state.update(
+                {
+                    "state": "blocked",
+                    "blocker": "diagnostic_input_package_missing",
+                    "updated_at": _now(),
+                }
+            )
+            self.store.put(lead_id, state)
+            return self._public_state(state)
 
         handoff = self.router.route(
             {
@@ -148,25 +246,13 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
-            self.store.put(lead.lead_id, state)
-            return self._public_state(state)
-
-        handler = self.dispatchers.get("Claude")
-        if handler is None:
-            state.update(
-                {
-                    "state": "dispatcher_unavailable",
-                    "blocker": "claude_dispatcher_not_configured",
-                    "updated_at": _now(),
-                }
-            )
-            self.store.put(lead.lead_id, state)
+            self.store.put(lead_id, state)
             return self._public_state(state)
 
         state["attempt_count"] = int(state.get("attempt_count") or 0) + 1
         state["state"] = "dispatching"
         state["updated_at"] = _now()
-        self.store.put(lead.lead_id, state)
+        self.store.put(lead_id, state)
 
         try:
             evidence = handler(dict(dispatch))
@@ -179,7 +265,7 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
-            self.store.put(lead.lead_id, state)
+            self.store.put(lead_id, state)
             return self._public_state(state)
 
         verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, evidence)
@@ -192,7 +278,7 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
-            self.store.put(lead.lead_id, state)
+            self.store.put(lead_id, state)
             return self._public_state(state)
 
         quality = self._quality_gate(evidence)
@@ -206,14 +292,15 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
-            self.store.put(lead.lead_id, state)
+            self.store.put(lead_id, state)
             return self._public_state(state)
 
+        versions = list(state.get("versions") or [])
         version_number = len(versions) + 1
         version = {
             "version": version_number,
             "created_at": _now(),
-            "input_fingerprint": fingerprint,
+            "input_fingerprint": state.get("input_fingerprint"),
             "dispatch": dict(dispatch),
             "evidence": dict(evidence),
             "quality_gate": quality,
@@ -231,12 +318,19 @@ class TonyInboundBlueprintLiteService:
         )
         state.pop("failure", None)
         state.pop("failed_checks", None)
-        self.store.put(lead.lead_id, state)
+        self.store.put(lead_id, state)
         return self._public_state(state)
 
     def status(self, lead_id: str) -> dict[str, Any] | None:
         state = self.store.get(lead_id)
         return self._public_state(state) if state is not None else None
+
+    def _run(self, lead_id: str) -> None:
+        try:
+            self.process(lead_id)
+        finally:
+            with self._active_lock:
+                self._active.discard(lead_id)
 
     @staticmethod
     def _instruction(lead: InboundLead) -> str:
