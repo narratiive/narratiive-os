@@ -61,10 +61,22 @@ def call_ingest(app: LeadAwareTonyApplication, *, remote_addr: str, authorizatio
 
 
 class LocalLeadSyncAuthTests(unittest.TestCase):
-    def test_loopback_n8n_can_ingest_without_bridge_secret(self):
+    def test_loopback_n8n_requires_bridge_secret(self):
         store = RecordingStore()
         app = LeadAwareTonyApplication(FakeBase(), store)
         status, payload = call_ingest(app, remote_addr="127.0.0.1")
+        self.assertEqual(status, "401 Unauthorized")
+        self.assertFalse(payload["ok"])
+        self.assertEqual(store.leads, [])
+
+    def test_loopback_n8n_accepts_valid_bridge_secret(self):
+        store = RecordingStore()
+        app = LeadAwareTonyApplication(FakeBase(), store)
+        status, payload = call_ingest(
+            app,
+            remote_addr="127.0.0.1",
+            authorization="Bearer secret",
+        )
         self.assertEqual(status, "200 OK")
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["contact"], "Lesley Harman")

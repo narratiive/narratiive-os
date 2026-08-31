@@ -16,6 +16,7 @@ from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
 from runtime.tony_blueprint_client_feedback import TonyBlueprintClientFeedbackCommandService
 from runtime.tony_blueprint_delivery_notion_sync import TonyBlueprintDeliveryNotionSyncCommandService
+from runtime.tony_blueprint_lite_inbound import FileBlueprintLitePreparationStore, TonyInboundBlueprintLiteService
 from runtime.tony_blueprint_revision_cycle import TonyBlueprintRevisionCycleCommandService
 from runtime.tony_blueprint_revision_persistence import TonyBlueprintRevisionPersistenceCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
@@ -58,10 +59,12 @@ class LeadAwareTonyApplication:
         lead_store: FileInboundLeadStore,
         *,
         agent_gateway: TonyAgentGateway | None = None,
+        blueprint_lite_service: TonyInboundBlueprintLiteService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
         self.agent_gateway = agent_gateway or build_gateway()
+        self.blueprint_lite_service = blueprint_lite_service
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -137,7 +140,31 @@ class LeadAwareTonyApplication:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_lead", "message": str(exc)}})
         except Exception:
             return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
-        return self._respond(start_response, HTTPStatus.OK, {"ok": True, "status": "lead_ingested", "lead_id": lead.lead_id, "contact": lead.contact, "source": lead.source})
+
+        preparation = None
+        if self.blueprint_lite_service is not None:
+            try:
+                preparation = self.blueprint_lite_service.enqueue_and_start(lead, payload)
+            except Exception:
+                preparation = {
+                    "state": "blocked",
+                    "lead_id": lead.lead_id,
+                    "blocker": "blueprint_lite_orchestration_error",
+                    "approval_required": False,
+                    "external_action_taken": False,
+                }
+
+        response: dict[str, Any] = {
+            "ok": True,
+            "status": "lead_ingested",
+            "lead_id": lead.lead_id,
+            "contact": lead.contact,
+            "source": lead.source,
+        }
+        if preparation is not None:
+            response["preparation_status"] = preparation.get("state", "unknown")
+            response["preparation"] = preparation
+        return self._respond(start_response, HTTPStatus.OK, response)
 
     @staticmethod
     def _respond(start_response, status: HTTPStatus, payload: dict[str, Any]):
@@ -190,6 +217,12 @@ def build_app() -> LeadAwareTonyApplication:
     adaptive_service = TonyAdaptiveResponseCommandService(learning_service, learning_store_path=executive_learning_path)
     memory_service = TonyMemoryCommandService(adaptive_service, ExecutiveMemoryStore(Path(os.getenv("TONY_EXECUTIVE_MEMORY_PATH", str(REPOSITORY_ROOT / ".runtime" / "executive-memory.jsonl")))), agency_id=workspace_id)
     live_dispatchers = build_http_dispatchers()
+    blueprint_lite_service = TonyInboundBlueprintLiteService(
+        FileBlueprintLitePreparationStore(
+            Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
+        ),
+        dispatchers=live_dispatchers,
+    )
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))))
 
     def accept_verified_commercial_result(worker: str, dispatch: dict[str, Any], evidence: dict[str, Any], executive_result: str) -> dict[str, Any]:
@@ -224,7 +257,13 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
-    return LeadAwareTonyApplication(app, lead_store, agent_gateway=build_gateway())
+    blueprint_lite_service.recover_pending()
+    return LeadAwareTonyApplication(
+        app,
+        lead_store,
+        agent_gateway=build_gateway(),
+        blueprint_lite_service=blueprint_lite_service,
+    )
 
 
 def main() -> None:
