@@ -4,12 +4,14 @@ import hashlib
 import json
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any, Callable, Mapping
 
 from runtime.inbound_leads import InboundLead
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
+
+DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
 _BLUEPRINT_LITE_SOURCES = {"growth diagnostic", "tally", "website"}
 _REQUIRED_LINEAGE_KEYS = ("fact", "interpretation", "hypothesis")
@@ -70,7 +72,7 @@ class TonyInboundBlueprintLiteService:
         self,
         store: FileBlueprintLitePreparationStore,
         *,
-        dispatchers: Mapping[str, callable] | None = None,
+        dispatchers: Mapping[str, DispatchHandler] | None = None,
         router: TonyExecutiveToolRouter | None = None,
     ) -> None:
         self.store = store
@@ -241,11 +243,13 @@ class TonyInboundBlueprintLiteService:
         subject = lead.company or lead.contact
         return (
             f"Prepare the canonical Blueprint Lite for {subject} from the completed Growth Diagnostic input package supplied in target context. "
+            "This is reversible internal preparation only. Do not send anything. "
             "Use only the supplied diagnostic evidence and genuinely verified public sources. Preserve source lineage and clearly separate facts, "
-            "interpretations and hypotheses. Identify one company-specific growth tension, one consequential but provisional opportunity, and "
-            "3–4 meaningful questions to answer next. Produce only the internal human-review-ready Blueprint Lite defined by the canonical product "
-            "contract. Do not create the paid Growth Blueprint, send email, share a file, update Notion, create a Calendar event, book Discovery, "
-            "or change any external state."
+            "interpretations and hypotheses. Explicitly report whether the supplied diagnostic package contains enough information to represent the "
+            "diagnostic faithfully; do not silently fill missing diagnostic inputs. Identify one company-specific growth tension, one consequential "
+            "but provisional opportunity, and 3–4 meaningful questions to answer next. Produce only the internal human-review-ready Blueprint Lite "
+            "defined by the canonical product contract. Do not create the paid Growth Blueprint, share a file, update Notion, create a Calendar event, "
+            "book Discovery, or change any external state."
         )
 
     @classmethod
@@ -259,11 +263,14 @@ class TonyInboundBlueprintLiteService:
         questions_ok = isinstance(questions, list) and 3 <= len([item for item in questions if _meaningful(item)]) <= 4
         sources = evidence.get("source_backed_evidence") or evidence.get("sources")
         returned_gate = evidence.get("quality_gate") if isinstance(evidence.get("quality_gate"), dict) else {}
+        coverage = evidence.get("diagnostic_input_coverage") if isinstance(evidence.get("diagnostic_input_coverage"), dict) else {}
         recommendation = str(evidence.get("recommendation") or "").strip().casefold()
         rendered = json.dumps(evidence, sort_keys=True).casefold()
 
         checks = {
             "blueprint_lite_present": _meaningful(evidence.get("blueprint_lite")),
+            "diagnostic_signals_used": _meaningful(evidence.get("diagnostic_signals_used")),
+            "diagnostic_input_coverage_complete": coverage.get("complete") is True,
             "outside_in_evidence_present": _meaningful(sources),
             "evidence_gaps_explicit": "evidence_gaps" in evidence,
             "fact_interpretation_hypothesis_lineage": lineage_ok,
