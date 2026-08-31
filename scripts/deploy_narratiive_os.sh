@@ -1,12 +1,13 @@
 #!/bin/zsh
 set -euo pipefail
 
-REPO="$HOME/Documents/narratiive-os"
+SCRIPT_DIR="${0:A:h}"
+REPO="${SCRIPT_DIR:h}"
 PYTHON="$REPO/.venv/bin/python"
 DEPLOY="$REPO/scripts/deploy_tony_runtime.py"
 
 if [[ ! -d "$REPO/.git" ]]; then
-  echo "Narratiive OS repository not found at canonical path: $REPO" >&2
+  echo "Narratiive OS repository not found relative to deploy script: $REPO" >&2
   exit 1
 fi
 
@@ -19,7 +20,7 @@ fi
 PYTHON_VERSION="$($PYTHON -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
 PYTHON_OK="$($PYTHON -c 'import sys; print("yes" if sys.version_info >= (3, 10) else "no")')"
 if [[ "$PYTHON_OK" != "yes" ]]; then
-  echo "Narratiive OS requires Python 3.10+; canonical .venv is $PYTHON_VERSION" >&2
+  echo "Narratiive OS requires Python 3.10+; repository .venv is $PYTHON_VERSION" >&2
   exit 1
 fi
 
