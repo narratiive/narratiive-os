@@ -144,7 +144,8 @@ class LeadAwareTonyApplication:
         preparation = None
         if self.blueprint_lite_service is not None:
             try:
-                preparation = self.blueprint_lite_service.enqueue_and_start(lead, payload)
+                preparation_payload = request if isinstance(request.get("lead"), dict) else payload
+                preparation = self.blueprint_lite_service.enqueue_and_start(lead, preparation_payload)
             except Exception:
                 preparation = {
                     "state": "blocked",
