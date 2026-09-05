@@ -7,18 +7,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
-from runtime.definitions import (
-    ApprovalPolicy,
-    InputContract,
-    OutputContract,
-    RetryPolicy,
-    StageDefinition,
-    WorkflowDefinition,
-)
 from runtime.inbound_leads import InboundLead
 from runtime.models import ArtifactRef, StageStatus
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.state_machine import WorkflowEngine
+from runtime.workflow_registry import GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
@@ -37,41 +30,7 @@ _FALSE_EXECUTION_MARKERS = (
     "updated notion",
 )
 
-BLUEPRINT_LITE_WORKFLOW = WorkflowDefinition(
-    workflow_id="growth_diagnostic_to_blueprint_lite",
-    entity_type="lead",
-    approval_required=True,
-    next_workflow_id="blueprint_lite_to_discovery_preparation",
-    failure_policy="block_and_escalate",
-    stages=(
-        StageDefinition(
-            stage_id="prepare_blueprint_lite",
-            agent_ref="Claude",
-            required_inputs=("diagnostic_input_package",),
-            capability="strategic_reasoning",
-            input_contract=InputContract(("diagnostic_input_package",)),
-            output_contract=OutputContract(
-                (
-                    "blueprint_lite",
-                    "diagnostic_signals_used",
-                    "diagnostic_input_coverage",
-                    "source_backed_evidence",
-                    "evidence_gaps",
-                    "fact_interpretation_hypothesis_lineage",
-                    "growth_tension",
-                    "provisional_opportunity",
-                    "questions_to_answer_next",
-                    "quality_gate",
-                    "recommendation",
-                )
-            ),
-            quality_contract="blueprint_lite_quality_gate",
-            retry_policy=RetryPolicy(max_attempts=2),
-            approval_policy=ApprovalPolicy(required=True, before_external_action=True),
-            side_effect_classification="preparation",
-        ),
-    ),
-)
+BLUEPRINT_LITE_WORKFLOW = GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE
 
 
 class FileBlueprintLitePreparationStore:

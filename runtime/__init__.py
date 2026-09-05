@@ -138,6 +138,7 @@ from .repositories import (
     WorkflowEvent,
 )
 from .run_service import WorkflowRunService
+from .workflow_registry import WorkflowNotFound, WorkflowRegistry, build_narratiive_workflow_registry
 from .revision_graph import (
     RevisionCategory,
     RevisionIssue,
@@ -315,6 +316,9 @@ __all__ = [
     "WorkflowDefinition",
     "load_workflow_definition",
     "WorkflowRunService",
+    "WorkflowRegistry",
+    "WorkflowNotFound",
+    "build_narratiive_workflow_registry",
     "DispatchJob",
     "FileDispatchQueue",
     "JobNotFound",
