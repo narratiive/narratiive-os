@@ -14,13 +14,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from openclaw.tony_http_bridge import (  # noqa: E402
-    build_brief_archive,
-    build_engineering_handoff_loader,
-    build_engineering_run_loader,
-    build_github_work_loader,
-    build_mission_control_loader,
-    build_proactive_delivery_status_loader,
-    load_growth_objects,
+    compose_tony_runtime,
 )
 from openclaw.telegram_outbound import (  # noqa: E402
     TelegramConfig,
@@ -28,9 +22,7 @@ from openclaw.telegram_outbound import (  # noqa: E402
     TelegramSender,
 )
 from runtime.composition import RuntimeComponents  # noqa: E402
-from runtime.inbound_leads import FileInboundLeadStore  # noqa: E402
 from runtime.mission_control import MissionControlSnapshot  # noqa: E402
-from runtime.notion_leads import build_authoritative_lead_loader  # noqa: E402
 from runtime.proactive_executive_delivery import (  # noqa: E402
     DeliveryStatusRecord,
     FileDeliveryKeyStore,
@@ -42,12 +34,9 @@ from runtime.proactive_executive_delivery import (  # noqa: E402
     ProactiveExecutiveDeliveryService,
     WorkspaceDeliveryLock,
 )
-from runtime.progress_engine import RepositoryProgressEngine  # noqa: E402
 from runtime.repositories import WorkflowEvent  # noqa: E402
-from runtime.repository_validator import GrowthObjectValidator  # noqa: E402
-from runtime.tony_command_service import TonyCommandService  # noqa: E402
 from runtime.tony_executive_commands import TonyExecutiveCommandService  # noqa: E402
-from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager  # noqa: E402
+from runtime.workspaces import WorkspaceNotFound  # noqa: E402
 
 
 FAILING_STATUSES = {
@@ -85,74 +74,25 @@ def build_components(
             "TONY_EXECUTIVE_WORKSPACE_ID (or TONY_GITHUB_WORKSPACE_ID) is required"
         )
     try:
-        workspace_runtime = WorkspaceRuntimeManager(runtime_root, REPOSITORY_ROOT).runtime(
-            workspace_id
+        composition = compose_tony_runtime(
+            runtime_root=runtime_root,
+            repository_root=REPOSITORY_ROOT,
+            workspace_id=workspace_id,
+            require_workspace=True,
         )
     except (ValueError, WorkspaceNotFound) as exc:
         raise ProactiveBriefConfigurationError(
             f"proactive delivery workspace is not configured: {exc}"
         ) from exc
-
-    schema_path = Path(
-        os.getenv(
-            "TONY_GROWTH_OBJECT_SCHEMA",
-            str(REPOSITORY_ROOT / "schemas" / "shared" / "growth-object.schema.json"),
-        )
-    )
-    objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
-    gateway_health_endpoint = os.getenv(
-        "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT", "http://127.0.0.1:8787/health"
-    )
-    validator = GrowthObjectValidator.from_path(schema_path)
-    progress_engine = RepositoryProgressEngine(validator)
-    object_loader = lambda: load_growth_objects(objects_root)  # noqa: E731
-
-    brief_archive = build_brief_archive(runtime_root=runtime_root, repository_root=REPOSITORY_ROOT)
-    if brief_archive.workspace_id != workspace_id:
+    if composition.brief_archive.workspace_id != workspace_id:
         raise ProactiveBriefConfigurationError(
             "the executive brief workspace does not match the configured proactive workspace"
         )
-    github_work_loader = build_github_work_loader(
-        runtime_root=runtime_root,
-        repository_root=REPOSITORY_ROOT,
-        brief_archive=brief_archive,
+    return (
+        composition.workspace_runtime,
+        composition.executive_command_service,
+        composition.mission_control_loader,
     )
-    engineering_handoff_loader = build_engineering_handoff_loader(
-        runtime_root=runtime_root, repository_root=REPOSITORY_ROOT
-    )
-    engineering_run_loader = build_engineering_run_loader(
-        runtime_root=runtime_root, repository_root=REPOSITORY_ROOT
-    )
-    proactive_status_loader = build_proactive_delivery_status_loader(
-        runtime_root=runtime_root, repository_root=REPOSITORY_ROOT
-    )
-    mission_control_loader = build_mission_control_loader(
-        progress_engine,
-        object_loader,
-        gateway_health_endpoint,
-        github_work_loader,
-        engineering_handoff_loader,
-        engineering_run_loader,
-        proactive_status_loader,
-    )
-    command_service = TonyCommandService(
-        progress_engine,
-        mission_control_loader=mission_control_loader,
-        github_configured=github_work_loader is not None,
-    )
-    lead_path = Path(
-        os.getenv(
-            "TONY_INBOUND_LEADS_PATH",
-            str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"),
-        )
-    ).resolve()
-    authoritative_lead_loader = build_authoritative_lead_loader(FileInboundLeadStore(lead_path))
-    executive_service = TonyExecutiveCommandService(
-        command_service,
-        brief_archive=brief_archive,
-        inbound_lead_loader=authoritative_lead_loader,
-    )
-    return workspace_runtime, executive_service, mission_control_loader
 
 
 def _event_recorder(workspace_runtime: RuntimeComponents) -> Callable[[dict[str, Any]], None]:

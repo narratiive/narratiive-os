@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from wsgiref.simple_server import make_server
 
+from openclaw.tony_http_bridge import compose_tony_runtime
+
 from .command_api import WorkspaceCommandAPI
 from .composition import compose_local_runtime
 from .production_gateway import GatewayConfig, ProductionGateway
@@ -19,12 +21,27 @@ def build_app(*, repository_root: str | Path, runtime_root: str | Path, api_key:
         WorkspaceRuntimeManager(runtime_root, repository_root),
     )
     wsgi = RuntimeWSGIApp(command_api)
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+        or "narratiive"
+    )
+    tony = compose_tony_runtime(
+        runtime_root=Path(runtime_root).resolve(),
+        repository_root=Path(repository_root).resolve(),
+        workspace_id=workspace_id,
+        dispatchers={},
+        gateway_health_endpoint="",
+        request_surface="runtime-gateway",
+    )
     return ProductionGateway(
         wsgi,
         GatewayConfig(
             api_key=api_key,
             idempotency_root=Path(runtime_root) / "idempotency",
+            mission_control_workspace_id=workspace_id,
         ),
+        mission_control_loader=tony.mission_control_gateway_loader,
     )
 
 
