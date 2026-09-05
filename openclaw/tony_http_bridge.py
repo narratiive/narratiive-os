@@ -66,6 +66,7 @@ class TonyRuntimeComposition:
     """Shared persisted read/control graph for Tony's operational entry points."""
 
     workspace_id: str
+    workflow_workspace_id: str
     workspace_runtime: RuntimeComponents
     progress_engine: RepositoryProgressEngine
     object_loader: ObjectLoader
@@ -522,14 +523,26 @@ def compose_tony_runtime(
     canonical_workspace = workspace_id.strip()
     if not canonical_workspace:
         raise ValueError("workspace_id must not be empty")
+    registered_workspace = False
     try:
         workspace_runtime = WorkspaceRuntimeManager(
             runtime_root, repository_root
         ).runtime(canonical_workspace)
+        registered_workspace = True
     except (ValueError, WorkspaceNotFound):
         if require_workspace:
             raise
         workspace_runtime = compose_local_runtime(runtime_root, repository_root)
+
+    # The executive workspace registry predates the generic workflow runtime:
+    # its client_id is the durable tenant identity used by production workflow
+    # records. Binding the two here keeps all entry points on one graph without
+    # widening visibility to another registered workspace.
+    workflow_workspace_id = (
+        workspace_runtime.workspace.client_id
+        if registered_workspace
+        else canonical_workspace
+    )
 
     schema_path = Path(
         os.getenv(
@@ -575,7 +588,7 @@ def compose_tony_runtime(
     workflow_backend = FileWorkflowCommandBackend(
         workflow_root,
         dispatchers=dispatchers,
-        workspace_id=canonical_workspace,
+        workspace_id=workflow_workspace_id,
     )
     endpoint = (
         os.getenv(
@@ -594,11 +607,11 @@ def compose_tony_runtime(
         engineering_run_loader,
         proactive_status_loader,
         workflow_backend.list_states,
-        canonical_workspace,
+        workflow_workspace_id,
         request_surface,
     )
     workflow_projector = WorkflowMissionControlProjector(
-        workspace_id=canonical_workspace
+        workspace_id=workflow_workspace_id
     )
     public_loader = MissionControlGatewayLoader(
         workspace_id=canonical_workspace,
@@ -628,6 +641,7 @@ def compose_tony_runtime(
     )
     return TonyRuntimeComposition(
         workspace_id=canonical_workspace,
+        workflow_workspace_id=workflow_workspace_id,
         workspace_runtime=workspace_runtime,
         progress_engine=progress_engine,
         object_loader=object_loader,
