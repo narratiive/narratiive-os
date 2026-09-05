@@ -155,6 +155,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertIn("growth_tension", prompt)
         self.assertIn("provisional_opportunity", prompt)
         self.assertIn("questions_to_answer_next", prompt)
+        self.assertIn("exact singular keys fact, interpretation, and hypothesis", prompt)
         self.assertIn("human-review-ready", prompt)
         self.assertIn("at the top level", prompt)
         self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)
@@ -257,6 +258,46 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertEqual(evidence["diagnostic_signals_used"], work_product["diagnostic_signals_used"])
         self.assertEqual(evidence["recommendation"], "advance")
         self.assertEqual(evidence["work_product"], work_product)
+        self.assertTrue(TonyInboundBlueprintLiteService._quality_gate(evidence)["passed"])
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_plural_lineage_keys_are_normalised_before_quality_validation(self, urlopen):
+        work_product = {
+            "blueprint_lite": "A substantive synthetic Blueprint Lite for contract validation.",
+            "diagnostic_signals_used": ["Synthetic diagnostic signal"],
+            "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
+            "source_backed_evidence": ["https://example.invalid/source"],
+            "evidence_gaps": ["Private commercial evidence is unavailable"],
+            "fact_interpretation_hypothesis_lineage": {
+                "facts": ["Synthetic diagnostic input was supplied"],
+                "interpretations": ["Synthetic interpretation"],
+                "hypotheses": ["Synthetic hypothesis to test"],
+            },
+            "growth_tension": "Synthetic company-specific tension",
+            "provisional_opportunity": "A synthetic opportunity to test",
+            "questions_to_answer_next": [
+                "Synthetic question one?",
+                "Synthetic question two?",
+                "Synthetic question three?",
+            ],
+            "quality_gate": {"human_review_ready": True},
+            "recommendation": "advance",
+        }
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_plural_lineage",
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": json.dumps(work_product)}],
+            }
+        )
+
+        evidence = build_http_dispatchers(self._env())["Claude"](self._blueprint_lite_contract())
+
+        lineage = evidence["fact_interpretation_hypothesis_lineage"]
+        self.assertEqual(lineage["fact"], lineage["facts"])
+        self.assertEqual(lineage["interpretation"], lineage["interpretations"])
+        self.assertEqual(lineage["hypothesis"], lineage["hypotheses"])
         self.assertTrue(TonyInboundBlueprintLiteService._quality_gate(evidence)["passed"])
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")

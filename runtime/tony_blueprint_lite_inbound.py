@@ -93,7 +93,7 @@ class TonyInboundBlueprintLiteService:
                 "external_action_taken": False,
             }
 
-        payload = _json_safe_mapping(raw_payload)
+        payload = _normalise_diagnostic_input_contract(_json_safe_mapping(raw_payload))
         fingerprint = _fingerprint(payload)
         existing = self.store.get(lead.lead_id)
 
@@ -416,6 +416,36 @@ def _fingerprint(payload: Mapping[str, Any]) -> str:
 
 def _json_safe_mapping(value: Mapping[str, Any]) -> dict[str, Any]:
     return json.loads(json.dumps(dict(value), sort_keys=True, default=str))
+
+
+def _normalise_diagnostic_input_contract(payload: dict[str, Any]) -> dict[str, Any]:
+    """Canonicalise equivalent transport keys without deriving missing evidence."""
+    diagnostic = payload.get("diagnostic")
+    if not isinstance(diagnostic, dict):
+        return payload
+
+    aliases = {
+        "overall_score": "overallScore",
+        "category_scores": "categoryScores",
+        "main_blockage": "mainBlockage",
+        "recommended_actions": "recommendedActions",
+        "raw_answers": "answers",
+        "submitted_at": "submittedAt",
+    }
+    normalised = dict(diagnostic)
+    for canonical, alias in aliases.items():
+        if not _meaningful(normalised.get(canonical)) and _meaningful(normalised.get(alias)):
+            normalised[canonical] = normalised[alias]
+
+    category_scores = normalised.get("category_scores")
+    if isinstance(category_scores, dict) and "demandGen" in category_scores and "demand_gen" not in category_scores:
+        category_scores = dict(category_scores)
+        category_scores["demand_gen"] = category_scores["demandGen"]
+        normalised["category_scores"] = category_scores
+
+    result = dict(payload)
+    result["diagnostic"] = normalised
+    return result
 
 
 def _meaningful(value: Any) -> bool:
