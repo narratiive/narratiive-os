@@ -15,7 +15,7 @@ class TonyControlPlaneRuntimeInspectTests(unittest.TestCase):
             return subprocess.CompletedProcess(command, returncode, stdout=json.dumps(payload), stderr="")
         return run
 
-    def test_current_three_tool_runtime_is_ready(self):
+    def test_current_control_plane_runtime_is_ready(self):
         payload = {"runtime": {"tools": [{"name": name} for name in sorted(EXPECTED_TOOLS)]}}
         result = inspect_runtime(self.runner(payload))
         self.assertTrue(result["control_plane_runtime_ready"])

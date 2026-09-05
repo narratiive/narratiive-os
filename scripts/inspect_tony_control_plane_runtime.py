@@ -9,6 +9,7 @@ EXPECTED_TOOLS = {
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",
+    "narratiive_workflow_control",
 }
 LEGACY_TOOLS = {
     "narratiive_executive_brief",
