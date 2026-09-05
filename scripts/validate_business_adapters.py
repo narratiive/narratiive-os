@@ -4,7 +4,12 @@ import argparse
 import json
 import os
 import sys
+from pathlib import Path
 from typing import Any, Mapping
+
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_execution_readiness import REQUIRED_LIVE_WORKERS, build_execution_readiness_report
