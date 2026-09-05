@@ -181,15 +181,59 @@ class WorkflowRunService:
         stage = state.stage(stage_id)
         if stage.status is not StageStatus.RUNNING:
             raise ValueError("workflow attempts can only be recorded for a running step")
-        if len(stage.attempts) >= stage.max_attempts:
+        revision_attempts = sum(
+            1
+            for item in stage.attempts
+            if int(item.get("revision", 0)) == stage.revision_count
+        )
+        if revision_attempts >= stage.max_attempts:
             raise ValueError("workflow step retry policy exhausted")
-        stage.attempts.append(dict(attempt))
+        recorded_attempt = dict(attempt)
+        recorded_attempt.setdefault("revision", stage.revision_count)
+        stage.attempts.append(recorded_attempt)
         state.touch()
         self._commit(
             state,
             "stage.attempt_recorded",
             {"stage_id": stage_id, "attempt": len(stage.attempts)},
         )
+        return state
+
+    def request_quality_revision(
+        self,
+        run_id: str,
+        *,
+        reviewer: str,
+        rationale: str,
+    ) -> WorkflowState:
+        """Explicitly reopen a quality-blocked step as a new bounded revision cycle."""
+        state = self.repository.load(run_id)
+        identity = reviewer.strip()
+        reason = rationale.strip()
+        if not identity or not reason:
+            raise ValueError("revision requires reviewer identity and rationale")
+        if (
+            state.status is not WorkflowStatus.BLOCKED
+            or not str(state.blocker or "").startswith("quality_failed:")
+            or not state.current_stage_id
+        ):
+            raise ValueError("workflow run is not blocked by quality validation")
+        stage = state.stage(state.current_stage_id)
+        if stage.status is not StageStatus.BLOCKED:
+            raise ValueError("quality-blocked workflow step is not revisable")
+        stage.revision_count += 1
+        revision = {
+            "reviewer": identity,
+            "rationale": reason,
+            "decision": "request_revision",
+            "requested_at": datetime.now(timezone.utc).isoformat(),
+            "stage_id": stage.stage_id,
+            "revision_count": stage.revision_count,
+        }
+        state.approval_history.append(revision)
+        self.engine.request_revision(state, stage.stage_id, stage.stage_id, reason)
+        self.engine.resume_stage(state, stage.stage_id, state.input_payload.keys())
+        self._commit(state, "quality.revision_requested", revision)
         return state
 
     def record_quality(self, run_id: str, stage_id: str, quality: Mapping[str, object]) -> WorkflowState:

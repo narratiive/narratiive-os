@@ -73,7 +73,15 @@ class TonyWorkflowRuntime:
         return workflow_to_dict(state)
 
     def reject_for_revision(self, run_id: str, *, reviewer: str, rationale: str) -> dict[str, Any]:
-        state = self.runs.reject_for_revision(run_id, reviewer=reviewer, rationale=rationale)
+        current = self.runs.load_run(run_id)
+        if current.status is WorkflowStatus.BLOCKED and str(current.blocker or "").startswith("quality_failed:"):
+            state = self.runs.request_quality_revision(
+                run_id,
+                reviewer=reviewer,
+                rationale=rationale,
+            )
+        else:
+            state = self.runs.reject_for_revision(run_id, reviewer=reviewer, rationale=rationale)
         self._project(state)
         return workflow_to_dict(state)
 

@@ -136,6 +136,50 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(len(state["stages"][0]["output_artifacts"]), 1)
         self.assertEqual(state["approval_history"][-1]["reviewer"], "telegram:123")
 
+    def test_rejection_opens_new_attempt_budget_for_quality_blocked_work(self) -> None:
+        def weak_blueprint(_contract):
+            return {"blueprint_lite": "Too weak"}
+
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-quality-client",
+            dispatchers={"Claude": weak_blueprint},
+            environ={},
+        )
+        runtime.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-quality-blocked-run",
+            {
+                "diagnostic_input_package": {"overall_score": 40},
+                "company": "SAFE Quality Revision Test",
+            },
+            entity_id="safe-quality-lead",
+            correlation_id="safe-quality-correlation",
+        )
+        blocked = runtime.advance("safe-quality-blocked-run", lifecycle("safe-quality-client"))
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(
+                self.root,
+                dispatchers={"Claude": weak_blueprint},
+                environ={},
+            ),
+        )
+
+        revised = service.execute(
+            "/reject safe-quality-blocked-run because revise the quality-rejected draft",
+            [],
+            principal_id="telegram:123",
+        )
+        state = runtime.status("safe-quality-blocked-run")
+
+        self.assertEqual(blocked.status, "blocked")
+        self.assertEqual(revised.data["status"], "active")
+        self.assertEqual(state["stages"][0]["status"], "ready")
+        self.assertEqual(state["stages"][0]["revision_count"], 1)
+        self.assertEqual(state["approval_history"][-1]["decision"], "request_revision")
+
     def test_ambiguous_company_reference_fails_safe(self) -> None:
         second = build_tony_workflow_runtime(
             self.root,

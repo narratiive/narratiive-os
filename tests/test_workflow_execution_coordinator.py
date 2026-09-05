@@ -210,6 +210,48 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(outcome.blocker, "quality_failed:quality")
         self.assertEqual(self.runs.load_run("run-empty").stage("draft").quality_result["failed_checks"], ["findings_present"])
 
+    def test_explicit_revision_reopens_quality_block_after_exhausted_attempts(self) -> None:
+        calls = []
+
+        def adapter(contract):
+            calls.append(contract)
+            if len(calls) == 1:
+                raise RuntimeError("synthetic transient failure")
+            if len(calls) == 2:
+                return {"draft": "weak"}
+            return {"draft": "revised and substantive"}
+
+        def quality(output):
+            passed = output.get("draft") == "revised and substantive"
+            return {
+                "passed": passed,
+                "failed_checks": [] if passed else ["substantive_draft"],
+            }
+
+        definition = WorkflowDefinition("quality-revision", (_stage("draft"),))
+        coordinator = self._coordinator(
+            definition,
+            _worker(adapter),
+            {"quality": quality},
+        )
+        coordinator.enqueue("quality-revision", "run-quality-revision", {"brief": "safe"}, entity_id="e", correlation_id="c")
+        blocked = coordinator.advance("run-quality-revision", _lifecycle())
+        self.assertEqual(blocked.status, "blocked")
+        self.assertEqual(blocked.blocker, "quality_failed:quality")
+        self.runs.request_quality_revision(
+            "run-quality-revision",
+            reviewer="authorised-human",
+            rationale="Retry with the corrected worker contract",
+        )
+
+        completed = coordinator.advance("run-quality-revision", _lifecycle())
+        state = self.runs.load_run("run-quality-revision")
+
+        self.assertEqual(completed.status, "complete")
+        self.assertEqual(len(state.stage("draft").attempts), 3)
+        self.assertEqual([item["revision"] for item in state.stage("draft").attempts], [0, 0, 1])
+        self.assertEqual(state.approval_history[-1]["decision"], "request_revision")
+
     def test_worker_unavailable_becomes_explicit_blocker(self) -> None:
         definition = WorkflowDefinition("no-worker", (_stage("draft", capability="market_research"),))
         coordinator = self._coordinator(definition, CapabilityWorkerRegistry())
