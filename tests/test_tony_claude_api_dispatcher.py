@@ -133,6 +133,31 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 build_claude_api_dispatcher({**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": value})
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_growth_blueprint_uses_its_bounded_long_form_output_budget(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"work_product":"SAFE Growth Blueprint draft"}'}],
+            }
+        )
+        contract = self._contract()
+        contract["target"] = {
+            "workflow_context": {"workflow_id": "research_to_growth_blueprint"},
+        }
+
+        build_claude_api_dispatcher(self._env())(contract)
+
+        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        self.assertEqual(sent["max_tokens"], 16384)
+
+    def test_growth_blueprint_output_budget_must_be_a_positive_integer(self):
+        key = "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS"
+        for value in ("invalid", "0", "-1"):
+            with self.subTest(value=value), self.assertRaises(ClaudeDispatcherConfigError):
+                build_claude_api_dispatcher({**self._env(), key: value})
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_blueprint_lite_prepare_receives_canonical_inbound_return_contract(self, urlopen):
         urlopen.return_value = _Response(
             {
