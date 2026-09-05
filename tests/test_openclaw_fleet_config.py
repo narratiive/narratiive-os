@@ -14,6 +14,10 @@ TONY_PROFILE_ADDITIONS = {
     "sessions_spawn",
     "sessions_yield",
     "subagents",
+    "narratiive_read_state",
+    "narratiive_execute_safe_read",
+    "narratiive_request_action_approval",
+    "narratiive_workflow_control",
 }
 LEGACY_STATE_TOOLS = {
     "narratiive_executive_brief",
