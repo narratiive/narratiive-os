@@ -102,7 +102,17 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertNotIn("allow", tony["tools"])
             self.assertEqual(
                 set(tony["tools"]["alsoAllow"]),
-                {"agents_list", "sessions_spawn", "sessions_yield", "sessions_send", "subagents"},
+                {
+                    "agents_list",
+                    "sessions_spawn",
+                    "sessions_yield",
+                    "sessions_send",
+                    "subagents",
+                    "narratiive_read_state",
+                    "narratiive_execute_safe_read",
+                    "narratiive_request_action_approval",
+                    "narratiive_workflow_control",
+                },
             )
 
     def test_dry_run_does_not_mutate_home(self):

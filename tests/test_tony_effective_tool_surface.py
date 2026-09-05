@@ -37,6 +37,14 @@ class TonyEffectiveToolSurfaceTests(unittest.TestCase):
         self.assertEqual(result["failure_stage"], "effective_tool_policy")
         self.assertIn("narratiive_read_state", result["missing_effective_tony_tools"])
 
+    def test_loaded_plugin_but_missing_workflow_tool_fails_at_policy_boundary(self):
+        visible = sorted((EXPECTED_NARRATIIVE_TOOLS | REQUIRED_ORCHESTRATION_TOOLS) - {"narratiive_workflow_control"})
+        payload = {"final": "Available tools: " + ", ".join(visible)}
+        result = inspect_effective_tools(runner=self.runner(payload))
+        self.assertFalse(result["effective_tool_surface_ready"])
+        self.assertEqual(result["failure_stage"], "effective_tool_policy")
+        self.assertIn("narratiive_workflow_control", result["missing_effective_tony_tools"])
+
     def test_cli_failure_does_not_fall_through_as_healthy(self):
         result = inspect_effective_tools(runner=self.runner({}, returncode=1))
         self.assertFalse(result["effective_tool_surface_ready"])

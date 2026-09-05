@@ -12,6 +12,10 @@ EXPECTED_TONY_ADDITIONS = {
     "sessions_spawn",
     "sessions_yield",
     "subagents",
+    "narratiive_read_state",
+    "narratiive_execute_safe_read",
+    "narratiive_request_action_approval",
+    "narratiive_workflow_control",
 }
 EXPECTED_NARRATIIVE_TOOLS = {
     "narratiive_read_state",
