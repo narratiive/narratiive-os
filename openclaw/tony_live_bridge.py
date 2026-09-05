@@ -45,6 +45,7 @@ from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandServ
 from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
+from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 _REQUIRED_FRIDAY_FIELDS = {"record_id", "occurred_at", "record_type", "summary", "evidence", "workspace_id"}
@@ -60,11 +61,15 @@ class LeadAwareTonyApplication:
         *,
         agent_gateway: TonyAgentGateway | None = None,
         blueprint_lite_service: TonyInboundBlueprintLiteService | None = None,
+        workflow_command_service: TonyWorkflowCommandService | None = None,
+        authorised_principal_id: str = "",
     ) -> None:
         self.base = base
         self.lead_store = lead_store
         self.agent_gateway = agent_gateway or build_gateway()
         self.blueprint_lite_service = blueprint_lite_service
+        self.workflow_command_service = workflow_command_service
+        self.authorised_principal_id = authorised_principal_id.strip()
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -109,7 +114,19 @@ class LeadAwareTonyApplication:
             if not text:
                 raise ValueError("text is required")
             if TonyAgentGateway.is_system_command(text):
-                status, payload = self.base._handle_telegram_command(text)
+                if self.workflow_command_service is not None and self.workflow_command_service.supports(text):
+                    supplied_principal = str(request.get("principal_id") or "").strip()
+                    principal = supplied_principal if supplied_principal == self.authorised_principal_id else ""
+                    response = self.workflow_command_service.execute(text, (), principal_id=principal)
+                    status = HTTPStatus.OK
+                    payload = {
+                        "ok": response.status != "error",
+                        "reply": response.message[:3500],
+                        "message": response.message[:3500],
+                        **response.to_dict(),
+                    }
+                else:
+                    status, payload = self.base._handle_telegram_command(text)
             else:
                 reply = self.agent_gateway.converse(text)
                 status = HTTPStatus.OK
@@ -258,12 +275,25 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
+    workflow_command_service = TonyWorkflowCommandService(
+        app.command_service,
+        FileWorkflowCommandBackend(
+            Path(os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))),
+            dispatchers=live_dispatchers,
+        ),
+    )
     blueprint_lite_service.recover_pending()
     return LeadAwareTonyApplication(
         app,
         lead_store,
         agent_gateway=build_gateway(),
         blueprint_lite_service=blueprint_lite_service,
+        workflow_command_service=workflow_command_service,
+        authorised_principal_id=(
+            f"telegram:{os.getenv('TONY_TELEGRAM_CHAT_ID', '').strip()}"
+            if os.getenv("TONY_TELEGRAM_CHAT_ID", "").strip()
+            else ""
+        ),
     )
 
 

@@ -128,7 +128,13 @@ class TelegramInboundService:
         return self._execute_legacy_command(text)
 
     def _execute_legacy_command(self, text: str) -> str:
-        body = json.dumps({"text": text, "source": "telegram"}).encode("utf-8")
+        body = json.dumps(
+            {
+                "text": text,
+                "source": "telegram",
+                "principal_id": f"telegram:{self.config.allowed_chat_id}",
+            }
+        ).encode("utf-8")
         headers = {"Content-Type": "application/json", "Accept": "application/json"}
         if self.config.bridge_token:
             headers["Authorization"] = f"Bearer {self.config.bridge_token}"
