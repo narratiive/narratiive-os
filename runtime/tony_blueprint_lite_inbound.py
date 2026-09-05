@@ -422,6 +422,7 @@ class TonyInboundBlueprintLiteService:
                 ),
             ),
         )
+        workflow.approval_status = "pending"
         workflow.proposed_next_action = "Authorised human reviews the Blueprint Lite before any client-facing use."
         state.update(
             {

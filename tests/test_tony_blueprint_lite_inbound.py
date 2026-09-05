@@ -125,6 +125,8 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             workflow = workflow_from_dict(persisted["workflow_run"])
             self.assertEqual(workflow.workflow_id, "growth_diagnostic_to_blueprint_lite")
             self.assertEqual(workflow.status.value, "awaiting_approval")
+            self.assertEqual(workflow.approval_status, "pending")
+            self.assertIn("human reviews", workflow.proposed_next_action)
             self.assertEqual(workflow.stage("prepare_blueprint_lite").capability, "strategic_reasoning")
             self.assertEqual(len(workflow.stage("prepare_blueprint_lite").attempts), 1)
             self.assertTrue(workflow.stage("prepare_blueprint_lite").quality_result["passed"])
