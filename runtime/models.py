@@ -119,6 +119,23 @@ class WorkflowState:
     def touch(self) -> None:
         self.updated_at = _utc_now()
 
+    def current_proposed_next_action(self) -> str | None:
+        """Return only an action that is still pending in the current state.
+
+        Older durable records retain the exact approved action on the snapshot as
+        well as in approval history.  Once that action has been approved it is
+        audit evidence, not a current recommendation.
+        """
+        action = self.proposed_next_action
+        if (
+            action
+            and self.approval_status == "approved"
+            and self.approval_history
+            and self.approval_history[-1].get("proposed_next_action") == action
+        ):
+            return None
+        return action
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()

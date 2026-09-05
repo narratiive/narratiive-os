@@ -130,7 +130,7 @@ class WorkflowBusinessProjectionService:
             "outstanding_approval": state.approval_status == "pending",
             "approval_status": state.approval_status,
             "blocker": state.blocker,
-            "proposed_next_action": state.proposed_next_action,
+            "proposed_next_action": state.current_proposed_next_action(),
             "latest_artifact_id": latest.output_artifacts[-1].artifact_id if latest else None,
             "runtime_updated_at": state.updated_at,
             "external_action_taken": state.external_action_taken,

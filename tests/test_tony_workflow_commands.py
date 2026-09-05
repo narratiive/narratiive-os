@@ -120,7 +120,29 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(missing_reason.data["error_code"], "rationale_required")
         self.assertEqual(approved.data["approval_status"], "approved")
         self.assertEqual(approved.data["status"], "complete")
+        self.assertIsNone(approved.data["proposed_next_action"])
         self.assertFalse(approved.data["external_action_taken"])
+
+        proposed = self.service.execute("/proposed safe-executive-run", [])
+        self.assertIn("No current proposed next action", proposed.message)
+
+    def test_legacy_approved_snapshot_does_not_present_approved_action_as_current(self) -> None:
+        self.service.execute(
+            "/approve safe-executive-run because reviewed synthetic work",
+            [],
+            principal_id="telegram:123",
+        )
+        state = self.runtime.runs.load_run("safe-executive-run")
+        approved_action = state.approval_history[-1]["proposed_next_action"]
+        state.proposed_next_action = approved_action
+        self.runtime.runs.repository.save(state)
+
+        status = self.service.execute("/workflow safe-executive-run", [])
+        projection = self.service.execute("/projection safe-executive-run", [])
+
+        self.assertIsNone(status.data["proposed_next_action"])
+        self.assertNotIn(" Next:", status.message)
+        self.assertIsNone(projection.data["proposed_next_action"])
 
     def test_rejection_reopens_exact_producing_step_without_deleting_artefact(self) -> None:
         rejected = self.service.execute(
