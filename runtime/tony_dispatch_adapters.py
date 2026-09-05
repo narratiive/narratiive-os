@@ -35,7 +35,7 @@ def build_http_dispatchers(
     TONY_DISPATCH_CLAUDE_MODE=anthropic_api. Nothing is inferred or enabled merely
     because credentials exist, so Tony remains fail-closed by default.
     """
-    env = environ or os.environ
+    env = os.environ if environ is None else environ
     handlers: dict[str, callable] = {}
     for worker in SUPPORTED_DISPATCH_WORKERS:
         key = _env_key(worker)

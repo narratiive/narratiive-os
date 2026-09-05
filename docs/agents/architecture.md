@@ -97,6 +97,14 @@ resume. Duplicate run identities are idempotent. Interrupted preparation may
 be retried under its declared policy; an interrupted external write is blocked
 for provider reconciliation and is never blindly replayed.
 
+`runtime/tony_workflow_runtime.py` is the scoped composition surface for the
+workflow registry, capability registry, durable run/event stores, immutable
+artefact store, and execution coordinator. It exposes enqueue, status, advance,
+approval, and recovery operations without performing work during construction.
+Only the Blueprint Lite quality validator is operational by default; other
+registered workflow quality contracts block before worker execution until
+their real validators and specialist adapters are implemented.
+
 - `DispatchService` validates current-stage readiness and creates dispatch jobs.
 - `FileDispatchQueue` owns job state and leases.
 - `WorkerRunner` claims a lease and delegates execution to an `AgentExecutor`.

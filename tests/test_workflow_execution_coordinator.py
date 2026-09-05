@@ -141,6 +141,38 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(state.stages[0].output_artifacts), 1)
         self.assertEqual(state.input_payload["final"], "reviewable synthesis")
 
+    def test_authorised_autonomous_cross_workflow_handoff_is_durable(self) -> None:
+        first = WorkflowDefinition(
+            "first-workflow",
+            (_stage("first", outputs=("handoff",)),),
+            next_workflow_id="second-workflow",
+            autonomous_handoff=True,
+        )
+        second = WorkflowDefinition(
+            "second-workflow",
+            (_stage("second", inputs=("handoff",), outputs=("final",)),),
+        )
+
+        def adapter(contract):
+            if contract["workflow_context"]["workflow_id"] == "first-workflow":
+                return {"handoff": "verified evidence"}
+            return {"final": f"used {contract['handoff']}"}
+
+        coordinator = WorkflowExecutionCoordinator(
+            registry=WorkflowRegistry((first, second)),
+            workers=_worker(adapter),
+            runs=self.runs,
+            artifacts=self.artifacts,
+            quality_validators={"quality": lambda output: {"passed": True}},
+        )
+        coordinator.enqueue("first-workflow", "run-chain", {"brief": "safe"}, entity_id="e", correlation_id="c")
+        outcome = coordinator.advance("run-chain", _lifecycle())
+        self.assertEqual(outcome.action, "continue_autonomously")
+        self.assertEqual(outcome.next_run_id, "run-chain-second-workflow")
+        downstream = self.runs.load_run(outcome.next_run_id)
+        self.assertEqual(downstream.status, WorkflowStatus.COMPLETE)
+        self.assertEqual(downstream.input_payload["final"], "used verified evidence")
+
     def test_quality_failure_stops_progression_with_evidence(self) -> None:
         definition = WorkflowDefinition("quality-stop", (_stage("draft"),))
         coordinator = self._coordinator(
