@@ -12,6 +12,7 @@ from runtime.models import WorkflowState
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
+from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 
 
 class WorkflowCommandBackend(Protocol):
@@ -38,10 +39,20 @@ class WorkflowCommandBackend(Protocol):
 class FileWorkflowCommandBackend:
     """Operate existing scoped workflow runs through the canonical runtime API."""
 
-    def __init__(self, root: str | Path, *, dispatchers=None, environ=None) -> None:
+    def __init__(
+        self,
+        root: str | Path,
+        *,
+        dispatchers=None,
+        environ=None,
+        workspace_id: str | None = None,
+    ) -> None:
         self.root = Path(root).resolve()
         self.dispatchers = dispatchers
         self.environ = environ
+        if workspace_id is not None and not workspace_id.strip():
+            raise ValueError("workspace_id must not be empty")
+        self.workspace_id = workspace_id.strip() if workspace_id is not None else None
 
     def list_states(self) -> tuple[WorkflowState, ...]:
         if not self.root.is_dir():
@@ -58,6 +69,8 @@ class FileWorkflowCommandBackend:
                     raise ValueError("workflow scope does not match its storage location")
             except (OSError, UnicodeDecodeError, json.JSONDecodeError, KeyError, TypeError, ValueError) as exc:
                 raise RuntimeError(f"workflow state is unreadable: {path.name}") from exc
+            if self.workspace_id is not None and state.workspace_id != self.workspace_id:
+                continue
             states.append(state)
         return tuple(states)
 
@@ -225,6 +238,8 @@ class FileWorkflowCommandBackend:
         return runtime.runs.load_run(run_id)
 
     def _runtime(self, state: WorkflowState) -> TonyWorkflowRuntime:
+        if self.workspace_id is not None and state.workspace_id != self.workspace_id:
+            raise ValueError("workflow state workspace mismatch")
         return build_tony_workflow_runtime(
             self.root,
             workspace_id=state.workspace_id,
@@ -444,26 +459,7 @@ class TonyWorkflowCommandService:
 
     @staticmethod
     def _summary(state: WorkflowState) -> dict[str, Any]:
-        current = state.stage(state.current_stage_id) if state.current_stage_id else None
-        latest = next((stage for stage in reversed(state.stages) if stage.output_artifacts), None)
-        return {
-            "run_id": state.run_id,
-            "workflow_id": state.workflow_id,
-            "entity_id": state.entity_id,
-            "client_id": state.client_id,
-            "company": _state_name(state),
-            "status": state.status.value,
-            "current_step": state.current_stage_id,
-            "attempt_count": len(current.attempts) if current else 0,
-            "quality_passed": current.quality_result.get("passed") if current and current.quality_result else (latest.quality_result.get("passed") if latest and latest.quality_result else None),
-            "approval_status": state.approval_status,
-            "approval_required": state.approval_status == "pending",
-            "blocker": state.blocker,
-            "proposed_next_action": state.current_proposed_next_action(),
-            "latest_artefact_id": latest.output_artifacts[-1].artifact_id if latest else None,
-            "external_action_taken": state.external_action_taken,
-            "updated_at": state.updated_at,
-        }
+        return workflow_state_summary(state)
 
     @staticmethod
     def _error(command: str, code: str, message: str) -> CommandResponse:
@@ -471,13 +467,7 @@ class TonyWorkflowCommandService:
 
 
 def _state_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    candidates = (
-        payload.get("company"), payload.get("company_name"),
-        payload.get("company_context", {}).get("name") if isinstance(payload.get("company_context"), Mapping) else None,
-        payload.get("client_context", {}).get("name") if isinstance(payload.get("client_context"), Mapping) else None,
-    )
-    return next((str(value).strip() for value in candidates if str(value or "").strip()), state.entity_id or state.client_id)
+    return workflow_state_name(state)
 
 
 def _exact_terms(state: WorkflowState) -> set[str]:

@@ -71,7 +71,7 @@ class _ProactiveBriefTestEnvironment:
         self.addCleanup(self._telegram_patch.stop)
 
         self._lead_loader_patch = patch(
-            "scripts.run_proactive_brief.build_authoritative_lead_loader",
+            "openclaw.tony_http_bridge.build_authoritative_lead_loader",
             return_value=lambda: (),
         )
         self.mock_lead_loader_factory = self._lead_loader_patch.start()

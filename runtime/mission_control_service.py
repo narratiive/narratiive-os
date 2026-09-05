@@ -80,6 +80,7 @@ class MissionControlService:
                 "engineering_runs": [
                     item.to_dict() for item in snapshot.engineering_runs
                 ],
+                "workflow_runs": [dict(item) for item in snapshot.workflow_runs],
                 "summary": {
                     "active_workstreams": len(active),
                     "blocked_workstreams": len(blocked),
@@ -103,6 +104,15 @@ class MissionControlService:
                     "engineering_runs_blocked": sum(
                         1 for item in snapshot.engineering_runs
                         if item.blockers
+                    ),
+                    "workflow_runs": len(snapshot.workflow_runs),
+                    "workflow_approvals": sum(
+                        1 for item in snapshot.workflow_runs
+                        if item.get("approval_required") is True
+                    ),
+                    "workflow_blockers": sum(
+                        1 for item in snapshot.workflow_runs
+                        if item.get("status") == "blocked"
                     ),
                 },
             },

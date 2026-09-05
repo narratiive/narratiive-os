@@ -94,6 +94,7 @@ class MissionControlSnapshot:
     recent_wins: tuple[str, ...] = ()
     risks: tuple[str, ...] = ()
     opportunities: tuple[str, ...] = ()
+    workflow_runs: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -120,6 +121,7 @@ class MissionControlSnapshot:
             "recent_wins": list(self.recent_wins),
             "risks": list(self.risks),
             "opportunities": list(self.opportunities),
+            "workflow_runs": [dict(item) for item in self.workflow_runs],
         }
 
 
@@ -140,6 +142,7 @@ class MissionControlBuilder:
         recent_wins: Iterable[str] = (),
         risks: Iterable[str] = (),
         opportunities: Iterable[str] = (),
+        workflow_runs: Iterable[Mapping[str, Any]] = (),
     ) -> MissionControlSnapshot:
         workstream_items = tuple(sorted(workstreams, key=lambda item: item.workstream_id))
         connection_items = self._connections(connections or {})
@@ -195,6 +198,7 @@ class MissionControlBuilder:
             recent_wins=win_items,
             risks=risk_items,
             opportunities=opportunity_items,
+            workflow_runs=tuple(dict(item) for item in workflow_runs),
         )
 
     @staticmethod

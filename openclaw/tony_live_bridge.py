@@ -9,7 +9,11 @@ from typing import Any
 from wsgiref.simple_server import make_server
 
 from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayError, build_gateway
-from openclaw.tony_http_bridge import TonyHTTPBridge, build_app as build_base_app
+from openclaw.tony_http_bridge import (
+    TonyHTTPBridge,
+    TonyRuntimeComposition,
+    build_app as build_base_app,
+)
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.notion_leads import build_authoritative_lead_loader
@@ -278,7 +282,8 @@ def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
 
 
 def build_app() -> LeadAwareTonyApplication:
-    app = build_base_app()
+    live_dispatchers = build_http_dispatchers()
+    app = build_base_app(dispatchers=live_dispatchers)
     if app.command_service is None:
         raise RuntimeError("Tony command service is not configured")
     records_root = Path(os.getenv("TONY_FRIDAY_REVIEW_RECORDS_ROOT", str(REPOSITORY_ROOT / ".runtime" / "executive-review-records")))
@@ -296,7 +301,6 @@ def build_app() -> LeadAwareTonyApplication:
     learning_service = TonyExecutiveLearningCommandService(outcome_evidence_service, store_path=executive_learning_path)
     adaptive_service = TonyAdaptiveResponseCommandService(learning_service, learning_store_path=executive_learning_path)
     memory_service = TonyMemoryCommandService(adaptive_service, ExecutiveMemoryStore(Path(os.getenv("TONY_EXECUTIVE_MEMORY_PATH", str(REPOSITORY_ROOT / ".runtime" / "executive-memory.jsonl")))), agency_id=workspace_id)
-    live_dispatchers = build_http_dispatchers()
     workflow_runtime_root = Path(
         os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))
     )
@@ -341,12 +345,19 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
     app.command_service = TonyTerminologyCommandService(execution_status_service)
-    workflow_command_service = TonyWorkflowCommandService(
-        app.command_service,
-        FileWorkflowCommandBackend(
+    composition = getattr(app, "runtime_composition", None)
+    workflow_backend = (
+        composition.workflow_backend
+        if isinstance(composition, TonyRuntimeComposition)
+        else FileWorkflowCommandBackend(
             workflow_runtime_root,
             dispatchers=live_dispatchers,
-        ),
+            workspace_id=workspace_id,
+        )
+    )
+    workflow_command_service = TonyWorkflowCommandService(
+        app.command_service,
+        workflow_backend,
     )
     blueprint_lite_service.recover_pending()
     return LeadAwareTonyApplication(

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from http import HTTPStatus
 from pathlib import Path
@@ -14,7 +15,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from runtime.composition import compose_local_runtime
+from runtime.composition import RuntimeComponents, compose_local_runtime
 from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.engineering_orchestrator import EngineeringRunSnapshot
 from runtime.executive_brief import ExecutiveBriefArchive
@@ -25,7 +26,11 @@ from runtime.github_work import (
     GitHubWorkService,
     GitHubWorkSnapshot,
 )
+from runtime.inbound_leads import FileInboundLeadStore
 from runtime.mission_control import MissionControlBuilder, MissionControlSnapshot
+from runtime.mission_control_gateway_loader import MissionControlGatewayLoader
+from runtime.notion_leads import build_authoritative_lead_loader
+from runtime.models import WorkflowState
 from runtime.proactive_executive_delivery import (
     LatestDeliveryStatusStore,
     describe_delivery_status,
@@ -33,6 +38,8 @@ from runtime.proactive_executive_delivery import (
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
 from runtime.tony_command_service import CommandResponse, TonyCommandService
+from runtime.tony_executive_commands import TonyExecutiveCommandService
+from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 from runtime.tony_orchestration import (
     HttpGatewayTransport,
     TonyCommand,
@@ -40,6 +47,7 @@ from runtime.tony_orchestration import (
     TonyOrchestrationAdapter,
 )
 from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager
+from runtime.workflow_mission_control import WorkflowMissionControlProjector
 from scripts.service_doctor import ServiceDoctor
 
 
@@ -50,6 +58,23 @@ GitHubWorkLoader = Callable[[], GitHubWorkSnapshot]
 EngineeringHandoffLoader = Callable[[], tuple[EngineeringHandoffSnapshot, ...]]
 EngineeringRunLoader = Callable[[], tuple[EngineeringRunSnapshot, ...]]
 ProactiveDeliveryStatusLoader = Callable[[], dict[str, Any] | None]
+WorkflowStateLoader = Callable[[], tuple[WorkflowState, ...]]
+
+
+@dataclass(slots=True)
+class TonyRuntimeComposition:
+    """Shared persisted read/control graph for Tony's operational entry points."""
+
+    workspace_id: str
+    workspace_runtime: RuntimeComponents
+    progress_engine: RepositoryProgressEngine
+    object_loader: ObjectLoader
+    brief_archive: ExecutiveBriefArchive
+    mission_control_loader: MissionControlLoader
+    mission_control_gateway_loader: MissionControlGatewayLoader
+    command_service: TonyCommandService
+    executive_command_service: TonyExecutiveCommandService
+    workflow_backend: FileWorkflowCommandBackend
 
 
 class TonyHTTPBridge:
@@ -69,6 +94,7 @@ class TonyHTTPBridge:
         object_loader: ObjectLoader | None = None,
         diagnostics_runner: DiagnosticsRunner | None = None,
         brief_archive: ExecutiveBriefArchive | None = None,
+        runtime_composition: TonyRuntimeComposition | None = None,
     ) -> None:
         self.adapter = adapter
         self.bridge_token = bridge_token.strip()
@@ -76,6 +102,7 @@ class TonyHTTPBridge:
         self.object_loader = object_loader
         self.diagnostics_runner = diagnostics_runner
         self.brief_archive = brief_archive
+        self.runtime_composition = runtime_composition
 
     def __call__(self, environ, start_response):
         try:
@@ -368,20 +395,33 @@ def build_mission_control_loader(
     engineering_handoff_loader: EngineeringHandoffLoader | None = None,
     engineering_run_loader: EngineeringRunLoader | None = None,
     proactive_delivery_status_loader: ProactiveDeliveryStatusLoader | None = None,
+    workflow_state_loader: WorkflowStateLoader | None = None,
+    workflow_workspace_id: str | None = None,
+    request_surface: str = "telegram-bridge",
 ) -> MissionControlLoader:
     """Build the live read-only Mission Control snapshot used by Telegram commands."""
     builder = MissionControlBuilder()
     doctor = ServiceDoctor(timeout_seconds=float(os.getenv("NARRATIIVE_DOCTOR_TIMEOUT_SECONDS", "3")))
+    workflow_projector = (
+        WorkflowMissionControlProjector(workspace_id=workflow_workspace_id)
+        if workflow_state_loader is not None and workflow_workspace_id
+        else None
+    )
 
     def load() -> MissionControlSnapshot:
         objects = list(object_loader())
         progress = progress_engine.build_snapshot(objects)
-        gateway = doctor.check("runtime-gateway", gateway_health_endpoint)
-        connection_state = "connected" if gateway.healthy else "degraded"
-        evidence = "HTTP health check passed" if gateway.healthy else gateway.error
+        if gateway_health_endpoint:
+            gateway = doctor.check("runtime-gateway", gateway_health_endpoint)
+            connection_state = "connected" if gateway.healthy else "degraded"
+            evidence = "HTTP health check passed" if gateway.healthy else gateway.error
+        else:
+            connection_state = "connected"
+            evidence = "Current authenticated request reached the runtime gateway"
         github_work = None
         engineering_handoffs: tuple[EngineeringHandoffSnapshot, ...] = ()
         engineering_runs: tuple[EngineeringRunSnapshot, ...] = ()
+        workflow_view = None
         if github_work_loader is None:
             github_connection = {
                 "state": "not_connected",
@@ -434,6 +474,10 @@ def build_mission_control_loader(
                     "state": "degraded",
                     "evidence": f"Proactive delivery status unavailable: {exc}",
                 }
+        if workflow_state_loader is not None:
+            if workflow_projector is None:
+                raise ValueError("workflow_workspace_id is required with workflow_state_loader")
+            workflow_view = workflow_projector.project(workflow_state_loader())
 
         return builder.build(
             generated_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
@@ -443,9 +487,9 @@ def build_mission_control_loader(
                     "state": connection_state,
                     "evidence": evidence,
                 },
-                "telegram-bridge": {
+                request_surface: {
                     "state": "connected",
-                    "evidence": "Current request reached Tony HTTP bridge",
+                    "evidence": f"Current request reached {request_surface}",
                 },
                 "GitHub": github_connection,
                 "proactive-delivery": proactive_delivery_connection,
@@ -453,9 +497,147 @@ def build_mission_control_loader(
             github_work=github_work,
             engineering_handoffs=engineering_handoffs,
             engineering_runs=engineering_runs,
+            workstreams=workflow_view.workstreams if workflow_view else (),
+            approvals_required=(
+                workflow_view.approvals_required if workflow_view else ()
+            ),
+            workflow_runs=workflow_view.runs if workflow_view else (),
         )
 
     return load
+
+
+def compose_tony_runtime(
+    *,
+    runtime_root: Path,
+    repository_root: Path,
+    workspace_id: str,
+    dispatchers=None,
+    require_workspace: bool = False,
+    gateway_health_endpoint: str | None = None,
+    request_surface: str = "telegram-bridge",
+) -> TonyRuntimeComposition:
+    """Compose one reusable Tony graph over canonical persisted runtime state."""
+
+    canonical_workspace = workspace_id.strip()
+    if not canonical_workspace:
+        raise ValueError("workspace_id must not be empty")
+    try:
+        workspace_runtime = WorkspaceRuntimeManager(
+            runtime_root, repository_root
+        ).runtime(canonical_workspace)
+    except (ValueError, WorkspaceNotFound):
+        if require_workspace:
+            raise
+        workspace_runtime = compose_local_runtime(runtime_root, repository_root)
+
+    schema_path = Path(
+        os.getenv(
+            "TONY_GROWTH_OBJECT_SCHEMA",
+            str(repository_root / "schemas" / "shared" / "growth-object.schema.json"),
+        )
+    )
+    objects_root = Path(
+        os.getenv("TONY_OBJECTS_ROOT", str(repository_root / "clients"))
+    )
+    progress_engine = RepositoryProgressEngine(
+        GrowthObjectValidator.from_path(schema_path)
+    )
+    object_loader = lambda: load_growth_objects(objects_root)  # noqa: E731
+    brief_archive = ExecutiveBriefArchive(
+        workspace_runtime.artifact_catalog,
+        workspace_runtime.event_log,
+        workspace_id=workspace_runtime.workspace.workspace_id,
+    )
+    github_work_loader = build_github_work_loader(
+        runtime_root=runtime_root,
+        repository_root=repository_root,
+        brief_archive=brief_archive,
+    )
+    engineering_handoff_loader = build_engineering_handoff_loader(
+        runtime_root=runtime_root,
+        repository_root=repository_root,
+    )
+    engineering_run_loader = build_engineering_run_loader(
+        runtime_root=runtime_root,
+        repository_root=repository_root,
+    )
+    proactive_status_loader = build_proactive_delivery_status_loader(
+        runtime_root=runtime_root,
+        repository_root=repository_root,
+    )
+    workflow_root = Path(
+        os.getenv(
+            "TONY_WORKFLOW_RUNTIME_ROOT",
+            str(repository_root / ".runtime" / "workflow-runtime"),
+        )
+    )
+    workflow_backend = FileWorkflowCommandBackend(
+        workflow_root,
+        dispatchers=dispatchers,
+        workspace_id=canonical_workspace,
+    )
+    endpoint = (
+        os.getenv(
+            "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT",
+            "http://127.0.0.1:8787/health",
+        )
+        if gateway_health_endpoint is None
+        else gateway_health_endpoint
+    )
+    mission_control_loader = build_mission_control_loader(
+        progress_engine,
+        object_loader,
+        endpoint,
+        github_work_loader,
+        engineering_handoff_loader,
+        engineering_run_loader,
+        proactive_status_loader,
+        workflow_backend.list_states,
+        canonical_workspace,
+        request_surface,
+    )
+    workflow_projector = WorkflowMissionControlProjector(
+        workspace_id=canonical_workspace
+    )
+    public_loader = MissionControlGatewayLoader(
+        workspace_id=canonical_workspace,
+        snapshot_loader=lambda requested: mission_control_loader(),
+        domain_values_loader=lambda requested: workflow_projector.project(
+            workflow_backend.list_states()
+        ).domain_values,
+    )
+    command_service = TonyCommandService(
+        progress_engine,
+        mission_control_loader=mission_control_loader,
+        github_configured=github_work_loader is not None,
+    )
+    lead_path = Path(
+        os.getenv(
+            "TONY_INBOUND_LEADS_PATH",
+            str(repository_root / ".runtime" / "inbound-leads.json"),
+        )
+    ).resolve()
+    executive_service = TonyExecutiveCommandService(
+        command_service,
+        brief_archive=brief_archive,
+        inbound_lead_loader=build_authoritative_lead_loader(
+            FileInboundLeadStore(lead_path)
+        ),
+        workspace_id=canonical_workspace,
+    )
+    return TonyRuntimeComposition(
+        workspace_id=canonical_workspace,
+        workspace_runtime=workspace_runtime,
+        progress_engine=progress_engine,
+        object_loader=object_loader,
+        brief_archive=brief_archive,
+        mission_control_loader=mission_control_loader,
+        mission_control_gateway_loader=public_loader,
+        command_service=command_service,
+        executive_command_service=executive_service,
+        workflow_backend=workflow_backend,
+    )
 
 
 def build_brief_archive(
@@ -641,7 +823,7 @@ def build_diagnostics_runner(
     return run
 
 
-def build_app() -> TonyHTTPBridge:
+def build_app(*, dispatchers=None) -> TonyHTTPBridge:
     api_key = os.getenv("NARRATIIVE_API_KEY", "").strip()
     if not api_key:
         raise SystemExit("NARRATIIVE_API_KEY is required")
@@ -651,59 +833,31 @@ def build_app() -> TonyHTTPBridge:
     gateway_timeout = float(os.getenv("TONY_GATEWAY_TIMEOUT_SECONDS", "25"))
     adapter = TonyOrchestrationAdapter(HttpGatewayTransport(endpoint, api_key, timeout_seconds=gateway_timeout))
 
-    schema_path = Path(os.getenv(
-        "TONY_GROWTH_OBJECT_SCHEMA",
-        str(REPOSITORY_ROOT / "schemas" / "shared" / "growth-object.schema.json"),
-    ))
-    objects_root = Path(os.getenv("TONY_OBJECTS_ROOT", str(REPOSITORY_ROOT / "clients")))
     runtime_root = Path(os.getenv("NARRATIIVE_RUNTIME_ROOT", ".runtime")).resolve()
-    validator = GrowthObjectValidator.from_path(schema_path)
-    progress_engine = RepositoryProgressEngine(validator)
-    object_loader = lambda: load_growth_objects(objects_root)
-    brief_archive = build_brief_archive(
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+        or "narratiive"
+    )
+    composition = compose_tony_runtime(
         runtime_root=runtime_root,
         repository_root=REPOSITORY_ROOT,
-    )
-    github_work_loader = build_github_work_loader(
-        runtime_root=runtime_root,
-        repository_root=REPOSITORY_ROOT,
-        brief_archive=brief_archive,
-    )
-    engineering_handoff_loader = build_engineering_handoff_loader(
-        runtime_root=runtime_root,
-        repository_root=REPOSITORY_ROOT,
-    )
-    engineering_run_loader = build_engineering_run_loader(
-        runtime_root=runtime_root,
-        repository_root=REPOSITORY_ROOT,
-    )
-    proactive_delivery_status_loader = build_proactive_delivery_status_loader(
-        runtime_root=runtime_root,
-        repository_root=REPOSITORY_ROOT,
-    )
-    mission_control_loader = build_mission_control_loader(
-        progress_engine,
-        object_loader,
-        gateway_health_endpoint,
-        github_work_loader,
-        engineering_handoff_loader,
-        engineering_run_loader,
-        proactive_delivery_status_loader,
-    )
-    command_service = TonyCommandService(
-        progress_engine,
-        mission_control_loader=mission_control_loader,
-        github_configured=github_work_loader is not None,
+        workspace_id=workspace_id,
+        dispatchers=dispatchers,
+        gateway_health_endpoint=gateway_health_endpoint,
     )
     return TonyHTTPBridge(
         adapter,
         bridge_token,
-        command_service=command_service,
-        object_loader=object_loader,
+        command_service=composition.command_service,
+        object_loader=composition.object_loader,
         diagnostics_runner=build_diagnostics_runner(
-            gateway_health_endpoint, command_service, object_loader
+            gateway_health_endpoint,
+            composition.command_service,
+            composition.object_loader,
         ),
-        brief_archive=brief_archive,
+        brief_archive=composition.brief_archive,
+        runtime_composition=composition,
     )
 
 
