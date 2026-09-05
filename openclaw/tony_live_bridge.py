@@ -171,6 +171,7 @@ class LeadAwareTonyApplication:
                 "recover": "recover",
                 "projection": "projection",
                 "sync-notion": "sync-notion",
+                "additional-research": "research",
             }
             command_name = commands.get(operation)
             if command_name is None:
@@ -180,8 +181,8 @@ class LeadAwareTonyApplication:
             inputs = request.get("inputs")
             if inputs is not None and not isinstance(inputs, dict):
                 raise ValueError("workflow inputs must be an object")
-            if inputs and operation != "continue":
-                raise ValueError("workflow inputs are only accepted for continue")
+            if inputs and operation not in {"continue", "additional-research"}:
+                raise ValueError("workflow inputs are only accepted for continue or additional research")
             if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
                 raise ValueError("workflow reference is required")
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")

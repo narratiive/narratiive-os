@@ -36,6 +36,7 @@ const WORKFLOW_OPERATIONS = [
   "status", "current_work", "approvals", "blockers", "latest_artifact",
   "proposed_next_action", "approve", "reject", "request_revision", "continue",
   "resume", "recover", "projection", "sync_notion",
+  "additional_research",
 ];
 const WORKFLOW_APPROVAL_OPERATIONS = new Set(["approve", "reject", "request_revision", "sync_notion"]);
 const WORKFLOW_REFERENCE_OPTIONAL = new Set(["current_work", "approvals", "blockers", "recover"]);
@@ -211,7 +212,7 @@ function approvalTool() {
 function workflowControlTool() {
   return {
     name: "narratiive_workflow_control",
-    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Reports persisted truth; approval, rejection and Notion projection use native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Reports persisted truth; approval, rejection and Notion projection use native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow. Additional research requires a focus (evidence_gap, question or hypothesis) and uses only explicitly approved sources.",
     parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
     async execute(_id, params) {
       try {
