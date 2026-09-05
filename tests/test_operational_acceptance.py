@@ -97,6 +97,33 @@ class OperationalAcceptanceTests(unittest.TestCase):
         self.assertEqual(values["TONY_BRIDGE_TOKEN"], "bridge-secret")
         self.assertEqual(values["NARRATIIVE_API_KEY"], "api-secret")
 
+    def test_roundtrip_scope_uses_configured_workspace_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            workspace_root = root / "workspaces" / "agency"
+            workspace_root.mkdir(parents=True)
+            (workspace_root / "workspace.json").write_text(
+                json.dumps(
+                    {
+                        "workspace_id": "agency",
+                        "client_id": "agency-client",
+                        "display_name": "SAFE Agency",
+                        "created_at": "2026-09-05T00:00:00+00:00",
+                    }
+                ),
+                encoding="utf-8",
+            )
+
+            scope = operational_acceptance.resolve_roundtrip_scope(
+                {},
+                {
+                    "TONY_EXECUTIVE_WORKSPACE_ID": "agency",
+                    "NARRATIIVE_RUNTIME_ROOT": str(root),
+                },
+            )
+
+        self.assertEqual(scope, ("agency", "agency-client"))
+
     def test_launch_agent_check_uses_user_domain_on_macos(self) -> None:
         calls = []
 

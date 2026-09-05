@@ -5,6 +5,7 @@ import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
 from typing import Any, Mapping, Protocol, runtime_checkable
+from urllib.parse import urlsplit, urlunsplit
 
 from runtime.tony_executive_interpretation import interpret_observability_result
 
@@ -64,6 +65,11 @@ class HttpGatewayTransport:
             raise ValueError("gateway endpoint must use HTTPS except on loopback")
         if not bearer_token:
             raise ValueError("bearer_token is required")
+        parts = urlsplit(endpoint)
+        if parts.path in {"", "/"}:
+            endpoint = urlunsplit(
+                (parts.scheme, parts.netloc, "/commands", parts.query, parts.fragment)
+            )
         self.endpoint = endpoint
         self._bearer_token = bearer_token
         self.timeout_seconds = timeout_seconds

@@ -4,11 +4,24 @@ from runtime.tony_orchestration import (
     FakeGatewayTransport,
     TonyCommand,
     TonyGatewayError,
+    HttpGatewayTransport,
     TonyOrchestrationAdapter,
 )
 
 
 class TonyOrchestrationTests(unittest.TestCase):
+    def test_gateway_base_url_resolves_to_canonical_commands_endpoint(self):
+        base = HttpGatewayTransport("http://127.0.0.1:8787/", "test-secret")
+        explicit = HttpGatewayTransport(
+            "http://127.0.0.1:8787/custom-command", "test-secret"
+        )
+
+        self.assertEqual(base.endpoint, "http://127.0.0.1:8787/commands")
+        self.assertEqual(
+            explicit.endpoint,
+            "http://127.0.0.1:8787/custom-command",
+        )
+
     def test_maps_actions_to_public_gateway_with_idempotency_and_correlation(self):
         transport = FakeGatewayTransport([
             {
