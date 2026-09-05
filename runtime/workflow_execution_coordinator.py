@@ -72,7 +72,13 @@ class FileWorkflowArtifactStore:
             artifact_type="workflow_step_output",
             location=str(target),
             checksum=checksum,
-            metadata={"workflow_id": state.workflow_id, "stage_id": stage_id},
+            metadata={
+                "workflow_id": state.workflow_id,
+                "stage_id": stage_id,
+                "parent_artifact_ids": list(
+                    state.input_payload.get("_lineage", {}).get("parent_artifact_ids", ())
+                ) if isinstance(state.input_payload.get("_lineage"), Mapping) else [],
+            },
         )
 
 

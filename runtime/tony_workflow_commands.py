@@ -75,6 +75,9 @@ class FileWorkflowCommandBackend:
             next_action=state.proposed_next_action or "Continue authorised internal workflow preparation.",
             evidence=(f"workflow_run:{state.run_id}",),
         )
+        if state.status.value == "complete" and runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id:
+            outcome = runtime.handoff(state.run_id, lifecycle)
+            return runtime.runs.load_run(outcome.next_run_id or f"{state.run_id}-{runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id}")
         runtime.advance(state.run_id, lifecycle)
         return runtime.runs.load_run(state.run_id)
 

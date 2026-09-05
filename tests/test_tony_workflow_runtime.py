@@ -5,6 +5,7 @@ import unittest
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from tests.test_workflow_quality import discovery_output, proposal_output
 
 
 def _lifecycle(client_id: str) -> ClientLifecycleRecord:
@@ -94,21 +95,21 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             self.assertEqual(restarted.status("safe-blueprint-run")["status"], "complete")
             self.assertEqual(len(calls), 1)
 
-    def test_unimplemented_quality_contract_blocks_before_worker_execution(self) -> None:
+    def test_discovery_preparation_uses_real_validator_and_pauses_for_review(self) -> None:
         calls = []
         with tempfile.TemporaryDirectory() as tmp:
             runtime = build_tony_workflow_runtime(
                 tmp,
                 workspace_id="agency",
                 client_id="safe-client",
-                dispatchers={"Claude": lambda contract: calls.append(contract) or {"discovery_hypotheses": ["x"]}},
+                dispatchers={"Claude": lambda contract: calls.append(contract) or discovery_output()},
                 environ={},
             )
             runtime.enqueue(
                 "blueprint_lite_to_discovery_preparation",
                 "safe-discovery-run",
                 {
-                    "blueprint_lite": "safe",
+                    "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite.",
                     "diagnostic_evidence": {"source": "synthetic"},
                     "company_context": {"name": "SAFE Synthetic Company"},
                 },
@@ -116,12 +117,41 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 correlation_id="safe-correlation",
             )
             outcome = runtime.advance("safe-discovery-run", _lifecycle("safe-client"))
-            self.assertEqual(
-                outcome.blocker,
-                "quality_validator_unavailable:discovery_preparation_quality_gate",
-            )
-            self.assertEqual(calls, [])
+            self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertTrue(runtime.status("safe-discovery-run")["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(len(calls), 1)
             self.assertFalse(outcome.external_action_taken)
+
+    def test_discovery_evidence_produces_quality_gated_proposal_draft(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Claude": lambda contract: proposal_output()},
+                environ={},
+            )
+            runtime.enqueue(
+                "discovery_evidence_to_growth_sprint_proposal",
+                "safe-proposal-run",
+                {
+                    "discovery_evidence": {
+                        "notes": "SAFE synthetic discovery notes with unresolved questions.",
+                        "sources": [{"source_id": "meeting-1", "source_type": "notes", "location": "meeting:synthetic"}],
+                    },
+                    "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite.",
+                    "commercial_context": {"company": "SAFE Synthetic Company"},
+                },
+                entity_id="safe-lead",
+                correlation_id="safe-correlation",
+            )
+            outcome = runtime.advance("safe-proposal-run", _lifecycle("safe-client"))
+
+            state = runtime.status("safe-proposal-run")
+            self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(state["approval_status"], "pending")
+            self.assertFalse(state["external_action_taken"])
 
     def test_workspace_client_scopes_are_durably_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,6 +185,63 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(first.status("shared-run-id")["entity_id"], "lead-one")
             self.assertEqual(second.status("shared-run-id")["entity_id"], "lead-two")
+
+    def test_explicit_approved_handoffs_progress_blueprint_to_discovery_to_proposal(self) -> None:
+        def claude(contract):
+            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            if workflow_id == "growth_diagnostic_to_blueprint_lite":
+                return _blueprint_output()
+            if workflow_id == "blueprint_lite_to_discovery_preparation":
+                return discovery_output()
+            if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                return proposal_output()
+            raise AssertionError(workflow_id)
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Claude": claude},
+                environ={},
+            )
+            runtime.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "safe-commercial-chain",
+                {
+                    "diagnostic_input_package": {"overall_score": 42, "raw_answers": {"challenge": "safe"}},
+                    "company": "SAFE Commercial Chain Test",
+                },
+                entity_id="safe-lead",
+                correlation_id="safe-correlation",
+            )
+            runtime.advance("safe-commercial-chain", _lifecycle("safe-client"))
+            runtime.approve("safe-commercial-chain", approver="authorised-human", rationale="SAFE test approval")
+
+            discovery = runtime.handoff("safe-commercial-chain", _lifecycle("safe-client"))
+            self.assertEqual(discovery.workflow_id, "blueprint_lite_to_discovery_preparation")
+            self.assertEqual(discovery.status, "awaiting_approval")
+            discovery_run = "safe-commercial-chain-blueprint_lite_to_discovery_preparation"
+            runtime.approve(discovery_run, approver="authorised-human", rationale="SAFE test approval")
+            with self.assertRaisesRegex(ValueError, "discovery_evidence"):
+                runtime.handoff(discovery_run, _lifecycle("safe-client"))
+
+            proposal = runtime.handoff(
+                discovery_run,
+                _lifecycle("safe-client"),
+                {
+                    "discovery_evidence": {
+                        "notes": "SAFE synthetic discovery notes with unresolved questions.",
+                        "sources": [{"source_id": "meeting-1", "source_type": "notes", "location": "meeting:synthetic"}],
+                    }
+                },
+            )
+            self.assertEqual(proposal.workflow_id, "discovery_evidence_to_growth_sprint_proposal")
+            self.assertEqual(proposal.status, "awaiting_approval")
+            proposal_state = runtime.status(proposal.run_id)
+            parent_ids = proposal_state["stages"][0]["output_artifacts"][0]["metadata"]["parent_artifact_ids"]
+            self.assertTrue(parent_ids)
+            self.assertFalse(proposal_state["external_action_taken"])
 
 
 if __name__ == "__main__":

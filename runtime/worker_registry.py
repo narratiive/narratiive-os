@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from runtime.workflow_instructions import workflow_instruction
+
 
 WorkerAdapter = Callable[[dict[str, Any]], dict[str, Any]]
 
@@ -202,11 +204,10 @@ def build_tony_worker_registry(
             if not isinstance(context, Mapping):
                 raise RuntimeError("generic Claude work requires workflow context")
             expected = context.get("expected_outputs") or []
-            instruction = (
-                f"Prepare the internal work for workflow {context.get('workflow_id')} "
-                f"step {context.get('stage_id')}. Return the required fields: "
-                f"{', '.join(str(item) for item in expected)}. "
-                f"Satisfy quality contract {context.get('quality_contract')}."
+            instruction = workflow_instruction(
+                str(context.get("workflow_id") or ""),
+                str(context.get("stage_id") or ""),
+                tuple(str(item) for item in expected),
             )
             return claude(
                 {

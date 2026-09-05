@@ -342,6 +342,29 @@ class WorkflowRunService:
         self._commit(state, "external_action.recorded", record)
         return state
 
+    def record_handoff(
+        self,
+        run_id: str,
+        *,
+        next_workflow_id: str,
+        next_run_id: str,
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        self._commit(
+            state,
+            "workflow.handoff_created",
+            {
+                "next_workflow_id": next_workflow_id,
+                "next_run_id": next_run_id,
+                "source_artifact_ids": [
+                    artifact.artifact_id
+                    for stage in state.stages
+                    for artifact in stage.output_artifacts
+                ],
+            },
+        )
+        return state
+
     def recover_interrupted_runs(self) -> int:
         recovered = 0
         for run_id in self.repository.list_run_ids():

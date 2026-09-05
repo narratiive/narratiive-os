@@ -10,6 +10,7 @@ from runtime.tony_blueprint_lite_inbound import (
     TonyInboundBlueprintLiteService,
 )
 from runtime.serialization import workflow_from_dict
+from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 
 
 class TonyInboundBlueprintLiteTests(unittest.TestCase):
@@ -138,6 +139,29 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertTrue(replay["replay"])
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(store.get("lead-1")["versions"]), 1)
+
+    def test_live_inbound_persists_the_same_completed_work_in_generic_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+
+            result = service.process("lead-1")
+            states = FileWorkflowCommandBackend(root / "workflow-runtime", dispatchers={}, environ={}).list_states()
+
+            self.assertEqual(result["state"], "awaiting_review")
+            self.assertEqual(len(states), 1)
+            self.assertEqual(states[0].run_id, "lead-1")
+            self.assertEqual(states[0].status.value, "awaiting_approval")
+            self.assertEqual(states[0].approval_status, "pending")
+            self.assertTrue(states[0].stage("prepare_blueprint_lite").quality_result["passed"])
+            self.assertEqual(len(states[0].stage("prepare_blueprint_lite").output_artifacts), 1)
+            self.assertFalse(states[0].external_action_taken)
 
     def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
         payload = self._payload()

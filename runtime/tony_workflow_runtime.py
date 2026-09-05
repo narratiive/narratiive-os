@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -21,6 +22,12 @@ from runtime.workflow_execution_coordinator import (
     WorkflowExecutionCoordinator,
 )
 from runtime.workflow_registry import build_narratiive_workflow_registry
+from runtime.workflow_quality import (
+    discovery_preparation_quality_gate,
+    growth_sprint_proposal_quality_gate,
+    validate_operational_inputs,
+)
+from runtime.workflow_handoffs import build_next_workflow_inputs
 
 
 @dataclass(slots=True)
@@ -39,6 +46,7 @@ class TonyWorkflowRuntime:
         entity_id: str,
         correlation_id: str,
     ) -> dict[str, Any]:
+        validate_operational_inputs(workflow_id, inputs)
         state = self.coordinator.enqueue(
             workflow_id,
             run_id,
@@ -87,6 +95,54 @@ class TonyWorkflowRuntime:
     def status(self, run_id: str) -> dict[str, Any]:
         return workflow_to_dict(self.runs.load_run(run_id))
 
+    def handoff(
+        self,
+        run_id: str,
+        lifecycle: ClientLifecycleRecord,
+        additional_inputs: Mapping[str, Any] | None = None,
+    ) -> ExecutionOutcome:
+        state = self.runs.load_run(run_id)
+        definition = self.coordinator.registry.resolve(state.workflow_id)
+        if state.status is not WorkflowStatus.COMPLETE:
+            raise ValueError("workflow must be complete before handoff")
+        if state.approval_required and state.approval_status != "approved":
+            raise ValueError("workflow handoff requires explicit approval")
+        if not definition.next_workflow_id:
+            raise ValueError("workflow has no registered next workflow")
+        artifacts = [artifact for stage in state.stages for artifact in stage.output_artifacts]
+        if not artifacts:
+            raise ValueError("workflow handoff requires a persisted artefact")
+        output = self.coordinator.artifacts.root.joinpath(Path(artifacts[-1].location).name)
+        try:
+            value = json.loads(output.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("workflow handoff artefact is unreadable") from exc
+        if not isinstance(value, Mapping):
+            raise ValueError("workflow handoff artefact must be structured")
+        inputs = build_next_workflow_inputs(state, value, additional_inputs)
+        next_definition = self.coordinator.registry.resolve(definition.next_workflow_id)
+        next_stage = next_definition.stages[0]
+        for field in next_stage.output_contract.required_fields:
+            if field not in next_stage.input_contract.required_fields:
+                inputs.pop(field, None)
+        missing = [field for field in next_stage.input_contract.required_fields if field not in inputs or inputs[field] in (None, "", [], {})]
+        if missing:
+            raise ValueError(f"next workflow requires additional inputs: {','.join(missing)}")
+        next_run_id = f"{state.run_id}-{definition.next_workflow_id}"
+        self.enqueue(
+            definition.next_workflow_id,
+            next_run_id,
+            inputs,
+            entity_id=state.entity_id,
+            correlation_id=state.correlation_id,
+        )
+        self.runs.record_handoff(
+            run_id,
+            next_workflow_id=definition.next_workflow_id,
+            next_run_id=next_run_id,
+        )
+        return self.advance(next_run_id, lifecycle)
+
     def list_run_ids(self) -> list[str]:
         return self.runs.repository.list_run_ids()
 
@@ -122,6 +178,8 @@ def build_tony_workflow_runtime(
     configured_dispatchers = dict(dispatchers) if dispatchers is not None else build_http_dispatchers(environ)
     validators: dict[str, QualityValidator] = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
+        "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
+        "growth_sprint_proposal_quality_gate": growth_sprint_proposal_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
     coordinator = WorkflowExecutionCoordinator(
