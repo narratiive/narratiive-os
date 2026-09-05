@@ -187,6 +187,20 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(state.blocker, "quality_failed:quality")
         self.assertEqual(state.stage("draft").quality_result["failed_checks"], ["substantive"])
 
+    def test_present_empty_collection_is_decided_by_quality_contract(self) -> None:
+        definition = WorkflowDefinition("empty-collection", (_stage("draft", outputs=("findings",)),))
+        coordinator = self._coordinator(
+            definition,
+            _worker(lambda contract: {"findings": []}),
+            {"quality": lambda output: {"passed": False, "failed_checks": ["findings_present"]}},
+        )
+        coordinator.enqueue("empty-collection", "run-empty", {"brief": "safe"}, entity_id="e", correlation_id="c")
+
+        outcome = coordinator.advance("run-empty", _lifecycle())
+
+        self.assertEqual(outcome.blocker, "quality_failed:quality")
+        self.assertEqual(self.runs.load_run("run-empty").stage("draft").quality_result["failed_checks"], ["findings_present"])
+
     def test_worker_unavailable_becomes_explicit_blocker(self) -> None:
         definition = WorkflowDefinition("no-worker", (_stage("draft", capability="market_research"),))
         coordinator = self._coordinator(definition, CapabilityWorkerRegistry())

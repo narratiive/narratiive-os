@@ -4,7 +4,9 @@ import unittest
 
 from runtime.workflow_quality import (
     discovery_preparation_quality_gate,
+    growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
+    research_evidence_quality_gate,
     validate_operational_inputs,
 )
 
@@ -68,6 +70,47 @@ def proposal_output() -> dict:
     }
 
 
+def growth_blueprint_output() -> dict:
+    def section(label: str, evidence: str) -> dict:
+        return {
+            "diagnosis": f"The supplied evidence indicates that {label} is a material growth question whose current ambiguity constrains commercial choice and makes execution less coherent than the leadership ambition requires.",
+            "evidence_refs": [evidence],
+            "implication": f"Narratiive should make an explicit {label} choice before downstream activation is commissioned.",
+            "uncertainties": [f"Direct validation of {label} remains incomplete."],
+        }
+
+    return {
+        "market_category_diagnosis": section("market and category", "ev-1"),
+        "audience": section("priority audience", "ev-2"),
+        "growth_barriers": section("growth barriers", "ev-1"),
+        "source_of_difference": section("source of difference", "ev-2"),
+        "positioning": section("positioning", "ev-1"),
+        "narrative": section("narrative platform", "ev-2"),
+        "growth_opportunity": section("growth opportunity", "ev-1"),
+        "activation_implications": section("activation implications", "ev-2"),
+        "key_strategic_choices": [
+            {"choice": "Prioritise the urgent audience", "tradeoff": "Reject broad relevance", "evidence_refs": ["ev-1"]},
+            {"choice": "Lead with a category point of view", "tradeoff": "Reduce feature-led flexibility", "evidence_refs": ["ev-2"]},
+            {"choice": "Use proof earlier", "tradeoff": "Simplify the opening story", "evidence_refs": ["ev-1", "ev-2"]},
+        ],
+        "evidence_and_uncertainty": ["Customer interviews remain limited.", "The competitor response is uncertain.", "Channel performance evidence is an open input."],
+        "fact_interpretation_hypothesis_lineage": [
+            {"claim": "The brief prioritises demand quality.", "classification": "fact", "source_refs": ["ev-1"]},
+            {"claim": "Broad positioning is reducing choice.", "classification": "interpretation", "source_refs": ["ev-1", "ev-2"]},
+            {"claim": "Earlier proof may improve conversion.", "classification": "hypothesis", "source_refs": ["ev-2"]},
+        ],
+        "evidence_lineage": [
+            {"claim": "Demand quality is a stated priority.", "classification": "fact", "source_refs": ["ev-1"]},
+            {"claim": "Category language is currently broad.", "classification": "fact", "source_refs": ["ev-2"]},
+            {"claim": "Broad language weakens distinction.", "classification": "interpretation", "source_refs": ["ev-1", "ev-2"]},
+            {"claim": "An urgent audience should lead.", "classification": "hypothesis", "source_refs": ["ev-1"]},
+            {"claim": "Earlier proof may improve confidence.", "classification": "hypothesis", "source_refs": ["ev-2"]},
+        ],
+        "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
 class WorkflowQualityTests(unittest.TestCase):
     def test_discovery_preparation_requires_substance_lineage_and_uncertainty(self) -> None:
         result = discovery_preparation_quality_gate(discovery_output())
@@ -107,6 +150,37 @@ class WorkflowQualityTests(unittest.TestCase):
         invalid["discovery_evidence"] = {"notes": "Unprovenanced notes"}
         with self.assertRaisesRegex(ValueError, "source provenance"):
             validate_operational_inputs("discovery_evidence_to_growth_sprint_proposal", invalid)
+
+    def test_research_gate_requires_provenance_allocation_and_linked_findings(self) -> None:
+        output = {
+            "research_tasks": [{"task_id": "task-1", "question": "What matters?", "required_capability": "market_research", "assigned_worker": "narratiive-research-engine"}],
+            "evidence_pack": {"records": [{"evidence_id": "ev-1"}], "sources": [{"policy": {"approved": True}}]},
+            "source_provenance": [{"source_id": "source-1", "content_hash": "abc", "retrieved_at": "2026-09-05T00:00:00Z"}],
+            "consolidated_findings": [{"statement": "Synthetic evidence", "classification": "fact", "evidence_refs": ["ev-1"], "source_refs": ["source-1"]}],
+            "contradictions": [],
+            "research_gaps": ["Customer evidence remains unavailable"],
+            "further_research_requests": [{"gap": "Customer evidence", "status": "requires_additional_approved_source"}],
+            "fact_interpretation_hypothesis_lineage": {"facts": [{"statement": "Synthetic evidence"}], "interpretations": [], "hypotheses": []},
+            "external_action_taken": False,
+        }
+        self.assertTrue(research_evidence_quality_gate(output)["passed"])
+        output["source_provenance"] = []
+        self.assertFalse(research_evidence_quality_gate(output)["passed"])
+
+    def test_source_publication_metadata_is_not_an_external_action_claim(self) -> None:
+        output = growth_blueprint_output()
+        output["evidence_lineage"][0]["published_at"] = "2026-09-05T00:00:00Z"
+
+        self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
+
+        output["release_status"] = "Client-facing publication completed"
+        self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_growth_blueprint_gate_requires_substantive_strategy_and_lineage(self) -> None:
+        output = growth_blueprint_output()
+        self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
+        output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
+        self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
 
 
 if __name__ == "__main__":

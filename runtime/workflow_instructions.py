@@ -8,6 +8,9 @@ Prepare an internal Discovery Preparation grounded in the supplied Growth Diagno
     "discovery_evidence_to_growth_sprint_proposal": """
 Prepare an internal, bespoke Growth Sprint proposal package grounded only in the supplied Discovery evidence, Blueprint Lite and commercial context. Return top-level JSON fields exactly as requested. Include a substantive discovery_synthesis; a clear growth_problem_or_opportunity; why_further_strategic_work_is_justified; at least three bounded proposed_scope items; workstreams_and_questions objects; expected_growth_blueprint_outputs; assumptions_and_dependencies; and evidence_lineage objects with claim, classification and source_refs. commercial_proposal_inputs must contain timeline, investment_recommendation, human_approval_required=true and approval_status=pending. draft_client_communication is a reviewable draft only. Do not send it, update Notion, accept commercial terms or claim any external action occurred.
 """,
+    "research_to_growth_blueprint": """
+Prepare an internal Growth Blueprint strategic draft from the approved Growth Sprint scope and the supplied evidence pack. Return every requested top-level field. Each strategic section (market_category_diagnosis, audience, growth_barriers, source_of_difference, positioning, narrative, growth_opportunity and activation_implications) must be an object with a substantive diagnosis, evidence_refs, a commercially useful implication and an uncertainties list. Include at least three key_strategic_choices with choice, tradeoff and evidence_refs. Keep Fact, Interpretation and Hypothesis distinct in fact_interpretation_hypothesis_lineage and retain claim-level evidence_lineage. evidence_and_uncertainty must state contradictions, limits and open inputs. recommendation may be advance only when this internal draft is genuinely ready for human review. Do not claim canonical approval, client release, presentation export or any external action.
+""",
 }
 
 

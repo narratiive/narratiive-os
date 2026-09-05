@@ -40,7 +40,7 @@ class WorkflowRegistryTests(unittest.TestCase):
                 self.assertTrue(step.output_contract.required_fields)
                 self.assertTrue(step.quality_contract)
                 self.assertGreaterEqual(step.retry_policy.max_attempts, 1)
-                self.assertEqual(step.side_effect_classification, "preparation")
+                self.assertIn(step.side_effect_classification, {"preparation", "external_read"})
                 self.assertTrue(step.approval_policy.before_external_action)
 
     def test_blueprint_lite_and_consequential_preparation_contracts_remain_human_gated(self) -> None:
@@ -68,6 +68,8 @@ class WorkflowRegistryTests(unittest.TestCase):
         registry = build_narratiive_workflow_registry()
         research = registry.resolve("growth_sprint_to_research_engine").stages[0]
         self.assertIn("source_provenance", research.output_contract.required_fields)
+        self.assertIn("research_sources", research.input_contract.required_fields)
+        self.assertEqual(research.side_effect_classification, "external_read")
         blueprint = registry.resolve("research_to_growth_blueprint").stages[0]
         self.assertEqual(
             set(blueprint.output_contract.required_fields),
@@ -80,7 +82,11 @@ class WorkflowRegistryTests(unittest.TestCase):
                 "narrative",
                 "growth_opportunity",
                 "activation_implications",
+                "key_strategic_choices",
+                "evidence_and_uncertainty",
+                "fact_interpretation_hypothesis_lineage",
                 "evidence_lineage",
+                "recommendation",
             },
         )
         self.assertTrue(blueprint.approval_policy.required)

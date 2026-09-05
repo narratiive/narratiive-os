@@ -192,6 +192,7 @@ class CapabilityWorkerRegistry:
 def build_tony_worker_registry(
     dispatchers: Mapping[str, WorkerAdapter],
     environ: Mapping[str, str] | None = None,
+    research_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
@@ -240,14 +241,33 @@ def build_tony_worker_registry(
             )
         )
 
+    if research_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-research-engine",
+                    provider="narratiive-os",
+                    capabilities=("market_research", "web_research"),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("external_read",),
+                    timeout_seconds=120,
+                    max_attempts=1,
+                    cost_class="source_dependent",
+                    selection_priority=5,
+                ),
+                research_adapter,
+            )
+        )
+
     planned = (
-        ("market-research-unavailable", ("market_research", "web_research")),
         ("document-generation-unavailable", ("document_generation", "deck_generation")),
         ("creative-production-unavailable", ("creative_asset_production", "image_generation", "video_generation")),
         ("crm-operations-unavailable", ("crm_operations",)),
         ("email-operations-unavailable", ("email_preparation", "email_sending")),
         ("calendar-operations-unavailable", ("calendar_operations",)),
     )
+    if research_adapter is None:
+        planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
     for worker_id, capabilities in planned:
         registrations.append(
             WorkerRegistration(
