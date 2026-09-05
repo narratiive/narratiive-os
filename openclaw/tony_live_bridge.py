@@ -235,11 +235,15 @@ def build_app() -> LeadAwareTonyApplication:
     adaptive_service = TonyAdaptiveResponseCommandService(learning_service, learning_store_path=executive_learning_path)
     memory_service = TonyMemoryCommandService(adaptive_service, ExecutiveMemoryStore(Path(os.getenv("TONY_EXECUTIVE_MEMORY_PATH", str(REPOSITORY_ROOT / ".runtime" / "executive-memory.jsonl")))), agency_id=workspace_id)
     live_dispatchers = build_http_dispatchers()
+    workflow_runtime_root = Path(
+        os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))
+    )
     blueprint_lite_service = TonyInboundBlueprintLiteService(
         FileBlueprintLitePreparationStore(
             Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
         ),
         dispatchers=live_dispatchers,
+        workflow_runtime_root=workflow_runtime_root,
     )
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))))
 
@@ -278,7 +282,7 @@ def build_app() -> LeadAwareTonyApplication:
     workflow_command_service = TonyWorkflowCommandService(
         app.command_service,
         FileWorkflowCommandBackend(
-            Path(os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))),
+            workflow_runtime_root,
             dispatchers=live_dispatchers,
         ),
     )

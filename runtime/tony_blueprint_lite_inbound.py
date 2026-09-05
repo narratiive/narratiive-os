@@ -89,11 +89,13 @@ class TonyInboundBlueprintLiteService:
         dispatchers: Mapping[str, DispatchHandler] | None = None,
         router: TonyExecutiveToolRouter | None = None,
         worker_registry: CapabilityWorkerRegistry | None = None,
+        workflow_runtime_root: Path | None = None,
     ) -> None:
         self.store = store
         self.dispatchers = dict(dispatchers or {})
         self.worker_registry = worker_registry or build_tony_worker_registry(self.dispatchers)
         self.router = router or TonyExecutiveToolRouter()
+        self.workflow_runtime_root = workflow_runtime_root
         self._active: set[str] = set()
         self._active_lock = threading.Lock()
 
@@ -408,6 +410,26 @@ class TonyInboundBlueprintLiteService:
             "quality_gate": quality,
         }
         versions.append(version)
+        try:
+            self._persist_generic_workflow(state, evidence, quality)
+        except Exception as exc:
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "workflow_runtime_persistence_failed",
+                "Repair durable generic workflow persistence before human review.",
+            )
+            state.update(
+                {
+                    "state": "blocked",
+                    "blocker": "workflow_runtime_persistence_failed",
+                    "failure": type(exc).__name__,
+                    "updated_at": _now(),
+                    "workflow_run": workflow_to_dict(workflow),
+                }
+            )
+            self.store.put(lead_id, state)
+            return self._public_state(state)
         artifact_content = json.dumps(evidence, sort_keys=True, default=str)
         WorkflowEngine().complete_stage(
             workflow,
@@ -439,6 +461,57 @@ class TonyInboundBlueprintLiteService:
         state.pop("failed_checks", None)
         self.store.put(lead_id, state)
         return self._public_state(state)
+
+    def _persist_generic_workflow(
+        self,
+        record: Mapping[str, Any],
+        evidence: Mapping[str, Any],
+        quality: Mapping[str, Any],
+    ) -> None:
+        if self.workflow_runtime_root is None:
+            return
+        from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+
+        lead_id = str(record.get("lead_id") or "").strip()
+        runtime = build_tony_workflow_runtime(
+            self.workflow_runtime_root,
+            workspace_id="narratiive",
+            client_id=lead_id,
+            dispatchers=self.dispatchers,
+        )
+        inputs = {
+            "diagnostic_input_package": dict(record.get("diagnostic_input_package") or {}),
+            "company": str(record.get("company") or ""),
+            "contact": str(record.get("contact") or ""),
+            "email": str(record.get("email") or ""),
+        }
+        state = runtime.coordinator.enqueue(
+            BLUEPRINT_LITE_WORKFLOW.workflow_id,
+            lead_id,
+            inputs,
+            entity_id=lead_id,
+            correlation_id=lead_id,
+        )
+        if state.status.value in {"awaiting_approval", "complete"}:
+            return
+        stage_id = state.current_stage_id or "prepare_blueprint_lite"
+        runtime.runs.start_stage(lead_id, stage_id)
+        runtime.runs.record_attempt(
+            lead_id,
+            stage_id,
+            {"status": "returned", "source": "blueprint_lite_live_inbound"},
+        )
+        runtime.runs.record_quality(lead_id, stage_id, quality)
+        current = runtime.runs.load_run(lead_id)
+        artifact = runtime.coordinator.artifacts.persist(current, stage_id, evidence)
+        required = current.stage(stage_id).expected_outputs
+        durable_outputs = {field: evidence[field] for field in required}
+        runtime.runs.merge_inputs(lead_id, durable_outputs)
+        runtime.runs.complete_stage(lead_id, stage_id, (artifact,), durable_outputs.keys())
+        runtime.runs.pause_for_approval(
+            lead_id,
+            "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
+        )
 
     def status(self, lead_id: str) -> dict[str, Any] | None:
         state = self.store.get(lead_id)

@@ -52,9 +52,13 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertEqual(step.agent_ref, "")
         discovery = registry.resolve("blueprint_lite_to_discovery_preparation").stages[0]
         self.assertIn("suggested_meeting_objective", discovery.output_contract.required_fields)
+        self.assertIn("what_we_currently_believe", discovery.output_contract.required_fields)
+        self.assertIn("evidence_lineage", discovery.output_contract.required_fields)
         self.assertTrue(discovery.approval_policy.required)
         proposal = registry.resolve("discovery_evidence_to_growth_sprint_proposal").stages[0]
         self.assertIn("draft_client_communication", proposal.output_contract.required_fields)
+        self.assertIn("growth_problem_or_opportunity", proposal.output_contract.required_fields)
+        self.assertIn("expected_growth_blueprint_outputs", proposal.output_contract.required_fields)
         self.assertTrue(proposal.approval_policy.required)
         delivery = registry.resolve("asset_review_to_delivery_preparation").stages[0]
         self.assertIn("proposed_delivery_action", delivery.output_contract.required_fields)
