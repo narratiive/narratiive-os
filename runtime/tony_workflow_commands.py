@@ -19,7 +19,7 @@ class WorkflowCommandBackend(Protocol):
     def approve(self, state: WorkflowState, *, approver: str, rationale: str) -> WorkflowState: ...
     def reject(self, state: WorkflowState, *, reviewer: str, rationale: str) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
-    def advance(self, state: WorkflowState) -> WorkflowState: ...
+    def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def recover(self) -> int: ...
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
@@ -67,7 +67,7 @@ class FileWorkflowCommandBackend:
         runtime.resume(state.run_id)
         return runtime.runs.load_run(state.run_id)
 
-    def advance(self, state: WorkflowState) -> WorkflowState:
+    def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState:
         runtime = self._runtime(state)
         lifecycle = ClientLifecycleRecord(
             client_id=state.client_id,
@@ -78,8 +78,10 @@ class FileWorkflowCommandBackend:
             evidence=(f"workflow_run:{state.run_id}",),
         )
         if state.status.value == "complete" and runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id:
-            outcome = runtime.handoff(state.run_id, lifecycle)
+            outcome = runtime.handoff(state.run_id, lifecycle, additional_inputs)
             return runtime.runs.load_run(outcome.next_run_id or f"{state.run_id}-{runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id}")
+        if additional_inputs:
+            raise ValueError("additional inputs can only be supplied to an approved cross-workflow handoff")
         runtime.advance(state.run_id, lifecycle)
         return runtime.runs.load_run(state.run_id)
 
@@ -157,6 +159,7 @@ class TonyWorkflowCommandService:
         objects: Iterable[dict[str, Any]],
         *,
         principal_id: str = "",
+        inputs: Mapping[str, Any] | None = None,
     ) -> CommandResponse:
         normalized = " ".join(command.strip().split())
         try:
@@ -222,7 +225,7 @@ class TonyWorkflowCommandService:
             if name == "resume":
                 changed = self.backend.resume(state)
                 return CommandResponse(name, "healthy", f"Resumed {changed.run_id} from persisted state. No external action was performed.", self._summary(changed))
-            changed = self.backend.advance(state)
+            changed = self.backend.advance(state, inputs)
             return CommandResponse("continue", changed.status.value, f"Re-evaluated {changed.run_id}: {changed.status.value.replace('_', ' ')}.", self._summary(changed))
         except LookupError as exc:
             return self._error(name, "workflow_not_found", str(exc))

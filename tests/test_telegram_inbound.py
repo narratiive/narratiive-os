@@ -39,10 +39,14 @@ class FakeAgentGateway:
 
 
 class FakeWorkflowCommands:
+    def __init__(self):
+        self.calls = []
+
     def supports(self, text):
         return text.startswith("/workflow")
 
-    def execute(self, text, objects, *, principal_id=""):
+    def execute(self, text, objects, *, principal_id="", inputs=None):
+        self.calls.append({"text": text, "principal_id": principal_id, "inputs": inputs})
         return type(
             "Response",
             (),
@@ -203,6 +207,50 @@ class TelegramInboundTests(unittest.TestCase):
 
         self.assertEqual(call("telegram:123")["reply"], "principal:telegram:123")
         self.assertEqual(call("telegram:999")["reply"], "principal:")
+
+    def test_native_workflow_control_passes_structured_inputs_and_only_marks_explicit_approval(self):
+        workflows = FakeWorkflowCommands()
+        app = LeadAwareTonyApplication(
+            FakeBase(),
+            DummyLeadStore(),
+            agent_gateway=FakeAgentGateway(),
+            workflow_command_service=workflows,
+        )
+
+        def call(body):
+            raw = json.dumps(body).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST",
+                "PATH_INFO": "/workflow/control",
+                "CONTENT_LENGTH": str(len(raw)),
+                "HTTP_AUTHORIZATION": "Bearer secret",
+                "wsgi.input": io.BytesIO(raw),
+            }
+            response = b"".join(app(environ, lambda status, headers: None))
+            return json.loads(response.decode("utf-8"))
+
+        call({
+            "operation": "continue",
+            "reference": "SAFE Director's Company",
+            "inputs": {"discovery_evidence": {"notes": "SAFE evidence"}},
+        })
+        call({
+            "operation": "approve",
+            "reference": "SAFE Company",
+            "rationale": "Reviewed internal work",
+            "approval_granted": False,
+        })
+        call({
+            "operation": "approve",
+            "reference": "SAFE Company",
+            "rationale": "Reviewed internal work",
+            "approval_granted": True,
+        })
+
+        self.assertEqual(workflows.calls[0]["inputs"]["discovery_evidence"]["notes"], "SAFE evidence")
+        self.assertIn("SAFE Director", workflows.calls[0]["text"])
+        self.assertEqual(workflows.calls[1]["principal_id"], "")
+        self.assertEqual(workflows.calls[2]["principal_id"], "openclaw:native-approval")
 
 
 if __name__ == "__main__":

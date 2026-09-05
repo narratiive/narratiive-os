@@ -19,6 +19,7 @@ EXPECTED_CONTROL_PLANE_TOOLS = {
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",
+    "narratiive_workflow_control",
 }
 LEGACY_STATE_TOOLS = {
     "narratiive_executive_brief",
@@ -130,7 +131,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertNotIn("sessions_send", agents["tony"]["tools"]["deny"])
         self.assertIn("message", agents["tony"]["tools"]["deny"])
 
-    def test_control_plane_contract_is_three_stable_capability_tools(self) -> None:
+    def test_control_plane_contract_exposes_stable_capability_tools(self) -> None:
         manifest = json.loads(
             (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "openclaw.plugin.json").read_text(encoding="utf-8")
         )
@@ -144,6 +145,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
 
         source = (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "index.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_read_state"', source)
+        self.assertIn('name: "narratiive_workflow_control"', source)
         self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
         self.assertIn('if (view === "open_work") return "/mission";', source)
         self.assertNotIn('return "/what\'s the status"', source)

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import shlex
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
@@ -81,6 +82,8 @@ class LeadAwareTonyApplication:
             return self._ingest(environ, start_response)
         if method == "POST" and path == "/telegram/inbound":
             return self._telegram_inbound(environ, start_response)
+        if method == "POST" and path == "/workflow/control":
+            return self._workflow_control(environ, start_response)
         return self.base(environ, start_response)
 
     @staticmethod
@@ -143,6 +146,64 @@ class LeadAwareTonyApplication:
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_telegram_message", "message": str(exc)}})
         return self._respond(start_response, status, payload)
+
+    def _workflow_control(self, environ, start_response):
+        denied = self._authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.workflow_command_service is None:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "workflow_control_unavailable", "message": "Workflow control is not configured"}})
+        try:
+            request = self._read_json(environ)
+            operation = str(request.get("operation") or "").strip().casefold().replace("_", "-")
+            commands = {
+                "status": "workflow",
+                "current-work": "work",
+                "approvals": "approvals",
+                "blockers": "blockers",
+                "latest-artifact": "artefact",
+                "proposed-next-action": "proposed",
+                "approve": "approve",
+                "reject": "reject",
+                "request-revision": "reject",
+                "continue": "continue",
+                "resume": "resume",
+                "recover": "recover",
+                "projection": "projection",
+                "sync-notion": "sync-notion",
+            }
+            command_name = commands.get(operation)
+            if command_name is None:
+                raise ValueError("unsupported workflow operation")
+            reference = str(request.get("reference") or "").strip()
+            rationale = str(request.get("rationale") or "").strip()
+            inputs = request.get("inputs")
+            if inputs is not None and not isinstance(inputs, dict):
+                raise ValueError("workflow inputs must be an object")
+            if inputs and operation != "continue":
+                raise ValueError("workflow inputs are only accepted for continue")
+            if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
+                raise ValueError("workflow reference is required")
+            command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
+            if rationale:
+                command += f" because {shlex.quote(rationale)}"
+            approval_operations = {"approve", "reject", "request-revision", "sync-notion"}
+            principal = "openclaw:native-approval" if operation in approval_operations and request.get("approval_granted") is True else ""
+            response = self.workflow_command_service.execute(
+                command,
+                (),
+                principal_id=principal,
+                inputs=inputs,
+            )
+            payload = {
+                "ok": response.status != "error",
+                "reply": response.message[:3500],
+                "message": response.message[:3500],
+                **response.to_dict(),
+            }
+            return self._respond(start_response, HTTPStatus.OK, payload)
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_workflow_control", "message": str(exc)}})
 
     def _ingest(self, environ, start_response):
         denied = self._authorize(environ, start_response)
