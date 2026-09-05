@@ -32,7 +32,10 @@ Use the actual user ID returned by `id -u` in the restart commands. Secrets are 
 `TONY_EXECUTIVE_WORKSPACE_ID` selects the existing workspace used for immutable
 morning and evening brief artifacts. If it is omitted, briefs use the legacy
 local runtime. This archive remains available whether or not GitHub awareness
-is configured.
+is configured. The same registered workspace also scopes Mission Control and
+executive workflow controls. Generic workflow records are read only from the
+client tenant bound by that workspace's `client_id`; records for any other
+tenant remain invisible.
 
 To enable Tony's read-only GitHub awareness for one repository, also configure:
 

@@ -12,10 +12,76 @@ from runtime import server
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_commands import TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from runtime.workspaces import WorkspaceRuntimeManager
 from tests.test_workflow_mission_control import _blueprint_output
 
 
 class TonyRuntimeCompositionTests(unittest.TestCase):
+    def test_registered_executive_workspace_reads_only_its_bound_workflow_tenant(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            runtime_root = root / "runtime"
+            workflow_root = root / "workflow-runtime"
+            WorkspaceRuntimeManager(runtime_root, root).create(
+                "agency", "narratiive", "SAFE Narratiive workspace"
+            )
+            narratiive = build_tony_workflow_runtime(
+                workflow_root,
+                workspace_id="narratiive",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            narratiive.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "safe-bound-run",
+                {"diagnostic_input_package": {"overall_score": 42}},
+                entity_id="safe-lead",
+                correlation_id="safe-correlation",
+            )
+            foreign = build_tony_workflow_runtime(
+                workflow_root,
+                workspace_id="foreign",
+                client_id="foreign-client",
+                dispatchers={},
+                environ={},
+            )
+            foreign.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "safe-foreign-run",
+                {"diagnostic_input_package": {"overall_score": 42}},
+                entity_id="safe-foreign-lead",
+                correlation_id="safe-foreign-correlation",
+            )
+
+            with mock.patch.dict(
+                "os.environ",
+                {
+                    "TONY_WORKFLOW_RUNTIME_ROOT": str(workflow_root),
+                    "TONY_OBJECTS_ROOT": str(root / "objects"),
+                },
+                clear=True,
+            ):
+                composition = tony_http_bridge.compose_tony_runtime(
+                    runtime_root=runtime_root,
+                    repository_root=Path(__file__).resolve().parents[1],
+                    workspace_id="agency",
+                    require_workspace=True,
+                    gateway_health_endpoint="",
+                )
+
+            states = composition.workflow_backend.list_states()
+            self.assertEqual(composition.workspace_id, "agency")
+            self.assertEqual(composition.workflow_workspace_id, "narratiive")
+            self.assertEqual([state.run_id for state in states], ["safe-bound-run"])
+            self.assertEqual(
+                [
+                    run["run_id"]
+                    for run in composition.mission_control_loader().workflow_runs
+                ],
+                ["safe-bound-run"],
+            )
+
     def test_live_bridge_reuses_composed_workflow_backend(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
