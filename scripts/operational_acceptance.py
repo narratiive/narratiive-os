@@ -12,6 +12,8 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
+from runtime.workspaces import Workspace
+
 
 @dataclass(frozen=True, slots=True)
 class CheckResult:
@@ -101,6 +103,51 @@ def read_env_file(path: Path) -> dict[str, str]:
     return values
 
 
+def resolve_roundtrip_scope(
+    environment: dict[str, str],
+    file_environment: dict[str, str],
+) -> tuple[str, str]:
+    """Resolve the health probe to an existing configured workspace."""
+
+    def configured(*names: str) -> str:
+        for name in names:
+            value = str(environment.get(name) or file_environment.get(name) or "").strip()
+            if value:
+                return value
+        return ""
+
+    workspace_id = configured(
+        "NARRATIIVE_HEALTH_WORKSPACE_ID",
+        "TONY_EXECUTIVE_WORKSPACE_ID",
+        "TONY_GITHUB_WORKSPACE_ID",
+    )
+    client_id = configured("NARRATIIVE_HEALTH_CLIENT_ID")
+    if workspace_id and not client_id:
+        runtime_root = Path(
+            configured("NARRATIIVE_RUNTIME_ROOT") or ".runtime"
+        ).expanduser()
+        try:
+            metadata = json.loads(
+                (
+                    runtime_root
+                    / "workspaces"
+                    / workspace_id
+                    / "workspace.json"
+                ).read_text(encoding="utf-8")
+            )
+            client_id = Workspace.from_dict(metadata).client_id
+        except (
+            OSError,
+            UnicodeDecodeError,
+            json.JSONDecodeError,
+            ValueError,
+            KeyError,
+            TypeError,
+        ):
+            pass
+    return workspace_id or "system", client_id or "system"
+
+
 def check_launch_agent(label: str, runner: Callable = subprocess.run) -> CheckResult:
     if platform.system() != "Darwin":
         return CheckResult(label, True, "not checked outside macOS")
@@ -160,8 +207,7 @@ def main() -> None:
     secret_file = Path(os.getenv("NARRATIIVE_ENV_FILE", "~/.config/narratiive/runtime.env"))
     file_env = read_env_file(secret_file)
     bridge_token = os.getenv("TONY_BRIDGE_TOKEN", file_env.get("TONY_BRIDGE_TOKEN", ""))
-    workspace_id = os.getenv("NARRATIIVE_HEALTH_WORKSPACE_ID", "system")
-    client_id = os.getenv("NARRATIIVE_HEALTH_CLIENT_ID", "system")
+    workspace_id, client_id = resolve_roundtrip_scope(dict(os.environ), file_env)
     exit_code, report = run_checks(
         runtime_url,
         bridge_url,
