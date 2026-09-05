@@ -15,6 +15,7 @@ from runtime.autonomy_planner import AutonomyAction, TonyAutonomyPlanner
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.models import ArtifactRef, StageStatus, WorkflowState, WorkflowStatus
 from runtime.run_service import WorkflowRunService
+from runtime.serialization import artifact_to_dict
 from runtime.worker_registry import (
     CapabilityWorkerRegistry,
     MalformedWorkerOutput,
@@ -47,9 +48,38 @@ class FileWorkflowArtifactStore:
         self.root.mkdir(parents=True, exist_ok=True)
 
     def persist(self, state: WorkflowState, stage_id: str, output: Mapping[str, Any]) -> ArtifactRef:
+        return self._persist(state, stage_id, output, artifact_type="workflow_step_output")
+
+    def persist_attempt(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+        output: Mapping[str, Any],
+        attempt_number: int,
+    ) -> ArtifactRef:
+        return self._persist(
+            state,
+            stage_id,
+            output,
+            artifact_type="worker_attempt_output",
+            discriminator=f"attempt-{attempt_number}",
+        )
+
+    def _persist(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+        output: Mapping[str, Any],
+        *,
+        artifact_type: str,
+        discriminator: str = "accepted",
+    ) -> ArtifactRef:
         encoded = json.dumps(dict(output), sort_keys=True, separators=(",", ":")).encode("utf-8")
         checksum = hashlib.sha256(encoded).hexdigest()
-        identity = hashlib.sha256(f"{state.run_id}:{stage_id}".encode("utf-8")).hexdigest()
+        identity_source = f"{state.run_id}:{stage_id}"
+        if discriminator != "accepted":
+            identity_source += f":{discriminator}"
+        identity = hashlib.sha256(identity_source.encode("utf-8")).hexdigest()
         artifact_id = f"artifact-{identity[:16]}-{checksum[:16]}"
         target = self.root / f"{artifact_id}.json"
         if target.exists():
@@ -69,7 +99,7 @@ class FileWorkflowArtifactStore:
                     os.unlink(temporary)
         return ArtifactRef(
             artifact_id=artifact_id,
-            artifact_type="workflow_step_output",
+            artifact_type=artifact_type,
             location=str(target),
             checksum=checksum,
             metadata={
@@ -240,15 +270,6 @@ class WorkflowExecutionCoordinator:
                     lifecycle,
                 )
 
-            self.runs.record_attempt(
-                run_id,
-                stage.stage_id,
-                {
-                    "status": "returned",
-                    "worker_id": worker.worker_id,
-                    "worker_attempt": output.get("worker_execution", {}).get("attempt"),
-                },
-            )
             missing = [
                 field
                 for field in stage_definition.output_contract.required_fields
@@ -268,6 +289,22 @@ class WorkflowExecutionCoordinator:
                     }
             else:
                 quality = {"passed": True, "failed_checks": []}
+            attempt_evidence: dict[str, Any] = {
+                "status": "returned",
+                "worker_id": worker.worker_id,
+                "worker_attempt": output.get("worker_execution", {}).get("attempt"),
+                "quality_passed": quality.get("passed") is True,
+            }
+            if quality.get("passed") is not True:
+                current = self.runs.load_run(run_id)
+                candidate = self.artifacts.persist_attempt(
+                    current,
+                    stage.stage_id,
+                    output,
+                    len(current.stage(stage.stage_id).attempts) + 1,
+                )
+                attempt_evidence["candidate_artifact"] = artifact_to_dict(candidate)
+            self.runs.record_attempt(run_id, stage.stage_id, attempt_evidence)
             self.runs.record_quality(run_id, stage.stage_id, quality)
             if quality.get("passed") is not True:
                 state = self.runs.block_for_reason(
