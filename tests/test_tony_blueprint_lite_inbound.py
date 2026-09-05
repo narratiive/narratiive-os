@@ -102,6 +102,10 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(calls[0]["worker"], "Claude")
             self.assertEqual(calls[0]["execution_mode"], "autonomous_prepare")
             self.assertIn("diagnostic_input_package", calls[0]["target"])
+            self.assertEqual(
+                calls[0]["target"]["diagnostic_input_coverage_assessment"],
+                {"complete": True, "missing_inputs": []},
+            )
             persisted = store.get("lead-1")
             self.assertEqual(len(persisted["versions"]), 1)
             self.assertEqual(persisted["versions"][0]["evidence"]["blueprint_lite"], self._good_evidence()["blueprint_lite"])
