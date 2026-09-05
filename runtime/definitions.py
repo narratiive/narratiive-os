@@ -79,6 +79,7 @@ class WorkflowDefinition:
     entity_type: str = "client"
     next_workflow_id: str = ""
     failure_policy: str = "block_and_escalate"
+    autonomous_handoff: bool = False
 
     def __post_init__(self) -> None:
         if not self.workflow_id.strip() or not self.stages:
@@ -88,6 +89,8 @@ class WorkflowDefinition:
             raise ValueError("stage_id values must be unique")
         if not self.entity_type.strip() or not self.failure_policy.strip():
             raise ValueError("entity_type and failure_policy must not be empty")
+        if not isinstance(self.autonomous_handoff, bool):
+            raise ValueError("autonomous_handoff must be a boolean")
 
     def new_state(
         self,
@@ -192,6 +195,7 @@ def workflow_definition_from_dict(data: dict[str, Any]) -> WorkflowDefinition:
         entity_type=str(data.get("entity_type", "client")).strip() or "client",
         next_workflow_id=str(data.get("next_workflow_id", "")).strip(),
         failure_policy=str(data.get("failure_policy", "block_and_escalate")).strip() or "block_and_escalate",
+        autonomous_handoff=data.get("autonomous_handoff", False),
     )
 
 
