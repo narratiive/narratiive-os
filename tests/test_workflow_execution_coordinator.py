@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
@@ -186,6 +187,14 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         state = self.runs.load_run("run-quality-stop")
         self.assertEqual(state.blocker, "quality_failed:quality")
         self.assertEqual(state.stage("draft").quality_result["failed_checks"], ["substantive"])
+        attempt = state.stage("draft").attempts[-1]
+        self.assertFalse(attempt["quality_passed"])
+        candidate = attempt["candidate_artifact"]
+        self.assertEqual(candidate["artifact_type"], "worker_attempt_output")
+        self.assertEqual(
+            json.loads(Path(candidate["location"]).read_text(encoding="utf-8"))["draft"],
+            "weak",
+        )
 
     def test_present_empty_collection_is_decided_by_quality_contract(self) -> None:
         definition = WorkflowDefinition("empty-collection", (_stage("draft", outputs=("findings",)),))
