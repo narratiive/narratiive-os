@@ -139,6 +139,18 @@ from .repositories import (
 )
 from .run_service import WorkflowRunService
 from .workflow_registry import WorkflowNotFound, WorkflowRegistry, build_narratiive_workflow_registry
+from .worker_registry import (
+    CapabilityWorkerRegistry,
+    MalformedWorkerOutput,
+    NoAvailableWorker,
+    ProhibitedWorkerSideEffect,
+    WorkerAvailability,
+    WorkerMetadata,
+    WorkerRegistration,
+    WorkerResolution,
+    WorkerSelectionPolicy,
+    build_tony_worker_registry,
+)
 from .revision_graph import (
     RevisionCategory,
     RevisionIssue,
@@ -319,6 +331,16 @@ __all__ = [
     "WorkflowRegistry",
     "WorkflowNotFound",
     "build_narratiive_workflow_registry",
+    "CapabilityWorkerRegistry",
+    "MalformedWorkerOutput",
+    "NoAvailableWorker",
+    "ProhibitedWorkerSideEffect",
+    "WorkerAvailability",
+    "WorkerMetadata",
+    "WorkerRegistration",
+    "WorkerResolution",
+    "WorkerSelectionPolicy",
+    "build_tony_worker_registry",
     "DispatchJob",
     "FileDispatchQueue",
     "JobNotFound",

@@ -12,6 +12,12 @@ from runtime.models import ArtifactRef, StageStatus
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.state_machine import WorkflowEngine
 from runtime.workflow_registry import GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE
+from runtime.worker_registry import (
+    CapabilityWorkerRegistry,
+    NoAvailableWorker,
+    WorkerResolution,
+    build_tony_worker_registry,
+)
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
@@ -82,9 +88,11 @@ class TonyInboundBlueprintLiteService:
         *,
         dispatchers: Mapping[str, DispatchHandler] | None = None,
         router: TonyExecutiveToolRouter | None = None,
+        worker_registry: CapabilityWorkerRegistry | None = None,
     ) -> None:
         self.store = store
         self.dispatchers = dict(dispatchers or {})
+        self.worker_registry = worker_registry or build_tony_worker_registry(self.dispatchers)
         self.router = router or TonyExecutiveToolRouter()
         self._active: set[str] = set()
         self._active_lock = threading.Lock()
@@ -104,7 +112,7 @@ class TonyInboundBlueprintLiteService:
         existing = self.store.get(lead.lead_id)
 
         if existing is not None and existing.get("input_fingerprint") == fingerprint:
-            if existing.get("state") == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+            if existing.get("state") == "dispatcher_unavailable" and self._worker_available():
                 _resume_workflow_record(existing)
                 existing["state"] = "preparation_queued"
                 existing["blocker"] = ""
@@ -145,11 +153,11 @@ class TonyInboundBlueprintLiteService:
         workflow.input_payload = payload
         WorkflowEngine().initialise(workflow, {"diagnostic_input_package"})
         state["workflow_run"] = workflow_to_dict(workflow)
-        if "Claude" not in self.dispatchers:
+        if not self._worker_available():
             WorkflowEngine().block_for_reason(
                 workflow,
                 "prepare_blueprint_lite",
-                "claude_dispatcher_not_configured",
+                "worker_unavailable:strategic_reasoning",
                 "Configure an eligible strategic-reasoning worker before dispatch.",
             )
             state["state"] = "dispatcher_unavailable"
@@ -192,7 +200,7 @@ class TonyInboundBlueprintLiteService:
                 state["updated_at"] = _now()
                 self.store.put(lead_id, state)
                 current = "preparation_queued"
-            if current == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+            if current == "dispatcher_unavailable" and self._worker_available():
                 _resume_workflow_record(state)
                 state["state"] = "preparation_queued"
                 state["blocker"] = ""
@@ -212,12 +220,13 @@ class TonyInboundBlueprintLiteService:
         workflow = _workflow_from_record(state)
         step_id = workflow.current_stage_id or "prepare_blueprint_lite"
 
-        handler = self.dispatchers.get("Claude")
-        if handler is None:
+        try:
+            worker = self._resolve_worker()
+        except NoAvailableWorker:
             WorkflowEngine().block_for_reason(
                 workflow,
                 step_id,
-                "claude_dispatcher_not_configured",
+                "worker_unavailable:strategic_reasoning",
                 "Configure an eligible strategic-reasoning worker before dispatch.",
             )
             state.update(
@@ -274,7 +283,7 @@ class TonyInboundBlueprintLiteService:
         state["dispatch"] = dict(dispatch)
 
         if not (
-            dispatch.get("worker") == "Claude"
+            dispatch.get("worker") == worker.registration.metadata.dispatch_name
             and dispatch.get("execution_mode") == "autonomous_prepare"
             and dispatch.get("eligible") is True
             and dispatch.get("state") == "ready_for_autonomous_dispatch"
@@ -305,7 +314,7 @@ class TonyInboundBlueprintLiteService:
         self.store.put(lead_id, state)
 
         try:
-            evidence = handler(dict(dispatch))
+            evidence = self.worker_registry.execute(worker, dispatch, side_effect="preparation")
         except Exception as exc:
             _record_workflow_attempt(
                 workflow,
@@ -440,6 +449,16 @@ class TonyInboundBlueprintLiteService:
         finally:
             with self._active_lock:
                 self._active.discard(lead_id)
+
+    def _resolve_worker(self) -> WorkerResolution:
+        return self.worker_registry.resolve("strategic_reasoning", side_effect="preparation")
+
+    def _worker_available(self) -> bool:
+        try:
+            self._resolve_worker()
+        except NoAvailableWorker:
+            return False
+        return True
 
     @staticmethod
     def _instruction(lead: InboundLead) -> str:

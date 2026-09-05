@@ -78,6 +78,10 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             persisted = store.get("lead-1")
             self.assertIsNotNone(persisted)
             self.assertEqual(persisted["state"], "dispatcher_unavailable")
+            self.assertEqual(
+                persisted["workflow_run"]["blocker"],
+                "worker_unavailable:strategic_reasoning",
+            )
             self.assertEqual(workflow_from_dict(persisted["workflow_run"]).status.value, "blocked")
             replay = service.enqueue(self._lead(), self._payload())
             self.assertTrue(replay["replay"])
