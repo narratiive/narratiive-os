@@ -12,9 +12,6 @@ from urllib.error import URLError
 from urllib.request import Request, urlopen
 from uuid import uuid4
 
-from runtime.workspaces import Workspace
-
-
 @dataclass(frozen=True, slots=True)
 class CheckResult:
     name: str
@@ -135,7 +132,21 @@ def resolve_roundtrip_scope(
                     / "workspace.json"
                 ).read_text(encoding="utf-8")
             )
-            client_id = Workspace.from_dict(metadata).client_id
+            if not isinstance(metadata, dict):
+                raise ValueError("workspace metadata must be an object")
+            recorded_workspace = str(metadata.get("workspace_id", "")).strip()
+            candidate_client = str(metadata.get("client_id", "")).strip()
+            if recorded_workspace != workspace_id:
+                raise ValueError("workspace metadata identity mismatch")
+            if (
+                not candidate_client
+                or candidate_client in {".", ".."}
+                or Path(candidate_client).name != candidate_client
+                or "/" in candidate_client
+                or "\\" in candidate_client
+            ):
+                raise ValueError("workspace client identity is invalid")
+            client_id = candidate_client
         except (
             OSError,
             UnicodeDecodeError,
