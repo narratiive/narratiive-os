@@ -24,6 +24,15 @@ class WorkflowCommandBackend(Protocol):
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
+    def commission_additional_research(
+        self,
+        state: WorkflowState,
+        *,
+        focus: Mapping[str, Any],
+        sources: list[Mapping[str, Any]] | None,
+        requester: str,
+        rationale: str,
+    ) -> WorkflowState: ...
 
 
 class FileWorkflowCommandBackend:
@@ -124,6 +133,97 @@ class FileWorkflowCommandBackend:
             rationale=rationale,
         )
 
+    def commission_additional_research(
+        self,
+        state: WorkflowState,
+        *,
+        focus: Mapping[str, Any],
+        sources: list[Mapping[str, Any]] | None,
+        requester: str,
+        rationale: str,
+    ) -> WorkflowState:
+        kind, statement = _research_focus(focus)
+        base_sources = state.input_payload.get("research_sources")
+        combined_sources = _merge_research_sources(base_sources, sources)
+        if not combined_sources:
+            raise ValueError("additional research requires at least one explicitly approved source")
+        scope = state.input_payload.get("approved_growth_sprint_scope")
+        client_context = state.input_payload.get("client_context")
+        if not scope or not isinstance(client_context, Mapping):
+            raise ValueError("additional research requires an approved Growth Sprint scope and client context")
+        parent_artifacts = [
+            artifact.artifact_id
+            for stage in state.stages
+            for artifact in stage.output_artifacts
+        ]
+        prior_lineage = state.input_payload.get("_lineage")
+        if isinstance(prior_lineage, Mapping):
+            parent_artifacts.extend(
+                str(item)
+                for item in prior_lineage.get("parent_artifact_ids", [])
+                if str(item).strip()
+            )
+        inputs = {
+            "approved_growth_sprint_scope": scope,
+            "research_requirements": {
+                "workstreams_and_questions": [
+                    {
+                        "workstream": f"additional_{kind}",
+                        "questions": [statement],
+                    }
+                ],
+                "known_gaps": [statement] if kind == "evidence_gap" else [],
+            },
+            "research_sources": combined_sources,
+            "client_context": dict(client_context),
+            "research_iteration": {
+                "kind": kind,
+                "statement": statement,
+                "requested_by": requester.strip() or "Tony",
+                "rationale": rationale.strip(),
+                "source_run_id": state.run_id,
+            },
+            "_lineage": {
+                "parent_workflow_id": state.workflow_id,
+                "parent_run_id": state.run_id,
+                "parent_artifact_ids": list(dict.fromkeys(parent_artifacts)),
+            },
+        }
+        identity = hashlib.sha256(
+            json.dumps(
+                {
+                    "source_run_id": state.run_id,
+                    "focus": {"kind": kind, "statement": statement},
+                    "research_sources": combined_sources,
+                    "requested_by": requester.strip() or "Tony",
+                    "rationale": rationale.strip(),
+                },
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode("utf-8")
+        ).hexdigest()[:16]
+        run_id = f"{state.run_id}-additional-research-{identity}"
+        runtime = self._runtime(state)
+        runtime.enqueue(
+            "growth_sprint_to_research_engine",
+            run_id,
+            inputs,
+            entity_id=state.entity_id,
+            correlation_id=state.correlation_id,
+        )
+        runtime.advance(
+            run_id,
+            ClientLifecycleRecord(
+                client_id=state.client_id,
+                client_name=_state_name(state),
+                stage=ClientLifecycleStage.RESEARCH,
+                owner="Tony",
+                next_action=f"Investigate the specific {kind.replace('_', ' ')} without crossing a human gate.",
+                evidence=(f"workflow_run:{state.run_id}",),
+            ),
+        )
+        return runtime.runs.load_run(run_id)
+
     def _runtime(self, state: WorkflowState) -> TonyWorkflowRuntime:
         return build_tony_workflow_runtime(
             self.root,
@@ -140,7 +240,7 @@ class TonyWorkflowCommandService:
     _COMMANDS = {
         "workflow", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover",
-        "projection", "sync-notion",
+        "projection", "sync-notion", "research",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -212,6 +312,39 @@ class TonyWorkflowCommandService:
                     + ("The returned record evidence verified this exact projection." if changed else "No new Notion write is being claimed.")
                 )
                 return CommandResponse(name, "healthy" if status in {"verified", "duplicate_suppressed"} else "blocked", message, projection)
+            if name == "research":
+                if not rationale:
+                    return self._error(
+                        name,
+                        "rationale_required",
+                        "Use /research <run or company> because <why this iteration is needed>.",
+                    )
+                supplied = dict(inputs or {})
+                focus = supplied.get("focus")
+                if not isinstance(focus, Mapping):
+                    return self._error(
+                        name,
+                        "research_focus_required",
+                        "Additional research requires a structured focus with kind and statement.",
+                    )
+                raw_sources = supplied.get("research_sources")
+                if raw_sources is not None and not isinstance(raw_sources, list):
+                    return self._error(name, "research_sources_invalid", "Research sources must be a list.")
+                changed = self.backend.commission_additional_research(
+                    state,
+                    focus=focus,
+                    sources=raw_sources,
+                    requester=principal_id or "Tony",
+                    rationale=rationale,
+                )
+                status = changed.status.value
+                return CommandResponse(
+                    "research",
+                    "healthy" if status == "complete" else status,
+                    f"Additional research {changed.run_id} is {status.replace('_', ' ')}. "
+                    "The iteration is persisted with its focus, sources and parent lineage; no external write occurred.",
+                    self._summary(changed),
+                )
             if name in {"approve", "reject", "revise"}:
                 if not principal_id.strip():
                     return self._error(name, "authorised_principal_required", "This decision requires an authenticated human identity.")
@@ -363,3 +496,36 @@ def _output_excerpt(output: Mapping[str, Any]) -> str:
             compact = " ".join(value.split())
             return compact[:500] + ("…" if len(compact) > 500 else "")
     return ""
+
+
+def _research_focus(focus: Mapping[str, Any]) -> tuple[str, str]:
+    kind = str(focus.get("kind") or "").strip().casefold().replace("-", "_").replace(" ", "_")
+    aliases = {"gap": "evidence_gap", "question": "question", "hypothesis": "hypothesis"}
+    kind = aliases.get(kind, kind)
+    if kind not in {"evidence_gap", "question", "hypothesis"}:
+        raise ValueError("research focus kind must be evidence_gap, question or hypothesis")
+    statement = " ".join(str(focus.get("statement") or focus.get("question") or "").split())
+    if len(statement) < 12 or len(statement) > 1000:
+        raise ValueError("research focus statement must be specific and between 12 and 1000 characters")
+    return kind, statement
+
+
+def _merge_research_sources(existing: Any, supplied: list[Mapping[str, Any]] | None) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    values: list[Any] = []
+    if isinstance(existing, list):
+        values.extend(existing)
+    if supplied is not None:
+        values.extend(supplied)
+    for item in values:
+        if not isinstance(item, Mapping):
+            raise ValueError("research source must be a structured object")
+        source_id = str(item.get("source_id") or "").strip()
+        policy = item.get("policy") if isinstance(item.get("policy"), Mapping) else {}
+        if not source_id or policy.get("approved") is not True:
+            raise ValueError("additional research sources must be complete and explicitly approved")
+        candidate = dict(item)
+        if source_id in merged and merged[source_id] != candidate:
+            raise ValueError(f"conflicting research source definition: {source_id}")
+        merged[source_id] = candidate
+    return [merged[key] for key in sorted(merged)]

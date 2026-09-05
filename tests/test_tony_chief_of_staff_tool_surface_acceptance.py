@@ -150,6 +150,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         source = (ROOT / "openclaw" / "plugins" / "narratiive-control-plane" / "index.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_read_state"', source)
         self.assertIn('name: "narratiive_workflow_control"', source)
+        self.assertIn('"additional_research"', source)
         self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
         self.assertIn('if (view === "open_work") return "/mission";', source)
         self.assertNotIn('return "/what\'s the status"', source)

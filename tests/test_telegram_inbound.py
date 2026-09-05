@@ -235,6 +235,17 @@ class TelegramInboundTests(unittest.TestCase):
             "inputs": {"discovery_evidence": {"notes": "SAFE evidence"}},
         })
         call({
+            "operation": "additional_research",
+            "reference": "SAFE Director's Company",
+            "rationale": "Resolve the recorded audience evidence gap",
+            "inputs": {
+                "focus": {
+                    "kind": "evidence_gap",
+                    "statement": "Which audience has the strongest evidence of urgency?",
+                }
+            },
+        })
+        call({
             "operation": "approve",
             "reference": "SAFE Company",
             "rationale": "Reviewed internal work",
@@ -249,8 +260,10 @@ class TelegramInboundTests(unittest.TestCase):
 
         self.assertEqual(workflows.calls[0]["inputs"]["discovery_evidence"]["notes"], "SAFE evidence")
         self.assertIn("SAFE Director", workflows.calls[0]["text"])
-        self.assertEqual(workflows.calls[1]["principal_id"], "")
-        self.assertEqual(workflows.calls[2]["principal_id"], "openclaw:native-approval")
+        self.assertIn("/research", workflows.calls[1]["text"])
+        self.assertEqual(workflows.calls[1]["inputs"]["focus"]["kind"], "evidence_gap")
+        self.assertEqual(workflows.calls[2]["principal_id"], "")
+        self.assertEqual(workflows.calls[3]["principal_id"], "openclaw:native-approval")
 
 
 if __name__ == "__main__":

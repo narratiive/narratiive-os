@@ -99,11 +99,20 @@ class OpenClawNativeActionApprovalTests(unittest.TestCase):
             "buildWorkflowApprovalRequirement",
             {"operation": "status", "reference": "SAFE Company"},
         )
+        research = self._node_json(
+            "buildWorkflowApprovalRequirement",
+            {
+                "operation": "additional_research",
+                "reference": "SAFE Company",
+                "rationale": "Resolve one evidence gap",
+            },
+        )
 
         self.assertTrue(approval["required"])
         self.assertEqual(approval["requireApproval"]["allowedDecisions"], ["allow-once", "deny"])
         self.assertIn("SAFE Company", approval["requireApproval"]["description"])
         self.assertFalse(read["required"])
+        self.assertFalse(research["required"])
 
     def test_plugin_uses_before_tool_call_native_approval_hook(self):
         source = (PLUGIN / "index.js").read_text(encoding="utf-8")

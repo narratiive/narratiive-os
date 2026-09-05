@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import tempfile
 import unittest
 from pathlib import Path
@@ -8,7 +9,7 @@ from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
-from tests.test_workflow_quality import discovery_output, proposal_output
+from tests.test_workflow_quality import discovery_output, growth_blueprint_output, proposal_output
 
 
 class FallbackCommands:
@@ -59,6 +60,8 @@ class TonyWorkflowCommandTests(unittest.TestCase):
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
                 return proposal_output()
+            if workflow_id == "research_to_growth_blueprint":
+                return growth_blueprint_output()
             return blueprint_output()
 
         self.dispatchers = {"Claude": claude}
@@ -297,6 +300,99 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(proposal.data["workflow_id"], "discovery_evidence_to_growth_sprint_proposal")
         self.assertEqual(proposal.data["status"], "awaiting_approval")
         self.assertFalse(proposal.data["external_action_taken"])
+
+    def test_additional_research_is_durable_idempotent_and_can_feed_a_new_blueprint(self) -> None:
+        scope = hashlib.sha256(b"narratiive:safe-client").hexdigest()[:24]
+        workspace = self.root / scope / "research" / "workspaces" / "narratiive"
+        workspace.mkdir(parents=True)
+        (workspace / "evidence.md").write_text(
+            "SAFE approved evidence indicates that category language and buyer proof remain unresolved strategic choices.",
+            encoding="utf-8",
+        )
+        research_inputs = {
+            "approved_growth_sprint_scope": ["Category diagnosis", "Audience evidence", "Positioning choices"],
+            "research_requirements": {
+                "workstreams_and_questions": [
+                    {"workstream": "category", "questions": ["How does the category describe the problem?"]}
+                ]
+            },
+            "research_sources": [
+                {
+                    "source_id": "safe-approved-source",
+                    "source_type": "document",
+                    "uri": "evidence.md",
+                    "policy": {"approved": True, "allow_local_files": True},
+                }
+            ],
+            "client_context": {"name": "SAFE Executive Workflow Test"},
+        }
+        self.runtime.enqueue(
+            "growth_sprint_to_research_engine",
+            "safe-research-run",
+            research_inputs,
+            entity_id="safe-lead",
+            correlation_id="safe-correlation",
+        )
+        self.runtime.advance("safe-research-run", lifecycle("safe-client"))
+        request = {
+            "focus": {
+                "kind": "evidence_gap",
+                "statement": "What direct evidence supports the strongest category entry point?",
+            }
+        }
+
+        commissioned = self.service.execute(
+            "/research safe-research-run because close the recorded category evidence gap",
+            [],
+            inputs=request,
+        )
+        replay = self.service.execute(
+            "/research safe-research-run because close the recorded category evidence gap",
+            [],
+            inputs=request,
+        )
+
+        self.assertEqual(commissioned.data["status"], "complete")
+        self.assertEqual(replay.data["run_id"], commissioned.data["run_id"])
+        self.assertFalse(commissioned.data["external_action_taken"])
+        iteration = self.runtime.runs.repository.load(commissioned.data["run_id"])
+        self.assertEqual(iteration.input_payload["research_iteration"]["kind"], "evidence_gap")
+        self.assertEqual(iteration.input_payload["research_iteration"]["source_run_id"], "safe-research-run")
+        self.assertTrue(iteration.input_payload["_lineage"]["parent_artifact_ids"])
+        self.assertTrue(iteration.stage("orchestrate_research").quality_result["passed"])
+
+        restarted = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}),
+        )
+        status = restarted.execute(f"/workflow {commissioned.data['run_id']}", [])
+        blueprint = restarted.execute(f"/continue {commissioned.data['run_id']}", [])
+        self.assertEqual(status.data["status"], "complete")
+        self.assertEqual(blueprint.data["workflow_id"], "research_to_growth_blueprint")
+        self.assertEqual(blueprint.data["status"], "awaiting_approval")
+        self.assertFalse(blueprint.data["external_action_taken"])
+
+    def test_additional_research_rejects_unapproved_sources_without_creating_a_run(self) -> None:
+        before = {state.run_id for state in self.service.backend.list_states()}
+
+        result = self.service.execute(
+            "/research safe-executive-run because test an unsupported hypothesis",
+            [],
+            inputs={
+                "focus": {"kind": "hypothesis", "statement": "Buyers prefer a narrowly framed category promise."},
+                "research_sources": [
+                    {
+                        "source_id": "unsafe-source",
+                        "source_type": "web",
+                        "uri": "https://example.invalid",
+                        "policy": {"approved": False},
+                    }
+                ],
+            },
+        )
+
+        self.assertEqual(result.status, "error")
+        self.assertEqual(before, {state.run_id for state in self.service.backend.list_states()})
 
     def test_malformed_persisted_state_fails_closed(self) -> None:
         broken = self.root / "invalid-scope" / "runs"
