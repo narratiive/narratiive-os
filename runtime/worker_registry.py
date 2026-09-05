@@ -195,6 +195,31 @@ def build_tony_worker_registry(
     registrations: list[WorkerRegistration] = []
     claude = dispatchers.get("Claude")
     if claude is not None:
+        def claude_preparation_adapter(contract: dict[str, Any]) -> dict[str, Any]:
+            if contract.get("worker") == "Claude":
+                return claude(contract)
+            context = contract.get("workflow_context")
+            if not isinstance(context, Mapping):
+                raise RuntimeError("generic Claude work requires workflow context")
+            expected = context.get("expected_outputs") or []
+            instruction = (
+                f"Prepare the internal work for workflow {context.get('workflow_id')} "
+                f"step {context.get('stage_id')}. Return the required fields: "
+                f"{', '.join(str(item) for item in expected)}. "
+                f"Satisfy quality contract {context.get('quality_contract')}."
+            )
+            return claude(
+                {
+                    "worker": "Claude",
+                    "execution_mode": "autonomous_prepare",
+                    "eligible": True,
+                    "state": "ready_for_autonomous_dispatch",
+                    "execution_truth": "not_dispatched",
+                    "instruction": instruction,
+                    "target": dict(contract),
+                }
+            )
+
         registrations.append(
             WorkerRegistration(
                 WorkerMetadata(
@@ -210,7 +235,7 @@ def build_tony_worker_registry(
                     dispatch_name="Claude",
                     selection_priority=10,
                 ),
-                claude,
+                claude_preparation_adapter,
             )
         )
 

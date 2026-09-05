@@ -168,6 +168,15 @@ class WorkflowExecutionCoordinator:
                 state = self.runs.pause_for_approval(run_id, proposed_action)
                 return self._outcome(state, AutonomyAction.APPROVAL.value)
 
+            if stage.quality_contract and stage.quality_contract not in self.quality_validators:
+                state = self.runs.block_for_reason(
+                    run_id,
+                    stage.stage_id,
+                    f"quality_validator_unavailable:{stage.quality_contract}",
+                    "Configure the declared quality validator before worker execution.",
+                )
+                return self._outcome(state, AutonomyAction.ESCALATE.value)
+
             try:
                 worker = self.workers.resolve(
                     stage.capability,
@@ -202,6 +211,8 @@ class WorkflowExecutionCoordinator:
                 "correlation_id": state.correlation_id,
                 "idempotency_key": idempotency_key,
                 "side_effect_classification": stage.side_effect_classification,
+                "expected_outputs": list(stage.expected_outputs),
+                "quality_contract": stage.quality_contract,
             }
             try:
                 output = self.workers.execute(
@@ -239,17 +250,14 @@ class WorkflowExecutionCoordinator:
                 quality = {"passed": False, "failed_checks": [f"required_output:{field}" for field in missing]}
             elif stage.quality_contract:
                 validator = self.quality_validators.get(stage.quality_contract)
-                if validator is None:
-                    quality = {"passed": False, "failed_checks": ["quality_validator_unavailable"]}
-                else:
-                    try:
-                        quality = dict(validator(output))
-                        quality["passed"] = quality.get("passed") is True
-                    except Exception as exc:
-                        quality = {
-                            "passed": False,
-                            "failed_checks": [f"quality_validator_error:{type(exc).__name__}"],
-                        }
+                try:
+                    quality = dict(validator(output))
+                    quality["passed"] = quality.get("passed") is True
+                except Exception as exc:
+                    quality = {
+                        "passed": False,
+                        "failed_checks": [f"quality_validator_error:{type(exc).__name__}"],
+                    }
             else:
                 quality = {"passed": True, "failed_checks": []}
             self.runs.record_quality(run_id, stage.stage_id, quality)

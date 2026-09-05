@@ -22,6 +22,14 @@ class _Response:
 
 
 class TonyDispatchAdapterTests(unittest.TestCase):
+    def test_explicit_empty_environment_does_not_inherit_process_credentials(self):
+        with mock.patch.dict(
+            "os.environ",
+            {"TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9001/gmail"},
+            clear=True,
+        ):
+            self.assertEqual(build_http_dispatchers({}), {})
+
     def test_only_explicitly_configured_workers_are_enabled(self):
         dispatchers = build_http_dispatchers(
             {

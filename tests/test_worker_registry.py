@@ -54,6 +54,32 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(metadata.dispatch_name, "Claude")
         self.assertEqual(metadata.side_effect_permissions, ("preparation",))
 
+    def test_generic_workflow_contract_is_adapted_to_safe_claude_dispatch(self) -> None:
+        received = []
+
+        def claude(contract):
+            received.append(contract)
+            return {"draft": "prepared"}
+
+        registry = build_tony_worker_registry({"Claude": claude}, {})
+        result = registry.execute(
+            registry.resolve("synthesis"),
+            {
+                "brief": "safe",
+                "workflow_context": {
+                    "workflow_id": "discovery-preparation",
+                    "stage_id": "prepare",
+                    "expected_outputs": ["draft"],
+                    "quality_contract": "draft-quality",
+                },
+            },
+        )
+        self.assertEqual(result["draft"], "prepared")
+        self.assertEqual(received[0]["worker"], "Claude")
+        self.assertEqual(received[0]["execution_mode"], "autonomous_prepare")
+        self.assertEqual(received[0]["execution_truth"], "not_dispatched")
+        self.assertEqual(received[0]["target"]["brief"], "safe")
+
     def test_planned_capability_is_visible_but_not_routable(self) -> None:
         registry = build_tony_worker_registry({})
         declared = {item.metadata.worker_id: item.metadata for item in registry.all()}
