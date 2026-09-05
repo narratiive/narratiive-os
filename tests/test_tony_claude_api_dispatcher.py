@@ -156,6 +156,8 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertIn("provisional_opportunity", prompt)
         self.assertIn("questions_to_answer_next", prompt)
         self.assertIn("exact singular keys fact, interpretation, and hypothesis", prompt)
+        self.assertIn("assesses only whether the submitted diagnostic fields are present", prompt)
+        self.assertIn("record those research and context limitations under evidence_gaps", prompt)
         self.assertIn("human-review-ready", prompt)
         self.assertIn("at the top level", prompt)
         self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)

@@ -230,6 +230,7 @@ class TonyInboundBlueprintLiteService:
                     "email": lead.email,
                     "source": lead.source,
                     "diagnostic_input_package": payload,
+                    "diagnostic_input_coverage_assessment": _diagnostic_input_coverage(payload),
                     "product": "Blueprint Lite",
                 },
             }
@@ -446,6 +447,24 @@ def _normalise_diagnostic_input_contract(payload: dict[str, Any]) -> dict[str, A
     result = dict(payload)
     result["diagnostic"] = normalised
     return result
+
+
+def _diagnostic_input_coverage(payload: Mapping[str, Any]) -> dict[str, Any]:
+    """Assess submitted diagnostic coverage separately from research evidence."""
+    diagnostic = payload.get("diagnostic")
+    if not isinstance(diagnostic, Mapping):
+        return {"complete": False, "missing_inputs": ["diagnostic"]}
+
+    required = {
+        "challenge": diagnostic.get("challenge"),
+        "overall_score": diagnostic.get("overall_score"),
+        "category_scores": diagnostic.get("category_scores"),
+        "main_blockage": diagnostic.get("main_blockage"),
+        "recommended_actions": diagnostic.get("recommended_actions"),
+        "raw_answers": diagnostic.get("raw_answers") or diagnostic.get("answers"),
+    }
+    missing = [name for name, value in required.items() if not _meaningful(value)]
+    return {"complete": not missing, "missing_inputs": missing}
 
 
 def _meaningful(value: Any) -> bool:
