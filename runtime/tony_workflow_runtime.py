@@ -10,6 +10,7 @@ from typing import Any
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.models import StageStatus, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
+from runtime.research_workflow_adapter import ResearchWorkflowAdapter
 from runtime.run_service import WorkflowRunService
 from runtime.serialization import workflow_to_dict
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
@@ -24,7 +25,9 @@ from runtime.workflow_execution_coordinator import (
 from runtime.workflow_registry import build_narratiive_workflow_registry
 from runtime.workflow_quality import (
     discovery_preparation_quality_gate,
+    growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
+    research_evidence_quality_gate,
     validate_operational_inputs,
 )
 from runtime.workflow_handoffs import build_next_workflow_inputs
@@ -180,11 +183,17 @@ def build_tony_workflow_runtime(
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
         "growth_sprint_proposal_quality_gate": growth_sprint_proposal_quality_gate,
+        "research_evidence_quality_gate": research_evidence_quality_gate,
+        "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
     coordinator = WorkflowExecutionCoordinator(
         registry=build_narratiive_workflow_registry(),
-        workers=build_tony_worker_registry(configured_dispatchers, environ),
+        workers=build_tony_worker_registry(
+            configured_dispatchers,
+            environ,
+            research_adapter=ResearchWorkflowAdapter(scoped_root),
+        ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
         quality_validators=validators,

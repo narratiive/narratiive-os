@@ -20,6 +20,10 @@ def build_next_workflow_inputs(
             combined["company_context"] = {"name": name, "source_ref": f"workflow_run:{source.run_id}"}
     elif source.workflow_id == "blueprint_lite_to_discovery_preparation":
         combined.setdefault("commercial_context", combined.get("company_context"))
+    elif source.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+        combined.setdefault("approved_growth_sprint_scope", output.get("proposed_scope"))
+        combined.setdefault("research_requirements", {"workstreams_and_questions": output.get("workstreams_and_questions", [])})
+        combined.setdefault("client_context", combined.get("commercial_context"))
     combined["_lineage"] = {
         "parent_workflow_id": source.workflow_id,
         "parent_run_id": source.run_id,

@@ -87,6 +87,16 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         with self.assertRaisesRegex(NoAvailableWorker, "creative_asset_production"):
             registry.resolve("creative_asset_production")
 
+    def test_existing_research_engine_adapter_makes_research_capability_operational(self) -> None:
+        adapter = lambda contract: {"evidence_pack": {"records": []}}
+        registry = build_tony_worker_registry({}, research_adapter=adapter)
+
+        resolution = registry.resolve("market_research", side_effect="external_read")
+
+        self.assertEqual(resolution.worker_id, "narratiive-research-engine")
+        self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
+        self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("external_read",))
+
     def test_multiple_workers_use_explicit_policy_then_stable_default(self) -> None:
         registry = CapabilityWorkerRegistry(
             (

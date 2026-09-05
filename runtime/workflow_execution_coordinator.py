@@ -215,6 +215,8 @@ class WorkflowExecutionCoordinator:
                 "stage_id": stage.stage_id,
                 "entity_id": state.entity_id,
                 "correlation_id": state.correlation_id,
+                "workspace_id": state.workspace_id,
+                "client_id": state.client_id,
                 "idempotency_key": idempotency_key,
                 "side_effect_classification": stage.side_effect_classification,
                 "expected_outputs": list(stage.expected_outputs),
@@ -250,7 +252,7 @@ class WorkflowExecutionCoordinator:
             missing = [
                 field
                 for field in stage_definition.output_contract.required_fields
-                if field not in output or output[field] in (None, "", [], {})
+                if field not in output or output[field] in (None, "")
             ]
             if missing:
                 quality = {"passed": False, "failed_checks": [f"required_output:{field}" for field in missing]}

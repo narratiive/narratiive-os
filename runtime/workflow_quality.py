@@ -7,7 +7,8 @@ from typing import Any
 
 _FALSE_ACTION_MARKERS = (
     "email sent", "proposal sent", "sent to the client", "sent to the prospect",
-    "meeting booked", "calendar event created", "notion updated", "published",
+    "meeting booked", "calendar event created", "notion updated", "published to the client",
+    "client-facing publication completed", "publication completed",
 )
 
 
@@ -29,6 +30,24 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
         sources = evidence.get("sources")
         if not isinstance(sources, list) or not sources or not all(_valid_source(item) for item in sources):
             raise ValueError("discovery evidence requires source provenance")
+    elif workflow_id == "growth_sprint_to_research_engine":
+        if not _meaningful(inputs.get("approved_growth_sprint_scope")):
+            raise ValueError("research requires an approved Growth Sprint scope")
+        if not _meaningful(inputs.get("research_requirements")):
+            raise ValueError("research requires explicit research requirements")
+        sources = inputs.get("research_sources")
+        if not isinstance(sources, list) or not sources:
+            raise ValueError("research requires approved sources")
+        for source in sources:
+            policy = source.get("policy") if isinstance(source, Mapping) and isinstance(source.get("policy"), Mapping) else {}
+            if not isinstance(source, Mapping) or not all(_meaningful(source.get(key)) for key in ("source_id", "source_type")) or not _meaningful(source.get("uri") or source.get("location")) or policy.get("approved") is not True:
+                raise ValueError("research sources must be complete and explicitly approved")
+    elif workflow_id == "research_to_growth_blueprint":
+        pack = inputs.get("evidence_pack")
+        if not isinstance(pack, Mapping) or not _meaningful(pack.get("records")):
+            raise ValueError("Growth Blueprint preparation requires a substantive evidence pack")
+        if not _meaningful(inputs.get("approved_growth_sprint_scope")):
+            raise ValueError("Growth Blueprint preparation requires approved Growth Sprint scope")
 
 
 def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -66,6 +85,41 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
         "assumptions_and_dependencies_are_explicit": _meaningful_list(output.get("assumptions_and_dependencies"), minimum=2),
         "draft_client_communication_is_reviewable": _bounded_text(output.get("draft_client_communication"), 60, 500),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def research_evidence_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    pack = output.get("evidence_pack")
+    records = pack.get("records") if isinstance(pack, Mapping) else None
+    checks = {
+        "research_tasks_are_decomposed_and_allocated": _research_tasks(output.get("research_tasks")),
+        "evidence_pack_contains_source_records": isinstance(records, list) and bool(records),
+        "source_provenance_is_retained": _provenance(output.get("source_provenance")),
+        "findings_are_evidence_linked": _research_findings(output.get("consolidated_findings")),
+        "contradictions_are_explicit": isinstance(output.get("contradictions"), list),
+        "research_gaps_are_explicit": isinstance(output.get("research_gaps"), list),
+        "further_research_requests_are_explicit": isinstance(output.get("further_research_requests"), list),
+        "fact_interpretation_hypothesis_classes_are_separate": _research_lineage(output.get("fact_interpretation_hypothesis_lineage")),
+        "approved_source_policy_is_preserved": _approved_pack_sources(pack),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    strategic_fields = (
+        "market_category_diagnosis", "audience", "growth_barriers", "source_of_difference",
+        "positioning", "narrative", "growth_opportunity", "activation_implications",
+    )
+    checks = {
+        "all_strategic_questions_are_substantive": all(_strategic_section(output.get(field)) for field in strategic_fields),
+        "key_strategic_choices_are_explicit": _strategic_choices(output.get("key_strategic_choices")),
+        "evidence_and_uncertainty_are_explicit": _meaningful_list(output.get("evidence_and_uncertainty"), minimum=3),
+        "fact_interpretation_hypothesis_lineage_is_complete": _lineage(output.get("fact_interpretation_hypothesis_lineage"), minimum=3),
+        "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=5),
+        "recommendation_is_advance": str(output.get("recommendation") or "").casefold() == "advance",
         "no_false_external_execution_claim": _no_false_action(output),
     }
     return _result(checks)
@@ -184,6 +238,73 @@ def _commercial_inputs(value: Any) -> bool:
         and _meaningful(value.get("investment_recommendation"))
         and value.get("human_approval_required") is True
         and str(value.get("approval_status") or "").casefold() == "pending"
+    )
+
+
+def _research_tasks(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(item, Mapping)
+        and _meaningful(item.get("task_id"))
+        and _meaningful(item.get("question"))
+        and item.get("required_capability") == "market_research"
+        and _meaningful(item.get("assigned_worker"))
+        for item in value
+    )
+
+
+def _provenance(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(item, Mapping)
+        and _meaningful(item.get("source_id"))
+        and _meaningful(item.get("content_hash"))
+        and _meaningful(item.get("retrieved_at"))
+        for item in value
+    )
+
+
+def _research_findings(value: Any) -> bool:
+    return isinstance(value, list) and bool(value) and all(
+        isinstance(item, Mapping)
+        and _meaningful(item.get("statement"))
+        and item.get("classification") == "fact"
+        and _meaningful_list(item.get("evidence_refs"), minimum=1)
+        and _meaningful_list(item.get("source_refs"), minimum=1)
+        for item in value
+    )
+
+
+def _research_lineage(value: Any) -> bool:
+    return isinstance(value, Mapping) and all(isinstance(value.get(key), list) for key in ("facts", "interpretations", "hypotheses")) and bool(value.get("facts"))
+
+
+def _approved_pack_sources(value: Any) -> bool:
+    if not isinstance(value, Mapping) or not isinstance(value.get("sources"), list) or not value.get("sources"):
+        return False
+    return all(
+        isinstance(source, Mapping)
+        and isinstance(source.get("policy"), Mapping)
+        and source["policy"].get("approved") is True
+        for source in value["sources"]
+    )
+
+
+def _strategic_section(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and _substantive_text(value.get("diagnosis"), minimum_words=15)
+        and _meaningful_list(value.get("evidence_refs"), minimum=1)
+        and _substantive_text(value.get("implication"), minimum_words=8)
+        and isinstance(value.get("uncertainties"), list)
+    )
+
+
+def _strategic_choices(value: Any) -> bool:
+    return isinstance(value, list) and len(value) >= 3 and all(
+        isinstance(item, Mapping)
+        and _meaningful(item.get("choice"))
+        and _meaningful(item.get("tradeoff"))
+        and _meaningful_list(item.get("evidence_refs"), minimum=1)
+        for item in value
     )
 
 
