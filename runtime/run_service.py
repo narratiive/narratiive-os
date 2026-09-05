@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Mapping
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from .definitions import WorkflowDefinition
@@ -70,6 +71,17 @@ class WorkflowRunService:
         state = self.repository.load(run_id)
         if state.workflow_id != definition.workflow_id:
             raise ValueError(f"run {run_id} belongs to another workflow")
+        entity_id = str(identity.get("entity_id") or "").strip()
+        correlation_id = str(identity.get("correlation_id") or "").strip()
+        input_payload = identity.get("input_payload")
+        if entity_id and state.entity_id != entity_id:
+            raise ValueError(f"run {run_id} belongs to another entity")
+        if correlation_id and state.correlation_id != correlation_id:
+            raise ValueError(f"run {run_id} belongs to another correlation")
+        if input_payload is not None:
+            supplied = dict(input_payload)
+            if any(key not in state.input_payload or state.input_payload[key] != value for key, value in supplied.items()):
+                raise ValueError(f"run {run_id} was already created with different inputs")
         return state
 
     def load_run(self, run_id: str) -> WorkflowState:
@@ -194,6 +206,24 @@ class WorkflowRunService:
         )
         return state
 
+    def merge_inputs(self, run_id: str, inputs: Mapping[str, object]) -> WorkflowState:
+        state = self.repository.load(run_id)
+        conflicts = sorted(
+            key
+            for key, value in inputs.items()
+            if key in state.input_payload and state.input_payload[key] != value
+        )
+        if conflicts:
+            raise ValueError(f"workflow output cannot overwrite existing inputs: {','.join(conflicts)}")
+        state.input_payload.update(dict(inputs))
+        state.touch()
+        self._commit(
+            state,
+            "workflow.inputs_merged",
+            {"input_fields": sorted(inputs)},
+        )
+        return state
+
     def block_for_reason(self, run_id: str, stage_id: str, blocker: str, next_action: str) -> WorkflowState:
         state = self.repository.load(run_id)
         self.engine.block_for_reason(state, stage_id, blocker, next_action)
@@ -204,6 +234,69 @@ class WorkflowRunService:
         )
         return state
 
+    def pause_for_approval(self, run_id: str, proposed_next_action: str) -> WorkflowState:
+        state = self.repository.load(run_id)
+        action = proposed_next_action.strip()
+        if not action:
+            raise ValueError("approval pause requires an exact proposed next action")
+        if (
+            state.approval_status == "approved"
+            and state.approval_history
+            and state.approval_history[-1].get("proposed_next_action") == action
+        ):
+            return state
+        state.status = WorkflowStatus.AWAITING_APPROVAL
+        state.approval_status = "pending"
+        state.proposed_next_action = action
+        state.touch()
+        self._commit(
+            state,
+            "approval.requested",
+            {"stage_id": state.current_stage_id, "proposed_next_action": action},
+        )
+        return state
+
+    def approve(self, run_id: str, *, approver: str, rationale: str) -> WorkflowState:
+        state = self.repository.load(run_id)
+        identity = approver.strip()
+        reason = rationale.strip()
+        if state.approval_status != "pending" or state.status is not WorkflowStatus.AWAITING_APPROVAL:
+            raise ValueError("workflow run is not awaiting approval")
+        if not identity or not reason:
+            raise ValueError("approval requires approver identity and rationale")
+        approval = {
+            "approver": identity,
+            "rationale": reason,
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "proposed_next_action": state.proposed_next_action,
+        }
+        state.approval_history.append(approval)
+        state.approval_status = "approved"
+        state.status = WorkflowStatus.ACTIVE if state.current_stage_id else WorkflowStatus.COMPLETE
+        state.touch()
+        self._commit(state, "approval.granted", approval)
+        return state
+
+    def record_external_action(
+        self,
+        run_id: str,
+        *,
+        idempotency_key: str,
+        receipt: Mapping[str, object],
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        key = idempotency_key.strip()
+        if not key or not receipt:
+            raise ValueError("external action requires an idempotency key and receipt")
+        if any(item.get("idempotency_key") == key for item in state.external_action_receipts):
+            return state
+        record = {"idempotency_key": key, "receipt": dict(receipt)}
+        state.external_action_receipts.append(record)
+        state.external_action_taken = True
+        state.touch()
+        self._commit(state, "external_action.recorded", record)
+        return state
+
     def recover_interrupted_runs(self) -> int:
         recovered = 0
         for run_id in self.repository.list_run_ids():
@@ -212,6 +305,16 @@ class WorkflowRunService:
                 continue
             stage = state.stage(state.current_stage_id)
             if stage.status is not StageStatus.RUNNING:
+                continue
+            if stage.side_effect_classification == "external_write":
+                self.engine.block_for_reason(
+                    state,
+                    stage.stage_id,
+                    "ambiguous_external_action_requires_reconciliation",
+                    "Reconcile the external provider using the persisted idempotency key before resuming.",
+                )
+                self._commit(state, "stage.recovery_blocked", {"stage_id": stage.stage_id})
+                recovered += 1
                 continue
             self.engine.request_retry(state, stage.stage_id, "recovered_after_runtime_restart")
             self.engine.resume_stage(state, stage.stage_id, stage.required_inputs)

@@ -98,6 +98,9 @@ def workflow_to_dict(state: WorkflowState) -> dict[str, Any]:
         "blocker": state.blocker,
         "proposed_next_action": state.proposed_next_action,
         "external_action_taken": state.external_action_taken,
+        "approval_status": state.approval_status,
+        "approval_history": list(state.approval_history),
+        "external_action_receipts": list(state.external_action_receipts),
         "stages": [stage_to_dict(stage) for stage in state.stages],
     }
 
@@ -124,4 +127,7 @@ def workflow_from_dict(data: dict[str, Any]) -> WorkflowState:
         blocker=data.get("blocker"),
         proposed_next_action=data.get("proposed_next_action"),
         external_action_taken=bool(data.get("external_action_taken", False)),
+        approval_status=str(data.get("approval_status", "not_required")),
+        approval_history=list(data.get("approval_history") or []),
+        external_action_receipts=list(data.get("external_action_receipts") or []),
     )

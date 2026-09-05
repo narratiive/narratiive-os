@@ -93,6 +93,9 @@ class WorkflowState:
     blocker: str | None = None
     proposed_next_action: str | None = None
     external_action_taken: bool = False
+    approval_status: str = "not_required"
+    approval_history: list[dict[str, Any]] = field(default_factory=list)
+    external_action_receipts: list[dict[str, Any]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         if not self.workflow_id.strip():
@@ -101,6 +104,8 @@ class WorkflowState:
             raise ValueError("run_id must not be empty")
         if not self.workspace_id.strip() or not self.client_id.strip():
             raise ValueError("workspace_id and client_id must not be empty")
+        if self.approval_status not in {"not_required", "pending", "approved", "rejected"}:
+            raise ValueError("invalid approval_status")
         stage_ids = [stage.stage_id for stage in self.stages]
         if len(stage_ids) != len(set(stage_ids)):
             raise ValueError("stage_id values must be unique")
