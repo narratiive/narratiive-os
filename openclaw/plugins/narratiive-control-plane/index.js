@@ -3,6 +3,7 @@ import { buildActionProposal } from "./action-policy.js";
 import { buildNativeApprovalRequirement, buildWorkflowApprovalRequirement } from "./approval-policy.js";
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
+import { resolveBridgeToken } from "./bridge-auth.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
@@ -84,7 +85,7 @@ async function executeWorkflowControl(params) {
   const rationale = String(params?.rationale || "").trim();
   if (!WORKFLOW_REFERENCE_OPTIONAL.has(operation) && !reference) throw new Error("workflow reference is required");
   if (WORKFLOW_APPROVAL_OPERATIONS.has(operation) && !rationale) throw new Error("approved workflow decisions require a rationale");
-  const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
+  const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
   const timeoutMs = controlPlaneTimeoutMs();
@@ -115,7 +116,7 @@ async function executeWorkflowControl(params) {
 }
 
 async function readControlPlane(params) {
-  const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
+  const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
   const timeoutMs = controlPlaneTimeoutMs();
