@@ -114,6 +114,7 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
         "offer one consequential but provisional opportunity; include meaningful questions to answer next; and stop at a human-review-ready internal artefact. "
         "Return blueprint_lite, diagnostic_signals_used, diagnostic_input_coverage, source_backed_evidence (or sources), evidence_gaps, "
         "fact_interpretation_hypothesis_lineage, growth_tension, provisional_opportunity, questions_to_answer_next, quality_gate, and recommendation containing advance, revise, or stop. "
+        "blueprint_lite is required and must contain the substantive, personalised free strategic follow-up itself; a status note, summary of other fields, or statement that an artefact was prepared is not a Blueprint Lite and must not substitute for it. "
         "fact_interpretation_hypothesis_lineage must be an object using the exact singular keys fact, interpretation, and hypothesis; each value must contain the evidence-linked statements for that class. "
         "Put each named Blueprint Lite field at the top level of the returned object; do not nest them inside work_product, result, or output. "
         "diagnostic_input_coverage must follow the deterministic diagnostic_input_coverage_assessment supplied in target context. It assesses only whether the submitted diagnostic fields are present: challenge, overall score, category scores, main blockage, recommended actions, and raw answers. "

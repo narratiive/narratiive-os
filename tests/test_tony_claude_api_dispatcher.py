@@ -151,6 +151,8 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         sent = json.loads(req.data.decode("utf-8"))
         prompt = sent["messages"][0]["content"]
         self.assertIn("For Blueprint Lite work", prompt)
+        self.assertIn("blueprint_lite is required", prompt)
+        self.assertIn("must contain the substantive, personalised free strategic follow-up itself", prompt)
         self.assertIn("facts, interpretations and hypotheses", prompt)
         self.assertIn("growth_tension", prompt)
         self.assertIn("provisional_opportunity", prompt)
