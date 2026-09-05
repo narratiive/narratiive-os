@@ -7,6 +7,7 @@ from urllib import request
 
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_API_URL = "https://api.anthropic.com/v1/messages"
+DEFAULT_MAX_TOKENS = 8192
 
 
 class ClaudeDispatcherConfigError(RuntimeError):
@@ -24,7 +25,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     model = str(environ.get("TONY_DISPATCH_CLAUDE_MODEL") or "").strip()
     api_url = str(environ.get("TONY_DISPATCH_CLAUDE_API_URL") or DEFAULT_API_URL).strip()
     version = str(environ.get("TONY_DISPATCH_CLAUDE_API_VERSION") or DEFAULT_ANTHROPIC_VERSION).strip()
-    max_tokens_raw = str(environ.get("TONY_DISPATCH_CLAUDE_MAX_TOKENS") or "4096").strip()
+    max_tokens_raw = str(environ.get("TONY_DISPATCH_CLAUDE_MAX_TOKENS") or DEFAULT_MAX_TOKENS).strip()
 
     if not api_key:
         raise ClaudeDispatcherConfigError("Claude API dispatch requires ANTHROPIC_API_KEY or TONY_DISPATCH_CLAUDE_API_KEY")
