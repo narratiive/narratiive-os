@@ -90,7 +90,15 @@ def build_controlled_integration_report(environ: Mapping[str, str]) -> tuple[Con
         ),
         "Notion": (
             ("read_business_pipeline",),
-            ("project_workflow_state", "update_verified_business_transition"),
+            ("project_workflow_state",),
+        ),
+        "Google Drive": (
+            ("read_file_metadata",),
+            ("create_internal_workspace", "persist_reviewed_artifact"),
+        ),
+        "Fireflies": (
+            ("read_verified_transcript",),
+            (),
         ),
     }
     return tuple(
@@ -114,6 +122,30 @@ def _worker_readiness(worker: str, environ: Mapping[str, str]) -> WorkerReadines
     url = str(environ.get(url_key, "")).strip()
     if url:
         return WorkerReadiness(worker=worker, configured=True, mode="http", missing=())
+
+    native_mode = str(environ.get(f"TONY_DISPATCH_{key}_MODE", "")).strip().casefold()
+    if worker in {"Gmail", "Google Calendar", "Google Drive"} and native_mode == "google_api":
+        has_access_token = bool(str(environ.get("TONY_GOOGLE_ACCESS_TOKEN", "")).strip())
+        refresh_fields = ("TONY_GOOGLE_CLIENT_ID", "TONY_GOOGLE_CLIENT_SECRET", "TONY_GOOGLE_REFRESH_TOKEN")
+        missing = () if has_access_token else tuple(name for name in refresh_fields if not str(environ.get(name, "")).strip())
+        return WorkerReadiness(worker=worker, configured=not missing, mode="google_api", missing=missing)
+    if worker == "Notion" and native_mode == "notion_api":
+        token_names = ("NARRATIIVE_NOTION_TOKEN", "NOTION_API_TOKEN", "NOTION_API_KEY", "NOTION_TOKEN")
+        configured = any(str(environ.get(name, "")).strip() for name in token_names)
+        return WorkerReadiness(
+            worker=worker,
+            configured=configured,
+            mode="notion_api",
+            missing=() if configured else ("NARRATIIVE_NOTION_TOKEN",),
+        )
+    if worker == "Fireflies" and native_mode == "fireflies_api":
+        configured = bool(str(environ.get("TONY_FIREFLIES_API_KEY") or environ.get("FIREFLIES_API_KEY") or "").strip())
+        return WorkerReadiness(
+            worker=worker,
+            configured=configured,
+            mode="fireflies_api",
+            missing=() if configured else ("TONY_FIREFLIES_API_KEY or FIREFLIES_API_KEY",),
+        )
 
     if worker == "Claude":
         mode = str(environ.get("TONY_DISPATCH_CLAUDE_MODE", "")).strip().casefold()
