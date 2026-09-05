@@ -8,6 +8,7 @@ from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from tests.test_workflow_quality import discovery_output, proposal_output
 
 
 class FallbackCommands:
@@ -51,7 +52,16 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.root = Path(self.temporary.name)
         self.calls = []
-        self.dispatchers = {"Claude": lambda contract: self.calls.append(contract) or blueprint_output()}
+        def claude(contract):
+            self.calls.append(contract)
+            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            if workflow_id == "blueprint_lite_to_discovery_preparation":
+                return discovery_output()
+            if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                return proposal_output()
+            return blueprint_output()
+
+        self.dispatchers = {"Claude": claude}
         self.runtime = build_tony_workflow_runtime(
             self.root,
             workspace_id="narratiive",
@@ -187,6 +197,40 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(synced.data["projection_status"], "verified")
         self.assertEqual(replay.data["projection_status"], "duplicate_suppressed")
         self.assertEqual(len(calls), 1)
+
+    def test_continue_can_supply_provenanced_discovery_evidence_to_next_workflow(self) -> None:
+        self.service.execute(
+            "/approve safe-executive-run because reviewed Blueprint Lite",
+            [],
+            principal_id="telegram:123",
+        )
+        discovery = self.service.execute("/continue safe-executive-run", [])
+        discovery_run = discovery.data["run_id"]
+        self.service.execute(
+            f"/approve {discovery_run} because reviewed discovery preparation",
+            [],
+            principal_id="telegram:123",
+        )
+        proposal = self.service.execute(
+            f"/continue {discovery_run}",
+            [],
+            inputs={
+                "discovery_evidence": {
+                    "notes": "SAFE synthetic discovery notes retain unresolved questions.",
+                    "sources": [
+                        {
+                            "source_id": "meeting-safe",
+                            "source_type": "notes",
+                            "location": "meeting:safe",
+                        }
+                    ],
+                }
+            },
+        )
+
+        self.assertEqual(proposal.data["workflow_id"], "discovery_evidence_to_growth_sprint_proposal")
+        self.assertEqual(proposal.data["status"], "awaiting_approval")
+        self.assertFalse(proposal.data["external_action_taken"])
 
     def test_malformed_persisted_state_fails_closed(self) -> None:
         broken = self.root / "invalid-scope" / "runs"

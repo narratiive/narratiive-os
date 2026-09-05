@@ -1,6 +1,6 @@
 import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { buildActionProposal } from "./action-policy.js";
-import { buildNativeApprovalRequirement } from "./approval-policy.js";
+import { buildNativeApprovalRequirement, buildWorkflowApprovalRequirement } from "./approval-policy.js";
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 
@@ -31,6 +31,20 @@ const STATE_READ_SCHEMA = {
   scope: { type: "string", enum: ["execution", "outcome"] },
 };
 
+const WORKFLOW_OPERATIONS = [
+  "status", "current_work", "approvals", "blockers", "latest_artifact",
+  "proposed_next_action", "approve", "reject", "request_revision", "continue",
+  "resume", "recover", "projection", "sync_notion",
+];
+const WORKFLOW_APPROVAL_OPERATIONS = new Set(["approve", "reject", "request_revision", "sync_notion"]);
+const WORKFLOW_REFERENCE_OPTIONAL = new Set(["current_work", "approvals", "blockers", "recover"]);
+const WORKFLOW_SCHEMA = {
+  operation: { type: "string", enum: WORKFLOW_OPERATIONS },
+  reference: { type: "string", minLength: 1, maxLength: 500 },
+  rationale: { type: "string", minLength: 1, maxLength: 1000 },
+  inputs: { type: "object", additionalProperties: true },
+};
+
 function commandForStateRead(params) {
   const view = String(params?.view || "").toLowerCase();
   if (view === "executive_brief") {
@@ -57,6 +71,47 @@ function controlPlaneUrl() {
 function controlPlaneTimeoutMs() {
   const configured = Number(process.env.TONY_CONTROL_PLANE_TIMEOUT_MS || DEFAULT_CONTROL_PLANE_TIMEOUT_MS);
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_CONTROL_PLANE_TIMEOUT_MS;
+}
+
+function workflowControlUrl() {
+  return controlPlaneUrl().replace(/\/control-plane$/, "/workflow/control");
+}
+
+async function executeWorkflowControl(params) {
+  const operation = String(params?.operation || "").toLowerCase();
+  if (!WORKFLOW_OPERATIONS.includes(operation)) throw new Error("unsupported workflow operation");
+  const reference = String(params?.reference || "").trim();
+  const rationale = String(params?.rationale || "").trim();
+  if (!WORKFLOW_REFERENCE_OPTIONAL.has(operation) && !reference) throw new Error("workflow reference is required");
+  if (WORKFLOW_APPROVAL_OPERATIONS.has(operation) && !rationale) throw new Error("approved workflow decisions require a rationale");
+  const token = String(process.env.TONY_BRIDGE_TOKEN || "").trim();
+  const headers = { "content-type": "application/json", accept: "application/json" };
+  if (token) headers.authorization = `Bearer ${token}`;
+  const timeoutMs = controlPlaneTimeoutMs();
+  let response;
+  try {
+    response = await fetch(workflowControlUrl(), {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        operation,
+        reference,
+        rationale,
+        inputs: params?.inputs && typeof params.inputs === "object" && !Array.isArray(params.inputs) ? params.inputs : undefined,
+        approval_granted: WORKFLOW_APPROVAL_OPERATIONS.has(operation),
+        source: "openclaw_native_workflow_tool",
+      }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+  } catch (error) {
+    if (error?.name === "TimeoutError" || error?.name === "AbortError") throw new Error(`Narratiive workflow control timed out after ${timeoutMs}ms`);
+    throw error;
+  }
+  const raw = await response.text();
+  let payload;
+  try { payload = JSON.parse(raw || "{}"); } catch { throw new Error("Narratiive workflow control returned invalid JSON"); }
+  if (!response.ok) throw new Error(`Narratiive workflow control returned HTTP ${response.status}`);
+  return payload;
 }
 
 async function readControlPlane(params) {
@@ -152,20 +207,42 @@ function approvalTool() {
   };
 }
 
+function workflowControlTool() {
+  return {
+    name: "narratiive_workflow_control",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Reports persisted truth; approval, rejection and Notion projection use native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
+    parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
+    async execute(_id, params) {
+      try {
+        return renderToolResult(await executeWorkflowControl(params || {}));
+      } catch (error) {
+        return renderToolResult({ ok: false, error: String(error?.message || error), execution_truth: "not_verified" });
+      }
+    },
+  };
+}
+
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
   description: "Authoritative Narratiive OS state and evidence plus bounded autonomous reads, native approval and verified consequence execution for Tony.",
   register(api) {
     api.on("before_tool_call", async (event) => {
-      if (event.toolName !== "narratiive_request_action_approval") return;
-      const requirement = buildNativeApprovalRequirement(event.params || {});
-      if (!requirement.required) return;
-      return { requireApproval: requirement.requireApproval };
+      if (event.toolName === "narratiive_request_action_approval") {
+        const requirement = buildNativeApprovalRequirement(event.params || {});
+        if (!requirement.required) return;
+        return { requireApproval: requirement.requireApproval };
+      }
+      if (event.toolName === "narratiive_workflow_control") {
+        const requirement = buildWorkflowApprovalRequirement(event.params || {});
+        if (!requirement.required) return;
+        return { requireApproval: requirement.requireApproval };
+      }
     });
 
     api.registerTool(stateReadTool());
     api.registerTool(safeReadTool());
     api.registerTool(approvalTool());
+    api.registerTool(workflowControlTool());
   },
 });

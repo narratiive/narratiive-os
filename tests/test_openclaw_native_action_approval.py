@@ -86,10 +86,30 @@ class OpenClawNativeActionApprovalTests(unittest.TestCase):
                 self.assertTrue(result["required"])
                 self.assertEqual(result["requireApproval"]["severity"], "critical")
 
+    def test_workflow_decisions_use_single_use_native_approval(self):
+        approval = self._node_json(
+            "buildWorkflowApprovalRequirement",
+            {
+                "operation": "approve",
+                "reference": "SAFE Company",
+                "rationale": "Reviewed the internal artefact",
+            },
+        )
+        read = self._node_json(
+            "buildWorkflowApprovalRequirement",
+            {"operation": "status", "reference": "SAFE Company"},
+        )
+
+        self.assertTrue(approval["required"])
+        self.assertEqual(approval["requireApproval"]["allowedDecisions"], ["allow-once", "deny"])
+        self.assertIn("SAFE Company", approval["requireApproval"]["description"])
+        self.assertFalse(read["required"])
+
     def test_plugin_uses_before_tool_call_native_approval_hook(self):
         source = (PLUGIN / "index.js").read_text(encoding="utf-8")
         self.assertIn('api.on("before_tool_call"', source)
-        self.assertIn('event.toolName !== "narratiive_request_action_approval"', source)
+        self.assertIn('event.toolName === "narratiive_request_action_approval"', source)
+        self.assertIn('event.toolName === "narratiive_workflow_control"', source)
         self.assertIn("requireApproval", source)
         self.assertIn("allowedDecisions", (PLUGIN / "approval-policy.js").read_text(encoding="utf-8"))
 

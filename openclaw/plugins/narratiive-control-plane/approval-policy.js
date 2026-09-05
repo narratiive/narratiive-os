@@ -59,3 +59,22 @@ export function approvedActionResult(params = {}) {
       : "No approval gate is required; use an authorised bounded read/preparation tool and verify returned evidence.",
   };
 }
+
+export function buildWorkflowApprovalRequirement(params = {}) {
+  const operation = String(params.operation || "").toLowerCase();
+  if (!new Set(["approve", "reject", "request_revision", "sync_notion"]).has(operation)) {
+    return { required: false };
+  }
+  const reference = String(params.reference || "workflow").slice(0, 160);
+  const rationale = String(params.rationale || "").slice(0, 240);
+  return {
+    required: true,
+    requireApproval: {
+      title: `Approve workflow ${operation.replaceAll("_", " ")}`.slice(0, 80),
+      description: `${reference} | ${rationale} | Single use; persisted and auditable.`.slice(0, 512),
+      severity: operation === "sync_notion" ? "warning" : "info",
+      allowedDecisions: ["allow-once", "deny"],
+      timeoutMs: 120000,
+    },
+  };
+}
