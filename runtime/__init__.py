@@ -157,6 +157,7 @@ from .workflow_execution_coordinator import (
     WorkflowExecutionCoordinator,
 )
 from .tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
+from .tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from .revision_graph import (
     RevisionCategory,
     RevisionIssue,
@@ -352,6 +353,8 @@ __all__ = [
     "WorkflowExecutionCoordinator",
     "TonyWorkflowRuntime",
     "build_tony_workflow_runtime",
+    "FileWorkflowCommandBackend",
+    "TonyWorkflowCommandService",
     "DispatchJob",
     "FileDispatchQueue",
     "JobNotFound",

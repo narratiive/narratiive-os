@@ -38,6 +38,27 @@ class FakeAgentGateway:
         return f"answered:{text}"
 
 
+class FakeWorkflowCommands:
+    def supports(self, text):
+        return text.startswith("/workflow")
+
+    def execute(self, text, objects, *, principal_id=""):
+        return type(
+            "Response",
+            (),
+            {
+                "status": "healthy",
+                "message": f"principal:{principal_id}",
+                "to_dict": lambda self: {
+                    "command": "workflow",
+                    "status": "healthy",
+                    "message": self.message,
+                    "data": {},
+                },
+            },
+        )()
+
+
 class DummyLeadStore:
     def upsert(self, lead):
         raise AssertionError("lead store should not be called")
@@ -90,6 +111,41 @@ class TelegramInboundTests(unittest.TestCase):
             "I couldn't phrase that safely.",
         )
 
+    def test_slash_command_passes_authenticated_chat_as_principal(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            service = TelegramInboundService(
+                TelegramInboundConfig(
+                    bot_token="token",
+                    allowed_chat_id="123",
+                    bridge_token="bridge-secret",
+                    offset_path=Path(tmp) / "offset.json",
+                )
+            )
+            captured = {}
+
+            class Response:
+                def __enter__(self):
+                    return self
+
+                def __exit__(self, *args):
+                    return None
+
+                def read(self):
+                    return b'{"reply":"ok"}'
+
+            def fake_urlopen(request, timeout):
+                captured["body"] = json.loads(request.data.decode("utf-8"))
+                captured["authorization"] = request.headers.get("Authorization")
+                return Response()
+
+            from unittest.mock import patch
+
+            with patch("openclaw.telegram_inbound.urlopen", fake_urlopen):
+                self.assertEqual(service._execute_legacy_command("/approve run because reviewed"), "ok")
+
+        self.assertEqual(captured["body"]["principal_id"], "telegram:123")
+        self.assertEqual(captured["authorization"], "Bearer bridge-secret")
+
     def test_offsets_persist_atomically(self):
         with tempfile.TemporaryDirectory() as tmp:
             path = Path(tmp) / "offset.json"
@@ -123,6 +179,30 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertEqual(payload["reply"], "answered:What inbound leads did we get today?")
         self.assertEqual(payload["data"]["runtime"], "openclaw")
         self.assertEqual(gateway.messages, ["What inbound leads did we get today?"])
+
+    def test_live_bridge_only_trusts_configured_workflow_principal(self):
+        app = LeadAwareTonyApplication(
+            FakeBase(),
+            DummyLeadStore(),
+            agent_gateway=FakeAgentGateway(),
+            workflow_command_service=FakeWorkflowCommands(),
+            authorised_principal_id="telegram:123",
+        )
+
+        def call(principal):
+            body = json.dumps({"text": "/workflow safe", "principal_id": principal}).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST",
+                "PATH_INFO": "/telegram/inbound",
+                "CONTENT_LENGTH": str(len(body)),
+                "HTTP_AUTHORIZATION": "Bearer secret",
+                "wsgi.input": io.BytesIO(body),
+            }
+            response = b"".join(app(environ, lambda status, headers: None))
+            return json.loads(response.decode("utf-8"))
+
+        self.assertEqual(call("telegram:123")["reply"], "principal:telegram:123")
+        self.assertEqual(call("telegram:999")["reply"], "principal:")
 
 
 if __name__ == "__main__":

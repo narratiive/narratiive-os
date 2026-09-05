@@ -277,6 +277,51 @@ class WorkflowRunService:
         self._commit(state, "approval.granted", approval)
         return state
 
+    def reject_for_revision(
+        self,
+        run_id: str,
+        *,
+        reviewer: str,
+        rationale: str,
+    ) -> WorkflowState:
+        """Record an explicit rejection and reopen the producing step.
+
+        The completed artefact and prior approval request remain immutable.  A
+        revision creates another attempt/version; it never rewrites the output
+        that was reviewed.
+        """
+        state = self.repository.load(run_id)
+        identity = reviewer.strip()
+        reason = rationale.strip()
+        if state.approval_status != "pending" or state.status is not WorkflowStatus.AWAITING_APPROVAL:
+            raise ValueError("workflow run is not awaiting approval")
+        if not identity or not reason:
+            raise ValueError("rejection requires reviewer identity and rationale")
+        completed = [stage for stage in state.stages if stage.status is StageStatus.COMPLETED]
+        if not completed:
+            raise ValueError("workflow run has no completed step to revise")
+        owner = completed[-1]
+        rejection = {
+            "reviewer": identity,
+            "rationale": reason,
+            "rejected_at": datetime.now(timezone.utc).isoformat(),
+            "proposed_next_action": state.proposed_next_action,
+        }
+        state.approval_history.append(rejection)
+        state.approval_status = "rejected"
+        state.status = WorkflowStatus.ACTIVE
+        state.proposed_next_action = None
+        state.blocker = None
+        self.engine.request_revision(state, owner.stage_id, owner.stage_id, reason)
+        owner.revision_count += 1
+        self.engine.resume_stage(state, owner.stage_id, state.input_payload.keys())
+        self._commit(
+            state,
+            "approval.revision_requested",
+            {**rejection, "stage_id": owner.stage_id, "revision_count": owner.revision_count},
+        )
+        return state
+
     def record_external_action(
         self,
         run_id: str,

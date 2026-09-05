@@ -1,0 +1,166 @@
+from __future__ import annotations
+
+import tempfile
+import unittest
+from pathlib import Path
+
+from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.tony_command_service import CommandResponse
+from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
+from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+
+
+class FallbackCommands:
+    def execute(self, command, objects):
+        return CommandResponse("fallback", "healthy", "fallback", {})
+
+
+def lifecycle(client_id: str) -> ClientLifecycleRecord:
+    return ClientLifecycleRecord(
+        client_id=client_id,
+        client_name="SAFE Executive Workflow Test",
+        stage=ClientLifecycleStage.RESEARCH,
+        owner="Tony",
+        next_action="Prepare internal work",
+        evidence=("synthetic:test",),
+    )
+
+
+def blueprint_output() -> dict:
+    return {
+        "blueprint_lite": "A substantive synthetic Blueprint Lite with a clear strategic point of view.",
+        "diagnostic_signals_used": ["overall score", "main blockage"],
+        "diagnostic_input_coverage": {"complete": True},
+        "source_backed_evidence": [{"source": "https://example.invalid", "fact": "Synthetic evidence"}],
+        "evidence_gaps": ["Customer interviews are not yet available"],
+        "fact_interpretation_hypothesis_lineage": {
+            "fact": ["Synthetic fact"],
+            "interpretation": ["Synthetic interpretation"],
+            "hypothesis": ["Synthetic hypothesis"],
+        },
+        "growth_tension": "Demand exists but the proposition is unclear.",
+        "provisional_opportunity": "Clarify the category entry point.",
+        "questions_to_answer_next": ["Who buys?", "Why now?", "Why this?"],
+        "quality_gate": {"human_review_ready": True},
+        "recommendation": "advance",
+    }
+
+
+class TonyWorkflowCommandTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.calls = []
+        self.dispatchers = {"Claude": lambda contract: self.calls.append(contract) or blueprint_output()}
+        self.runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=self.dispatchers,
+            environ={},
+        )
+        self.runtime.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-executive-run",
+            {
+                "diagnostic_input_package": {"overall_score": 40},
+                "company": "SAFE Executive Workflow Test",
+            },
+            entity_id="safe-lead",
+            correlation_id="safe-correlation",
+        )
+        self.runtime.advance("safe-executive-run", lifecycle("safe-client"))
+        self.service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}),
+        )
+
+    def tearDown(self) -> None:
+        self.temporary.cleanup()
+
+    def test_status_and_queues_report_persisted_truth_concisely(self) -> None:
+        status = self.service.execute("/workflow SAFE Executive Workflow Test", [])
+        approvals = self.service.execute("/approvals", [])
+        artefact = self.service.execute("/artefact safe-executive-run", [])
+
+        self.assertEqual(status.data["status"], "awaiting_approval")
+        self.assertTrue(status.data["approval_required"])
+        self.assertFalse(status.data["external_action_taken"])
+        self.assertEqual(len(approvals.data["runs"]), 1)
+        self.assertIn("blueprint_lite", artefact.data["artefact_fields"])
+        self.assertNotIn("input_payload", status.data)
+
+    def test_approval_requires_authenticated_principal_and_rationale(self) -> None:
+        denied = self.service.execute(
+            "/approve safe-executive-run because reviewed synthetic work",
+            [],
+        )
+        missing_reason = self.service.execute(
+            "/approve safe-executive-run",
+            [],
+            principal_id="telegram:123",
+        )
+        approved = self.service.execute(
+            "/approve safe-executive-run because reviewed synthetic work",
+            [],
+            principal_id="telegram:123",
+        )
+
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(missing_reason.data["error_code"], "rationale_required")
+        self.assertEqual(approved.data["approval_status"], "approved")
+        self.assertEqual(approved.data["status"], "complete")
+        self.assertFalse(approved.data["external_action_taken"])
+
+    def test_rejection_reopens_exact_producing_step_without_deleting_artefact(self) -> None:
+        rejected = self.service.execute(
+            "/reject safe-executive-run because strengthen the evidence",
+            [],
+            principal_id="telegram:123",
+        )
+        state = self.runtime.status("safe-executive-run")
+
+        self.assertEqual(rejected.data["status"], "active")
+        self.assertEqual(state["stages"][0]["status"], "ready")
+        self.assertEqual(state["stages"][0]["revision_count"], 1)
+        self.assertEqual(len(state["stages"][0]["output_artifacts"]), 1)
+        self.assertEqual(state["approval_history"][-1]["reviewer"], "telegram:123")
+
+    def test_ambiguous_company_reference_fails_safe(self) -> None:
+        second = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client-two",
+            dispatchers={},
+            environ={},
+        )
+        second.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-executive-run-two",
+            {"diagnostic_input_package": {"overall_score": 50}, "company": "SAFE Executive Workflow Test"},
+            entity_id="safe-lead-two",
+            correlation_id="safe-correlation-two",
+        )
+
+        response = self.service.execute("/workflow SAFE Executive Workflow Test", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertIn("ambiguous", response.message)
+
+    def test_non_workflow_command_delegates(self) -> None:
+        response = self.service.execute("/health", [])
+        self.assertEqual(response.command, "fallback")
+
+    def test_malformed_persisted_state_fails_closed(self) -> None:
+        broken = self.root / "invalid-scope" / "runs"
+        broken.mkdir(parents=True)
+        (broken / "broken.json").write_text("{not-json", encoding="utf-8")
+
+        response = self.service.execute("/work", [])
+
+        self.assertEqual(response.status, "error")
+        self.assertEqual(response.data["error_code"], "workflow_state_unavailable")
+
+
+if __name__ == "__main__":
+    unittest.main()
