@@ -106,8 +106,11 @@ class TonyInboundBlueprintLiteService:
             return self._public_state(existing, replay=True)
 
         versions = []
+        attempts = []
         if existing is not None and isinstance(existing.get("versions"), list):
             versions = list(existing["versions"])
+        if existing is not None and isinstance(existing.get("attempts"), list):
+            attempts = list(existing["attempts"])
 
         state: dict[str, Any] = {
             "lead_id": lead.lead_id,
@@ -119,6 +122,7 @@ class TonyInboundBlueprintLiteService:
             "diagnostic_input_package": payload,
             "state": "preparation_queued",
             "attempt_count": 0,
+            "attempts": attempts,
             "versions": versions,
             "approval_required": False,
             "external_action_taken": False,
@@ -283,6 +287,18 @@ class TonyInboundBlueprintLiteService:
 
         quality = self._quality_gate(evidence)
         state["quality_gate"] = quality
+        attempts = list(state.get("attempts") or [])
+        attempts.append(
+            {
+                "attempt": len(attempts) + 1,
+                "completed_at": _now(),
+                "input_fingerprint": state.get("input_fingerprint"),
+                "dispatch": dict(dispatch),
+                "evidence": dict(evidence),
+                "quality_gate": quality,
+            }
+        )
+        state["attempts"] = attempts
         if not quality["passed"]:
             state.update(
                 {

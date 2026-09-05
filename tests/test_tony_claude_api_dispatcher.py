@@ -5,6 +5,7 @@ import json
 import unittest
 from unittest import mock
 
+from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
 from runtime.tony_claude_api_dispatcher import ClaudeDispatcherConfigError, build_claude_api_dispatcher
 from runtime.tony_dispatch_adapters import build_http_dispatchers
 
@@ -154,6 +155,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertIn("provisional_opportunity", prompt)
         self.assertIn("questions_to_answer_next", prompt)
         self.assertIn("human-review-ready", prompt)
+        self.assertIn("at the top level", prompt)
         self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)
 
     def test_dispatcher_rejects_any_non_prepare_or_unapproved_contract_shape(self):
@@ -183,6 +185,92 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         evidence = build_claude_api_dispatcher(self._env())(self._contract())
         self.assertEqual(evidence["work_product"], "Prepared draft content")
         self.assertTrue(evidence["verified"])
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_blueprint_lite_json_after_model_preamble_is_parsed(self, urlopen):
+        work_product = {
+            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "diagnostic_signals_used": ["Synthetic diagnostic signal"],
+            "recommendation": "advance",
+        }
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_preamble",
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": "Prepared internal work product:\n" + json.dumps(work_product),
+                    }
+                ],
+            }
+        )
+
+        evidence = build_http_dispatchers(self._env())["Claude"](self._blueprint_lite_contract())
+
+        self.assertEqual(evidence["blueprint_lite"], work_product["blueprint_lite"])
+        self.assertEqual(evidence["diagnostic_signals_used"], work_product["diagnostic_signals_used"])
+        self.assertEqual(evidence["recommendation"], "advance")
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_model_added_work_product_envelope_is_promoted_for_quality_validation(self, urlopen):
+        work_product = {
+            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "diagnostic_signals_used": ["Synthetic diagnostic signal"],
+            "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
+            "source_backed_evidence": ["https://example.invalid/source"],
+            "evidence_gaps": ["Private commercial evidence is unavailable"],
+            "fact_interpretation_hypothesis_lineage": {
+                "fact": ["Synthetic diagnostic input was supplied"],
+                "interpretation": ["Synthetic interpretation"],
+                "hypothesis": ["Synthetic hypothesis to test"],
+            },
+            "growth_tension": "Synthetic company-specific tension",
+            "provisional_opportunity": "A synthetic opportunity to test",
+            "questions_to_answer_next": [
+                "Synthetic question one?",
+                "Synthetic question two?",
+                "Synthetic question three?",
+            ],
+            "quality_gate": {"human_review_ready": True},
+            "recommendation": "advance",
+        }
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_wrapped",
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [
+                    {
+                        "type": "text",
+                        "text": json.dumps({"work_product": work_product}),
+                    }
+                ],
+            }
+        )
+
+        evidence = build_http_dispatchers(self._env())["Claude"](self._blueprint_lite_contract())
+
+        self.assertEqual(evidence["blueprint_lite"], work_product["blueprint_lite"])
+        self.assertEqual(evidence["diagnostic_signals_used"], work_product["diagnostic_signals_used"])
+        self.assertEqual(evidence["recommendation"], "advance")
+        self.assertEqual(evidence["work_product"], work_product)
+        self.assertTrue(TonyInboundBlueprintLiteService._quality_gate(evidence)["passed"])
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_truncated_claude_response_fails_before_partial_work_can_reach_quality_gate(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_truncated",
+                "model": "claude-test-model",
+                "stop_reason": "max_tokens",
+                "content": [{"type": "text", "text": '{"blueprint_lite":"incomplete'}],
+            }
+        )
+
+        with self.assertRaisesRegex(RuntimeError, "truncated at the configured max_tokens limit"):
+            build_http_dispatchers(self._env())["Claude"](self._blueprint_lite_contract())
 
 
 if __name__ == "__main__":

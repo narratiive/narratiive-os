@@ -105,6 +105,8 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             persisted = store.get("lead-1")
             self.assertEqual(len(persisted["versions"]), 1)
             self.assertEqual(persisted["versions"][0]["evidence"]["blueprint_lite"], self._good_evidence()["blueprint_lite"])
+            self.assertEqual(len(persisted["attempts"]), 1)
+            self.assertTrue(persisted["attempts"][0]["quality_gate"]["passed"])
 
             replay = service.enqueue(self._lead(), self._payload())
             self.assertEqual(replay["state"], "awaiting_review")
@@ -131,6 +133,34 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertIn("diagnostic input coverage complete", result["failed_checks"])
             self.assertIsNone(result["current_version"])
             self.assertFalse(result["approval_required"])
+            persisted = store.get("lead-1")
+            self.assertEqual(len(persisted["attempts"]), 1)
+            self.assertEqual(persisted["attempts"][0]["evidence"]["recommendation"], "revise")
+            self.assertFalse(persisted["attempts"][0]["quality_gate"]["passed"])
+
+    def test_unstructured_worker_response_is_blocked_and_retained_for_diagnosis(self) -> None:
+        evidence = {
+            "verified": True,
+            "work_product": "Synthetic non-JSON worker response",
+            "provider": "anthropic",
+            "stop_reason": "end_turn",
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: evidence})
+            service.enqueue(self._lead(), self._payload())
+
+            result = service.process("lead-1")
+
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(result["blocker"], "blueprint_lite_quality_gate")
+            self.assertFalse(result["approval_required"])
+            persisted = store.get("lead-1")
+            self.assertEqual(persisted["versions"], [])
+            self.assertEqual(len(persisted["attempts"]), 1)
+            self.assertEqual(persisted["attempts"][0]["evidence"]["work_product"], evidence["work_product"])
+            self.assertFalse(persisted["attempts"][0]["quality_gate"]["passed"])
 
     def test_process_contract_routes_to_claude_despite_external_systems_named_in_prohibitions(self) -> None:
         calls: list[dict] = []
