@@ -114,6 +114,28 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(store.get("lead-1")["versions"]), 1)
 
+    def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
+        payload = self._payload()
+        payload["diagnostic"] = {
+            "overallScore": 54,
+            "categoryScores": {"positioning": 42, "messaging": 61, "demandGen": 57, "competitive": 49},
+            "mainBlockage": "The proposition is difficult to distinguish",
+            "recommendedActions": ["Sharpen the positioning"],
+            "answers": {"growth_priority": "Win more high-value customers"},
+        }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: self._good_evidence()})
+            service.enqueue(self._lead(), payload)
+
+            persisted = store.get("lead-1")["diagnostic_input_package"]["diagnostic"]
+            self.assertEqual(persisted["overall_score"], 54)
+            self.assertEqual(persisted["category_scores"]["demand_gen"], 57)
+            self.assertEqual(persisted["main_blockage"], payload["diagnostic"]["mainBlockage"])
+            self.assertEqual(persisted["recommended_actions"], ["Sharpen the positioning"])
+            self.assertEqual(persisted["raw_answers"], payload["diagnostic"]["answers"])
+
     def test_incomplete_diagnostic_coverage_is_blocked_not_promoted(self) -> None:
         evidence = self._good_evidence()
         evidence["diagnostic_input_coverage"] = {
