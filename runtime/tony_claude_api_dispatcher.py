@@ -8,6 +8,7 @@ from urllib import request
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_API_URL = "https://api.anthropic.com/v1/messages"
 DEFAULT_MAX_TOKENS = 8192
+DEFAULT_GROWTH_BLUEPRINT_MAX_TOKENS = 16384
 DEFAULT_TIMEOUT_SECONDS = 180
 
 
@@ -27,6 +28,10 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     api_url = str(environ.get("TONY_DISPATCH_CLAUDE_API_URL") or DEFAULT_API_URL).strip()
     version = str(environ.get("TONY_DISPATCH_CLAUDE_API_VERSION") or DEFAULT_ANTHROPIC_VERSION).strip()
     max_tokens_raw = str(environ.get("TONY_DISPATCH_CLAUDE_MAX_TOKENS") or DEFAULT_MAX_TOKENS).strip()
+    growth_blueprint_max_tokens_raw = str(
+        environ.get("TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS")
+        or DEFAULT_GROWTH_BLUEPRINT_MAX_TOKENS
+    ).strip()
     timeout_raw = str(environ.get("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS).strip()
 
     if not api_key:
@@ -40,6 +45,16 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     if max_tokens <= 0:
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_MAX_TOKENS must be greater than zero")
     try:
+        growth_blueprint_max_tokens = int(growth_blueprint_max_tokens_raw)
+    except ValueError as exc:
+        raise ClaudeDispatcherConfigError(
+            "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS must be an integer"
+        ) from exc
+    if growth_blueprint_max_tokens <= 0:
+        raise ClaudeDispatcherConfigError(
+            "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS must be greater than zero"
+        )
+    try:
         timeout_seconds = int(timeout_raw)
     except ValueError as exc:
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS must be an integer") from exc
@@ -49,9 +64,14 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     def dispatch(contract: dict[str, Any]) -> dict[str, Any]:
         _validate_safe_contract(contract)
         prompt = _render_prompt(contract)
+        request_max_tokens = (
+            growth_blueprint_max_tokens
+            if _workflow_id(contract) == "research_to_growth_blueprint"
+            else max_tokens
+        )
         payload = {
             "model": model,
-            "max_tokens": max_tokens,
+            "max_tokens": request_max_tokens,
             "messages": [{"role": "user", "content": prompt}],
         }
         body = json.dumps(payload).encode("utf-8")
@@ -90,6 +110,12 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
         return evidence
 
     return dispatch
+
+
+def _workflow_id(contract: Mapping[str, Any]) -> str:
+    target = contract.get("target")
+    context = target.get("workflow_context") if isinstance(target, Mapping) else None
+    return str(context.get("workflow_id") or "").strip() if isinstance(context, Mapping) else ""
 
 
 def _validate_safe_contract(contract: Mapping[str, Any]) -> None:
