@@ -47,6 +47,9 @@ class WorkflowRegistryTests(unittest.TestCase):
         registry = build_narratiive_workflow_registry()
         self.assertIs(registry.resolve("growth_diagnostic_to_blueprint_lite"), GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE)
         self.assertTrue(GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE.approval_required)
+        step = GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE.stages[0]
+        self.assertEqual(step.capability, "strategic_reasoning")
+        self.assertEqual(step.agent_ref, "")
         discovery = registry.resolve("blueprint_lite_to_discovery_preparation").stages[0]
         self.assertIn("suggested_meeting_objective", discovery.output_contract.required_fields)
         self.assertTrue(discovery.approval_policy.required)

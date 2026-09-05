@@ -102,7 +102,6 @@ GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE = _workflow(
     _step(
         "prepare_blueprint_lite",
         capability="strategic_reasoning",
-        agent_ref="Claude",
         inputs=("diagnostic_input_package",),
         outputs=(
             "blueprint_lite",

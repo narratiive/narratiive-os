@@ -76,6 +76,19 @@ substitute for audit history.
 
 ### Dispatch and execution
 
+Workflow definitions name required capabilities rather than model vendors.
+`runtime/worker_registry.py` resolves each capability to an eligible adapter
+using deterministic policy and normalises responses at the worker boundary.
+Unavailable or malformed workers fail closed with a durable blocker; they do
+not silently fall back to an inappropriate capability.
+
+The configured Claude adapter is currently operational for internal
+preparation requiring strategic reasoning, synthesis, copy drafting, and
+structured-data processing. Market/web research, document/deck generation,
+creative asset/image/video production, CRM, email, and calendar workers are
+declared as planned and unavailable until real adapters are configured. No
+registered worker has permission to perform an external write.
+
 - `DispatchService` validates current-stage readiness and creates dispatch jobs.
 - `FileDispatchQueue` owns job state and leases.
 - `WorkerRunner` claims a lease and delegates execution to an `AgentExecutor`.
