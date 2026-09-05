@@ -250,7 +250,39 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(completed.status, "complete")
         self.assertEqual(len(state.stage("draft").attempts), 3)
         self.assertEqual([item["revision"] for item in state.stage("draft").attempts], [0, 0, 1])
+        self.assertEqual(state.stage("draft").attempts[0]["error_code"], "worker_execution_failed")
         self.assertEqual(state.approval_history[-1]["decision"], "request_revision")
+
+    def test_explicit_revision_reopens_worker_retry_exhaustion(self) -> None:
+        calls = []
+
+        def adapter(contract):
+            calls.append(contract)
+            if len(calls) <= 2:
+                raise TimeoutError("synthetic worker timeout")
+            return {"draft": "recovered after timeout correction"}
+
+        definition = WorkflowDefinition("worker-revision", (_stage("draft"),))
+        coordinator = self._coordinator(
+            definition,
+            _worker(adapter),
+            {"quality": lambda output: {"passed": True, "failed_checks": []}},
+        )
+        coordinator.enqueue("worker-revision", "run-worker-revision", {"brief": "safe"}, entity_id="e", correlation_id="c")
+        blocked = coordinator.advance("run-worker-revision", _lifecycle())
+
+        self.assertEqual(blocked.blocker, "worker_retry_policy_exhausted")
+        self.runs.request_blocked_revision(
+            "run-worker-revision",
+            reviewer="authorised-human",
+            rationale="Retry after correcting the worker timeout",
+        )
+        completed = coordinator.advance("run-worker-revision", _lifecycle())
+        state = self.runs.load_run("run-worker-revision")
+
+        self.assertEqual(completed.status, "complete")
+        self.assertEqual([item["revision"] for item in state.stage("draft").attempts], [0, 0, 1])
+        self.assertTrue(all(item["error_code"] == "worker_timeout" for item in state.stage("draft").attempts[:2]))
 
     def test_worker_unavailable_becomes_explicit_blocker(self) -> None:
         definition = WorkflowDefinition("no-worker", (_stage("draft", capability="market_research"),))

@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import Any
 
+from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS
 from runtime.workflow_instructions import workflow_instruction
 
 
@@ -231,7 +232,7 @@ def build_tony_worker_registry(
                     capabilities=("strategic_reasoning", "synthesis", "copy_drafting", "structured_data_processing"),
                     availability=WorkerAvailability.AVAILABLE,
                     side_effect_permissions=("preparation",),
-                    timeout_seconds=90,
+                    timeout_seconds=int(env.get("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS),
                     max_attempts=1,
                     cost_class="configured_model",
                     dispatch_name="Claude",
