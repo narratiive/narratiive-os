@@ -69,7 +69,15 @@ from .composition import (
     compose_local_runtime,
     compose_workspace_runtime,
 )
-from .definitions import StageDefinition, WorkflowDefinition, load_workflow_definition
+from .definitions import (
+    ApprovalPolicy,
+    InputContract,
+    OutputContract,
+    RetryPolicy,
+    StageDefinition,
+    WorkflowDefinition,
+    load_workflow_definition,
+)
 from .dispatch import (
     DispatchJob,
     FileDispatchQueue,
@@ -300,6 +308,10 @@ __all__ = [
     "RunNotFound",
     "WorkflowEvent",
     "StageDefinition",
+    "InputContract",
+    "OutputContract",
+    "RetryPolicy",
+    "ApprovalPolicy",
     "WorkflowDefinition",
     "load_workflow_definition",
     "WorkflowRunService",

@@ -9,6 +9,7 @@ from runtime.tony_blueprint_lite_inbound import (
     FileBlueprintLitePreparationStore,
     TonyInboundBlueprintLiteService,
 )
+from runtime.serialization import workflow_from_dict
 
 
 class TonyInboundBlueprintLiteTests(unittest.TestCase):
@@ -77,9 +78,15 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             persisted = store.get("lead-1")
             self.assertIsNotNone(persisted)
             self.assertEqual(persisted["state"], "dispatcher_unavailable")
+            self.assertEqual(workflow_from_dict(persisted["workflow_run"]).status.value, "blocked")
             replay = service.enqueue(self._lead(), self._payload())
             self.assertTrue(replay["replay"])
             self.assertEqual(len(store.read_all()), 1)
+
+            available = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: self._good_evidence()})
+            resumed = available.enqueue(self._lead(), self._payload())
+            self.assertEqual(resumed["state"], "preparation_queued")
+            self.assertEqual(workflow_from_dict(store.get("lead-1")["workflow_run"]).stage("prepare_blueprint_lite").status.value, "ready")
 
     def test_verified_blueprint_lite_is_versioned_and_stops_at_human_review(self) -> None:
         calls: list[dict] = []
@@ -111,6 +118,14 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(persisted["versions"][0]["evidence"]["blueprint_lite"], self._good_evidence()["blueprint_lite"])
             self.assertEqual(len(persisted["attempts"]), 1)
             self.assertTrue(persisted["attempts"][0]["quality_gate"]["passed"])
+            workflow = workflow_from_dict(persisted["workflow_run"])
+            self.assertEqual(workflow.workflow_id, "growth_diagnostic_to_blueprint_lite")
+            self.assertEqual(workflow.status.value, "awaiting_approval")
+            self.assertEqual(workflow.stage("prepare_blueprint_lite").capability, "strategic_reasoning")
+            self.assertEqual(len(workflow.stage("prepare_blueprint_lite").attempts), 1)
+            self.assertTrue(workflow.stage("prepare_blueprint_lite").quality_result["passed"])
+            self.assertEqual(workflow.stage("prepare_blueprint_lite").output_artifacts[0].artifact_type, "blueprint_lite")
+            self.assertFalse(workflow.external_action_taken)
 
             replay = service.enqueue(self._lead(), self._payload())
             self.assertEqual(replay["state"], "awaiting_review")
@@ -163,6 +178,10 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(len(persisted["attempts"]), 1)
             self.assertEqual(persisted["attempts"][0]["evidence"]["recommendation"], "revise")
             self.assertFalse(persisted["attempts"][0]["quality_gate"]["passed"])
+            workflow = workflow_from_dict(persisted["workflow_run"])
+            self.assertEqual(workflow.status.value, "blocked")
+            self.assertEqual(workflow.blocker, "blueprint_lite_quality_gate")
+            self.assertFalse(workflow.external_action_taken)
 
     def test_unstructured_worker_response_is_blocked_and_retained_for_diagnosis(self) -> None:
         evidence = {

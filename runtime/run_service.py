@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from uuid import uuid4
 
 from .definitions import WorkflowDefinition
-from .models import ArtifactRef, WorkflowState, WorkflowStatus
+from .models import ArtifactRef, StageStatus, WorkflowState, WorkflowStatus
 from .repositories import EventLog, WorkflowEvent, WorkflowRunRepository
 from .state_machine import WorkflowEngine
 
@@ -31,6 +31,10 @@ class WorkflowRunService:
         definition: WorkflowDefinition,
         run_id: str,
         available_inputs: Iterable[str],
+        *,
+        entity_id: str = "",
+        correlation_id: str = "",
+        input_payload: Mapping[str, object] | None = None,
     ) -> WorkflowState:
         if self.repository.exists(run_id):
             raise ValueError(f"workflow run already exists: {run_id}")
@@ -39,6 +43,9 @@ class WorkflowRunService:
             workspace_id=self.workspace_id,
             client_id=self.client_id,
         )
+        state.entity_id = entity_id.strip()
+        state.correlation_id = correlation_id.strip()
+        state.input_payload = dict(input_payload or {})
         self.engine.initialise(state, available_inputs)
         self._commit(
             state,
@@ -49,6 +56,20 @@ class WorkflowRunService:
                 "status": state.status.value,
             },
         )
+        return state
+
+    def create_or_load_run(
+        self,
+        definition: WorkflowDefinition,
+        run_id: str,
+        available_inputs: Iterable[str],
+        **identity: object,
+    ) -> WorkflowState:
+        if not self.repository.exists(run_id):
+            return self.create_run(definition, run_id, available_inputs, **identity)
+        state = self.repository.load(run_id)
+        if state.workflow_id != definition.workflow_id:
+            raise ValueError(f"run {run_id} belongs to another workflow")
         return state
 
     def load_run(self, run_id: str) -> WorkflowState:
@@ -142,6 +163,61 @@ class WorkflowRunService:
             },
         )
         return state
+
+    def record_attempt(self, run_id: str, stage_id: str, attempt: Mapping[str, object]) -> WorkflowState:
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        if stage.status is not StageStatus.RUNNING:
+            raise ValueError("workflow attempts can only be recorded for a running step")
+        if len(stage.attempts) >= stage.max_attempts:
+            raise ValueError("workflow step retry policy exhausted")
+        stage.attempts.append(dict(attempt))
+        state.touch()
+        self._commit(
+            state,
+            "stage.attempt_recorded",
+            {"stage_id": stage_id, "attempt": len(stage.attempts)},
+        )
+        return state
+
+    def record_quality(self, run_id: str, stage_id: str, quality: Mapping[str, object]) -> WorkflowState:
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        if stage.status is not StageStatus.RUNNING:
+            raise ValueError("quality can only be recorded for a running step")
+        stage.quality_result = dict(quality)
+        state.touch()
+        self._commit(
+            state,
+            "stage.quality_recorded",
+            {"stage_id": stage_id, "passed": quality.get("passed") is True},
+        )
+        return state
+
+    def block_for_reason(self, run_id: str, stage_id: str, blocker: str, next_action: str) -> WorkflowState:
+        state = self.repository.load(run_id)
+        self.engine.block_for_reason(state, stage_id, blocker, next_action)
+        self._commit(
+            state,
+            "stage.blocked",
+            {"stage_id": stage_id, "blocker": blocker, "proposed_next_action": next_action},
+        )
+        return state
+
+    def recover_interrupted_runs(self) -> int:
+        recovered = 0
+        for run_id in self.repository.list_run_ids():
+            state = self.repository.load(run_id)
+            if not state.current_stage_id:
+                continue
+            stage = state.stage(state.current_stage_id)
+            if stage.status is not StageStatus.RUNNING:
+                continue
+            self.engine.request_retry(state, stage.stage_id, "recovered_after_runtime_restart")
+            self.engine.resume_stage(state, stage.stage_id, stage.required_inputs)
+            self._commit(state, "stage.recovered", {"stage_id": stage.stage_id})
+            recovered += 1
+        return recovered
 
     def resume_stage(
         self,
