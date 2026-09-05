@@ -59,6 +59,10 @@ class WorkflowEngine:
         output_list = list(outputs)
         if not output_list:
             raise InvalidTransition("a completed stage must produce at least one artifact")
+        if stage.quality_contract and not (
+            isinstance(stage.quality_result, dict) and stage.quality_result.get("passed") is True
+        ):
+            raise InvalidTransition("a step with a quality contract cannot complete unless quality passed")
         self._transition(stage, StageStatus.COMPLETED)
         stage.output_artifacts = output_list
         stage.mark_completed()
@@ -86,6 +90,25 @@ class WorkflowEngine:
         self._transition(stage, StageStatus.BLOCKED)
         stage.missing_inputs = missing
         stage.failure_reason = "missing required inputs"
+        stage.blocker = "missing_required_inputs"
+        stage.proposed_next_action = "Supply the required inputs before resuming this step."
+        state.blocker = stage.blocker
+        state.proposed_next_action = stage.proposed_next_action
+        self._refresh_workflow(state)
+        return state
+
+    def block_for_reason(self, state: WorkflowState, stage_id: str, blocker: str, next_action: str) -> WorkflowState:
+        stage = state.stage(stage_id)
+        reason = blocker.strip()
+        action = next_action.strip()
+        if not reason or not action:
+            raise ValueError("blocked work requires a blocker and proposed next action")
+        self._transition(stage, StageStatus.BLOCKED)
+        stage.blocker = reason
+        stage.failure_reason = reason
+        stage.proposed_next_action = action
+        state.blocker = reason
+        state.proposed_next_action = action
         self._refresh_workflow(state)
         return state
 
@@ -125,6 +148,10 @@ class WorkflowEngine:
         self._transition(stage, target)
         stage.missing_inputs = missing
         stage.failure_reason = "missing required inputs" if missing else None
+        stage.blocker = "missing_required_inputs" if missing else None
+        stage.proposed_next_action = "Supply the required inputs before resuming this step." if missing else None
+        state.blocker = stage.blocker
+        state.proposed_next_action = stage.proposed_next_action
         state.current_stage_id = stage.stage_id
 
     @staticmethod

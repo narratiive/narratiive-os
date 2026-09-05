@@ -7,7 +7,18 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from runtime.definitions import (
+    ApprovalPolicy,
+    InputContract,
+    OutputContract,
+    RetryPolicy,
+    StageDefinition,
+    WorkflowDefinition,
+)
 from runtime.inbound_leads import InboundLead
+from runtime.models import ArtifactRef, StageStatus
+from runtime.serialization import workflow_from_dict, workflow_to_dict
+from runtime.state_machine import WorkflowEngine
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
@@ -24,6 +35,42 @@ _FALSE_EXECUTION_MARKERS = (
     "calendar event created",
     "meeting booked",
     "updated notion",
+)
+
+BLUEPRINT_LITE_WORKFLOW = WorkflowDefinition(
+    workflow_id="growth_diagnostic_to_blueprint_lite",
+    entity_type="lead",
+    approval_required=True,
+    next_workflow_id="blueprint_lite_to_discovery_preparation",
+    failure_policy="block_and_escalate",
+    stages=(
+        StageDefinition(
+            stage_id="prepare_blueprint_lite",
+            agent_ref="Claude",
+            required_inputs=("diagnostic_input_package",),
+            capability="strategic_reasoning",
+            input_contract=InputContract(("diagnostic_input_package",)),
+            output_contract=OutputContract(
+                (
+                    "blueprint_lite",
+                    "diagnostic_signals_used",
+                    "diagnostic_input_coverage",
+                    "source_backed_evidence",
+                    "evidence_gaps",
+                    "fact_interpretation_hypothesis_lineage",
+                    "growth_tension",
+                    "provisional_opportunity",
+                    "questions_to_answer_next",
+                    "quality_gate",
+                    "recommendation",
+                )
+            ),
+            quality_contract="blueprint_lite_quality_gate",
+            retry_policy=RetryPolicy(max_attempts=2),
+            approval_policy=ApprovalPolicy(required=True, before_external_action=True),
+            side_effect_classification="preparation",
+        ),
+    ),
 )
 
 
@@ -99,6 +146,7 @@ class TonyInboundBlueprintLiteService:
 
         if existing is not None and existing.get("input_fingerprint") == fingerprint:
             if existing.get("state") == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+                _resume_workflow_record(existing)
                 existing["state"] = "preparation_queued"
                 existing["blocker"] = ""
                 existing["updated_at"] = _now()
@@ -128,9 +176,26 @@ class TonyInboundBlueprintLiteService:
             "external_action_taken": False,
             "updated_at": _now(),
         }
+        workflow = BLUEPRINT_LITE_WORKFLOW.new_state(
+            lead.lead_id,
+            workspace_id="narratiive",
+            client_id=lead.lead_id,
+        )
+        workflow.entity_id = lead.lead_id
+        workflow.correlation_id = lead.lead_id
+        workflow.input_payload = payload
+        WorkflowEngine().initialise(workflow, {"diagnostic_input_package"})
+        state["workflow_run"] = workflow_to_dict(workflow)
         if "Claude" not in self.dispatchers:
+            WorkflowEngine().block_for_reason(
+                workflow,
+                "prepare_blueprint_lite",
+                "claude_dispatcher_not_configured",
+                "Configure an eligible strategic-reasoning worker before dispatch.",
+            )
             state["state"] = "dispatcher_unavailable"
             state["blocker"] = "claude_dispatcher_not_configured"
+            state["workflow_run"] = workflow_to_dict(workflow)
         self.store.put(lead.lead_id, state)
         return self._public_state(state)
 
@@ -162,12 +227,14 @@ class TonyInboundBlueprintLiteService:
         for lead_id, state in self.store.read_all().items():
             current = str(state.get("state") or "")
             if current == "dispatching":
+                _recover_workflow_record(state)
                 state["state"] = "preparation_queued"
                 state["blocker"] = "recovered_after_runtime_restart"
                 state["updated_at"] = _now()
                 self.store.put(lead_id, state)
                 current = "preparation_queued"
             if current == "dispatcher_unavailable" and "Claude" in self.dispatchers:
+                _resume_workflow_record(state)
                 state["state"] = "preparation_queued"
                 state["blocker"] = ""
                 state["updated_at"] = _now()
@@ -183,9 +250,17 @@ class TonyInboundBlueprintLiteService:
             return {"state": "missing", "lead_id": lead_id, "external_action_taken": False}
         if state.get("state") != "preparation_queued":
             return self._public_state(state)
+        workflow = _workflow_from_record(state)
+        step_id = workflow.current_stage_id or "prepare_blueprint_lite"
 
         handler = self.dispatchers.get("Claude")
         if handler is None:
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "claude_dispatcher_not_configured",
+                "Configure an eligible strategic-reasoning worker before dispatch.",
+            )
             state.update(
                 {
                     "state": "dispatcher_unavailable",
@@ -193,6 +268,7 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
+            state["workflow_run"] = workflow_to_dict(workflow)
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -244,6 +320,12 @@ class TonyInboundBlueprintLiteService:
             and dispatch.get("eligible") is True
             and dispatch.get("state") == "ready_for_autonomous_dispatch"
         ):
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "unsafe_or_invalid_dispatch_contract",
+                "Resolve the worker routing contract before retrying this workflow step.",
+            )
             state.update(
                 {
                     "state": "blocked",
@@ -251,10 +333,14 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
+            state["workflow_run"] = workflow_to_dict(workflow)
             self.store.put(lead_id, state)
             return self._public_state(state)
 
         state["attempt_count"] = int(state.get("attempt_count") or 0) + 1
+        if workflow.stage(step_id).status is StageStatus.READY:
+            WorkflowEngine().start_stage(workflow, step_id)
+        state["workflow_run"] = workflow_to_dict(workflow)
         state["state"] = "dispatching"
         state["updated_at"] = _now()
         self.store.put(lead_id, state)
@@ -262,6 +348,16 @@ class TonyInboundBlueprintLiteService:
         try:
             evidence = handler(dict(dispatch))
         except Exception as exc:
+            _record_workflow_attempt(
+                workflow,
+                {"attempt": state["attempt_count"], "error": str(exc)[:500], "verified": False},
+            )
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "claude_dispatch_failed",
+                "Inspect the persisted attempt evidence before retrying the worker.",
+            )
             state.update(
                 {
                     "state": "dispatch_failed",
@@ -270,11 +366,22 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
+            state["workflow_run"] = workflow_to_dict(workflow)
             self.store.put(lead_id, state)
             return self._public_state(state)
 
         verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, evidence)
         if not verified:
+            _record_workflow_attempt(
+                workflow,
+                {"attempt": state["attempt_count"], "evidence": dict(evidence), "verified": False, "failure": reason},
+            )
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "claude_evidence_unverified",
+                "Inspect the returned worker evidence and resolve the verification failure.",
+            )
             state.update(
                 {
                     "state": "dispatch_unverified",
@@ -283,6 +390,7 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
+            state["workflow_run"] = workflow_to_dict(workflow)
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -300,7 +408,15 @@ class TonyInboundBlueprintLiteService:
             }
         )
         state["attempts"] = attempts
+        _record_workflow_attempt(workflow, attempts[-1])
+        workflow.stage(step_id).quality_result = dict(quality)
         if not quality["passed"]:
+            WorkflowEngine().block_for_reason(
+                workflow,
+                step_id,
+                "blueprint_lite_quality_gate",
+                "Revise the worker output against the failed quality checks before progression.",
+            )
             state.update(
                 {
                     "state": "blocked",
@@ -309,6 +425,7 @@ class TonyInboundBlueprintLiteService:
                     "updated_at": _now(),
                 }
             )
+            state["workflow_run"] = workflow_to_dict(workflow)
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -323,6 +440,21 @@ class TonyInboundBlueprintLiteService:
             "quality_gate": quality,
         }
         versions.append(version)
+        artifact_content = json.dumps(evidence, sort_keys=True, default=str)
+        WorkflowEngine().complete_stage(
+            workflow,
+            step_id,
+            (
+                ArtifactRef(
+                    artifact_id=f"{lead_id}--blueprint-lite--v{version_number}",
+                    artifact_type="blueprint_lite",
+                    location=f"blueprint-lite-preparation:{lead_id}:v{version_number}",
+                    checksum=hashlib.sha256(artifact_content.encode("utf-8")).hexdigest(),
+                    metadata={"version": version_number, "quality_contract": "blueprint_lite_quality_gate"},
+                ),
+            ),
+        )
+        workflow.proposed_next_action = "Authorised human reviews the Blueprint Lite before any client-facing use."
         state.update(
             {
                 "state": "awaiting_review",
@@ -331,6 +463,7 @@ class TonyInboundBlueprintLiteService:
                 "current_version": version_number,
                 "approval_required": True,
                 "updated_at": _now(),
+                "workflow_run": workflow_to_dict(workflow),
             }
         )
         state.pop("failure", None)
@@ -413,6 +546,62 @@ class TonyInboundBlueprintLiteService:
 def _fingerprint(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _workflow_from_record(record: Mapping[str, Any]):
+    raw = record.get("workflow_run")
+    if isinstance(raw, dict):
+        workflow = workflow_from_dict(raw)
+        if workflow.workflow_id != BLUEPRINT_LITE_WORKFLOW.workflow_id:
+            raise ValueError("preparation record belongs to another workflow")
+        return workflow
+
+    lead_id = str(record.get("lead_id") or "").strip()
+    if not lead_id:
+        raise ValueError("preparation record has no workflow identity")
+    workflow = BLUEPRINT_LITE_WORKFLOW.new_state(
+        lead_id,
+        workspace_id="narratiive",
+        client_id=lead_id,
+    )
+    workflow.entity_id = lead_id
+    workflow.correlation_id = lead_id
+    payload = record.get("diagnostic_input_package")
+    workflow.input_payload = dict(payload) if isinstance(payload, dict) else {}
+    available = {"diagnostic_input_package"} if isinstance(payload, dict) else set()
+    WorkflowEngine().initialise(workflow, available)
+    return workflow
+
+
+def _record_workflow_attempt(workflow, attempt: Mapping[str, Any]) -> None:
+    stage_id = workflow.current_stage_id or "prepare_blueprint_lite"
+    stage = workflow.stage(stage_id)
+    if len(stage.attempts) >= stage.max_attempts:
+        raise ValueError("Blueprint Lite retry policy exhausted")
+    stage.attempts.append(_json_safe_mapping(attempt))
+    workflow.touch()
+
+
+def _recover_workflow_record(record: dict[str, Any]) -> None:
+    workflow = _workflow_from_record(record)
+    if workflow.current_stage_id:
+        stage = workflow.stage(workflow.current_stage_id)
+        if stage.status is StageStatus.RUNNING:
+            engine = WorkflowEngine()
+            engine.request_retry(workflow, stage.stage_id, "recovered_after_runtime_restart")
+            engine.resume_stage(workflow, stage.stage_id, stage.required_inputs)
+    record["workflow_run"] = workflow_to_dict(workflow)
+
+
+def _resume_workflow_record(record: dict[str, Any]) -> None:
+    workflow = _workflow_from_record(record)
+    if workflow.current_stage_id:
+        stage = workflow.stage(workflow.current_stage_id)
+        if stage.status is StageStatus.BLOCKED:
+            WorkflowEngine().resume_stage(workflow, stage.stage_id, stage.required_inputs)
+            workflow.blocker = None
+            workflow.proposed_next_action = None
+    record["workflow_run"] = workflow_to_dict(workflow)
 
 
 def _json_safe_mapping(value: Mapping[str, Any]) -> dict[str, Any]:

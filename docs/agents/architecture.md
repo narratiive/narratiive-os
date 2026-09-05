@@ -104,6 +104,23 @@ persisted.
 - A client-ready final stage moves the workflow to `awaiting_approval`; an
   authorised approval decision moves it to `complete`.
 
+### Generic workflow execution contract
+
+`WorkflowDefinition` and `StageDefinition` are the reusable orchestration
+contract. A step can declare its required capability, input and output fields,
+quality contract, retry policy, approval policy, and side-effect classification
+without assuming one model provider. `WorkflowState` durably records entity and
+correlation identity, supplied inputs, attempt history, quality results,
+blockers, the proposed next action, immutable artefact references, and explicit
+external-action truth. Interrupted running preparation is recovered to a ready
+state; it is never treated as completed merely because the process restarted.
+
+The live Growth Diagnostic to Blueprint Lite path retains its existing public
+and `.runtime/blueprint-lite-preparation.json` compatibility projection, while
+also persisting and transitioning a generic `workflow_run` snapshot. The
+Blueprint Lite quality contract remains product-specific and completion stops
+at `awaiting_approval` for authorised human review.
+
 ## Workspace isolation and public boundary
 
 - `WorkspaceRuntimeManager` creates one physical runtime root per workspace and

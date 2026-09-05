@@ -39,6 +39,16 @@ def stage_to_dict(stage: StageRecord) -> dict[str, Any]:
         "revision_count": stage.revision_count,
         "started_at": stage.started_at,
         "completed_at": stage.completed_at,
+        "capability": stage.capability,
+        "expected_outputs": list(stage.expected_outputs),
+        "quality_contract": stage.quality_contract,
+        "max_attempts": stage.max_attempts,
+        "step_approval_required": stage.step_approval_required,
+        "side_effect_classification": stage.side_effect_classification,
+        "attempts": list(stage.attempts),
+        "quality_result": stage.quality_result,
+        "blocker": stage.blocker,
+        "proposed_next_action": stage.proposed_next_action,
     }
 
 
@@ -56,6 +66,16 @@ def stage_from_dict(data: dict[str, Any]) -> StageRecord:
         revision_count=int(data.get("revision_count", 0)),
         started_at=data.get("started_at"),
         completed_at=data.get("completed_at"),
+        capability=str(data.get("capability", "")),
+        expected_outputs=tuple(data.get("expected_outputs") or ()),
+        quality_contract=str(data.get("quality_contract", "")),
+        max_attempts=int(data.get("max_attempts", 1)),
+        step_approval_required=bool(data.get("step_approval_required", False)),
+        side_effect_classification=str(data.get("side_effect_classification", "preparation")),
+        attempts=list(data.get("attempts") or []),
+        quality_result=dict(data["quality_result"]) if isinstance(data.get("quality_result"), dict) else None,
+        blocker=data.get("blocker"),
+        proposed_next_action=data.get("proposed_next_action"),
     )
 
 
@@ -72,6 +92,12 @@ def workflow_to_dict(state: WorkflowState) -> dict[str, Any]:
         "client_id": state.client_id,
         "created_at": state.created_at,
         "updated_at": state.updated_at,
+        "entity_id": state.entity_id,
+        "correlation_id": state.correlation_id,
+        "input_payload": state.input_payload,
+        "blocker": state.blocker,
+        "proposed_next_action": state.proposed_next_action,
+        "external_action_taken": state.external_action_taken,
         "stages": [stage_to_dict(stage) for stage in state.stages],
     }
 
@@ -92,4 +118,10 @@ def workflow_from_dict(data: dict[str, Any]) -> WorkflowState:
         client_id=str(data.get("client_id", "legacy")),
         created_at=data["created_at"],
         updated_at=data["updated_at"],
+        entity_id=str(data.get("entity_id", "")),
+        correlation_id=str(data.get("correlation_id", "")),
+        input_payload=dict(data.get("input_payload") or {}),
+        blocker=data.get("blocker"),
+        proposed_next_action=data.get("proposed_next_action"),
+        external_action_taken=bool(data.get("external_action_taken", False)),
     )

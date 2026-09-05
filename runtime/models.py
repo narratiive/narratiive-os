@@ -56,6 +56,16 @@ class StageRecord:
     revision_count: int = 0
     started_at: str | None = None
     completed_at: str | None = None
+    capability: str = ""
+    expected_outputs: tuple[str, ...] = ()
+    quality_contract: str = ""
+    max_attempts: int = 1
+    step_approval_required: bool = False
+    side_effect_classification: str = "preparation"
+    attempts: list[dict[str, Any]] = field(default_factory=list)
+    quality_result: dict[str, Any] | None = None
+    blocker: str | None = None
+    proposed_next_action: str | None = None
 
     def mark_started(self) -> None:
         self.started_at = _utc_now()
@@ -77,6 +87,12 @@ class WorkflowState:
     client_id: str = "legacy"
     created_at: str = field(default_factory=lambda: _utc_now())
     updated_at: str = field(default_factory=lambda: _utc_now())
+    entity_id: str = ""
+    correlation_id: str = ""
+    input_payload: dict[str, Any] = field(default_factory=dict)
+    blocker: str | None = None
+    proposed_next_action: str | None = None
+    external_action_taken: bool = False
 
     def __post_init__(self) -> None:
         if not self.workflow_id.strip():
