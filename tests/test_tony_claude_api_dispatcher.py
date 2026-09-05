@@ -105,6 +105,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         req = urlopen.call_args.args[0]
         sent = json.loads(req.data.decode("utf-8"))
         self.assertEqual(sent["model"], "claude-test-model")
+        self.assertEqual(sent["max_tokens"], 8192)
         self.assertEqual(sent["messages"][0]["role"], "user")
         prompt = sent["messages"][0]["content"]
         self.assertIn("Do not send email", prompt)
