@@ -89,6 +89,14 @@ creative asset/image/video production, CRM, email, and calendar workers are
 declared as planned and unavailable until real adapters are configured. No
 registered worker has permission to perform an external write.
 
+`runtime/workflow_execution_coordinator.py` applies autonomy-planner decisions
+to durable runs. It advances only ready internal work, records worker attempts
+and immutable outputs, validates explicit output and quality contracts, pauses
+with the exact proposed action at human gates, and persists approvals before
+resume. Duplicate run identities are idempotent. Interrupted preparation may
+be retried under its declared policy; an interrupted external write is blocked
+for provider reconciliation and is never blindly replayed.
+
 - `DispatchService` validates current-stage readiness and creates dispatch jobs.
 - `FileDispatchQueue` owns job state and leases.
 - `WorkerRunner` claims a lease and delegates execution to an `AgentExecutor`.

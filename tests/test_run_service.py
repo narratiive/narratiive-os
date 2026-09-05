@@ -218,6 +218,32 @@ class WorkflowRunServiceTests(unittest.TestCase):
         self.assertFalse(recovered.external_action_taken)
         self.assertIn("stage.recovered", [event.event_type for event in self.event_log.read("run-recover")])
 
+    def test_interrupted_external_write_requires_reconciliation_instead_of_replay(self) -> None:
+        definition = workflow_definition_from_dict(
+            {
+                "workflow_id": "external-write",
+                "stages": [
+                    {
+                        "stage_id": "send",
+                        "capability": "email_sending",
+                        "side_effect_classification": "external_write",
+                    }
+                ],
+            }
+        )
+        self.service.create_run(definition, "run-external", set())
+        self.service.start_stage("run-external", "send")
+
+        restarted = WorkflowRunService(self.repository, self.event_log)
+        self.assertEqual(restarted.recover_interrupted_runs(), 1)
+        recovered = restarted.load_run("run-external")
+        self.assertEqual(recovered.status, WorkflowStatus.BLOCKED)
+        self.assertEqual(
+            recovered.blocker,
+            "ambiguous_external_action_requires_reconciliation",
+        )
+        self.assertFalse(recovered.external_action_taken)
+
 
 if __name__ == "__main__":
     unittest.main()

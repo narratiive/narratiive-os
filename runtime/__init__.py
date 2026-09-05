@@ -151,6 +151,11 @@ from .worker_registry import (
     WorkerSelectionPolicy,
     build_tony_worker_registry,
 )
+from .workflow_execution_coordinator import (
+    ExecutionOutcome,
+    FileWorkflowArtifactStore,
+    WorkflowExecutionCoordinator,
+)
 from .revision_graph import (
     RevisionCategory,
     RevisionIssue,
@@ -341,6 +346,9 @@ __all__ = [
     "WorkerResolution",
     "WorkerSelectionPolicy",
     "build_tony_worker_registry",
+    "ExecutionOutcome",
+    "FileWorkflowArtifactStore",
+    "WorkflowExecutionCoordinator",
     "DispatchJob",
     "FileDispatchQueue",
     "JobNotFound",
