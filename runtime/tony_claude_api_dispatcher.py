@@ -68,6 +68,8 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
         text = _response_text(returned)
         if not text:
             raise RuntimeError("Claude API returned no text work product")
+        if str(returned.get("stop_reason") or "").strip() == "max_tokens":
+            raise RuntimeError("Claude API work product was truncated at the configured max_tokens limit")
         evidence = _parse_work_product(text)
         evidence.setdefault("work_product", text)
         evidence["verified"] = True
@@ -111,6 +113,7 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
         "offer one consequential but provisional opportunity; include meaningful questions to answer next; and stop at a human-review-ready internal artefact. "
         "Return blueprint_lite, diagnostic_signals_used, diagnostic_input_coverage, source_backed_evidence (or sources), evidence_gaps, "
         "fact_interpretation_hypothesis_lineage, growth_tension, provisional_opportunity, questions_to_answer_next, quality_gate, and recommendation containing advance, revise, or stop. "
+        "Put each named Blueprint Lite field at the top level of the returned object; do not nest them inside work_product, result, or output. "
         "diagnostic_input_coverage must be an object with complete=true only if the supplied target context genuinely contains enough diagnostic evidence to represent the completed diagnostic faithfully; otherwise set complete=false and list missing_inputs. "
         "quality_gate.human_review_ready may be true only when the diagnostic input coverage is complete and the returned Blueprint Lite satisfies the requested evidence discipline. "
         "Do not turn Blueprint Lite into the paid Growth Blueprint, a proposal, or a client send. "
@@ -147,7 +150,38 @@ def _parse_work_product(text: str) -> dict[str, Any]:
     try:
         parsed = json.loads(candidate)
     except json.JSONDecodeError:
-        return {"work_product": text}
+        parsed = _embedded_json_object(candidate)
     if not isinstance(parsed, dict) or not parsed:
         return {"work_product": text}
-    return dict(parsed)
+    return _normalise_work_product(parsed)
+
+
+def _embedded_json_object(candidate: str) -> dict[str, Any] | None:
+    """Recover one JSON object when a model adds prose around the contract."""
+    if candidate.lstrip().startswith("{"):
+        return None
+    decoder = json.JSONDecoder()
+    for offset, character in enumerate(candidate):
+        if character != "{":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(candidate[offset:])
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed:
+            return dict(parsed)
+    return None
+
+
+def _normalise_work_product(parsed: Mapping[str, Any]) -> dict[str, Any]:
+    """Promote task fields from a single model-added response envelope."""
+    result = dict(parsed)
+    for wrapper in ("work_product", "result", "output"):
+        nested = parsed.get(wrapper)
+        if not isinstance(nested, Mapping) or not nested:
+            continue
+        result = dict(nested)
+        result.update({key: value for key, value in parsed.items() if key != wrapper})
+        result[wrapper] = dict(nested)
+        break
+    return result
