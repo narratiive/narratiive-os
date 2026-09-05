@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import stat
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -36,6 +37,25 @@ class FakeResponse:
 
 
 class OperationalAcceptanceTests(unittest.TestCase):
+    def test_module_imports_when_repository_root_is_not_on_python_path(self) -> None:
+        code = (
+            "import importlib.util,sys;"
+            f"p={str(MODULE_PATH)!r};"
+            "s=importlib.util.spec_from_file_location('standalone_acceptance',p);"
+            "m=importlib.util.module_from_spec(s);"
+            "sys.modules[s.name]=m;"
+            "s.loader.exec_module(m)"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            completed = subprocess.run(
+                [sys.executable, "-c", code],
+                cwd=directory,
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
     def test_http_health_requires_200_and_ok_true(self) -> None:
         good = operational_acceptance.check_http(
             "service", "http://service/health", opener=lambda *_args, **_kwargs: FakeResponse({"ok": True})
