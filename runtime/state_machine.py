@@ -19,7 +19,11 @@ _ALLOWED_TRANSITIONS: dict[StageStatus, set[StageStatus]] = {
         StageStatus.REVISION_REQUIRED,
         StageStatus.FAILED,
     },
-    StageStatus.BLOCKED: {StageStatus.READY, StageStatus.FAILED},
+    StageStatus.BLOCKED: {
+        StageStatus.READY,
+        StageStatus.REVISION_REQUIRED,
+        StageStatus.FAILED,
+    },
     StageStatus.RETRY_REQUIRED: {StageStatus.READY, StageStatus.BLOCKED, StageStatus.FAILED},
     StageStatus.REVISION_REQUIRED: {StageStatus.READY, StageStatus.BLOCKED, StageStatus.FAILED},
     StageStatus.COMPLETED: {StageStatus.REVISION_REQUIRED},

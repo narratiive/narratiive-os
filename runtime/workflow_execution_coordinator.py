@@ -368,7 +368,13 @@ class WorkflowExecutionCoordinator:
             {"status": "failed", "error_type": type(error).__name__},
         )
         state = self.runs.load_run(run_id)
-        if len(state.stage(stage_id).attempts) < state.stage(stage_id).max_attempts:
+        stage = state.stage(stage_id)
+        revision_attempts = sum(
+            1
+            for item in stage.attempts
+            if int(item.get("revision", 0)) == stage.revision_count
+        )
+        if revision_attempts < stage.max_attempts:
             self.runs.request_retry(run_id, stage_id, "worker_execution_failed")
             self.runs.resume_stage(run_id, stage_id, available_inputs)
             return self._advance_locked(run_id, lifecycle)
