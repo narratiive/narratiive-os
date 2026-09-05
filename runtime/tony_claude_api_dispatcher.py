@@ -8,6 +8,7 @@ from urllib import request
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
 DEFAULT_API_URL = "https://api.anthropic.com/v1/messages"
 DEFAULT_MAX_TOKENS = 8192
+DEFAULT_TIMEOUT_SECONDS = 180
 
 
 class ClaudeDispatcherConfigError(RuntimeError):
@@ -26,6 +27,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     api_url = str(environ.get("TONY_DISPATCH_CLAUDE_API_URL") or DEFAULT_API_URL).strip()
     version = str(environ.get("TONY_DISPATCH_CLAUDE_API_VERSION") or DEFAULT_ANTHROPIC_VERSION).strip()
     max_tokens_raw = str(environ.get("TONY_DISPATCH_CLAUDE_MAX_TOKENS") or DEFAULT_MAX_TOKENS).strip()
+    timeout_raw = str(environ.get("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS).strip()
 
     if not api_key:
         raise ClaudeDispatcherConfigError("Claude API dispatch requires ANTHROPIC_API_KEY or TONY_DISPATCH_CLAUDE_API_KEY")
@@ -37,6 +39,12 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_MAX_TOKENS must be an integer") from exc
     if max_tokens <= 0:
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_MAX_TOKENS must be greater than zero")
+    try:
+        timeout_seconds = int(timeout_raw)
+    except ValueError as exc:
+        raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS must be an integer") from exc
+    if timeout_seconds <= 0:
+        raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS must be greater than zero")
 
     def dispatch(contract: dict[str, Any]) -> dict[str, Any]:
         _validate_safe_contract(contract)
@@ -58,7 +66,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             },
             method="POST",
         )
-        with request.urlopen(req, timeout=90) as response:  # nosec B310 - Anthropic URL is explicit operator config
+        with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
             raw = response.read().decode("utf-8")
         returned = json.loads(raw or "{}")
         if not isinstance(returned, dict):

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from uuid import uuid4
 
@@ -207,6 +207,40 @@ class WorkflowRunService:
         rationale: str,
     ) -> WorkflowState:
         """Explicitly reopen a quality-blocked step as a new bounded revision cycle."""
+        return self._request_blocked_revision(
+            run_id,
+            reviewer=reviewer,
+            rationale=rationale,
+            allowed_blocker=lambda value: value.startswith("quality_failed:"),
+        )
+
+    def request_blocked_revision(
+        self,
+        run_id: str,
+        *,
+        reviewer: str,
+        rationale: str,
+    ) -> WorkflowState:
+        """Explicitly reopen revisable worker or quality failures without erasing evidence."""
+        return self._request_blocked_revision(
+            run_id,
+            reviewer=reviewer,
+            rationale=rationale,
+            allowed_blocker=lambda value: (
+                value.startswith("quality_failed:")
+                or value == "worker_retry_policy_exhausted"
+                or value.startswith("worker_output_rejected:")
+            ),
+        )
+
+    def _request_blocked_revision(
+        self,
+        run_id: str,
+        *,
+        reviewer: str,
+        rationale: str,
+        allowed_blocker: Callable[[str], bool],
+    ) -> WorkflowState:
         state = self.repository.load(run_id)
         identity = reviewer.strip()
         reason = rationale.strip()
@@ -214,13 +248,13 @@ class WorkflowRunService:
             raise ValueError("revision requires reviewer identity and rationale")
         if (
             state.status is not WorkflowStatus.BLOCKED
-            or not str(state.blocker or "").startswith("quality_failed:")
+            or not allowed_blocker(str(state.blocker or ""))
             or not state.current_stage_id
         ):
-            raise ValueError("workflow run is not blocked by quality validation")
+            raise ValueError("workflow run is not blocked by a revisable worker or quality failure")
         stage = state.stage(state.current_stage_id)
         if stage.status is not StageStatus.BLOCKED:
-            raise ValueError("quality-blocked workflow step is not revisable")
+            raise ValueError("blocked workflow step is not revisable")
         stage.revision_count += 1
         revision = {
             "reviewer": identity,

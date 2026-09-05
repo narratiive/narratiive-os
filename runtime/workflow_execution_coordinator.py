@@ -365,7 +365,11 @@ class WorkflowExecutionCoordinator:
         self.runs.record_attempt(
             run_id,
             stage_id,
-            {"status": "failed", "error_type": type(error).__name__},
+            {
+                "status": "failed",
+                "error_type": type(error).__name__,
+                "error_code": _safe_worker_error_code(error),
+            },
         )
         state = self.runs.load_run(run_id)
         stage = state.stage(stage_id)
@@ -390,7 +394,11 @@ class WorkflowExecutionCoordinator:
         self.runs.record_attempt(
             run_id,
             stage_id,
-            {"status": "rejected", "error_type": type(error).__name__},
+            {
+                "status": "rejected",
+                "error_type": type(error).__name__,
+                "error_code": _safe_worker_error_code(error),
+            },
         )
         state = self.runs.block_for_reason(
             run_id,
@@ -455,7 +463,6 @@ class WorkflowExecutionCoordinator:
             proposed_next_action=state.proposed_next_action or "",
             external_action_taken=state.external_action_taken,
         )
-
     @contextmanager
     def _run_lock(self, run_id: str):
         identity = hashlib.sha256(run_id.encode("utf-8")).hexdigest()
@@ -466,3 +473,17 @@ class WorkflowExecutionCoordinator:
                 yield
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _safe_worker_error_code(error: Exception) -> str:
+    """Retain actionable failure class without persisting provider or client text."""
+    message = str(error).casefold()
+    if isinstance(error, TimeoutError) or "timed out" in message or "timeout" in message:
+        return "worker_timeout"
+    if "truncated" in message or "max_tokens" in message:
+        return "worker_output_truncated"
+    if "no text work product" in message:
+        return "worker_output_empty"
+    if "json" in message:
+        return "worker_output_invalid_json"
+    return "worker_execution_failed"

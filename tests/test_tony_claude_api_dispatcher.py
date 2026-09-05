@@ -106,10 +106,31 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         sent = json.loads(req.data.decode("utf-8"))
         self.assertEqual(sent["model"], "claude-test-model")
         self.assertEqual(sent["max_tokens"], 8192)
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 180)
         self.assertEqual(sent["messages"][0]["role"], "user")
         prompt = sent["messages"][0]["content"]
         self.assertIn("Do not send email", prompt)
         self.assertIn("Growth Blueprint", prompt)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_claude_timeout_is_configurable_for_larger_internal_work_products(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"work_product":"SAFE draft"}'}],
+            }
+        )
+        env = {**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": "240"}
+
+        build_claude_api_dispatcher(env)(self._contract())
+
+        self.assertEqual(urlopen.call_args.kwargs["timeout"], 240)
+
+    def test_claude_timeout_must_be_a_positive_integer(self):
+        for value in ("invalid", "0", "-1"):
+            with self.subTest(value=value), self.assertRaises(ClaudeDispatcherConfigError):
+                build_claude_api_dispatcher({**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": value})
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_blueprint_lite_prepare_receives_canonical_inbound_return_contract(self, urlopen):
