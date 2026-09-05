@@ -1,6 +1,6 @@
 import unittest
 
-from runtime.client_lifecycle import ClientLifecycleStage
+from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
 from runtime.client_lifecycle_commands import ClientLifecycleCommandService
 from runtime.client_lifecycle_fixtures import deterministic_test_clients
 
@@ -48,6 +48,27 @@ class ClientLifecycleCommandTests(unittest.TestCase):
                 next_action="Begin delivery.",
                 evidence="proposal:accepted",
             )
+
+    def test_advance_preserves_acquisition_path(self):
+        inbound = ClientLifecycleRecord(
+            client_id="safe-inbound",
+            client_name="SAFE Inbound",
+            stage=ClientLifecycleStage.BLUEPRINT_LITE,
+            owner="Tony",
+            next_action="Prepare discovery.",
+            acquisition_path=AcquisitionPath.INBOUND,
+        )
+        saved = []
+        service = ClientLifecycleCommandService(lambda: (inbound,), saved.append)
+
+        service.advance(
+            "safe-inbound",
+            ClientLifecycleStage.MEETING,
+            next_action="Run discovery.",
+            evidence="workflow:safe-discovery",
+        )
+
+        self.assertEqual(saved[0].acquisition_path, AcquisitionPath.INBOUND)
 
 
 if __name__ == "__main__":

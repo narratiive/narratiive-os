@@ -2,7 +2,11 @@ from __future__ import annotations
 
 import unittest
 
-from runtime.tony_execution_readiness import build_execution_readiness_report, render_execution_readiness
+from runtime.tony_execution_readiness import (
+    build_controlled_integration_report,
+    build_execution_readiness_report,
+    render_execution_readiness,
+)
 
 
 class TonyExecutionReadinessTests(unittest.TestCase):
@@ -59,6 +63,24 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         rendered = render_execution_readiness(ready)
         self.assertNotIn("not-rendered", rendered)
         self.assertIn("OK — Claude (anthropic_api)", rendered)
+
+    def test_controlled_integration_points_keep_writes_approval_gated(self):
+        integrations = {
+            item.surface: item
+            for item in build_controlled_integration_report(
+                {
+                    "TONY_DISPATCH_GMAIL_URL": "http://gmail",
+                    "TONY_DISPATCH_GOOGLE_CALENDAR_URL": "http://calendar",
+                    "TONY_DISPATCH_NOTION_URL": "http://notion",
+                }
+            )
+        }
+
+        self.assertTrue(integrations["Gmail"].configured)
+        self.assertIn("send_reviewed_email", integrations["Gmail"].approval_gated_operations)
+        self.assertIn("create_recipient_confirmed_meeting", integrations["Google Calendar"].approval_gated_operations)
+        self.assertIn("project_workflow_state", integrations["Notion"].approval_gated_operations)
+        self.assertNotIn("send_reviewed_email", integrations["Gmail"].autonomous_operations)
 
 
 if __name__ == "__main__":

@@ -22,6 +22,8 @@ class WorkflowCommandBackend(Protocol):
     def advance(self, state: WorkflowState) -> WorkflowState: ...
     def recover(self) -> int: ...
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
+    def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
+    def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
 
 
 class FileWorkflowCommandBackend:
@@ -107,6 +109,19 @@ class FileWorkflowCommandBackend:
             return None
         return value if isinstance(value, Mapping) else None
 
+    def projection(self, state: WorkflowState) -> Mapping[str, Any]:
+        runtime = self._runtime(state)
+        if runtime.business_projection is None:
+            raise ValueError("business projection is not configured")
+        return runtime.business_projection.prepare(state)
+
+    def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]:
+        return self._runtime(state).sync_business_projection(
+            state.run_id,
+            approver=approver,
+            rationale=rationale,
+        )
+
     def _runtime(self, state: WorkflowState) -> TonyWorkflowRuntime:
         return build_tony_workflow_runtime(
             self.root,
@@ -123,6 +138,7 @@ class TonyWorkflowCommandService:
     _COMMANDS = {
         "workflow", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover",
+        "projection", "sync-notion",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -173,6 +189,26 @@ class TonyWorkflowCommandService:
                 return self._artefact(state)
             if name == "proposed":
                 return self._proposed(state)
+            if name == "projection":
+                projection = dict(self.backend.projection(state))
+                message = (
+                    f"{state.run_id}: Notion projection is {projection.get('projection_status')}; "
+                    f"runtime remains the execution source of truth."
+                )
+                return CommandResponse(name, "healthy", message, projection)
+            if name == "sync-notion":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "This Notion write requires an authenticated human identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /sync-notion <run or company> because <reason>.")
+                projection = dict(self.backend.sync_projection(state, approver=principal_id, rationale=rationale))
+                status = str(projection.get("projection_status") or "unknown")
+                changed = projection.get("external_action_taken") is True
+                message = (
+                    f"Notion projection for {state.run_id}: {status}. "
+                    + ("The returned record evidence verified this exact projection." if changed else "No new Notion write is being claimed.")
+                )
+                return CommandResponse(name, "healthy" if status in {"verified", "duplicate_suppressed"} else "blocked", message, projection)
             if name in {"approve", "reject", "revise"}:
                 if not principal_id.strip():
                     return self._error(name, "authorised_principal_required", "This decision requires an authenticated human identity.")

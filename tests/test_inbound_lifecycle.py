@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 
 from runtime.autonomy_planner import AutonomyAction
-from runtime.client_lifecycle import ClientLifecycleStage
+from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleStage
 from runtime.inbound_leads import InboundLead
 from runtime.inbound_lifecycle import plan_inbound_autonomy, project_inbound_lead
 
@@ -33,6 +33,7 @@ class InboundLifecycleProjectionTests(unittest.TestCase):
         self.assertEqual(record.next_action, "Prepare the verified Blueprint Lite evidence package.")
         self.assertIn("pipeline_stage:New Diagnostic", record.evidence)
         self.assertIn("notion:https://notion.so/lead-1", record.evidence)
+        self.assertEqual(record.acquisition_path, AcquisitionPath.INBOUND)
 
     def test_known_pipeline_labels_map_to_existing_lifecycle_only(self):
         cases = {
@@ -47,6 +48,11 @@ class InboundLifecycleProjectionTests(unittest.TestCase):
         for pipeline_stage, expected in cases.items():
             with self.subTest(pipeline_stage=pipeline_stage):
                 self.assertEqual(project_inbound_lead(lead(pipeline_stage)).stage, expected)
+
+        self.assertEqual(
+            project_inbound_lead(lead("Outreach")).acquisition_path,
+            AcquisitionPath.LEGACY,
+        )
 
     def test_unknown_pipeline_label_fails_safe_to_lead(self):
         self.assertEqual(

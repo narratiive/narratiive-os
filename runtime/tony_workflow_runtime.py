@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
-from runtime.models import StageStatus, WorkflowStatus
+from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
 from runtime.run_service import WorkflowRunService
@@ -22,6 +22,7 @@ from runtime.workflow_execution_coordinator import (
     QualityValidator,
     WorkflowExecutionCoordinator,
 )
+from runtime.workflow_business_projection import WorkflowBusinessProjectionService
 from runtime.workflow_registry import build_narratiive_workflow_registry
 from runtime.workflow_quality import (
     discovery_preparation_quality_gate,
@@ -39,6 +40,7 @@ class TonyWorkflowRuntime:
 
     coordinator: WorkflowExecutionCoordinator
     runs: WorkflowRunService
+    business_projection: WorkflowBusinessProjectionService | None = None
 
     def enqueue(
         self,
@@ -57,20 +59,23 @@ class TonyWorkflowRuntime:
             entity_id=entity_id,
             correlation_id=correlation_id,
         )
+        self._project(state)
         return workflow_to_dict(state)
 
     def advance(self, run_id: str, lifecycle: ClientLifecycleRecord) -> ExecutionOutcome:
-        return self.coordinator.advance(run_id, lifecycle)
+        outcome = self.coordinator.advance(run_id, lifecycle)
+        self._project(self.runs.load_run(run_id))
+        return outcome
 
     def approve(self, run_id: str, *, approver: str, rationale: str) -> dict[str, Any]:
-        return workflow_to_dict(
-            self.coordinator.approve(run_id, approver=approver, rationale=rationale)
-        )
+        state = self.coordinator.approve(run_id, approver=approver, rationale=rationale)
+        self._project(state)
+        return workflow_to_dict(state)
 
     def reject_for_revision(self, run_id: str, *, reviewer: str, rationale: str) -> dict[str, Any]:
-        return workflow_to_dict(
-            self.runs.reject_for_revision(run_id, reviewer=reviewer, rationale=rationale)
-        )
+        state = self.runs.reject_for_revision(run_id, reviewer=reviewer, rationale=rationale)
+        self._project(state)
+        return workflow_to_dict(state)
 
     def resume(self, run_id: str) -> dict[str, Any]:
         state = self.runs.load_run(run_id)
@@ -91,9 +96,9 @@ class TonyWorkflowRuntime:
             raise ValueError("declared quality validator is still unavailable")
         if stage.status is not StageStatus.BLOCKED:
             raise ValueError("workflow step is not resumable")
-        return workflow_to_dict(
-            self.runs.resume_stage(run_id, stage.stage_id, state.input_payload.keys())
-        )
+        state = self.runs.resume_stage(run_id, stage.stage_id, state.input_payload.keys())
+        self._project(state)
+        return workflow_to_dict(state)
 
     def status(self, run_id: str) -> dict[str, Any]:
         return workflow_to_dict(self.runs.load_run(run_id))
@@ -144,13 +149,30 @@ class TonyWorkflowRuntime:
             next_workflow_id=definition.next_workflow_id,
             next_run_id=next_run_id,
         )
+        self._project(self.runs.load_run(run_id))
         return self.advance(next_run_id, lifecycle)
 
     def list_run_ids(self) -> list[str]:
         return self.runs.repository.list_run_ids()
 
     def recover_pending(self) -> int:
-        return self.coordinator.recover_pending()
+        recovered = self.coordinator.recover_pending()
+        for run_id in self.list_run_ids():
+            self._project(self.runs.load_run(run_id))
+        return recovered
+
+    def sync_business_projection(self, run_id: str, *, approver: str, rationale: str) -> dict[str, Any]:
+        if self.business_projection is None:
+            raise ValueError("business projection is not configured")
+        return self.business_projection.sync(
+            self.runs.load_run(run_id),
+            approver=approver,
+            rationale=rationale,
+        )
+
+    def _project(self, state: WorkflowState) -> None:
+        if self.business_projection is not None:
+            self.business_projection.prepare(state)
 
 
 def build_tony_workflow_runtime(
@@ -198,4 +220,8 @@ def build_tony_workflow_runtime(
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
         quality_validators=validators,
     )
-    return TonyWorkflowRuntime(coordinator=coordinator, runs=runs)
+    projection = WorkflowBusinessProjectionService(
+        scoped_root / "business-projection",
+        dispatcher=configured_dispatchers.get("Notion"),
+    )
+    return TonyWorkflowRuntime(coordinator=coordinator, runs=runs, business_projection=projection)

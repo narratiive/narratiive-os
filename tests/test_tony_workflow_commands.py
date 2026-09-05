@@ -151,6 +151,43 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         response = self.service.execute("/health", [])
         self.assertEqual(response.command, "fallback")
 
+    def test_notion_projection_requires_exact_approval_and_is_idempotent(self) -> None:
+        calls = []
+
+        def notion(dispatch):
+            calls.append(dispatch)
+            return {
+                "external_action_taken": True,
+                "record_id": "safe-notion-record",
+                "projection_key": dispatch["idempotency_key"],
+            }
+
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(
+                self.root,
+                dispatchers={**self.dispatchers, "Notion": notion},
+                environ={},
+            ),
+        )
+
+        denied = service.execute("/sync-notion safe-executive-run because SAFE test", [])
+        synced = service.execute(
+            "/sync-notion safe-executive-run because SAFE test",
+            [],
+            principal_id="telegram:123",
+        )
+        replay = service.execute(
+            "/sync-notion safe-executive-run because SAFE replay",
+            [],
+            principal_id="telegram:123",
+        )
+
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(synced.data["projection_status"], "verified")
+        self.assertEqual(replay.data["projection_status"], "duplicate_suppressed")
+        self.assertEqual(len(calls), 1)
+
     def test_malformed_persisted_state_fails_closed(self) -> None:
         broken = self.root / "invalid-scope" / "runs"
         broken.mkdir(parents=True)
