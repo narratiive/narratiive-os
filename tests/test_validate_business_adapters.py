@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import unittest
 from unittest import mock
 
@@ -8,6 +10,18 @@ from scripts.validate_business_adapters import validate
 
 
 class ValidateBusinessAdaptersTests(unittest.TestCase):
+    def test_documented_script_entrypoint_loads_runtime_package(self):
+        result = subprocess.run(
+            [sys.executable, "scripts/validate_business_adapters.py", "--help"],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("read-only provider", result.stdout)
+        self.assertIn("operations", result.stdout)
+
     def test_unconfigured_adapters_fail_when_required_without_exposing_values(self):
         report = validate(
             {"TONY_DISPATCH_GMAIL_MODE": "google_api", "TONY_GOOGLE_CLIENT_ID": "secret-value"},
