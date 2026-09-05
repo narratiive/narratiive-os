@@ -27,6 +27,38 @@ class ClientLifecycleStage(str, Enum):
 _STAGE_ORDER = tuple(ClientLifecycleStage)
 
 
+class AcquisitionPath(str, Enum):
+    """Explicit acquisition journey without rewriting legacy lifecycle history."""
+
+    INBOUND = "inbound"
+    OUTBOUND = "outbound"
+    LEGACY = "legacy"
+
+
+_PATH_STAGE_ORDER = {
+    AcquisitionPath.INBOUND: (
+        ClientLifecycleStage.LEAD,
+        ClientLifecycleStage.BLUEPRINT_LITE,
+        ClientLifecycleStage.MEETING,
+        ClientLifecycleStage.PROPOSAL,
+        ClientLifecycleStage.DELIVERY,
+        ClientLifecycleStage.INVOICE,
+        ClientLifecycleStage.COMPLETE,
+    ),
+    AcquisitionPath.OUTBOUND: (
+        ClientLifecycleStage.LEAD,
+        ClientLifecycleStage.RESEARCH,
+        ClientLifecycleStage.OUTREACH,
+        ClientLifecycleStage.MEETING,
+        ClientLifecycleStage.PROPOSAL,
+        ClientLifecycleStage.DELIVERY,
+        ClientLifecycleStage.INVOICE,
+        ClientLifecycleStage.COMPLETE,
+    ),
+    AcquisitionPath.LEGACY: _STAGE_ORDER,
+}
+
+
 @dataclass(frozen=True, slots=True)
 class ClientLifecycleRecord:
     client_id: str
@@ -39,8 +71,13 @@ class ClientLifecycleRecord:
     blocker: str | None = None
     requires_matt: bool = False
     value_gbp: int | None = None
+    acquisition_path: AcquisitionPath = AcquisitionPath.LEGACY
 
     def __post_init__(self) -> None:
+        if not isinstance(self.stage, ClientLifecycleStage):
+            raise ValueError("stage must be a ClientLifecycleStage")
+        if not isinstance(self.acquisition_path, AcquisitionPath):
+            raise ValueError("acquisition_path must be an AcquisitionPath")
         if not self.client_id.strip():
             raise ValueError("client_id is required")
         if not self.client_name.strip():
@@ -53,10 +90,14 @@ class ClientLifecycleRecord:
             raise ValueError("blocked lifecycle records require a blocker")
         if self.value_gbp is not None and self.value_gbp < 0:
             raise ValueError("value_gbp cannot be negative")
+        if self.stage not in _PATH_STAGE_ORDER[self.acquisition_path]:
+            raise ValueError(
+                f"stage {self.stage.value} is not valid for {self.acquisition_path.value} acquisition"
+            )
 
     @property
     def stage_index(self) -> int:
-        return _STAGE_ORDER.index(self.stage)
+        return _PATH_STAGE_ORDER[self.acquisition_path].index(self.stage)
 
     @property
     def is_commercial(self) -> bool:
@@ -78,8 +119,9 @@ class ClientLifecycleRecord:
         return self.stage in {ClientLifecycleStage.INVOICE, ClientLifecycleStage.COMPLETE}
 
     def advance(self, next_stage: ClientLifecycleStage, *, next_action: str) -> "ClientLifecycleRecord":
+        stage_order = _PATH_STAGE_ORDER[self.acquisition_path]
         expected_index = self.stage_index + 1
-        if expected_index >= len(_STAGE_ORDER) or _STAGE_ORDER[expected_index] is not next_stage:
+        if expected_index >= len(stage_order) or stage_order[expected_index] is not next_stage:
             raise ValueError(
                 f"invalid lifecycle transition: {self.stage.value} -> {next_stage.value}"
             )
@@ -94,6 +136,7 @@ class ClientLifecycleRecord:
             blocker=None,
             requires_matt=False,
             value_gbp=self.value_gbp,
+            acquisition_path=self.acquisition_path,
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -108,4 +151,5 @@ class ClientLifecycleRecord:
             "blocker": self.blocker,
             "requires_matt": self.requires_matt,
             "value_gbp": self.value_gbp,
+            "acquisition_path": self.acquisition_path.value,
         }

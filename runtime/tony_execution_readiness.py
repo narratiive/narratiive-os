@@ -38,6 +38,22 @@ class ExecutionReadinessReport:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class ControlledIntegration:
+    surface: str
+    configured: bool
+    autonomous_operations: tuple[str, ...]
+    approval_gated_operations: tuple[str, ...]
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "surface": self.surface,
+            "configured": self.configured,
+            "autonomous_operations": list(self.autonomous_operations),
+            "approval_gated_operations": list(self.approval_gated_operations),
+        }
+
+
 # These are the live surfaces required by the end-to-end commercial and delivery flow.
 REQUIRED_LIVE_WORKERS = (
     "Claude",
@@ -58,6 +74,33 @@ def build_execution_readiness_report(environ: Mapping[str, str]) -> ExecutionRea
         configured_workers=configured,
         missing_workers=missing,
         workers=workers,
+    )
+
+
+def build_controlled_integration_report(environ: Mapping[str, str]) -> tuple[ControlledIntegration, ...]:
+    """Describe existing adapter operations without implying configuration or execution."""
+    operations = {
+        "Gmail": (
+            ("read_verified_thread", "monitor_reply"),
+            ("send_reviewed_email",),
+        ),
+        "Google Calendar": (
+            ("read_availability",),
+            ("create_recipient_confirmed_meeting",),
+        ),
+        "Notion": (
+            ("read_business_pipeline",),
+            ("project_workflow_state", "update_verified_business_transition"),
+        ),
+    }
+    return tuple(
+        ControlledIntegration(
+            surface=surface,
+            configured=_worker_readiness(surface, environ).configured,
+            autonomous_operations=autonomous,
+            approval_gated_operations=gated,
+        )
+        for surface, (autonomous, gated) in operations.items()
     )
 
 

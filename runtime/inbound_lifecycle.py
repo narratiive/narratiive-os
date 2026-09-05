@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Iterable
 
 from runtime.autonomy_planner import AutonomyPlan, TonyAutonomyPlanner
-from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
 from runtime.inbound_leads import InboundLead
 
 
@@ -28,6 +28,11 @@ def project_inbound_lead(lead: InboundLead) -> ClientLifecycleRecord:
     """Project Notion-backed inbound state without claiming unobserved progression."""
     pipeline_stage = " ".join(lead.pipeline_stage.strip().casefold().replace("_", " ").split())
     stage = _PIPELINE_STAGE_MAP.get(pipeline_stage, ClientLifecycleStage.LEAD)
+    acquisition_path = (
+        AcquisitionPath.LEGACY
+        if stage in {ClientLifecycleStage.RESEARCH, ClientLifecycleStage.OUTREACH}
+        else AcquisitionPath.INBOUND
+    )
     client_name = lead.company.strip() or lead.contact.strip()
     evidence = tuple(
         value
@@ -51,6 +56,7 @@ def project_inbound_lead(lead: InboundLead) -> ClientLifecycleRecord:
         blocked=False,
         blocker=None,
         requires_matt=False,
+        acquisition_path=acquisition_path,
     )
 
 

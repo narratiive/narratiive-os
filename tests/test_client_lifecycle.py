@@ -1,6 +1,6 @@
 import unittest
 
-from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
 
 
 class ClientLifecycleTests(unittest.TestCase):
@@ -44,6 +44,46 @@ class ClientLifecycleTests(unittest.TestCase):
             lead.advance(
                 ClientLifecycleStage.PROPOSAL,
                 next_action="Create a proposal.",
+            )
+
+    def test_inbound_and_outbound_paths_converge_at_discovery(self):
+        inbound = ClientLifecycleRecord(
+            client_id="inbound",
+            client_name="Inbound Test",
+            stage=ClientLifecycleStage.LEAD,
+            owner="Tony",
+            next_action="Prepare Blueprint Lite.",
+            acquisition_path=AcquisitionPath.INBOUND,
+        )
+        outbound = ClientLifecycleRecord(
+            client_id="outbound",
+            client_name="Outbound Test",
+            stage=ClientLifecycleStage.LEAD,
+            owner="Tony",
+            next_action="Research the target.",
+            acquisition_path=AcquisitionPath.OUTBOUND,
+        )
+
+        inbound = inbound.advance(ClientLifecycleStage.BLUEPRINT_LITE, next_action="Prepare discovery.")
+        inbound = inbound.advance(ClientLifecycleStage.MEETING, next_action="Run discovery.")
+        outbound = outbound.advance(ClientLifecycleStage.RESEARCH, next_action="Prepare outreach.")
+        outbound = outbound.advance(ClientLifecycleStage.OUTREACH, next_action="Secure discovery.")
+        outbound = outbound.advance(ClientLifecycleStage.MEETING, next_action="Run discovery.")
+
+        self.assertEqual(inbound.stage, ClientLifecycleStage.MEETING)
+        self.assertEqual(outbound.stage, ClientLifecycleStage.MEETING)
+        self.assertEqual(inbound.acquisition_path, AcquisitionPath.INBOUND)
+        self.assertEqual(outbound.acquisition_path, AcquisitionPath.OUTBOUND)
+
+    def test_path_specific_stage_is_rejected_fail_safe(self):
+        with self.assertRaisesRegex(ValueError, "not valid for inbound"):
+            ClientLifecycleRecord(
+                client_id="inbound",
+                client_name="Inbound Test",
+                stage=ClientLifecycleStage.OUTREACH,
+                owner="Tony",
+                next_action="Do not infer progression.",
+                acquisition_path=AcquisitionPath.INBOUND,
             )
 
     def test_blocked_record_requires_a_specific_blocker(self):

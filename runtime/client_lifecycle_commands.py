@@ -66,6 +66,7 @@ class ClientLifecycleCommandService:
             next_action=advanced.next_action,
             evidence=(*current.evidence, evidence.strip()),
             value_gbp=advanced.value_gbp,
+            acquisition_path=advanced.acquisition_path,
         )
         self.saver(advanced)
         return ClientLifecycleCommandResult(
