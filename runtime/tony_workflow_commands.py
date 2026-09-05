@@ -277,8 +277,9 @@ class TonyWorkflowCommandService:
             message += f" Current step: {state.current_stage_id.replace('_', ' ')}."
         if state.blocker:
             message += f" Blocker: {state.blocker}."
-        if state.proposed_next_action:
-            message += f" Next: {state.proposed_next_action}"
+        next_action = state.current_proposed_next_action()
+        if next_action:
+            message += f" Next: {next_action}"
         return CommandResponse("workflow", "blocked" if state.status.value == "blocked" else "healthy", message, summary)
 
     def _approval(self, state: WorkflowState) -> CommandResponse:
@@ -291,7 +292,7 @@ class TonyWorkflowCommandService:
         return CommandResponse("blockers", "blocked" if state.blocker else "healthy", message, self._summary(state))
 
     def _proposed(self, state: WorkflowState) -> CommandResponse:
-        action = state.proposed_next_action or "No proposed next action is recorded."
+        action = state.current_proposed_next_action() or "No current proposed next action is recorded."
         return CommandResponse("proposed", "healthy", f"{state.run_id}: {action}", self._summary(state))
 
     def _artefact(self, state: WorkflowState) -> CommandResponse:
@@ -325,7 +326,7 @@ class TonyWorkflowCommandService:
             "approval_status": state.approval_status,
             "approval_required": state.approval_status == "pending",
             "blocker": state.blocker,
-            "proposed_next_action": state.proposed_next_action,
+            "proposed_next_action": state.current_proposed_next_action(),
             "latest_artefact_id": latest.output_artifacts[-1].artifact_id if latest else None,
             "external_action_taken": state.external_action_taken,
             "updated_at": state.updated_at,

@@ -350,6 +350,7 @@ class WorkflowRunService:
         }
         state.approval_history.append(approval)
         state.approval_status = "approved"
+        state.proposed_next_action = None
         state.status = WorkflowStatus.ACTIVE if state.current_stage_id else WorkflowStatus.COMPLETE
         state.touch()
         self._commit(state, "approval.granted", approval)
