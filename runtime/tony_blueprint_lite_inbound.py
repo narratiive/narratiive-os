@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
+from runtime.external_action_truth import no_asserted_external_action
 from runtime.inbound_leads import InboundLead
 from runtime.models import ArtifactRef, StageStatus
 from runtime.serialization import workflow_from_dict, workflow_to_dict
@@ -561,7 +562,6 @@ class TonyInboundBlueprintLiteService:
         returned_gate = evidence.get("quality_gate") if isinstance(evidence.get("quality_gate"), dict) else {}
         coverage = evidence.get("diagnostic_input_coverage") if isinstance(evidence.get("diagnostic_input_coverage"), dict) else {}
         recommendation = str(evidence.get("recommendation") or "").strip().casefold()
-        rendered = json.dumps(evidence, sort_keys=True).casefold()
 
         checks = {
             "blueprint_lite_present": _meaningful(evidence.get("blueprint_lite")),
@@ -575,7 +575,7 @@ class TonyInboundBlueprintLiteService:
             "three_to_four_next_questions": questions_ok,
             "worker_marks_human_review_ready": returned_gate.get("human_review_ready") is True,
             "recommendation_is_advance": recommendation == "advance",
-            "no_false_external_execution_claim": not any(marker in rendered for marker in _FALSE_EXECUTION_MARKERS),
+            "no_false_external_execution_claim": no_asserted_external_action(evidence, _FALSE_EXECUTION_MARKERS),
         }
         failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
         return {"passed": not failed, "failed_checks": failed, "checks": checks}
