@@ -6,6 +6,19 @@ from runtime.workflow_instructions import workflow_instruction
 
 
 class WorkflowInstructionTests(unittest.TestCase):
+    def test_blueprint_lite_contract_matches_validator(self) -> None:
+        instruction = workflow_instruction(
+            "growth_diagnostic_to_blueprint_lite",
+            "prepare_blueprint_lite",
+            ("diagnostic_input_coverage", "questions_to_answer_next"),
+        )
+
+        self.assertIn("exact boolean key complete", instruction)
+        self.assertIn("Do not use status as a substitute for complete", instruction)
+        self.assertIn("exactly 3 or 4 distinct, substantive questions", instruction)
+        self.assertIn("exact singular keys fact, interpretation and hypothesis", instruction)
+        self.assertIn("human_review_ready=true", instruction)
+
     def test_discovery_hypothesis_contract_matches_validator(self) -> None:
         instruction = workflow_instruction(
             "blueprint_lite_to_discovery_preparation",
