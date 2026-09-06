@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+from collections.abc import Mapping
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -19,6 +20,15 @@ from runtime.real_evidence_pilot import (
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 
 
+def default_workflow_root(environ: Mapping[str, str] | None = None) -> Path:
+    env = os.environ if environ is None else environ
+    return Path(
+        str(env.get("TONY_WORKFLOW_RUNTIME_ROOT", "")).strip()
+        or str(env.get("TONY_WORKFLOW_RUNTIME_PATH", "")).strip()
+        or REPOSITORY_ROOT / ".runtime" / "workflow-runtime"
+    )
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Preflight or inspect one controlled real-evidence Narratiive pilot.")
     parser.add_argument("command", choices=("preflight", "status"))
@@ -31,7 +41,7 @@ def main() -> int:
     parser.add_argument(
         "--workflow-root",
         type=Path,
-        default=Path(os.getenv("TONY_WORKFLOW_RUNTIME_PATH", REPOSITORY_ROOT / ".runtime" / "workflows")),
+        default=default_workflow_root(),
     )
     args = parser.parse_args()
     try:

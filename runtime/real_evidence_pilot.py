@@ -255,7 +255,7 @@ def _validate_source(value: Any) -> dict[str, Any]:
     location = str(value.get("uri") or value.get("location") or "").strip()
     policy = value.get("policy")
     provenance = value.get("provenance")
-    if source_type not in {"document", "web", "transcript", "notes"} or not location:
+    if source_type not in {"document", "web", "transcript", "notes", "fireflies_transcript"} or not location:
         raise PilotValidationError("pilot_evidence_source_invalid")
     if not isinstance(policy, Mapping) or policy.get("approved") is not True:
         raise PilotValidationError("pilot_evidence_source_not_approved")
