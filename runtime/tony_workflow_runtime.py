@@ -222,7 +222,10 @@ def build_tony_workflow_runtime(
         workers=build_tony_worker_registry(
             configured_dispatchers,
             environ,
-            research_adapter=ResearchWorkflowAdapter(scoped_root),
+            research_adapter=ResearchWorkflowAdapter(
+                scoped_root,
+                fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
+            ),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

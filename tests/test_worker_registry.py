@@ -97,6 +97,35 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
         self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("external_read",))
 
+    def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
+        calls = []
+        registry = build_tony_worker_registry(
+            {"Fireflies": lambda contract: calls.append(contract) or {"verified": True, "read_only": True, "mutation_count": 0}},
+            {},
+        )
+
+        resolution = registry.resolve("meeting_evidence_retrieval", side_effect="external_read")
+
+        self.assertEqual(resolution.worker_id, "fireflies-read-only")
+        self.assertEqual(resolution.registration.metadata.provider, "fireflies")
+        self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("external_read",))
+        result = registry.execute(
+            resolution,
+            {"execution_mode": "autonomous_read", "payload": {"transcript_id": "safe"}},
+            side_effect="external_read",
+        )
+        self.assertEqual(result["worker_execution"]["capability"], "meeting_evidence_retrieval")
+        self.assertEqual(len(calls), 1)
+        with self.assertRaises(NoAvailableWorker):
+            registry.resolve("meeting_evidence_retrieval", side_effect="external_write")
+
+    def test_unconfigured_fireflies_capabilities_block_truthfully(self) -> None:
+        registry = build_tony_worker_registry({})
+        declared = {item.metadata.worker_id: item.metadata for item in registry.all()}
+        self.assertEqual(declared["fireflies-unavailable"].availability, WorkerAvailability.PLANNED)
+        with self.assertRaisesRegex(NoAvailableWorker, "fireflies-unavailable"):
+            registry.resolve("transcript_retrieval", side_effect="external_read")
+
     def test_multiple_workers_use_explicit_policy_then_stable_default(self) -> None:
         registry = CapabilityWorkerRegistry(
             (

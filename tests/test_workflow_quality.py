@@ -151,6 +151,25 @@ class WorkflowQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "source provenance"):
             validate_operational_inputs("discovery_evidence_to_growth_sprint_proposal", invalid)
 
+    def test_fireflies_adapter_output_is_valid_discovery_evidence_without_inference(self) -> None:
+        validate_operational_inputs(
+            "discovery_evidence_to_growth_sprint_proposal",
+            {
+                "discovery_evidence": {
+                    "transcript": "Synthetic: This is exact source meeting evidence.",
+                    "fireflies_summary": {"action_items": ["Source-provided action only"]},
+                    "sources": [{
+                        "source_id": "fireflies:transcript:transcript-safe",
+                        "source_type": "fireflies_transcript",
+                        "location": "https://app.fireflies.ai/view/transcript-safe",
+                        "content_hash": "safe-hash",
+                    }],
+                },
+                "blueprint_lite": "Synthetic Blueprint Lite",
+                "commercial_context": {},
+            },
+        )
+
     def test_research_gate_requires_provenance_allocation_and_linked_findings(self) -> None:
         output = {
             "research_tasks": [{"task_id": "task-1", "question": "What matters?", "required_capability": "market_research", "assigned_worker": "narratiive-research-engine"}],

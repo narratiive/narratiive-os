@@ -260,6 +260,30 @@ def build_tony_worker_registry(
             )
         )
 
+    fireflies = dispatchers.get("Fireflies")
+    if fireflies is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="fireflies-read-only",
+                    provider="fireflies",
+                    capabilities=(
+                        "meeting_evidence_retrieval",
+                        "transcript_retrieval",
+                        "external_evidence_gathering",
+                    ),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("external_read",),
+                    timeout_seconds=60,
+                    max_attempts=1,
+                    cost_class="configured_account",
+                    dispatch_name="Fireflies",
+                    selection_priority=5,
+                ),
+                fireflies,
+            )
+        )
+
     planned = (
         ("document-generation-unavailable", ("document_generation", "deck_generation")),
         ("creative-production-unavailable", ("creative_asset_production", "image_generation", "video_generation")),
@@ -269,6 +293,8 @@ def build_tony_worker_registry(
     )
     if research_adapter is None:
         planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
+    if fireflies is None:
+        planned = (("fireflies-unavailable", ("meeting_evidence_retrieval", "transcript_retrieval", "external_evidence_gathering")), *planned)
     for worker_id, capabilities in planned:
         registrations.append(
             WorkerRegistration(

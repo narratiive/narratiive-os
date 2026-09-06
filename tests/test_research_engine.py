@@ -14,6 +14,7 @@ FIXTURE_ROOT = Path(__file__).resolve().parent / "fixtures" / "research"
 from runtime.research_engine import (  # noqa: E402
     EvidenceSource,
     EvidenceSourcePolicy,
+    FirefliesEvidenceAdapter,
     MaterialClaim,
     LocalDocumentIngestionAdapter,
     ResearchEngine,
@@ -35,6 +36,65 @@ class ResearchEngineTests(unittest.TestCase):
 
     def tearDown(self) -> None:
         self.tmpdir.cleanup()
+
+    def test_fireflies_adapter_preserves_provenance_and_replay_identity(self) -> None:
+        calls = []
+
+        def dispatch(contract):
+            calls.append(contract)
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": "fireflies:transcript:transcript-safe",
+                "source_url": "https://app.fireflies.ai/view/transcript-safe",
+                "title": "SAFE discovery",
+                "transcript": "Synthetic: Customers need clearer evidence.",
+                "content_hash": "stable-content-hash",
+                "meeting_metadata": {"date": 1788861600000},
+                "sources": [{"retrieved_at": "2026-09-06T00:00:00+00:00"}],
+            }
+
+        source = EvidenceSource(
+            source_id="approved-meeting-source",
+            workspace_id="Rave",
+            source_type="fireflies_transcript",
+            uri="fireflies:transcript:transcript-safe",
+            policy=EvidenceSourcePolicy(approved=True),
+        )
+        job = ResearchJob(job_id="safe-fireflies", workspace_id="Rave", query="meeting evidence", sources=(source,))
+        adapter = FirefliesEvidenceAdapter(dispatch)
+
+        first = adapter.collect(job, source)
+        replay = adapter.collect(job, source)
+
+        self.assertEqual(first.records[0].evidence_id, replay.records[0].evidence_id)
+        self.assertEqual(first.records[0].content_hash, "stable-content-hash")
+        self.assertEqual(first.records[0].source_ids, ["approved-meeting-source", "fireflies:transcript:transcript-safe"])
+        self.assertEqual(first.records[0].provenance[0]["provider"], "Fireflies")
+        self.assertTrue(first.records[0].provenance[0]["read_only"])
+        self.assertEqual(calls[0]["execution_mode"], "autonomous_read")
+        self.assertNotIn("approval_granted", calls[0])
+
+    def test_fireflies_adapter_fails_closed_for_incomplete_source_data(self) -> None:
+        source = EvidenceSource(
+            source_id="meeting-source",
+            workspace_id="Rave",
+            source_type="fireflies_transcript",
+            uri="fireflies:transcript:missing-content",
+            policy=EvidenceSourcePolicy(approved=True),
+        )
+        adapter = FirefliesEvidenceAdapter(lambda contract: {
+            "verified": True,
+            "read_only": True,
+            "mutation_count": 0,
+            "source_id": "fireflies:transcript:missing-content",
+        })
+
+        batch = adapter.collect(ResearchJob(job_id="safe", workspace_id="Rave", query="evidence"), source)
+
+        self.assertEqual(batch.records, [])
+        self.assertIn("no transcript", batch.blocker.lower())
 
     def test_run_deduplicates_repeated_evidence_and_persists_lineage(self) -> None:
         workspace_id = "Rave"

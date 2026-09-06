@@ -7,6 +7,7 @@ from typing import Any
 from runtime.research_engine import (
     EvidenceSource,
     EvidenceSourcePolicy,
+    FirefliesEvidenceAdapter,
     ResearchEngine,
     ResearchJob,
 )
@@ -15,9 +16,11 @@ from runtime.research_engine import (
 class ResearchWorkflowAdapter:
     """Execute approved, workspace-scoped sources through the existing Research Engine."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, fireflies_dispatcher=None) -> None:
         self.root = Path(root)
         self.engine = ResearchEngine(self.root)
+        if fireflies_dispatcher is not None:
+            self.engine.adapters.insert(0, FirefliesEvidenceAdapter(fireflies_dispatcher))
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         context = contract.get("workflow_context")

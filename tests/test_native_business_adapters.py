@@ -4,6 +4,7 @@ import json
 import unittest
 from unittest import mock
 from urllib.error import HTTPError
+from datetime import datetime, timezone
 
 from runtime.native_business_adapters import (
     BusinessAdapterError,
@@ -283,13 +284,88 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["projection_key"], "safe-key")
 
     def test_fireflies_returns_provenanced_transcript_without_mutation(self):
-        router = Router([{"data": {"transcript": {"id": "transcript-1", "title": "SAFE TEST", "sentences": [{"speaker_name": "Synthetic", "text": "Evidence only"}]}}}])
-        adapter = FirefliesDispatcher("synthetic", opener=router)
+        router = Router([{"data": {"transcript": {
+            "id": "transcript-1",
+            "title": "SAFE TEST",
+            "date": 1788861600000,
+            "transcript_url": "https://app.fireflies.ai/view/transcript-1",
+            "participants": ["safe@example.invalid"],
+            "speakers": [{"id": 1, "name": "Synthetic"}],
+            "summary": {"overview": "Source-provided overview", "action_items": "Synthetic action"},
+            "sentences": [{"index": 0, "speaker_name": "Synthetic", "speaker_id": 1, "text": "Evidence only", "start_time": 1.5, "end_time": 3.0}],
+        }}}])
+        adapter = FirefliesDispatcher(
+            "synthetic",
+            opener=router,
+            clock=lambda: datetime(2026, 9, 6, tzinfo=timezone.utc),
+        )
         result = adapter({"execution_mode": "autonomous_read", "payload": {"transcript_id": "transcript-1"}})
         self.assertTrue(result["read_only"])
         self.assertEqual(result["source_id"], "fireflies:transcript:transcript-1")
         self.assertIn("Evidence only", result["content"])
+        self.assertEqual(result["sentences"][0]["start_time"], 1.5)
+        self.assertEqual(result["fireflies_summary"]["action_items"], "Synthetic action")
+        self.assertEqual(result["sources"][0]["location"], "https://app.fireflies.ai/view/transcript-1")
+        self.assertEqual(result["sources"][0]["retrieved_at"], "2026-09-06T00:00:00+00:00")
+        self.assertEqual(result["evidence_status"], "complete")
+        self.assertFalse(result["external_action_taken"])
         self.assertEqual(result["mutation_count"], 0)
+
+    def test_fireflies_discovers_transcripts_with_bounded_pagination(self):
+        first = [{"id": f"transcript-{index}", "title": "SAFE"} for index in range(50)]
+        second = [{"id": f"transcript-{index}", "title": "SAFE"} for index in range(50, 55)]
+        router = Router([{"data": {"transcripts": first}}, {"data": {"transcripts": second}}])
+        adapter = FirefliesDispatcher("synthetic", opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "payload": {"kind": "fireflies_transcript_discovery", "limit": 55, "keyword": "SAFE"},
+        })
+
+        self.assertEqual(result["returned_count"], 55)
+        self.assertEqual(result["next_skip"], 55)
+        self.assertTrue(result["has_more"])
+        self.assertEqual(json.loads(router.requests[0].data)["variables"]["skip"], 0)
+        self.assertEqual(json.loads(router.requests[1].data)["variables"]["skip"], 50)
+        self.assertNotIn("mutation", json.loads(router.requests[0].data)["query"].casefold())
+
+    def test_fireflies_retries_rate_limit_and_classifies_provider_errors(self):
+        rate_limit = HTTPError("https://api.fireflies.ai/graphql", 429, "rate", {"Retry-After": "0"}, None)
+        router = Router([rate_limit, {"data": {"user": {"user_id": "safe-user"}, "transcripts": []}}])
+        sleeps = []
+        adapter = FirefliesDispatcher("synthetic", opener=router, sleeper=sleeps.append)
+        probe = adapter.probe()
+        self.assertTrue(probe["verified"])
+        self.assertIn("transcript_text_and_timestamps", probe["validated_capabilities"])
+        self.assertEqual(sleeps, [0.0])
+
+        for payload, expected in (
+            ({"errors": [{"code": "auth_failed"}]}, "fireflies_auth_failed"),
+            ({"errors": [{"code": "object_not_found"}]}, "fireflies_transcript_not_found"),
+            (["not-an-object"], "fireflies_response_malformed"),
+        ):
+            failing = FirefliesDispatcher("synthetic", opener=Router([payload]), max_attempts=1)
+            with self.assertRaisesRegex(BusinessAdapterError, expected):
+                failing({"execution_mode": "autonomous_read", "payload": {"transcript_id": "missing"}})
+
+        for status, expected in ((401, "fireflies_auth_failed"), (403, "fireflies_forbidden")):
+            error = HTTPError("https://api.fireflies.ai/graphql", status, "denied", {}, None)
+            failing = FirefliesDispatcher("synthetic", opener=Router([error]), max_attempts=1)
+            with self.assertRaisesRegex(BusinessAdapterError, expected):
+                failing.probe()
+
+    def test_fireflies_missing_credential_and_incomplete_records_fail_safe(self):
+        with self.assertRaisesRegex(BusinessAdapterError, "fireflies_not_configured"):
+            FirefliesDispatcher("")
+        adapter = FirefliesDispatcher(
+            "synthetic",
+            opener=Router([{"data": {"transcript": {"id": "transcript-1", "title": "Metadata only"}}}]),
+        )
+        result = adapter({"execution_mode": "autonomous_read", "payload": {"transcript_id": "transcript-1"}})
+        self.assertEqual(result["evidence_status"], "metadata_only")
+        self.assertEqual(result["transcript"], "")
+        self.assertEqual(result["summary"], "")
+        self.assertFalse(result["external_action_taken"])
 
     def test_fireflies_resolves_the_exact_calendar_event_before_reading_transcript(self):
         router = Router(
