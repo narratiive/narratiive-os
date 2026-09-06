@@ -17,6 +17,7 @@ from runtime.real_evidence_pilot import (
     inspect_pilot,
 )
 from runtime.workflow_registry import build_narratiive_workflow_registry
+from scripts.real_evidence_pilot import default_workflow_root
 
 
 def manifest_payload() -> dict:
@@ -109,6 +110,26 @@ class RealEvidencePilotTests(unittest.TestCase):
         ungated["approval_gates"] = []
         with self.assertRaisesRegex(PilotValidationError, "approval_gates_invalid"):
             PilotManifest.from_mapping(ungated)
+
+        fireflies = manifest_payload()
+        fireflies["evidence_sources"][0] = {
+            "source_id": "safe-fireflies-transcript",
+            "source_type": "fireflies_transcript",
+            "uri": "fireflies:transcript:safe-transcript-id",
+            "policy": {"approved": True},
+            "provenance": {
+                "origin": "Fireflies transcript selected for an authorised pilot",
+                "captured_at": "2026-09-05T12:00:00Z",
+                "permitted_use": "Narratiive real-evidence pilot only",
+            },
+        }
+        accepted = PilotManifest.from_mapping(fireflies)
+        self.assertEqual(accepted.evidence_sources[0]["source_type"], "fireflies_transcript")
+
+    def test_cli_defaults_to_the_canonical_workflow_runtime_root(self):
+        self.assertEqual(default_workflow_root({"TONY_WORKFLOW_RUNTIME_ROOT": "/canonical"}), Path("/canonical"))
+        self.assertEqual(default_workflow_root({"TONY_WORKFLOW_RUNTIME_PATH": "/legacy"}), Path("/legacy"))
+        self.assertEqual(default_workflow_root({}), Path.cwd() / ".runtime" / "workflow-runtime")
 
     def test_preflight_ledger_is_scoped_append_only_and_idempotent(self):
         manifest = PilotManifest.from_mapping(manifest_payload())
