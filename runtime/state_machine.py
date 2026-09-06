@@ -68,7 +68,10 @@ class WorkflowEngine:
         ):
             raise InvalidTransition("a step with a quality contract cannot complete unless quality passed")
         self._transition(stage, StageStatus.COMPLETED)
-        stage.output_artifacts = output_list
+        if stage.revision_count and stage.output_artifacts:
+            stage.output_artifacts.extend(output_list)
+        else:
+            stage.output_artifacts = output_list
         stage.mark_completed()
 
         index = state.stages.index(stage)
