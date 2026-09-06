@@ -3,7 +3,9 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from email.message import EmailMessage
 from typing import Any, Callable, Mapping
 from urllib import parse, request
@@ -523,70 +525,160 @@ class NotionWorkflowProjectionDispatcher:
 
 class FirefliesDispatcher:
     api_url = "https://api.fireflies.ai/graphql"
+    transcript_fields = """
+        id title date dateString duration privacy host_email organizer_email
+        calendar_id cal_id calendar_type transcript_url meeting_link is_live
+        participants fireflies_users
+        meeting_attendees { displayName email phoneNumber name location }
+        meeting_attendance { name join_time leave_time }
+        speakers { id name }
+        meeting_info { fred_joined silent_meeting summary_status }
+        summary {
+          keywords action_items outline shorthand_bullet notes overview bullet_gist gist
+          short_summary short_overview meeting_type topics_discussed
+          transcript_chapters
+        }
+        sentences { index speaker_name speaker_id text raw_text start_time end_time }
+    """
 
-    def __init__(self, api_key: str, *, opener: OpenUrl = request.urlopen) -> None:
+    def __init__(
+        self,
+        api_key: str,
+        *,
+        opener: OpenUrl = request.urlopen,
+        sleeper: Callable[[float], None] = time.sleep,
+        clock: Callable[[], datetime] | None = None,
+        max_attempts: int = 3,
+        max_calendar_pages: int = 20,
+        max_response_bytes: int = 5_000_000,
+    ) -> None:
         if not _text(api_key):
             raise BusinessAdapterError("fireflies_not_configured")
+        if max_attempts < 1 or max_calendar_pages < 1:
+            raise ValueError("Fireflies retry and pagination limits must be positive")
         self.api_key = api_key
-        self.client = JsonApiClient(opener=opener)
+        self.opener = opener
+        self.sleeper = sleeper
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.max_attempts = max_attempts
+        self.max_calendar_pages = max_calendar_pages
+        self.max_response_bytes = max_response_bytes
 
     def _headers(self) -> dict[str, str]:
         return {"Authorization": f"Bearer {self.api_key}"}
 
     def probe(self) -> dict[str, Any]:
-        result = self.client.call(self.api_url, method="POST", headers=self._headers(), body={"query": "query { user { user_id } }"})
+        result = self._graphql("""
+            query AdapterProbe {
+              user { user_id }
+              transcripts(limit: 1, mine: true) {
+                id title transcript_url participants speakers { id name }
+                sentences { index speaker_name speaker_id text start_time end_time }
+                summary { overview notes action_items }
+              }
+            }
+        """)
         if not _text(_mapping(_mapping(result.get("data")).get("user")).get("user_id")):
             raise BusinessAdapterError("fireflies_probe_unverified")
-        return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "fireflies:user"}
+        transcripts = _mapping(result.get("data")).get("transcripts")
+        if not isinstance(transcripts, list):
+            raise BusinessAdapterError("fireflies_transcript_access_unverified")
+        return {
+            "verified": True,
+            "read_only": True,
+            "mutation_count": 0,
+            "source_id": "fireflies:user",
+            "validated_capabilities": [
+                "api_key_authentication",
+                "transcript_discovery",
+                "meeting_metadata",
+                "participants_and_speakers",
+                "transcript_text_and_timestamps",
+                "source_provided_summary_notes_and_action_items",
+            ],
+            "external_action_taken": False,
+        }
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         _require_read(contract)
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
+        kind = _text(payload.get("kind")).casefold()
+        if kind in {"fireflies_transcript_discovery", "transcript_discovery", "list_transcripts"}:
+            return self._list_transcripts(payload)
         transcript_id = _text(payload.get("transcript_id") or target.get("transcript_id") or target.get("meeting_id"))
         calendar_event_id = _text(payload.get("calendar_event_id") or target.get("calendar_event_id"))
         if not transcript_id and calendar_event_id:
             transcript_id = self._find_transcript_for_calendar_event(calendar_event_id)
         if not transcript_id:
             raise BusinessAdapterError("fireflies_read_requires_transcript_or_calendar_event_id")
-        query = "query Transcript($id: String!) { transcript(id: $id) { id title date duration participants summary { overview short_summary action_items } sentences { speaker_name text } } }"
-        result = self.client.call(self.api_url, method="POST", headers=self._headers(), body={"query": query, "variables": {"id": transcript_id}})
+        query = f"query Transcript($id: String!) {{ transcript(id: $id) {{ {self.transcript_fields} }} }}"
+        result = self._graphql(query, {"id": transcript_id})
         transcript = _mapping(_mapping(result.get("data")).get("transcript"))
         if _text(transcript.get("id")) != transcript_id:
             raise BusinessAdapterError("fireflies_transcript_unverified")
-        sentences = [item for item in transcript.get("sentences", []) if isinstance(item, Mapping)]
-        content = "\n".join(f"{_text(item.get('speaker_name'))}: {_text(item.get('text'))}" for item in sentences if _text(item.get("text")))
-        generated_summary = _mapping(transcript.get("summary"))
+        source_record = self._normalise_transcript(transcript)
+        sentences = source_record["sentences"]
+        content = "\n".join(
+            f"{item['speaker_name']}: {item['text']}" if item["speaker_name"] else item["text"]
+            for item in sentences
+            if item["text"]
+        )
+        generated_summary = _mapping(source_record.get("fireflies_summary"))
         summary_text = _text(generated_summary.get("overview") or generated_summary.get("short_summary"))
+        source_url = _text(source_record.get("transcript_url") or source_record.get("meeting_link"))
+        encoded = json.dumps(source_record, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        content_hash = hashlib.sha256(encoded).hexdigest()
+        source_id = f"fireflies:transcript:{transcript_id}"
+        retrieved_at = self._now()
         return {
             "verified": True,
             "read_only": True,
             "mutation_count": 0,
-            "source_id": f"fireflies:transcript:{transcript_id}",
+            "source_id": source_id,
+            "source_url": source_url,
             "transcript_id": transcript_id,
             "meeting_id": transcript_id,
-            "title": _text(transcript.get("title")),
-            "participants": list(transcript.get("participants", [])) if isinstance(transcript.get("participants"), list) else [],
+            "title": _text(source_record.get("title")),
+            "meeting_metadata": source_record["meeting_metadata"],
+            "participants": source_record["participants"],
+            "speakers": source_record["speakers"],
+            "sentences": sentences,
             "content": content or summary_text,
             "transcript": content,
             "meeting_summary": summary_text,
-            "summary": summary_text or "Fireflies transcript evidence was retrieved without mutation.",
+            "fireflies_summary": dict(generated_summary),
+            "action_items": generated_summary.get("action_items"),
+            "source_record": source_record,
+            "sources": [{
+                "source_id": source_id,
+                "source_type": "fireflies_transcript",
+                "location": source_url or source_id,
+                "provider": "Fireflies",
+                "provider_record_id": transcript_id,
+                "retrieved_at": retrieved_at,
+                "content_hash": content_hash,
+            }],
+            "evidence_id": f"ev_{hashlib.sha256(f'{source_id}|{content_hash}'.encode()).hexdigest()[:16]}",
+            "content_hash": content_hash,
+            "evidence_status": "complete" if content else ("summary_only" if summary_text else "metadata_only"),
+            "summary": summary_text,
+            "external_action_taken": False,
         }
 
     def _find_transcript_for_calendar_event(self, event_id: str) -> str:
-        query = "query Transcripts($limit: Int, $mine: Boolean) { transcripts(limit: $limit, mine: $mine) { id calendar_id cal_id } }"
-        result = self.client.call(
-            self.api_url,
-            method="POST",
-            headers=self._headers(),
-            body={"query": query, "variables": {"limit": 50, "mine": True}},
-        )
-        transcripts = _mapping(result.get("data")).get("transcripts", [])
-        matches = [
-            item
-            for item in transcripts
-            if isinstance(item, Mapping)
-            and event_id in {_text(item.get("calendar_id")), _text(item.get("cal_id")).split("_")[0]}
-        ]
+        matches: list[Mapping[str, Any]] = []
+        exhausted = False
+        for page in range(self.max_calendar_pages):
+            transcripts = self._transcript_page(limit=50, skip=page * 50, filters={"mine": True})
+            matches.extend(
+                item for item in transcripts
+                if event_id in {_text(item.get("calendar_id")), _text(item.get("cal_id")).split("_")[0]}
+            )
+            if len(transcripts) < 50:
+                exhausted = True
+                break
+        if not exhausted:
+            raise BusinessAdapterError("fireflies_calendar_search_pagination_limit_reached")
         if len(matches) != 1:
             raise BusinessAdapterError(
                 "fireflies_calendar_event_not_found" if not matches else "fireflies_calendar_event_ambiguous"
@@ -595,6 +687,164 @@ class FirefliesDispatcher:
         if not transcript_id:
             raise BusinessAdapterError("fireflies_calendar_event_unverified")
         return transcript_id
+
+    def _list_transcripts(self, payload: Mapping[str, Any]) -> dict[str, Any]:
+        try:
+            requested = int(payload.get("limit") or 50)
+            skip = int(payload.get("skip") or 0)
+        except (TypeError, ValueError) as exc:
+            raise BusinessAdapterError("fireflies_transcript_discovery_pagination_invalid") from exc
+        if requested < 1 or requested > 250:
+            raise BusinessAdapterError("fireflies_transcript_discovery_limit_invalid")
+        if skip < 0:
+            raise BusinessAdapterError("fireflies_transcript_discovery_skip_invalid")
+        filters: dict[str, Any] = {"mine": payload.get("mine") is not False}
+        for source_key, api_key in (
+            ("keyword", "keyword"), ("from_date", "fromDate"), ("to_date", "toDate"),
+            ("organizers", "organizers"), ("participants", "participants"), ("user_id", "user_id"),
+        ):
+            value = payload.get(source_key)
+            if value not in (None, "", []):
+                filters[api_key] = value
+        records: list[dict[str, Any]] = []
+        cursor = skip
+        while len(records) < requested:
+            page_limit = min(50, requested - len(records))
+            page = self._transcript_page(limit=page_limit, skip=cursor, filters=filters)
+            records.extend(self._normalise_listing_item(item) for item in page)
+            cursor += len(page)
+            if len(page) < page_limit:
+                break
+        return {
+            "verified": True,
+            "read_only": True,
+            "mutation_count": 0,
+            "source_id": "fireflies:transcripts",
+            "transcripts": records,
+            "returned_count": len(records),
+            "next_skip": cursor,
+            "has_more": len(records) == requested,
+            "filters": filters,
+            "external_action_taken": False,
+        }
+
+    def _transcript_page(self, *, limit: int, skip: int, filters: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+        declarations = ["$limit: Int", "$skip: Int", "$mine: Boolean", "$keyword: String", "$fromDate: DateTime", "$toDate: DateTime", "$organizers: [String]", "$participants: [String]", "$user_id: String"]
+        arguments = ["limit: $limit", "skip: $skip", "mine: $mine", "keyword: $keyword", "fromDate: $fromDate", "toDate: $toDate", "organizers: $organizers", "participants: $participants", "user_id: $user_id"]
+        query = f"query Transcripts({', '.join(declarations)}) {{ transcripts({', '.join(arguments)}) {{ id title date duration calendar_id cal_id transcript_url meeting_link participants speakers {{ id name }} }} }}"
+        variables = {"limit": limit, "skip": skip, **dict(filters)}
+        result = self._graphql(query, variables)
+        value = _mapping(result.get("data")).get("transcripts")
+        if not isinstance(value, list) or not all(isinstance(item, Mapping) for item in value):
+            raise BusinessAdapterError("fireflies_transcript_list_malformed")
+        return list(value)
+
+    @staticmethod
+    def _normalise_listing_item(value: Mapping[str, Any]) -> dict[str, Any]:
+        transcript_id = _text(value.get("id"))
+        if not transcript_id:
+            raise BusinessAdapterError("fireflies_transcript_list_item_malformed")
+        return {
+            "transcript_id": transcript_id,
+            "title": _text(value.get("title")),
+            "date": value.get("date"),
+            "duration": value.get("duration"),
+            "calendar_id": _text(value.get("calendar_id")),
+            "cal_id": _text(value.get("cal_id")),
+            "source_url": _text(value.get("transcript_url") or value.get("meeting_link")),
+            "participants": list(value.get("participants") or []) if isinstance(value.get("participants"), list) else [],
+            "speakers": [dict(item) for item in value.get("speakers", []) if isinstance(item, Mapping)],
+        }
+
+    @staticmethod
+    def _normalise_transcript(value: Mapping[str, Any]) -> dict[str, Any]:
+        sentences = []
+        for item in value.get("sentences", []) if isinstance(value.get("sentences"), list) else []:
+            if not isinstance(item, Mapping):
+                continue
+            sentences.append({key: item.get(key) for key in ("index", "speaker_name", "speaker_id", "text", "raw_text", "start_time", "end_time")})
+        attendees = [dict(item) for item in value.get("meeting_attendees", []) if isinstance(item, Mapping)] if isinstance(value.get("meeting_attendees"), list) else []
+        participants = list(value.get("participants") or []) if isinstance(value.get("participants"), list) else []
+        return {
+            "id": _text(value.get("id")),
+            "title": _text(value.get("title")),
+            "transcript_url": _text(value.get("transcript_url")),
+            "meeting_link": _text(value.get("meeting_link")),
+            "participants": participants,
+            "meeting_attendees": attendees,
+            "meeting_attendance": [dict(item) for item in value.get("meeting_attendance", []) if isinstance(item, Mapping)] if isinstance(value.get("meeting_attendance"), list) else [],
+            "speakers": [dict(item) for item in value.get("speakers", []) if isinstance(item, Mapping)] if isinstance(value.get("speakers"), list) else [],
+            "sentences": sentences,
+            "fireflies_summary": dict(_mapping(value.get("summary"))),
+            "meeting_metadata": {key: value.get(key) for key in (
+                "date", "dateString", "duration", "privacy", "host_email", "organizer_email",
+                "calendar_id", "cal_id", "calendar_type", "is_live", "fireflies_users", "meeting_info",
+            )},
+        }
+
+    def _graphql(self, query: str, variables: Mapping[str, Any] | None = None) -> dict[str, Any]:
+        body = json.dumps({"query": query, "variables": dict(variables or {})}).encode("utf-8")
+        req = request.Request(
+            self.api_url,
+            data=body,
+            headers={"Accept": "application/json", "Content-Type": "application/json", **self._headers()},
+            method="POST",
+        )
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                with self.opener(req, timeout=20.0) as response:
+                    raw = response.read(self.max_response_bytes + 1)
+            except HTTPError as exc:
+                code = "fireflies_auth_failed" if exc.code == 401 else "fireflies_forbidden" if exc.code == 403 else "fireflies_rate_limited" if exc.code == 429 else "fireflies_transient_error" if exc.code >= 500 else f"fireflies_http_{exc.code}"
+                if code in {"fireflies_rate_limited", "fireflies_transient_error"} and attempt < self.max_attempts:
+                    self.sleeper(self._retry_delay(exc.headers.get("Retry-After", 1) if exc.headers else 1))
+                    continue
+                raise BusinessAdapterError(code) from exc
+            except (URLError, TimeoutError, OSError) as exc:
+                if attempt < self.max_attempts:
+                    self.sleeper(1.0)
+                    continue
+                raise BusinessAdapterError("fireflies_unavailable") from exc
+            if len(raw) > self.max_response_bytes:
+                raise BusinessAdapterError("fireflies_response_too_large")
+            try:
+                payload = json.loads(raw.decode("utf-8") or "{}")
+            except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+                raise BusinessAdapterError("fireflies_response_malformed") from exc
+            if not isinstance(payload, dict):
+                raise BusinessAdapterError("fireflies_response_malformed")
+            errors = payload.get("errors")
+            if errors:
+                error = next((item for item in errors if isinstance(item, Mapping)), {})
+                error_code = _text(error.get("code") or _mapping(error.get("extensions")).get("code")).casefold()
+                status = _mapping(error.get("extensions")).get("status")
+                classified = {
+                    "auth_failed": "fireflies_auth_failed",
+                    "object_not_found": "fireflies_transcript_not_found",
+                    "too_many_requests": "fireflies_rate_limited",
+                    "request_timeout": "fireflies_transient_error",
+                    "invariant_violation": "fireflies_transient_error",
+                }.get(error_code, "fireflies_forbidden" if status == 403 else "fireflies_api_error")
+                if classified in {"fireflies_rate_limited", "fireflies_transient_error"} and attempt < self.max_attempts:
+                    retry_after = _mapping(_mapping(error.get("extensions")).get("metadata")).get("retryAfter") or 1
+                    self.sleeper(self._retry_delay(retry_after))
+                    continue
+                raise BusinessAdapterError(classified)
+            return payload
+        raise BusinessAdapterError("fireflies_unavailable")
+
+    def _now(self) -> str:
+        value = self.clock()
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc).replace(microsecond=0).isoformat()
+
+    @staticmethod
+    def _retry_delay(value: Any) -> float:
+        try:
+            return max(0.0, min(float(value), 5.0))
+        except (TypeError, ValueError):
+            return 1.0
 
 
 def _notion_plain_text(prop: Mapping[str, Any]) -> str:

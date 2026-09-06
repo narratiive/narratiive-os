@@ -97,6 +97,61 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
             self.assertEqual(blueprint_state["approval_status"], "pending")
             self.assertFalse(blueprint_state["external_action_taken"])
 
+    def test_runtime_research_ingests_approved_fireflies_source(self) -> None:
+        calls = []
+
+        def fireflies(contract):
+            calls.append(contract)
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "external_action_taken": False,
+                "source_id": "fireflies:transcript:transcript-safe",
+                "source_url": "https://app.fireflies.ai/view/transcript-safe",
+                "title": "SAFE discovery",
+                "transcript": "Synthetic: The buying team needs earlier proof and clearer positioning evidence.",
+                "content_hash": "safe-content-hash",
+                "sources": [{"retrieved_at": "2026-09-06T00:00:00+00:00"}],
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-research-client",
+                dispatchers={"Fireflies": fireflies},
+                environ={},
+            )
+            runtime.enqueue(
+                "growth_sprint_to_research_engine",
+                "safe-fireflies-research-run",
+                {
+                    "approved_growth_sprint_scope": ["Audience", "Positioning"],
+                    "research_requirements": {"workstreams_and_questions": [{"workstream": "Evidence", "questions": ["What did discovery establish?"]}]},
+                    "research_sources": [{
+                        "source_id": "meeting-source",
+                        "source_type": "fireflies_transcript",
+                        "uri": "fireflies:transcript:transcript-safe",
+                        "policy": {"approved": True},
+                    }],
+                    "client_context": {"name": "SAFE Research Production Test", "workspace_id": "agency"},
+                },
+                entity_id="safe-research-client",
+                correlation_id="safe-fireflies-correlation",
+            )
+
+            outcome = runtime.advance("safe-fireflies-research-run", lifecycle())
+            replay = runtime.advance("safe-fireflies-research-run", lifecycle())
+            state = runtime.status("safe-fireflies-research-run")
+
+            self.assertEqual(outcome.status, "complete", state)
+            self.assertEqual(replay.status, "complete", state)
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(len(calls), 1)
+            self.assertEqual(calls[0]["payload"]["transcript_id"], "transcript-safe")
+            self.assertFalse(state["external_action_taken"])
+
 
 if __name__ == "__main__":
     unittest.main()

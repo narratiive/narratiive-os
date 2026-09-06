@@ -58,6 +58,7 @@ def validate(environ: Mapping[str, str], *, required: tuple[str, ...] = PROBE_WO
                 "status": "verified_read_only" if verified else "unverified_response",
                 "ok": verified,
                 "source_id": str(evidence.get("source_id") or "") if isinstance(evidence, dict) else "",
+                "validated_capabilities": list(evidence.get("validated_capabilities") or []) if isinstance(evidence, dict) else [],
             }
         )
     return {"ok": all(check["ok"] for check in checks), "checks": checks}

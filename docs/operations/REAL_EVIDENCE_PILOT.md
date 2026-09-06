@@ -74,6 +74,18 @@ browser session or manually copied unprovenanced data.
 4. Ingest discovery notes/transcript with exact source provenance. If Fireflies
    is used, retain its transcript ID or exact Calendar event ID. Do not infer
    answers that are absent from the evidence.
+   An approved Research Engine source uses the canonical descriptor below; the
+   transcript identifier remains provider provenance and no meeting mutation is
+   authorised:
+
+   ```json
+   {
+     "source_id": "pilot-approved-discovery-meeting",
+     "source_type": "fireflies_transcript",
+     "uri": "fireflies:transcript:<exact-transcript-id>",
+     "policy": {"approved": true}
+   }
+   ```
 5. Continue to Growth Sprint Proposal. Review scope and commercial inputs, then
    explicitly approve the internal scope. Do not send the draft communication.
 6. Continue with only approved research sources. Inspect Research Engine

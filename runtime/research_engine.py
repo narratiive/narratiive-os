@@ -19,7 +19,7 @@ import urllib.request
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Mapping, Protocol, runtime_checkable
 from urllib.parse import urljoin
 
 
@@ -464,6 +464,106 @@ class LocalDocumentIngestionAdapter:
 
     def _evidence_id(self, workspace_id: str, source_id: str, content_hash: str) -> str:
         return f"ev_{sha256_hex(f'{workspace_id}|{source_id}|{content_hash}')[:16]}"
+
+
+class FirefliesEvidenceAdapter:
+    """Collect an approved Fireflies transcript through the canonical read-only dispatcher."""
+
+    name = "fireflies_transcript_ingestion"
+
+    def __init__(self, dispatcher: Callable[[dict[str, Any]], dict[str, Any]]) -> None:
+        self.dispatcher = dispatcher
+
+    def supports(self, source: EvidenceSource) -> bool:
+        return source.source_type in {"fireflies", "fireflies_transcript", "meeting_transcript"}
+
+    def collect(self, job: ResearchJob, source: EvidenceSource) -> EvidenceBatch:
+        if not source.policy.approved:
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies source is not approved.")
+        if source.workspace_id.strip() != job.workspace_id.strip():
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies source workspace does not match the research job workspace.")
+        transcript_id, calendar_event_id = self._source_anchor(source)
+        if not transcript_id and not calendar_event_id:
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies source requires an exact transcript or Calendar event identifier.")
+        result = self.dispatcher(
+            {
+                "eligible": True,
+                "state": "ready_for_autonomous_dispatch",
+                "worker": "Fireflies",
+                "execution_mode": "autonomous_read",
+                "execution_truth": "not_dispatched",
+                "target": {
+                    "workspace_id": job.workspace_id,
+                    "transcript_id": transcript_id,
+                    "calendar_event_id": calendar_event_id,
+                },
+                "payload": {
+                    "kind": "research_meeting_evidence",
+                    "transcript_id": transcript_id,
+                    "calendar_event_id": calendar_event_id,
+                },
+            }
+        )
+        if not isinstance(result, Mapping) or result.get("verified") is not True or result.get("read_only") is not True or result.get("mutation_count") != 0:
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies returned unverified or non-read-only evidence.")
+        content = normalise_text(str(result.get("transcript") or result.get("meeting_summary") or ""))
+        if not content:
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies meeting record contains no transcript or source-provided summary.")
+        provider_source_id = str(result.get("source_id") or "").strip()
+        if not provider_source_id.startswith("fireflies:transcript:"):
+            return EvidenceBatch(source_id=source.source_id, adapter=self.name, blocker="Fireflies source provenance is incomplete.")
+        content_hash = str(result.get("content_hash") or sha256_hex(content)).strip()
+        retrieved_at = self._retrieved_at(result)
+        evidence_id = f"ev_{sha256_hex(f'{job.workspace_id}|{provider_source_id}|{content_hash}')[:16]}"
+        provenance = [{
+            "adapter": self.name,
+            "source_id": source.source_id,
+            "provider_source_id": provider_source_id,
+            "provider": "Fireflies",
+            "workspace_id": job.workspace_id,
+            "uri": str(result.get("source_url") or source.uri),
+            "retrieved_at": retrieved_at,
+            "content_hash": content_hash,
+            "read_only": True,
+        }]
+        record = EvidenceRecord(
+            evidence_id=evidence_id,
+            workspace_id=job.workspace_id,
+            source_id=source.source_id,
+            source_type="fireflies_transcript",
+            uri=str(result.get("source_url") or source.uri),
+            title=str(result.get("title") or source.title or "Fireflies meeting transcript"),
+            content=content,
+            excerpt=truncate_text(content),
+            published_at=str(_mapping(result.get("meeting_metadata")).get("date") or source.metadata.get("published_at") or "") or None,
+            retrieved_at=retrieved_at,
+            content_hash=content_hash,
+            provenance=provenance,
+            source_ids=[source.source_id, provider_source_id],
+        )
+        return EvidenceBatch(source_id=source.source_id, adapter=self.name, records=[record])
+
+    @staticmethod
+    def _source_anchor(source: EvidenceSource) -> tuple[str, str]:
+        transcript_id = str(source.metadata.get("transcript_id") or "").strip()
+        calendar_event_id = str(source.metadata.get("calendar_event_id") or "").strip()
+        if source.uri.startswith("fireflies:transcript:"):
+            transcript_id = source.uri.removeprefix("fireflies:transcript:").strip()
+        elif source.uri.startswith("fireflies:calendar-event:"):
+            calendar_event_id = source.uri.removeprefix("fireflies:calendar-event:").strip()
+        return transcript_id, calendar_event_id
+
+    @staticmethod
+    def _retrieved_at(result: Mapping[str, Any]) -> str:
+        sources = result.get("sources") if isinstance(result.get("sources"), list) else []
+        for source in sources:
+            if isinstance(source, Mapping) and str(source.get("retrieved_at") or "").strip():
+                return str(source["retrieved_at"])
+        return utc_now()
+
+
+def _mapping(value: Any) -> Mapping[str, Any]:
+    return value if isinstance(value, Mapping) else {}
 
 
 class EvidencePackStore:
