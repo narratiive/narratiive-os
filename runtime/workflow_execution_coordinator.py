@@ -337,7 +337,7 @@ class WorkflowExecutionCoordinator:
                 field: output[field]
                 for field in stage_definition.output_contract.required_fields
             }
-            self.runs.merge_inputs(run_id, durable_outputs)
+            self.runs.promote_stage_outputs(run_id, stage.stage_id, durable_outputs)
             state = self.runs.complete_stage(
                 run_id,
                 stage.stage_id,

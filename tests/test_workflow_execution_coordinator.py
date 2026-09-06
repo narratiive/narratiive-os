@@ -315,6 +315,49 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
         self.assertEqual(len(self.runs.load_run("run-resume").approval_history), 1)
 
+    def test_rejected_completed_output_is_revised_without_rewriting_artifact_history(self) -> None:
+        calls = []
+
+        def adapter(_contract):
+            value = "initial reviewed draft" if not calls else "revised evidence-led draft"
+            calls.append(value)
+            return {"draft": value}
+
+        definition = WorkflowDefinition(
+            "review-revision",
+            (_stage("draft"),),
+            approval_required=True,
+        )
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            "review-revision",
+            "run-review-revision",
+            {"brief": "safe"},
+            entity_id="e",
+            correlation_id="c",
+        )
+        first = coordinator.advance("run-review-revision", _lifecycle())
+        first_state = self.runs.load_run("run-review-revision")
+        first_artifact = first_state.stage("draft").output_artifacts[0]
+        first_payload = json.loads(Path(first_artifact.location).read_text(encoding="utf-8"))
+
+        self.assertEqual(first.status, "awaiting_approval")
+        self.runs.reject_for_revision(
+            "run-review-revision",
+            reviewer="authorised-reviewer",
+            rationale="Strengthen the evidence and strategic choice",
+        )
+        revised = coordinator.advance("run-review-revision", _lifecycle())
+        state = self.runs.load_run("run-review-revision")
+
+        self.assertEqual(revised.status, "awaiting_approval")
+        self.assertEqual(state.input_payload["draft"], "revised evidence-led draft")
+        self.assertEqual(state.stage("draft").revision_count, 1)
+        self.assertEqual(len(state.stage("draft").output_artifacts), 2)
+        self.assertEqual(state.stage("draft").output_artifacts[0], first_artifact)
+        self.assertNotEqual(state.stage("draft").output_artifacts[1].artifact_id, first_artifact.artifact_id)
+        self.assertEqual(first_payload["draft"], "initial reviewed draft")
+
     def test_restart_recovers_pending_work_without_duplicate_execution(self) -> None:
         calls = []
         definition = WorkflowDefinition("restart-safe", (_stage("draft"),))

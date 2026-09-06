@@ -302,6 +302,48 @@ class WorkflowRunService:
         )
         return state
 
+    def promote_stage_outputs(
+        self,
+        run_id: str,
+        stage_id: str,
+        outputs: Mapping[str, object],
+    ) -> WorkflowState:
+        """Promote validated stage outputs into the run's current derived view.
+
+        Initial execution retains the strict no-overwrite input contract.  A
+        formally requested revision may replace only fields declared as outputs
+        of the same previously completed stage.  Prior artefacts and events stay
+        immutable and remain the audit history for the replaced view.
+        """
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        output_fields = set(outputs)
+        if not output_fields.issubset(set(stage.expected_outputs)):
+            raise ValueError("stage output promotion contains undeclared fields")
+        conflicts = sorted(
+            key
+            for key, value in outputs.items()
+            if key in state.input_payload and state.input_payload[key] != value
+        )
+        if conflicts and not (
+            stage.revision_count > 0
+            and stage.output_artifacts
+            and set(conflicts).issubset(set(stage.expected_outputs))
+        ):
+            raise ValueError(f"workflow output cannot overwrite existing inputs: {','.join(conflicts)}")
+        state.input_payload.update(dict(outputs))
+        state.touch()
+        self._commit(
+            state,
+            "workflow.outputs_promoted",
+            {
+                "stage_id": stage_id,
+                "output_fields": sorted(outputs),
+                "revision_count": stage.revision_count,
+            },
+        )
+        return state
+
     def block_for_reason(self, run_id: str, stage_id: str, blocker: str, next_action: str) -> WorkflowState:
         state = self.repository.load(run_id)
         self.engine.block_for_reason(state, stage_id, blocker, next_action)
