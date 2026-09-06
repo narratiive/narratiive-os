@@ -136,6 +136,10 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertIn("commercial inputs are pending human approval", result["failed_checks"])
         self.assertIn("no false external execution claim", result["failed_checks"])
 
+        denied = proposal_output()
+        denied["draft_client_communication"] += " No email sent; this remains internal."
+        self.assertTrue(growth_sprint_proposal_quality_gate(denied)["passed"])
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {

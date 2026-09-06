@@ -4,6 +4,8 @@ import json
 from collections.abc import Mapping
 from typing import Any
 
+from runtime.external_action_truth import no_asserted_external_action
+
 
 _FALSE_ACTION_MARKERS = (
     "email sent", "proposal sent", "sent to the client", "sent to the prospect",
@@ -316,5 +318,4 @@ def _contains_uncertainty(output: Mapping[str, Any]) -> bool:
 def _no_false_action(output: Mapping[str, Any]) -> bool:
     if output.get("external_action_taken") is True:
         return False
-    rendered = json.dumps(dict(output), sort_keys=True).casefold()
-    return not any(marker in rendered for marker in _FALSE_ACTION_MARKERS)
+    return no_asserted_external_action(output, _FALSE_ACTION_MARKERS)

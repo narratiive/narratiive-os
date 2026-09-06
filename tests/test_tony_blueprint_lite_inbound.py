@@ -213,6 +213,20 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(workflow.blocker, "blueprint_lite_quality_gate")
             self.assertFalse(workflow.external_action_taken)
 
+    def test_truthful_external_action_denial_passes_while_execution_claim_fails(self) -> None:
+        denied = self._good_evidence()
+        denied["blueprint_lite"] = {
+            "content": "Substantive internal Blueprint Lite.",
+            "boundary_confirmation": "No email sent; no client contact occurred.",
+        }
+        self.assertTrue(TonyInboundBlueprintLiteService._quality_gate(denied)["passed"])
+
+        claimed = self._good_evidence()
+        claimed["blueprint_lite"] = "The internal work is complete and an email sent to the prospect."
+        result = TonyInboundBlueprintLiteService._quality_gate(claimed)
+        self.assertFalse(result["passed"])
+        self.assertIn("no false external execution claim", result["failed_checks"])
+
     def test_unstructured_worker_response_is_blocked_and_retained_for_diagnosis(self) -> None:
         evidence = {
             "verified": True,
