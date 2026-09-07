@@ -5,8 +5,8 @@ import { pathToFileURL } from "node:url";
 const specPath = path.resolve(process.argv[2] || "");
 const outputDir = path.resolve(process.argv[3] || "");
 const skillDir = path.resolve(process.env.SKILL_DIR || "");
-const runtimePython = process.env.RUNTIME_PYTHON || "python3";
 const runtimeNodeModules = process.env.RUNTIME_NODE_MODULES || "";
+const runtimePython = process.env.RUNTIME_PYTHON || "python3";
 if (!specPath || !outputDir || !skillDir || !runtimeNodeModules) throw new Error("spec, output, SKILL_DIR and RUNTIME_NODE_MODULES are required");
 const spec = JSON.parse(await fs.readFile(specPath, "utf8"));
 await fs.mkdir(outputDir, { recursive: true });
@@ -15,82 +15,36 @@ const { Presentation, PresentationFile } = await importRuntimeModule("@oai/artif
 const { resolvePresentationFont, finalizePresentation } = await import(pathToFileURL(path.join(skillDir, "container_tools/artifact_tool_utils.mjs")).href);
 const family = resolvePresentationFont({ availableFonts: ["Aptos", "Arial", "Helvetica"] });
 const presentation = Presentation.create({ slideSize: { width: 1280, height: 720 } });
-const C = { ink: "#1E1C2A", muted: "#6D6875", cream: "#F7F4EF", accent: "#E55934", violet: "#433E5B", soft: "#E8E2F0", white: "#FFFFFF", line: "#D8D2C8" };
-const safeText = value => String(value || "").replace(/[\u2013\u2014]/g, "-");
-function textbox(slide, text, position, style = {}) {
+const C = { ink: "#17130F", ivory: "#F4F0E8", muted: "#8B8173", amber: "#F2B500", rust: "#C85A32", sage: "#A8B5A0", smoke: "#DED7CA", white: "#FFFDF7", dark: "#0F0D0B" };
+const clean = value => String(value || "").replace(/[\u2013\u2014]/g, "-").replace(/\s+/g, " ").trim();
+const short = (value, limit) => { const x = clean(value); if (x.length <= limit) return x; const cut = x.slice(0, limit).lastIndexOf(" "); return `${x.slice(0, cut > 20 ? cut : limit - 1)}…`; };
+function text(slide, value, position, style = {}) {
   const shape = slide.shapes.add({ geometry: "textbox", position, fill: "none", line: { fill: "none", width: 0 } });
-  shape.text = safeText(text);
-  shape.text.style = { typeface: family, fontSize: style.fontSize || 20, color: style.color || C.ink, bold: Boolean(style.bold), italic: Boolean(style.italic), autoFit: "shrinkTextOnOverflow", alignment: style.alignment || "left" };
+  shape.text = clean(value);
+  shape.text.style = { typeface: style.typeface || family, fontSize: style.fontSize || 20, color: style.color || C.ink, bold: Boolean(style.bold), italic: Boolean(style.italic), autoFit: "shrinkTextOnOverflow", alignment: style.alignment || "left" };
   return shape;
 }
-function rect(slide, position, fill, radius = false) {
-  return slide.shapes.add({ geometry: radius ? "roundRect" : "rect", position, fill, line: { fill: fill, width: 0 } });
+function box(slide, position, fill, radius = false, line = "none") { return slide.shapes.add({ geometry: radius ? "roundRect" : "rect", position, fill, line: { fill: line === "none" ? fill : line, width: line === "none" ? 0 : 1 } }); }
+function footer(slide, s) { text(slide, "NARRATIIVE  /  GROWTH BLUEPRINT", { left: 72, top: 677, width: 430, height: 18 }, { fontSize: 10, color: C.muted, bold: true }); text(slide, `${String(s.slide_no).padStart(2, "0")}  /  ${String(spec.slides.length).padStart(2, "0")}`, { left: 1120, top: 677, width: 88, height: 18 }, { fontSize: 10, color: C.muted, alignment: "right" }); }
+function header(slide, s, act = "") { text(slide, act || "THE NARRATIIVE GROWTH BLUEPRINT", { left: 72, top: 34, width: 650, height: 18 }, { fontSize: 11, color: C.rust, bold: true }); text(slide, s.title, { left: 72, top: 72, width: 1120, height: 58 }, { fontSize: 33, color: C.ink, bold: true }); box(slide, { left: 72, top: 146, width: 1136, height: 2 }, C.smoke); }
+function cards(slide, s, count = 3) { const gap = 20, left = 72, top = 230, width = (1136 - gap * (count - 1)) / count; const chunks = [short(s.takeaway, 120), short(s.body, 110), "What this means next"]; for (let i = 0; i < count; i += 1) { const x = left + i * (width + gap); box(slide, { left: x, top, width, height: 260 }, i === 0 ? C.dark : i === 1 ? C.smoke : C.sage, true); text(slide, i === 0 ? "THE SIGNAL" : i === 1 ? "THE READING" : "THE MOVE", { left: x + 24, top: top + 24, width: width - 48, height: 18 }, { fontSize: 10, color: i === 0 ? C.amber : C.rust, bold: true }); text(slide, chunks[i], { left: x + 24, top: top + 64, width: width - 48, height: 170 }, { fontSize: i === 0 ? 21 : 19, color: i === 0 ? C.white : C.ink, bold: i === 0 }); } }
+function render(slide, s, index) {
+  const arch = s.layout_type || s.visual_treatment;
+  const act = index < 7 ? "ACT 1  /  THE CASE FOR CHANGE" : index < 13 ? "ACT 2  /  THE DIAGNOSIS" : index < 17 ? "ACT 3  /  THE CHOICE" : "ACT 4  /  THE MOVE";
+  if (index === 1) {
+    slide.background.fill = C.dark; box(slide, { left: 0, top: 0, width: 14, height: 720 }, C.amber); text(slide, "NARRATIIVE", { left: 88, top: 74, width: 360, height: 34 }, { fontSize: 18, color: C.white, bold: true }); text(slide, "S T R A T E G Y   ·   N A R R A T I V E   ·   G R O W T H", { left: 90, top: 115, width: 540, height: 20 }, { fontSize: 10, color: C.muted, bold: true }); text(slide, s.title, { left: 88, top: 265, width: 980, height: 90 }, { fontSize: 62, color: C.white, bold: false }); box(slide, { left: 90, top: 390, width: 58, height: 4 }, C.amber); text(slide, "THE NARRATIIVE GROWTH BLUEPRINT", { left: 90, top: 430, width: 700, height: 28 }, { fontSize: 18, color: C.amber, bold: true }); text(slide, "Strategic clarity for scalable growth.", { left: 90, top: 470, width: 650, height: 34 }, { fontSize: 22, color: "#BDB4A5", italic: true }); text(slide, "SAFE INTERNAL STRATEGIC PILOT - NOT COMMISSIONED - NO CONTACT", { left: 90, top: 650, width: 720, height: 18 }, { fontSize: 10, color: C.muted, bold: true }); slide.speakerNotes.textFrame.setText(`${(s.source_notes || []).join("\\n")}\\nInternal pilot disclosure: Rave Coffee did not commission this work.`); return; }
+  slide.background.fill = C.ivory; header(slide, s, act);
+  if (arch === "thesis" || arch === "provocation" || arch === "closing") { text(slide, short(s.takeaway, 125), { left: 100, top: 230, width: 1010, height: 155 }, { fontSize: 32, color: C.dark, bold: true }); box(slide, { left: 100, top: 425, width: 10, height: 105 }, C.amber); text(slide, short(s.body, 180), { left: 136, top: 425, width: 940, height: 92 }, { fontSize: 20, color: C.ink }); }
+  else if (["market_forces", "comparison", "competitive_landscape", "demand_pools", "channel_roles", "message_architecture"].includes(arch)) cards(slide, s, 3);
+  else if (["positioning_map", "journey", "flywheel", "prioritisation"].includes(arch)) { text(slide, s.takeaway, { left: 72, top: 205, width: 460, height: 130 }, { fontSize: 29, color: C.dark, bold: true }); box(slide, { left: 620, top: 200, width: 588, height: 300 }, C.dark, true); text(slide, arch === "positioning_map" ? "OWNABLE TERRITORY" : arch.toUpperCase(), { left: 660, top: 235, width: 500, height: 20 }, { fontSize: 11, color: C.amber, bold: true }); text(slide, s.body, { left: 660, top: 282, width: 500, height: 170 }, { fontSize: 22, color: C.white, bold: true }); }
+  else { text(slide, short(s.takeaway, 90), { left: 72, top: 205, width: 540, height: 120 }, { fontSize: 22, color: C.dark, bold: true }); box(slide, { left: 72, top: 380, width: 1136, height: 155 }, C.smoke, true); text(slide, arch.replace(/_/g, " ").toUpperCase(), { left: 102, top: 408, width: 400, height: 18 }, { fontSize: 10, color: C.rust, bold: true }); text(slide, short(s.body, 180), { left: 102, top: 443, width: 1020, height: 62 }, { fontSize: 22, color: C.ink }); }
+  footer(slide, s); slide.speakerNotes.textFrame.setText(`${(s.source_notes || []).join("\\n")}\\nEvidence refs (internal only): ${(s.evidence_refs || []).join(", ") || "none supplied"}`);
 }
-function addFooter(slide, specSlide) {
-  textbox(slide, "NARRATIIVE  /  GROWTH BLUEPRINT", { left: 72, top: 684, width: 420, height: 18 }, { fontSize: 11, color: C.muted, bold: true });
-  textbox(slide, `${String(specSlide.slide_no).padStart(2, "0")}  /  30`, { left: 1128, top: 684, width: 80, height: 18 }, { fontSize: 11, color: C.muted, alignment: "right" });
-}
-for (const specSlide of spec.slides) {
-  const slide = presentation.slides.add();
-  slide.background.fill = specSlide.slide_no === 1 ? C.violet : C.cream;
-  if (specSlide.slide_no === 1) {
-    rect(slide, { left: 0, top: 0, width: 1280, height: 720 }, C.violet);
-    rect(slide, { left: 72, top: 92, width: 18, height: 200 }, C.accent);
-    textbox(slide, "NARRATIIVE", { left: 112, top: 96, width: 420, height: 32 }, { fontSize: 18, color: C.white, bold: true });
-    textbox(slide, spec.title, { left: 112, top: 180, width: 920, height: 120 }, { fontSize: 48, color: C.white, bold: true });
-    textbox(slide, "SAFE INTERNAL STRATEGIC PILOT - NOT COMMISSIONED - NO CONTACT", { left: 112, top: 360, width: 760, height: 30 }, { fontSize: 17, color: "#DDD8E8", bold: true });
-    textbox(slide, "A structured Growth Blueprint translated into an editable client-review artefact. Strategic source remains immutable; release requires Matt approval.", { left: 112, top: 510, width: 760, height: 70 }, { fontSize: 22, color: C.white });
-    textbox(slide, "01  /  30", { left: 112, top: 660, width: 100, height: 18 }, { fontSize: 11, color: "#DDD8E8", bold: true });
-    slide.speakerNotes.textFrame.setText(`${specSlide.source_notes.join("\\n")}\\nInternal pilot disclosure: Rave Coffee did not commission this work.`);
-    continue;
-  }
-  const isStatement = specSlide.layout_type === "statement";
-  textbox(slide, "GROWTH BLUEPRINT", { left: 72, top: 42, width: 300, height: 22 }, { fontSize: 12, color: C.accent, bold: true });
-  textbox(slide, specSlide.title, { left: 72, top: 78, width: 1100, height: 58 }, { fontSize: 34, color: C.ink, bold: true });
-  rect(slide, { left: 72, top: 148, width: 1136, height: 3 }, C.line);
-  if (isStatement) {
-    textbox(slide, specSlide.takeaway, { left: 110, top: 220, width: 1040, height: 100 }, { fontSize: 36, color: C.violet, bold: true });
-    rect(slide, { left: 110, top: 370, width: 8, height: 135 }, C.accent);
-    textbox(slide, specSlide.body, { left: 140, top: 370, width: 970, height: 145 }, { fontSize: 22, color: C.ink });
-  } else {
-    textbox(slide, specSlide.takeaway, { left: 72, top: 190, width: 500, height: 110 }, { fontSize: 30, color: C.violet, bold: true });
-    rect(slide, { left: 660, top: 184, width: 548, height: 150 }, C.soft, true);
-    textbox(slide, "EVIDENCE / SOURCE REFS", { left: 692, top: 208, width: 450, height: 20 }, { fontSize: 12, color: C.accent, bold: true });
-    textbox(slide, `${safeText(specSlide.body).slice(0, 155)}...`, { left: 692, top: 240, width: 470, height: 78 }, { fontSize: 18, color: C.ink });
-    textbox(slide, "IMPLICATION", { left: 72, top: 370, width: 250, height: 20 }, { fontSize: 12, color: C.accent, bold: true });
-    textbox(slide, specSlide.body, { left: 72, top: 400, width: 760, height: 100 }, { fontSize: 22, color: C.ink });
-    rect(slide, { left: 872, top: 390, width: 336, height: 110 }, C.violet, true);
-    textbox(slide, specSlide.visual_treatment.toUpperCase(), { left: 902, top: 412, width: 275, height: 20 }, { fontSize: 12, color: "#DDD8E8", bold: true });
-    textbox(slide, specSlide.evidence_refs.length ? specSlide.evidence_refs.slice(0, 2).join("\\n") : "Evidence gap retained", { left: 902, top: 444, width: 275, height: 42 }, { fontSize: 14, color: C.white });
-  }
-  textbox(slide, `SO WHAT?  ${specSlide.takeaway}`, { left: 72, top: 570, width: 1020, height: 46 }, { fontSize: 17, color: C.violet, bold: true });
-  addFooter(slide, specSlide);
-  slide.speakerNotes.textFrame.setText(`${specSlide.source_notes.join("\\n")}\\nEvidence refs: ${specSlide.evidence_refs.join(", ") || "none supplied"}`);
-}
-const candidatePath = path.join(outputDir, ".candidate.pptx");
-await (await PresentationFile.exportPptx(presentation)).save(candidatePath);
+for (let i = 0; i < spec.slides.length; i += 1) { const s = spec.slides[i]; const slide = presentation.slides.add(); render(slide, s, i + 1); }
+const candidatePath = path.join(outputDir, ".candidate.pptx"); await (await PresentationFile.exportPptx(presentation)).save(candidatePath);
 const finalPath = path.join(outputDir, "Rave-Growth-Blueprint-SAFE-Pilot.pptx");
-const workspaceDir = path.dirname(outputDir);
-const reportPath = path.join(workspaceDir, `${path.basename(outputDir)}.validation.json`);
-const result = await finalizePresentation({
-  workspaceDir,
-  candidatePath,
-  finalPath,
-  pythonExecutable: runtimePython,
-  integrityValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_package_integrity.py"),
-  layoutValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_layout_geometry.py"),
-  layoutArgs: ["--expected-slide-size-emu", "12192000,6858000", "--validate-heading-fit"],
-  requiredNativeTableOwnerSlides: [],
-  fontPolicy: { basis: "design", families: [family] },
-  verifyArtifactToolImport: true,
-  receiptPath: reportPath,
-});
-const previewDir = path.join(outputDir, ".rendered-slides");
-await fs.mkdir(previewDir, { recursive: true });
-for (let index = 0; index < presentation.slides.count; index += 1) {
-  const preview = await presentation.export({ slide: presentation.slides.getItem(index), format: "png", scale: 1 });
-  await fs.writeFile(path.join(previewDir, `slide-${index + 1}.png`), Buffer.from(await preview.arrayBuffer()));
-}
-const pdfPath = path.join(outputDir, "Rave-Growth-Blueprint-SAFE-Pilot.pdf");
-await fs.writeFile(path.join(outputDir, "presentation-specification.json"), JSON.stringify(spec, null, 2) + "\n");
-console.log(JSON.stringify({ pptx: finalPath, pdf: pdfPath, validation: result, slideCount: spec.slides.length }, null, 2));
+const workspaceDir = path.dirname(outputDir); const reportPath = path.join(workspaceDir, `${path.basename(outputDir)}.validation.json`);
+const result = await finalizePresentation({ workspaceDir, candidatePath, finalPath, pythonExecutable: runtimePython, integrityValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_package_integrity.py"), layoutValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_layout_geometry.py"), layoutArgs: ["--expected-slide-size-emu", "12192000,6858000", "--validate-heading-fit"], requiredNativeTableOwnerSlides: [], fontPolicy: { basis: "design", families: [family] }, verifyArtifactToolImport: true, receiptPath: reportPath });
+const previewDir = path.join(outputDir, ".rendered-slides"); await fs.mkdir(previewDir, { recursive: true });
+for (let i = 0; i < presentation.slides.count; i += 1) { const preview = await presentation.export({ slide: presentation.slides.getItem(i), format: "png", scale: 1 }); await fs.writeFile(path.join(previewDir, `slide-${i + 1}.png`), Buffer.from(await preview.arrayBuffer())); }
+const pdfPath = path.join(outputDir, "Rave-Growth-Blueprint-SAFE-Pilot.pdf"); await fs.writeFile(path.join(outputDir, "presentation-specification.json"), JSON.stringify(spec, null, 2) + "\n"); console.log(JSON.stringify({ pptx: finalPath, pdf: pdfPath, validation: result, slideCount: spec.slides.length }, null, 2));

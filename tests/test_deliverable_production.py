@@ -10,6 +10,8 @@ from runtime.deliverable_production import (
     FakePresentationRenderer,
     FileDeliverableStore,
     build_growth_blueprint_presentation_spec,
+    build_directed_growth_blueprint_presentation_spec,
+    presentation_quality_checks,
 )
 from runtime.workflow_quality import growth_blueprint_deliverable_quality_gate
 
@@ -86,6 +88,18 @@ class DeliverableProductionTests(unittest.TestCase):
         )
         self.assertFalse(failed["passed"])
         self.assertIn("no external action taken", failed["failed_checks"])
+
+    def test_presentation_director_creates_editorial_arc_without_visible_lineage_ids(self) -> None:
+        spec = build_directed_growth_blueprint_presentation_spec(
+            artifact(), specification_id="director-1", source_blueprint_id="blueprint-rave",
+            source_blueprint_version=1, workspace_id="safe-rave", client_id="rave", title="Rave Coffee",
+        )
+        self.assertGreaterEqual(len(spec.slides), 12)
+        self.assertGreaterEqual(len({slide.layout_type for slide in spec.slides}), 8)
+        visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in spec.slides)
+        self.assertNotIn("ev-", visible)
+        self.assertTrue(presentation_quality_checks(spec)["no_visible_machine_runtime_artefacts"])
+        self.assertTrue(all(slide.evidence_refs for slide in spec.slides))
 
 
 if __name__ == "__main__":
