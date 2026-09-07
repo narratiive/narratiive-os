@@ -35,6 +35,7 @@ def _client_copy(value: Any, limit: int = 210) -> str:
     """Remove implementation identifiers from visible presentation copy."""
     import re
     text = re.sub(r"\(?\s*(?:ev_[A-Za-z0-9_-]+|artifact-[A-Za-z0-9_-]+|workflow[_-][A-Za-z0-9_-]+)(?:\s*,\s*(?:ev_|artifact-|workflow[_-])[A-Za-z0-9_-]+)*\s*\)?", "", str(value or ""))
+    text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
     text = " ".join(text.split()).strip(" ,;:")
     return _text(text, limit)
 
@@ -145,24 +146,35 @@ def build_directed_growth_blueprint_presentation_spec(
     # The sequence follows an argument: case for change -> diagnosis -> choice -> activation.
     plan = [
         ("The Narratiive Growth Blueprint", "Rave Coffee", "Strategic clarity for scalable growth.", "thesis", "growth_opportunity"),
-        ("The thesis", text("growth_opportunity"), "The strategic answer is a bounded, testable opportunity.", "thesis", "growth_opportunity"),
-        ("The commercial question", "Where could Rave's next meaningful growth come from?", "A question to resolve, not a claim to pretend is settled.", "question", "evidence_and_uncertainty"),
-        ("Four forces reshape the fight", text("market_category_diagnosis"), "Market context creates pressure; it does not diagnose the business alone.", "market_forces", "market_category_diagnosis"),
-        ("The category is becoming harder to remember", text("source_of_difference"), "Distinctiveness is the strategic variable to test.", "competitive_landscape", "source_of_difference"),
-        ("The growth constraint", text("growth_barriers"), "Growth is constrained by unresolved proof, proposition and repeat-behaviour questions.", "diagnosis", "growth_barriers"),
-        ("A useful provocation", text("growth_barriers", "implication"), "A sharper question can unlock a better decision than more activity.", "provocation", "growth_barriers"),
-        ("The audience we need to understand", text("audience"), "Outside-in evidence is directional; buyer reality still needs Discovery.", "audience", "audience"),
-        ("Where demand may pool", text("audience", "implication"), "Potential demand jobs are hypotheses, not settled segments.", "demand_pools", "audience"),
-        ("The opportunity", text("growth_opportunity"), "A specific, reversible bet grounded in the evidence available.", "opportunity", "growth_opportunity"),
-        ("The positioning choice", text("positioning"), "A position earns attention by making a choice about who it is for and against.", "positioning", "positioning"),
-        ("The territory to test", text("positioning", "implication"), "The position remains a testable hypothesis until company and customer evidence validate it.", "positioning_map", "positioning"),
-        ("The narrative platform", text("narrative"), "A coherent story turns a proposition into something easier to remember.", "narrative", "narrative"),
-        ("From story to system", text("narrative", "implication"), "Messages and channels should each do one job in the growth system.", "message_architecture", "narrative"),
-        ("The commercial mechanism", text("growth_opportunity", "implication"), "The prize is improved conversion and repeat behaviour, not activity volume.", "commercial_model", "growth_opportunity"),
-        ("Activation roles", text("activation_implications"), "Execution should test the proposition architecture, not multiply generic content.", "channel_roles", "activation_implications"),
-        ("What to do first", text("key_strategic_choices", "implication"), "Sequence reversible learning before irreversible scale.", "prioritisation", "key_strategic_choices"),
-        ("How we will know", text("evidence_and_uncertainty", "implication"), "Agree baselines, guardrails and falsification conditions before scaling.", "measurement", "evidence_and_uncertainty"),
-        ("The strategic principle", text("key_strategic_choices") or text("growth_opportunity"), "The next phase should make the proposition easier to trust, understand and choose.", "closing", "key_strategic_choices"),
+        ("The executive thesis", text("growth_opportunity"), "The answer is a choice about clarity, memory and momentum.", "thesis", "growth_opportunity"),
+        ("The commercial question", "Where could Rave's next meaningful growth come from?", "Move from marketing activity to being easier to choose.", "question", "evidence_and_uncertainty"),
+        ("Market reality", text("market_category_diagnosis"), "New category conditions change what growth must earn.", "market_forces", "market_category_diagnosis"),
+        ("Category growth dynamics", text("market_category_diagnosis", "implication"), "Name the battlefield: demand, distinction, distribution or trust.", "comparison", "market_category_diagnosis"),
+        ("Competitive landscape", text("source_of_difference"), "The category's default behaviour is visible in how brands compete.", "competitive_landscape", "source_of_difference"),
+        ("The Sea of Sameness", "The category's language and visual codes are converging.", "If every brand says quality, craft and freshness, Rave needs a more memorable reason to be chosen.", "sea_of_sameness", "source_of_difference"),
+        ("The market gap", text("growth_opportunity"), "The opportunity is a new interpretation of the category, not simply another audience.", "opportunity", "growth_opportunity"),
+        ("Growth constraint diagnosis", text("growth_barriers"), "Weak growth is not automatically a channel problem.", "diagnosis", "growth_barriers"),
+        ("The provocation", "Rave cannot scale a trust-dependent proposition while its proof remains unresolved.", "Resolve the contradiction before buying more attention.", "provocation", "growth_barriers"),
+        ("Audience reality", text("audience"), "The future growth audience may not look like today's customer.", "audience", "audience"),
+        ("Audience segments / demand pools", text("audience", "implication"), "Segment by growth opportunity, not persona fiction.", "demand_pools", "audience"),
+        ("Customer evidence board", text("audience"), "Observed signals are directional; interpretation remains bounded.", "evidence_board", "audience"),
+        ("Audience tensions / decision context", text("audience", "implication"), "Confidence is built or lost at specific moments.", "journey", "audience"),
+        ("Category entry points", text("positioning"), "The planning question is when Rave should be remembered.", "entry_points", "positioning"),
+        ("Current brand diagnosis", text("source_of_difference"), "Earn trust by being candid about what the brand currently means.", "comparison", "source_of_difference"),
+        ("The positioning problem", text("positioning"), "The gap is between what the business says and what the market hears.", "diagnosis", "positioning"),
+        ("Strategic positioning", text("positioning", "implication"), "Make the strategic anchor brutally simple and testable.", "positioning", "positioning"),
+        ("Positioning map", text("positioning"), "Use axes that expose strategic tension, not generic premium/value.", "positioning_map", "positioning"),
+        ("Narrative platform", text("narrative"), "Tension, shift and resolution join insight to activation.", "narrative", "narrative"),
+        ("Core message architecture", text("narrative", "implication"), "Messaging is a decision system, not a slogan bank.", "message_architecture", "narrative"),
+        ("Messaging territories", text("narrative"), "Each territory has a job: trust, desire, risk reduction or action.", "comparison", "narrative"),
+        ("Distinctive assets", "Distinctiveness should compound as recognisable verbal, visual and tonal codes.", "Build a small set of codes that make Rave recognisable before the logo appears.", "evidence_board", "source_of_difference"),
+        ("Attention strategy", text("activation_implications"), "The question is what people will notice, remember and connect.", "flywheel", "activation_implications"),
+        ("Channel roles", text("activation_implications", "implication"), "Every channel earns one strategic role.", "channel_roles", "activation_implications"),
+        ("Content / campaign system", text("narrative", "implication"), "Narrative becomes themes, campaigns, assets, distribution and learning.", "campaign_system", "narrative"),
+        ("Creative territories / lookbook", "Translate the strategic position into a world of warm, witty, everyday coffee.", "Use real kitchens, deadpan type, sensory detail and reassuring proof as creative routes to test.", "creative_territories", "activation_implications"),
+        ("90-day activation plan", text("key_strategic_choices", "implication"), "Prove the strategy before scaling it.", "roadmap", "key_strategic_choices"),
+        ("Measurement framework", "Measurement must capture movement in attention, confidence, choice and repeat.", "Set baselines and guardrails across attention, search, conversion, repeat and learning.", "measurement", "evidence_and_uncertainty"),
+        ("Strategic principle / closing mandate", "Make Rave easier to notice, trust, remember and choose.", "The strategy is to make the proposition easier to trust, understand and choose before scaling activity.", "closing", "key_strategic_choices"),
     ]
     slides = tuple(PresentationSlideSpec(
         slide_no=i, title=heading, takeaway=takeaway, body=body,
