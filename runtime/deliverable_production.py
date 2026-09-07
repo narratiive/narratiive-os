@@ -31,6 +31,14 @@ def _text(value: Any, limit: int = 480) -> str:
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
 
 
+def _client_copy(value: Any, limit: int = 210) -> str:
+    """Remove implementation identifiers from visible presentation copy."""
+    import re
+    text = re.sub(r"\(?\s*(?:ev_[A-Za-z0-9_-]+|artifact-[A-Za-z0-9_-]+|workflow[_-][A-Za-z0-9_-]+)(?:\s*,\s*(?:ev_|artifact-|workflow[_-])[A-Za-z0-9_-]+)*\s*\)?", "", str(value or ""))
+    text = " ".join(text.split()).strip(" ,;:")
+    return _text(text, limit)
+
+
 @dataclass(frozen=True, slots=True)
 class PresentationSlideSpec:
     slide_no: int
@@ -71,11 +79,11 @@ class PresentationSpecification:
     notes: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
-        if len(self.slides) != 30:
-            raise ValueError("Growth Blueprint presentation specification must contain 30 slides")
+        if not 12 <= len(self.slides) <= 40:
+            raise ValueError("presentation specification must contain between 12 and 40 slides")
         numbers = tuple(slide.slide_no for slide in self.slides)
-        if numbers != tuple(range(1, 31)):
-            raise ValueError("presentation slides must be ordered 1 through 30")
+        if numbers != tuple(range(1, len(self.slides) + 1)):
+            raise ValueError("presentation slides must be ordered from 1")
         if self.status != "ready_for_production":
             raise ValueError("presentation specification must be ready_for_production")
 
@@ -94,6 +102,81 @@ class PresentationSpecification:
             "strategic_source_unchanged": self.strategic_source_unchanged,
             "notes": list(self.notes),
         }
+
+
+ARCHETYPE_LIBRARY = (
+    "thesis", "provocation", "question", "market_forces", "comparison",
+    "competitive_landscape", "sea_of_sameness", "opportunity", "audience",
+    "demand_pools", "evidence_board", "journey", "entry_points", "diagnosis",
+    "positioning", "positioning_map", "narrative", "message_architecture",
+    "commercial_model", "flywheel", "channel_roles", "campaign_system",
+    "roadmap", "prioritisation", "measurement", "closing",
+)
+
+
+def _human_source_note(section: str) -> str:
+    return f"Internal provenance retained for {section}; detailed evidence remains in the review record."
+
+
+def build_directed_growth_blueprint_presentation_spec(
+    artifact: Mapping[str, Any], *, specification_id: str, source_blueprint_id: str,
+    source_blueprint_version: int, workspace_id: str, client_id: str, title: str,
+) -> PresentationSpecification:
+    """Create a director-led, variable-length story from the approved strategy.
+
+    This is deliberately an editorial plan, not a field-to-slide dump.  Raw
+    evidence identifiers stay in the immutable source and speaker notes, never
+    in visible client copy.  A frontier Presentation Director can replace this
+    rule-based director through the same normalized specification contract.
+    """
+    sections = {key: _section(artifact, key) for key in (
+        "market_category_diagnosis", "audience", "growth_barriers", "source_of_difference",
+        "positioning", "narrative", "growth_opportunity", "activation_implications",
+        "key_strategic_choices", "evidence_and_uncertainty")}
+    def text(key: str, field: str = "diagnosis", limit: int = 300) -> str:
+        value: Any = sections[key].get(field)
+        if not value and key == "key_strategic_choices":
+            raw = artifact.get(key)
+            if isinstance(raw, list):
+                value = " ".join(str(item.get("choice") or item.get("decision") or item) for item in raw[:2])
+        return _client_copy(value, min(limit, 150)) or "The approved source does not support a stronger conclusion here."
+    def refs(key: str) -> tuple[str, ...]:
+        return tuple(str(v) for v in sections[key].get("evidence_refs") or () if str(v).strip())
+    # The sequence follows an argument: case for change -> diagnosis -> choice -> activation.
+    plan = [
+        ("The Narratiive Growth Blueprint", "Rave Coffee", "Strategic clarity for scalable growth.", "thesis", "growth_opportunity"),
+        ("The thesis", text("growth_opportunity"), "The strategic answer is a bounded, testable opportunity.", "thesis", "growth_opportunity"),
+        ("The commercial question", "Where could Rave's next meaningful growth come from?", "A question to resolve, not a claim to pretend is settled.", "question", "evidence_and_uncertainty"),
+        ("Four forces reshape the fight", text("market_category_diagnosis"), "Market context creates pressure; it does not diagnose the business alone.", "market_forces", "market_category_diagnosis"),
+        ("The category is becoming harder to remember", text("source_of_difference"), "Distinctiveness is the strategic variable to test.", "competitive_landscape", "source_of_difference"),
+        ("The growth constraint", text("growth_barriers"), "Growth is constrained by unresolved proof, proposition and repeat-behaviour questions.", "diagnosis", "growth_barriers"),
+        ("A useful provocation", text("growth_barriers", "implication"), "A sharper question can unlock a better decision than more activity.", "provocation", "growth_barriers"),
+        ("The audience we need to understand", text("audience"), "Outside-in evidence is directional; buyer reality still needs Discovery.", "audience", "audience"),
+        ("Where demand may pool", text("audience", "implication"), "Potential demand jobs are hypotheses, not settled segments.", "demand_pools", "audience"),
+        ("The opportunity", text("growth_opportunity"), "A specific, reversible bet grounded in the evidence available.", "opportunity", "growth_opportunity"),
+        ("The positioning choice", text("positioning"), "A position earns attention by making a choice about who it is for and against.", "positioning", "positioning"),
+        ("The territory to test", text("positioning", "implication"), "The position remains a testable hypothesis until company and customer evidence validate it.", "positioning_map", "positioning"),
+        ("The narrative platform", text("narrative"), "A coherent story turns a proposition into something easier to remember.", "narrative", "narrative"),
+        ("From story to system", text("narrative", "implication"), "Messages and channels should each do one job in the growth system.", "message_architecture", "narrative"),
+        ("The commercial mechanism", text("growth_opportunity", "implication"), "The prize is improved conversion and repeat behaviour, not activity volume.", "commercial_model", "growth_opportunity"),
+        ("Activation roles", text("activation_implications"), "Execution should test the proposition architecture, not multiply generic content.", "channel_roles", "activation_implications"),
+        ("What to do first", text("key_strategic_choices", "implication"), "Sequence reversible learning before irreversible scale.", "prioritisation", "key_strategic_choices"),
+        ("How we will know", text("evidence_and_uncertainty", "implication"), "Agree baselines, guardrails and falsification conditions before scaling.", "measurement", "evidence_and_uncertainty"),
+        ("The strategic principle", text("key_strategic_choices") or text("growth_opportunity"), "The next phase should make the proposition easier to trust, understand and choose.", "closing", "key_strategic_choices"),
+    ]
+    slides = tuple(PresentationSlideSpec(
+        slide_no=i, title=heading, takeaway=takeaway, body=body,
+        visual_treatment=archetype, evidence_refs=refs(section),
+        source_notes=(_human_source_note(section),), layout_type=archetype,
+    ) for i, (heading, takeaway, body, archetype, section) in enumerate(plan, 1))
+    return PresentationSpecification(
+        specification_id=specification_id, source_blueprint_id=source_blueprint_id,
+        source_blueprint_version=source_blueprint_version, workspace_id=workspace_id,
+        client_id=client_id, title=title, status="ready_for_production",
+        template_source="Narratiive editorial benchmark grammar: dark ink, warm ivory, amber accent, serif hero typography, variable editorial pacing; benchmark PDF NOS-BLUEPRINT-RAVE-v1.pdf",
+        slides=slides, source_checksum=_checksum(artifact),
+        notes=("SAFE INTERNAL STRATEGIC PILOT — NOT COMMISSIONED — NO CONTACT", "Presentation Director plan; raw lineage is retained in notes and source records."),
+    )
 
 
 def _section(artifact: Mapping[str, Any], key: str) -> Mapping[str, Any]:
@@ -212,6 +295,20 @@ class VisualQAResult:
         return {"status": self.status, "checks": dict(self.checks), "findings": list(self.findings)}
 
 
+def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
+    """Deterministic editorial checks applied before human visual review."""
+    visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
+    archetypes = {s.layout_type for s in specification.slides}
+    return {
+        "variable_editorial_arc": 12 <= len(specification.slides) <= 40,
+        "layout_variety": len(archetypes) >= 8,
+        "no_visible_machine_runtime_artefacts": not any(token.lower() in visible for token in ("ev_", "artifact-", "workflow_run", "evidence / source refs")),
+        "conclusion_led_headlines": sum(bool(s.takeaway.strip()) for s in specification.slides) >= len(specification.slides) * 0.9,
+        "source_provenance_retained": all(s.source_notes for s in specification.slides),
+        "strategic_source_unchanged": specification.strategic_source_unchanged,
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class DeliverableProductionRecord:
     deliverable_id: str
@@ -322,7 +419,7 @@ class FakePresentationRenderer:
         pdf = output_dir / "blueprint.pdf"
         pptx.write_bytes(b"PK\x03\x04 synthetic pptx")
         pdf.write_bytes(b"%PDF-1.7 synthetic pdf")
-        checks = {"pptx_exists": True, "pdf_exists": True, "slide_count": len(specification.slides) == 30, "source_labels_present": True, "no_overflow_or_overlap": True}
+        checks = {"pptx_exists": True, "pdf_exists": True, "slide_count": len(specification.slides) >= 12, "source_labels_present": True, "no_overflow_or_overlap": True}
         return pptx, pdf, VisualQAResult("passed", checks)
 
 
@@ -351,8 +448,9 @@ class LocalArtifactToolPresentationRenderer:
         checks = {
             "pptx_exists": pptx.is_file() and pptx.stat().st_size > 0,
             "pdf_exists": pdf.is_file() and pdf.stat().st_size > 0,
-            "slide_count": len(tuple((output_dir / ".rendered-slides").glob("slide-*.png"))) == 30,
+            "slide_count": len(tuple((output_dir / ".rendered-slides").glob("slide-*.png"))) == len(specification.slides),
             "source_labels_present": all(slide.source_notes for slide in specification.slides),
+            **presentation_quality_checks(specification),
         }
         if validation.is_file():
             payload = json.loads(validation.read_text(encoding="utf-8"))

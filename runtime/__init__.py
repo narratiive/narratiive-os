@@ -71,6 +71,8 @@ from .deliverable_production import (
     PresentationSlideSpec,
     PresentationSpecification,
     VisualQAResult,
+    build_directed_growth_blueprint_presentation_spec,
+    presentation_quality_checks,
     build_growth_blueprint_presentation_spec,
 )
 from .command_api import CommandError, RuntimeCommandAPI, WorkspaceCommandAPI

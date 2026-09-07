@@ -13,8 +13,8 @@ def main() -> None:
     png_dir = Path(sys.argv[1])
     target = Path(sys.argv[2])
     slides = sorted(png_dir.glob("slide-*.png"), key=lambda path: int(path.stem.split("-")[-1]))
-    if len(slides) != 30:
-        raise SystemExit(f"expected 30 rendered slides, found {len(slides)}")
+    if not 12 <= len(slides) <= 40:
+        raise SystemExit(f"expected between 12 and 40 rendered slides, found {len(slides)}")
     target.parent.mkdir(parents=True, exist_ok=True)
     page_width, page_height = 1280, 720
     output = canvas.Canvas(str(target), pagesize=(page_width, page_height))
