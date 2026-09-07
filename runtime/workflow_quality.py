@@ -127,6 +127,21 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
     return _result(checks)
 
 
+def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate the presentation handoff without treating rendering as approval."""
+    qa = output.get("visual_qa")
+    qa_checks = qa.get("checks") if isinstance(qa, Mapping) else {}
+    checks = {
+        "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
+        "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
+        "review_pdf_is_present": _meaningful(output.get("review_pdf")),
+        "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed" and bool(qa_checks) and all(bool(item) for item in qa_checks.values()),
+        "approval_is_pending": str(output.get("approval_status") or "pending") == "pending",
+        "no_external_action_taken": output.get("external_action_taken") is False,
+    }
+    return _result(checks)
+
+
 def _result(checks: Mapping[str, bool]) -> dict[str, Any]:
     failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
     return {"passed": not failed, "failed_checks": failed, "checks": dict(checks)}

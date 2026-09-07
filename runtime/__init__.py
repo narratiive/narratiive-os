@@ -62,6 +62,17 @@ from .blueprint_visual_mapper import (
     VisualFrameworkRegistry,
     VisualFrameworkSelection,
 )
+from .deliverable_production import (
+    DeliverableProductionRecord,
+    DeliverableProductionService,
+    FakePresentationRenderer,
+    FileDeliverableStore,
+    LocalArtifactToolPresentationRenderer,
+    PresentationSlideSpec,
+    PresentationSpecification,
+    VisualQAResult,
+    build_growth_blueprint_presentation_spec,
+)
 from .command_api import CommandError, RuntimeCommandAPI, WorkspaceCommandAPI
 from .composition import (
     RuntimeComponents,

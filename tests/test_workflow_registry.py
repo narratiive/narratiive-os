@@ -20,6 +20,7 @@ class WorkflowRegistryTests(unittest.TestCase):
             "discovery_evidence_to_growth_sprint_proposal",
             "growth_sprint_to_research_engine",
             "research_to_growth_blueprint",
+            "growth_blueprint_deliverable_production",
             "growth_blueprint_to_campaign_world",
             "campaign_world_to_creative_bible",
             "creative_bible_to_asset_production",
@@ -90,6 +91,15 @@ class WorkflowRegistryTests(unittest.TestCase):
             },
         )
         self.assertTrue(blueprint.approval_policy.required)
+
+    def test_growth_blueprint_deliverable_is_a_separate_approval_gated_stage(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve("growth_blueprint_deliverable_production")
+        stage = definition.stages[0]
+        self.assertEqual(stage.capability, "document_generation")
+        self.assertEqual(stage.side_effect_classification, "preparation")
+        self.assertTrue(stage.approval_policy.required)
+        self.assertIn("editable_pptx", stage.output_contract.required_fields)
+        self.assertIn("review_pdf", stage.output_contract.required_fields)
 
     def test_unknown_duplicate_and_unsafe_workflows_fail_closed(self) -> None:
         registry = WorkflowRegistry()

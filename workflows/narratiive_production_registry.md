@@ -12,18 +12,19 @@ The registered sequence is:
 3. Discovery evidence → Growth Sprint proposal preparation
 4. Growth Sprint → Research Engine
 5. Research → Growth Blueprint
-6. Growth Blueprint → Campaign World
-7. Campaign World → Creative Director's Bible
-8. Creative Director's Bible → creative asset production
-9. Asset review → delivery preparation
-10. Delivery → follow-up / next action preparation
+6. Growth Blueprint → designed deliverable production
+7. Growth Blueprint → Campaign World
+8. Campaign World → Creative Director's Bible
+9. Creative Director's Bible → creative asset production
+10. Asset review → delivery preparation
+11. Delivery → follow-up / next action preparation
 
 These definitions describe internal orchestration and proposed handoffs. They do
 not claim an integration or external action occurred. All automatic handoffs are
 disabled until the execution coordinator proves the current step passed, the
 next step is authorised, a valid worker exists, and no approval gate applies.
-Client-facing drafts, meeting objectives, proposals, delivery packages, sends,
-bookings, publications, and financial consequences remain human-gated.
+Client-facing drafts, meeting objectives, proposals, designed deliverables,
+sends, bookings, publications, and financial consequences remain human-gated.
 
 The desired Blueprint Lite → Discovery journey is represented without changing
 the existing `ClientLifecycleStage` ordering, which currently includes OUTREACH
