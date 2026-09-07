@@ -220,6 +220,26 @@ RESEARCH_TO_GROWTH_BLUEPRINT = _workflow(
         quality="growth_blueprint_quality_gate",
         approval_required=True,
     ),
+    next_workflow_id="growth_blueprint_deliverable_production",
+    approval_required=True,
+)
+
+GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
+    "growth_blueprint_deliverable_production",
+    _step(
+        "produce_growth_blueprint_deliverable",
+        capability="document_generation",
+        inputs=("quality_accepted_growth_blueprint", "evidence_lineage", "blueprint_canon"),
+        outputs=(
+            "presentation_specification",
+            "editable_pptx",
+            "review_pdf",
+            "visual_qa",
+            "proposed_client_release",
+        ),
+        quality="growth_blueprint_deliverable_quality_gate",
+        approval_required=True,
+    ),
     next_workflow_id="growth_blueprint_to_campaign_world",
     approval_required=True,
 )
@@ -308,6 +328,7 @@ NARRATIIVE_PRODUCTION_WORKFLOWS = (
     DISCOVERY_EVIDENCE_TO_GROWTH_SPRINT_PROPOSAL,
     GROWTH_SPRINT_TO_RESEARCH_ENGINE,
     RESEARCH_TO_GROWTH_BLUEPRINT,
+    GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION,
     GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD,
     CAMPAIGN_WORLD_TO_CREATIVE_BIBLE,
     CREATIVE_BIBLE_TO_ASSET_PRODUCTION,

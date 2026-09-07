@@ -27,6 +27,7 @@ from runtime.workflow_registry import build_narratiive_workflow_registry
 from runtime.workflow_quality import (
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
+    growth_blueprint_deliverable_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
     validate_operational_inputs,
@@ -215,6 +216,7 @@ def build_tony_workflow_runtime(
         "growth_sprint_proposal_quality_gate": growth_sprint_proposal_quality_gate,
         "research_evidence_quality_gate": research_evidence_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
+        "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
     coordinator = WorkflowExecutionCoordinator(
