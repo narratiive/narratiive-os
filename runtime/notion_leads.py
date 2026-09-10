@@ -7,6 +7,7 @@ from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from dataclasses import replace
 from runtime.inbound_leads import (
     CANONICAL_NOTION_LEADS_DATA_SOURCE_ID,
     FileInboundLeadStore,
@@ -100,7 +101,18 @@ class NotionLeadSource:
                 f"Notion leads query exceeded the {self.config.max_pages}-page safety limit"
             )
 
-        deduped = {lead.lead_id: lead for lead in results}
+        # Notion owns business fields; attention/disposition is a Narratiive
+        # overlay and must survive every authoritative refresh.
+        prior = {lead.lead_id: lead for lead in (self.cache.read() if self.cache is not None else ())}
+        merged = []
+        for lead in results:
+            old = prior.get(lead.lead_id)
+            if old is not None and old.disposition != "active":
+                lead = replace(lead, disposition=old.disposition, disposition_reason=old.disposition_reason,
+                               disposition_actor=old.disposition_actor, disposition_at=old.disposition_at,
+                               disposition_evidence=old.disposition_evidence)
+            merged.append(lead)
+        deduped = {lead.lead_id: lead for lead in merged}
         snapshot = tuple(
             sorted(
                 deduped.values(),

@@ -116,6 +116,17 @@ class NotionLeadSourceTests(unittest.TestCase):
             self.assertEqual(source.read(), ())
             self.assertEqual(cache.read(), ())
 
+    def test_notion_refresh_preserves_narratiive_attention_overlay(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            cache = FileInboundLeadStore(Path(tmp) / "leads.json")
+            cache.upsert(InboundLead("page-1", "Original", company="Old", disposition="archived", disposition_reason="SAFE test", disposition_actor="test", disposition_at="2026-01-01", disposition_evidence=("audit:1",)))
+            payload = {"object":"list", "has_more":False, "next_cursor":None, "results":[{"id":"page-1", "created_time":"2026-02-01", "properties":{"Contact":{"title":[{"plain_text":"Updated"}]},"Company":{"rich_text":[{"plain_text":"New Co"}]},"Email":{"email":"u@example.com"}}}]}
+            source = NotionLeadSource(NotionLeadConfig(token="secret"), cache=cache, opener=lambda request, timeout: FakeResponse(payload))
+            lead = source.read()[0]
+            self.assertEqual(lead.company, "New Co")
+            self.assertEqual(lead.disposition, "archived")
+            self.assertEqual(lead.disposition_evidence, ("audit:1",))
+
     def test_incomplete_notion_snapshot_does_not_replace_cache(self):
         with tempfile.TemporaryDirectory() as tmp:
             cache = FileInboundLeadStore(Path(tmp) / "leads.json")
