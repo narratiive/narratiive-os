@@ -71,6 +71,11 @@ class InboundLead:
     notion_url: str = ""
     notes: str = ""
     ai_summary: str = ""
+    disposition: str = "active"
+    disposition_reason: str = ""
+    disposition_actor: str = ""
+    disposition_at: str = ""
+    disposition_evidence: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.lead_id.strip():
@@ -108,6 +113,12 @@ class InboundLead:
         lead_temperature = choose("lead_temperature", "Lead Temperature")
         recommended_next_action = choose("recommended_next_action", "Recommended Next Action")
         ai_summary = choose("ai_summary", "AI Summary")
+        disposition = choose("disposition", "Disposition", default="active") or "active"
+        disposition_reason = choose("disposition_reason", "Disposition Reason")
+        disposition_actor = choose("disposition_actor", "Disposition Actor")
+        disposition_at = choose("disposition_at", "Disposition At")
+        raw_evidence = value.get("disposition_evidence", ())
+        disposition_evidence = tuple(str(item) for item in raw_evidence) if isinstance(raw_evidence, (list, tuple)) else ()
         created_at = choose("created_at", "createdTime", "created_time")
 
         if source.casefold() in {"tally", "growth diagnostic", "website"}:
@@ -126,6 +137,8 @@ class InboundLead:
             lead_temperature=lead_temperature.strip(),
             recommended_next_action=(recommended_next_action.strip() or "Review the lead and decide the next commercial action."),
             created_at=created_at.strip(), notion_url=notion_url.strip(), notes=notes.strip(), ai_summary=ai_summary.strip(),
+            disposition=disposition.strip().casefold(), disposition_reason=disposition_reason.strip(),
+            disposition_actor=disposition_actor.strip(), disposition_at=disposition_at.strip(), disposition_evidence=disposition_evidence,
         )
 
     def to_dict(self) -> dict[str, str]:
