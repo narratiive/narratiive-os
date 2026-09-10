@@ -45,7 +45,7 @@ class AgencyStateProjector:
         for lead in leads:
             # Completed leads remain in Notion history but should not clutter the
             # daily commercial brief. Active/new/waiting leads stay visible.
-            if lead.status.casefold() != "complete":
+            if lead.status.casefold() != "complete" and lead.disposition not in {"suppressed", "test", "archived"}:
                 items.append(lead.to_agency_item())
 
         for index, approval in enumerate(snapshot.approvals_required):

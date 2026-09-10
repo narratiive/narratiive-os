@@ -16,6 +16,7 @@ from openclaw.tony_http_bridge import (
 )
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.lead_attention import LeadAttentionService
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
@@ -68,6 +69,7 @@ class LeadAwareTonyApplication:
         blueprint_lite_service: TonyInboundBlueprintLiteService | None = None,
         workflow_command_service: TonyWorkflowCommandService | None = None,
         authorised_principal_id: str = "",
+        attention_service: LeadAttentionService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -75,6 +77,7 @@ class LeadAwareTonyApplication:
         self.blueprint_lite_service = blueprint_lite_service
         self.workflow_command_service = workflow_command_service
         self.authorised_principal_id = authorised_principal_id.strip()
+        self.attention_service = attention_service
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -88,6 +91,8 @@ class LeadAwareTonyApplication:
             return self._telegram_inbound(environ, start_response)
         if method == "POST" and path == "/workflow/control":
             return self._workflow_control(environ, start_response)
+        if method == "POST" and path == "/attention/control":
+            return self._attention_control(environ, start_response)
         return self.base(environ, start_response)
 
     @staticmethod
@@ -210,6 +215,23 @@ class LeadAwareTonyApplication:
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_workflow_control", "message": str(exc)}})
 
+    def _attention_control(self, environ, start_response):
+        denied = self._authorize(environ, start_response)
+        if denied is not None: return denied
+        if self.attention_service is None: return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "attention_unavailable", "message": "Attention control is not configured"}})
+        try:
+            request = self._read_json(environ); operation = str(request.get("operation") or "").casefold().replace("-", "_"); actor = str(request.get("actor") or "openclaw"); reason = str(request.get("reason") or "")
+            if operation in {"show", "list"}: result = {"ok": True, "leads": [x.to_dict() for x in self.attention_service.list(str(request.get("scope") or "visible"))], "external_action_taken": False}
+            elif operation in {"archive_safe_tests", "suppress_safe_tests"}: result = self.attention_service.batch_safe("archived" if operation.startswith("archive") else "suppressed", reason, actor)
+            else:
+                reference = str(request.get("reference") or "").strip()
+                if not reference: raise ValueError("reference is required")
+                mapping = {"ignore": "suppressed", "suppress": "suppressed", "mark_test": "test", "archive": "archived", "restore": "active", "watch": "watching"}
+                result = self.attention_service.mutate(reference, mapping.get(operation, operation), reason, actor)
+            return self._respond(start_response, HTTPStatus.OK, {**result, "reply": "Attention state updated." if result.get("ok") else "No attention state changed."})
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_attention_control", "message": str(exc)}})
+
     def _ingest(self, environ, start_response):
         denied = self._authorize(environ, start_response)
         if denied is not None:
@@ -290,6 +312,7 @@ def build_app() -> LeadAwareTonyApplication:
     workspace_id = os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip() or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip() or "narratiive"
     lead_path = Path(os.getenv("TONY_INBOUND_LEADS_PATH", str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"))).resolve()
     lead_store = FileInboundLeadStore(lead_path)
+    attention_service = LeadAttentionService(lead_store, Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))))
     authoritative_lead_loader = build_authoritative_lead_loader(lead_store)
     executive_service = TonyExecutiveCommandService(app.command_service, brief_archive=app.brief_archive, friday_record_loader=lambda: load_friday_review_records(records_root), workspace_id=workspace_id, inbound_lead_loader=authoritative_lead_loader)
     capability_service = TonyCapabilityCommandService(executive_service)
@@ -371,6 +394,7 @@ def build_app() -> LeadAwareTonyApplication:
             if os.getenv("TONY_TELEGRAM_CHAT_ID", "").strip()
             else ""
         ),
+        attention_service=attention_service,
     )
 
 

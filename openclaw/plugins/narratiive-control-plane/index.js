@@ -46,6 +46,12 @@ const WORKFLOW_SCHEMA = {
   rationale: { type: "string", minLength: 1, maxLength: 1000 },
   inputs: { type: "object", additionalProperties: true },
 };
+const ATTENTION_SCHEMA = {
+  operation: { type: "string", enum: ["ignore", "suppress", "mark_test", "archive", "restore", "watch", "show", "list", "archive_safe_tests", "suppress_safe_tests"] },
+  reference: { type: "string", minLength: 1, maxLength: 500 },
+  reason: { type: "string", maxLength: 1000 },
+  scope: { type: "string", enum: ["visible", "suppressed", "test", "archived", "all"] },
+};
 
 function commandForStateRead(params) {
   const view = String(params?.view || "").toLowerCase();
@@ -224,6 +230,15 @@ function workflowControlTool() {
   };
 }
 
+function attentionControlTool() {
+  return { name: "narratiive_manage_attention", description: "Manage reversible internal lead attention state. Use for explicit SAFE/test suppression, archive, restore and listing; ambiguous references fail safely. This never contacts anyone or performs an external action.", parameters: schema(ATTENTION_SCHEMA, ["operation"]), async execute(_id, params) {
+    try {
+      const url = controlPlaneUrl().replace(/\/control-plane$/, "/attention/control"); const token = resolveBridgeToken(); const headers = { "content-type": "application/json" }; if (token) headers.authorization = `Bearer ${token}`;
+      const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(params || {}), signal: AbortSignal.timeout(controlPlaneTimeoutMs()) }); const payload = await response.json(); return renderToolResult(payload);
+    } catch (error) { return renderToolResult({ ok: false, error: String(error?.message || error), external_action_taken: false }); }
+  };
+}
+
 export default definePluginEntry({
   id: "narratiive-control-plane",
   name: "Narratiive Control Plane",
@@ -246,5 +261,6 @@ export default definePluginEntry({
     api.registerTool(safeReadTool());
     api.registerTool(approvalTool());
     api.registerTool(workflowControlTool());
+    api.registerTool(attentionControlTool());
   },
 });
