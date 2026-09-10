@@ -6,7 +6,8 @@ import shlex
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
-from wsgiref.simple_server import make_server
+from socketserver import ThreadingMixIn
+from wsgiref.simple_server import WSGIServer, make_server
 
 from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayError, build_gateway
 from openclaw.tony_http_bridge import (
@@ -54,6 +55,10 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+
+class ThreadingTonyServer(ThreadingMixIn, WSGIServer):
+    daemon_threads = True
 _REQUIRED_FRIDAY_FIELDS = {"record_id", "occurred_at", "record_type", "summary", "evidence", "workspace_id"}
 
 
@@ -401,7 +406,7 @@ def build_app() -> LeadAwareTonyApplication:
 def main() -> None:
     host = os.getenv("TONY_BRIDGE_HOST", "127.0.0.1")
     port = int(os.getenv("TONY_BRIDGE_PORT", "8790"))
-    with make_server(host, port, build_app()) as server:
+    with make_server(host, port, build_app(), server_class=ThreadingTonyServer) as server:
         print(f"Tony bridge listening on http://{host}:{port}")
         server.serve_forever()
 
