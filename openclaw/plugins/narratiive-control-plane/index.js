@@ -236,7 +236,7 @@ function attentionControlTool() {
       const url = controlPlaneUrl().replace(/\/control-plane$/, "/attention/control"); const token = resolveBridgeToken(); const headers = { "content-type": "application/json" }; if (token) headers.authorization = `Bearer ${token}`;
       const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(params || {}), signal: AbortSignal.timeout(controlPlaneTimeoutMs()) }); const payload = await response.json(); return renderToolResult(payload);
     } catch (error) { return renderToolResult({ ok: false, error: String(error?.message || error), external_action_taken: false }); }
-  };
+  } };
 }
 
 export default definePluginEntry({
