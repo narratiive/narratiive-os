@@ -5,6 +5,7 @@ from typing import Any, Iterable, Mapping
 
 from runtime.mission_control import WorkstreamStatus
 from runtime.models import WorkflowState
+from runtime.tony_internal_review_delivery import workflow_approval_token
 
 
 @dataclass(frozen=True, slots=True)
@@ -64,6 +65,7 @@ def workflow_state_summary(state: WorkflowState) -> dict[str, Any]:
         "quality_passed": quality_result.get("passed") if quality_result else None,
         "approval_status": state.approval_status,
         "approval_required": state.approval_status == "pending",
+        "approval_token": workflow_approval_token(state),
         "blocker": state.blocker,
         "proposed_next_action": state.current_proposed_next_action(),
         "latest_artefact_id": latest_artifact.artifact_id if latest_artifact else None,

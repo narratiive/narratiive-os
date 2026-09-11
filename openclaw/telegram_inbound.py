@@ -11,6 +11,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from openclaw.telegram_outbound import TelegramConfig, TelegramDeliveryError, TelegramSender
+from openclaw.telegram_output_policy import protect_telegram_output
 from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayConfig, TonyAgentGatewayError
 
 
@@ -122,7 +123,7 @@ class TelegramInboundService:
     def _execute_tony(self, text: str) -> str:
         if not TonyAgentGateway.is_system_command(text):
             try:
-                return self._sanitize_user_reply(self.agent_gateway.converse(text))[:3500]
+                return protect_telegram_output(self._sanitize_user_reply(self.agent_gateway.converse(text)))
             except TonyAgentGatewayError as exc:
                 raise TelegramInboundError(str(exc)) from exc
         return self._execute_legacy_command(text)
@@ -157,7 +158,7 @@ class TelegramInboundService:
         if not reply:
             error = payload.get("error") if isinstance(payload.get("error"), dict) else {}
             reply = str(error.get("message") or "Tony couldn't complete that request reliably.").strip()
-        return self._sanitize_user_reply(reply)[:3500]
+        return protect_telegram_output(self._sanitize_user_reply(reply))
 
     @staticmethod
     def _sanitize_user_reply(reply: str) -> str:

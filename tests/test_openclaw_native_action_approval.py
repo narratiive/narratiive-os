@@ -86,7 +86,7 @@ class OpenClawNativeActionApprovalTests(unittest.TestCase):
                 self.assertTrue(result["required"])
                 self.assertEqual(result["requireApproval"]["severity"], "critical")
 
-    def test_workflow_decisions_use_single_use_native_approval(self):
+    def test_telegram_workflow_decisions_use_artifact_token_while_notion_keeps_native_approval(self):
         approval = self._node_json(
             "buildWorkflowApprovalRequirement",
             {
@@ -107,12 +107,16 @@ class OpenClawNativeActionApprovalTests(unittest.TestCase):
                 "rationale": "Resolve one evidence gap",
             },
         )
+        notion = self._node_json(
+            "buildWorkflowApprovalRequirement",
+            {"operation": "sync_notion", "reference": "SAFE Company", "rationale": "Project approved state"},
+        )
 
-        self.assertTrue(approval["required"])
-        self.assertEqual(approval["requireApproval"]["allowedDecisions"], ["allow-once", "deny"])
-        self.assertIn("SAFE Company", approval["requireApproval"]["description"])
+        self.assertFalse(approval["required"])
         self.assertFalse(read["required"])
         self.assertFalse(research["required"])
+        self.assertTrue(notion["required"])
+        self.assertEqual(notion["requireApproval"]["allowedDecisions"], ["allow-once", "deny"])
 
     def test_plugin_uses_before_tool_call_native_approval_hook(self):
         source = (PLUGIN / "index.js").read_text(encoding="utf-8")

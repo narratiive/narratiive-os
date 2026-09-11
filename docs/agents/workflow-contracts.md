@@ -192,6 +192,22 @@ They require:
 Agents may prepare drafts and approval packages. They may not impersonate the
 human decision.
 
+Substantial internal review artefacts are delivered separately from the
+conversational control surface. The canonical workflow artefact remains the
+source of truth; an email attachment or link is a review copy, not a second
+authoritative store. `hello@narratiive.com` is the sole pre-authorised internal
+review recipient. Delivery to that exact Narratiive-owned address does not need
+a second client-send approval, but it must be idempotent and backed by verified
+Gmail message evidence recorded against the run. Every other recipient remains
+subject to the existing external-action approval contract.
+
+Conversational workflow decisions bind to the exact current run, gate and
+artefact checksum/version. The control plane issues an opaque approval token for
+that snapshot. An authenticated Matt Telegram turn may supply the judgement and
+rationale through OpenClaw without a second UI approval, but the token must
+match. Ambiguity, a missing token, or a token from an earlier revision fails
+closed. Approval history remains append-only.
+
 ## Existing tool and workflow governance
 
 This section governs only tools and handoffs already present in code or
@@ -254,6 +270,15 @@ boundary. Telegram slash commands use deterministic Tony services; managerial
 actions continue through `TonyOrchestrationAdapter` and the public gateway.
 `openclaw/tony_live_bridge.py` composes the live executive and capability
 services without expanding their authority.
+
+Telegram carries concise conversation, summaries, alerts and approval
+requests. Blueprint Lite, substantial Discovery synthesis, Growth Sprint
+proposal, Strategy Thesis, Growth Blueprint, Campaign World, Creative
+Director's Bible and substantial research content are artefacts and must not be
+dumped into Telegram. Semantic artefact routing is primary; the existing 3,500
+character response envelope is only a final transport safeguard. Tony may say
+the review email was sent only after the Gmail adapter returns a verified
+message identifier and the workflow records the receipt.
 
 The execution journal is append-only and hash-chained. Workspace state events
 are append-only and replayable, while atomic snapshots are derived current

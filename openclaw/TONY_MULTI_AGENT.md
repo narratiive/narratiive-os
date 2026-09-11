@@ -39,6 +39,12 @@ Tony must not use `Narratiive Shift` or `Opportunity Card` as the external name 
 
 If an asynchronous webhook has merely been accepted or queued, Tony may say it is queued or in progress. Tony may say an email, Drive artefact, Calendar event, Notion update or other external consequence completed only when decision-grade execution evidence exists.
 
+## Internal review delivery and Telegram gates
+
+Telegram carries conversation, concise executive summaries and gate decisions. It must not carry full substantial review artefacts. At a persisted quality or approval gate, Tony routes the exact immutable artefact through Narratiive OS to `hello@narratiive.com`, the sole pre-authorised Narratiive-owned internal review recipient. The existing Gmail adapter, stable artefact-scoped idempotency key and returned message identifier provide delivery evidence. This narrow exception does not authorise any other recipient, client-facing delivery or consequential external action.
+
+Matt may approve, reject or request revision in ordinary Telegram language. OpenClaw interprets the intent and invokes the authoritative workflow decision with the current gate's artefact-bound approval token. Ambiguous intent must result in a clarification question. A revised artefact changes the token, so an earlier decision cannot approve the new version. Email is a review-copy transport only; the OS artefact and append-only workflow history remain canonical.
+
 ## Conversational acceptance
 
 Tony must understand ordinary language without phrase-specific Python routing, including typos and contextual follow-ups. The target conversation includes: `Morning Tony, anything important?`, `whta shoudl I focus on?`, a broad question about what is happening across Narratiive and the specialist team, `what did they say?`, `sort that out`, `use Thursday`, `send it`, `did it go?`, and natural questions about the status of Research, Strategy, Creative Director, Production or Operations. Broad status answers combine Narratiive executive/open-work/lead evidence with configured specialist availability and live child-job status before asking Matt for missing context.

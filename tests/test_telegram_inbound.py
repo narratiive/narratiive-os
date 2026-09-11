@@ -215,6 +215,7 @@ class TelegramInboundTests(unittest.TestCase):
             DummyLeadStore(),
             agent_gateway=FakeAgentGateway(),
             workflow_command_service=workflows,
+            authorised_principal_id="telegram:123",
         )
 
         def call(body):
@@ -249,21 +250,23 @@ class TelegramInboundTests(unittest.TestCase):
             "operation": "approve",
             "reference": "SAFE Company",
             "rationale": "Reviewed internal work",
-            "approval_granted": False,
+            "inputs": {"approval_token": "a" * 64},
+            "source": "untrusted",
         })
         call({
             "operation": "approve",
             "reference": "SAFE Company",
             "rationale": "Reviewed internal work",
-            "approval_granted": True,
+            "inputs": {"approval_token": "a" * 64},
+            "source": "openclaw_telegram_workflow_tool",
         })
 
         self.assertEqual(workflows.calls[0]["inputs"]["discovery_evidence"]["notes"], "SAFE evidence")
         self.assertIn("SAFE Director", workflows.calls[0]["text"])
         self.assertIn("/research", workflows.calls[1]["text"])
         self.assertEqual(workflows.calls[1]["inputs"]["focus"]["kind"], "evidence_gap")
-        self.assertEqual(workflows.calls[2]["principal_id"], "")
-        self.assertEqual(workflows.calls[3]["principal_id"], "openclaw:native-approval")
+        self.assertEqual(len(workflows.calls), 3)
+        self.assertEqual(workflows.calls[2]["principal_id"], "telegram:123")
 
 
 if __name__ == "__main__":

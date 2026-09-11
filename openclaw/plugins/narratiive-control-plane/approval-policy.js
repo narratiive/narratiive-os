@@ -62,7 +62,10 @@ export function approvedActionResult(params = {}) {
 
 export function buildWorkflowApprovalRequirement(params = {}) {
   const operation = String(params.operation || "").toLowerCase();
-  if (!new Set(["approve", "reject", "request_revision", "sync_notion"]).has(operation)) {
+  // Human workflow judgements arrive as authenticated natural Telegram turns and
+  // are bound by the control plane to the exact current run/gate/artefact token.
+  // Only a separate external Notion write still needs OpenClaw's native UI gate.
+  if (operation !== "sync_notion") {
     return { required: false };
   }
   const reference = String(params.reference || "workflow").slice(0, 160);
