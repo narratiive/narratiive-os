@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Mapping
@@ -88,6 +89,8 @@ class TonyAgentGatewayConfig:
     user_id: str = ""
     timeout_seconds: float = 120.0
     work_timeout_seconds: float = 1800.0
+    work_poll_seconds: float = 1.0
+    state_dir: Path = Path.home() / ".openclaw"
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "TonyAgentGatewayConfig":
@@ -104,6 +107,8 @@ class TonyAgentGatewayConfig:
             user_id=str(env.get("TONY_OPENCLAW_USER_ID", "")).strip() or session_key,
             timeout_seconds=float(env.get("TONY_OPENCLAW_TIMEOUT_SECONDS", "120")),
             work_timeout_seconds=float(env.get("TONY_OPENCLAW_WORK_TIMEOUT_SECONDS", "1800")),
+            work_poll_seconds=float(env.get("TONY_OPENCLAW_WORK_POLL_SECONDS", "1")),
+            state_dir=openclaw_config_path(env).parent,
         )
 
 
@@ -141,12 +146,97 @@ class TonyAgentGateway:
         if not safe_work_id:
             raise TonyAgentGatewayError("work_id is required")
         session_key = f"{self.config.session_key}:work:{safe_work_id}"
-        return self._converse(
+        recovered = self._completed_yielded_reply(session_key)
+        if recovered:
+            return recovered
+        reply = self._converse(
             text,
             user_id=session_key,
             session_key=session_key,
             timeout_seconds=self.config.work_timeout_seconds,
         )
+        return self._await_yielded_reply(session_key, fallback=reply)
+
+    def _await_yielded_reply(self, session_key: str, *, fallback: str) -> str:
+        """Keep yielded specialist work open until Tony's resumed final turn.
+
+        OpenClaw's responses endpoint returns when ``sessions_yield`` releases the
+        initial run. The specialist completion then resumes Tony in the same
+        session. Treating the first HTTP response as final loses that later turn,
+        so the durable worker observes the session transcript until Tony has
+        reviewed the pushed result and produced a normal final response.
+        """
+        deadline = time.monotonic() + self.config.work_timeout_seconds
+        detection_deadline = min(deadline, time.monotonic() + 2.0)
+        while time.monotonic() < deadline:
+            yielded, completed = self._yielded_work_state(session_key)
+            if completed:
+                return completed
+            if not yielded and time.monotonic() >= detection_deadline:
+                return fallback
+            time.sleep(max(0.01, self.config.work_poll_seconds))
+        raise TonyAgentGatewayError("OpenClaw yielded work did not produce a final Tony response before the worker deadline")
+
+    def _completed_yielded_reply(self, session_key: str) -> str:
+        """Recover a completed pushed result without starting duplicate work."""
+        _yielded, completed = self._yielded_work_state(session_key)
+        return completed
+
+    def _yielded_work_state(self, session_key: str) -> tuple[bool, str]:
+        transcript = self._session_transcript(session_key)
+        if transcript is None:
+            return False, ""
+        yielded_at = ""
+        completed = ""
+        try:
+            lines = transcript.read_text(encoding="utf-8").splitlines()
+        except (OSError, UnicodeDecodeError):
+            return False, ""
+        for line in lines:
+            try:
+                entry = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            message = entry.get("message")
+            if not isinstance(message, Mapping):
+                continue
+            timestamp = str(entry.get("timestamp") or "")
+            content = message.get("content")
+            if not isinstance(content, list):
+                continue
+            if message.get("role") == "assistant":
+                for part in content:
+                    if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "sessions_yield":
+                        yielded_at = timestamp
+                        completed = ""
+                if yielded_at and timestamp > yielded_at and message.get("stopReason") == "stop":
+                    texts = [
+                        str(part.get("text") or "").strip()
+                        for part in content
+                        if isinstance(part, Mapping) and part.get("type") == "text"
+                    ]
+                    text = "\n".join(item for item in texts if item).strip()
+                    if text and text != "NO_REPLY":
+                        completed = text
+        return bool(yielded_at), completed
+
+    def _session_transcript(self, session_key: str) -> Path | None:
+        sessions_dir = self.config.state_dir / "agents" / self.config.agent_id / "sessions"
+        index_path = sessions_dir / "sessions.json"
+        try:
+            index = json.loads(index_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None
+        if not isinstance(index, Mapping):
+            return None
+        record = index.get(f"agent:{self.config.agent_id}:{session_key}")
+        if not isinstance(record, Mapping):
+            return None
+        explicit = str(record.get("sessionFile") or "").strip()
+        if explicit:
+            return Path(explicit).expanduser()
+        session_id = str(record.get("sessionId") or "").strip()
+        return sessions_dir / f"{session_id}.jsonl" if session_id else None
 
     def _converse(
         self,

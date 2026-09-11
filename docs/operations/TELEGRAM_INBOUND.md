@@ -42,6 +42,13 @@ generation and Telegram delivery independently. Ordinary conversation remains
 synchronous. This does not grant any external-action authority: consequential
 actions continue through the existing approval-gated command boundary.
 
+When Tony delegates and calls OpenClaw's `sessions_yield`, the initial OpenClaw
+HTTP response is not a completed work result. The worker keeps the durable run
+open and observes the correlated Tony session until the pushed specialist
+completion has been reviewed and Tony produces a normal final turn. On restart,
+an already-resumed final turn is recovered from that same session before any new
+model request is made, preventing duplicate specialist execution.
+
 ## Durable macOS startup
 
 Install the n8n and ngrok LaunchAgents with the canonical repository Python.

@@ -52,6 +52,7 @@
       {
         "id": "research",
         "name": "Research Agent",
+        "model": "anthropic/claude-sonnet-4-6",
         "workspace": "~/.openclaw/workspace-research",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
@@ -62,6 +63,7 @@
       {
         "id": "strategy",
         "name": "Strategy Agent",
+        "model": "anthropic/claude-sonnet-4-6",
         "workspace": "~/.openclaw/workspace-strategy",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
