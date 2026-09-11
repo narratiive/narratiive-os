@@ -42,6 +42,17 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
             True,
         ),
         AgentSpec(
+            "com.narratiive.tony-conversation-worker",
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(repo_root / "scripts" / "run_tony_conversation_worker.py"),
+            ),
+            True,
+        ),
+        AgentSpec(
             "com.narratiive.service-supervisor",
             (str(python_path), str(launcher), str(env_file), str(python_path), str(repo_root / "scripts" / "service_supervisor.py")),
             False,
@@ -179,6 +190,8 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
         raise FileNotFoundError("runtime/server.py not found in repository root")
     if not (repo_root / "openclaw" / "tony_live_bridge.py").is_file():
         raise FileNotFoundError("Tony live bridge not found")
+    if not (repo_root / "scripts" / "run_tony_conversation_worker.py").is_file():
+        raise FileNotFoundError("Tony conversation worker not found")
     if not (repo_root / "scripts" / "run_proactive_brief.py").is_file():
         raise FileNotFoundError("proactive brief runner not found")
     if not python_path.is_file():
@@ -218,6 +231,7 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
         "com.narratiive.proactive-watch",
         "com.narratiive.service-supervisor",
         "com.narratiive.tony-http-bridge",
+        "com.narratiive.tony-conversation-worker",
         "com.narratiive.runtime",
         *LEGACY_AGENT_LABELS,
     ):

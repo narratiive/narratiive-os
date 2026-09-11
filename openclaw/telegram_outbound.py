@@ -63,7 +63,7 @@ class TelegramSender:
     def __init__(self, config: TelegramConfig) -> None:
         self.config = config
 
-    def send(self, chat_id: str, text: str) -> None:
+    def send(self, chat_id: str, text: str) -> dict[str, Any]:
         if not chat_id.strip():
             raise TelegramDeliveryError("chat_id is required")
         if not text.strip():
@@ -92,3 +92,13 @@ class TelegramSender:
             raise TelegramDeliveryError("Telegram API returned an invalid response") from exc
         if not isinstance(payload, dict) or not payload.get("ok"):
             raise TelegramDeliveryError(f"Telegram API rejected the message: {payload}")
+        result = payload.get("result")
+        if not isinstance(result, dict):
+            return {}
+        chat = result.get("chat") if isinstance(result.get("chat"), dict) else {}
+        return {
+            "provider": "telegram",
+            "message_id": str(result.get("message_id") or ""),
+            "chat_id": str(chat.get("id") or chat_id),
+            "date": result.get("date") if isinstance(result.get("date"), int) else None,
+        }

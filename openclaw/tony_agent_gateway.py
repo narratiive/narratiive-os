@@ -87,6 +87,7 @@ class TonyAgentGatewayConfig:
     session_key: str = "narratiive:tony:telegram"
     user_id: str = ""
     timeout_seconds: float = 120.0
+    work_timeout_seconds: float = 1800.0
 
     @classmethod
     def from_env(cls, env: Mapping[str, str]) -> "TonyAgentGatewayConfig":
@@ -102,6 +103,7 @@ class TonyAgentGatewayConfig:
             session_key=session_key,
             user_id=str(env.get("TONY_OPENCLAW_USER_ID", "")).strip() or session_key,
             timeout_seconds=float(env.get("TONY_OPENCLAW_TIMEOUT_SECONDS", "120")),
+            work_timeout_seconds=float(env.get("TONY_OPENCLAW_WORK_TIMEOUT_SECONDS", "1800")),
         )
 
 
@@ -131,45 +133,92 @@ class TonyAgentGateway:
         return text.lstrip().startswith("/")
 
     def converse(self, text: str) -> str:
+        return self._converse(text, user_id=self.stable_user_id, session_key=self.config.session_key)
+
+    def converse_for_work(self, text: str, work_id: str) -> str:
+        """Run durable commissioned work in an isolated, correlated agent session."""
+        safe_work_id = str(work_id).strip()
+        if not safe_work_id:
+            raise TonyAgentGatewayError("work_id is required")
+        session_key = f"{self.config.session_key}:work:{safe_work_id}"
+        return self._converse(
+            text,
+            user_id=session_key,
+            session_key=session_key,
+            timeout_seconds=self.config.work_timeout_seconds,
+        )
+
+    def _converse(
+        self,
+        text: str,
+        *,
+        user_id: str,
+        session_key: str,
+        timeout_seconds: float | None = None,
+    ) -> str:
         message = str(text).strip()
         if not message:
             raise TonyAgentGatewayError("message is required")
         if self.is_system_command(message):
             raise TonyAgentGatewayError("slash commands belong to the deterministic command surface")
-        if not self.stable_user_id:
+        if not user_id.strip() or not session_key.strip():
             raise TonyAgentGatewayError("a stable OpenClaw user/session key is required")
 
         request_body: dict[str, Any] = {
             "model": f"openclaw/{self.config.agent_id}",
-            "user": self.stable_user_id,
+            "user": user_id,
             "input": message,
         }
 
-        payload = self._post_openclaw(request_body)
+        payload = self._post_openclaw(
+            request_body,
+            session_key=session_key,
+            timeout_seconds=timeout_seconds,
+        )
         reply = self._extract_text(payload)
         if not reply:
             raise TonyAgentGatewayError("OpenClaw returned no conversational response")
         return reply
 
-    def _post_openclaw(self, body: dict[str, Any]) -> dict[str, Any]:
+    def _post_openclaw(
+        self,
+        body: dict[str, Any],
+        *,
+        session_key: str | None = None,
+        timeout_seconds: float | None = None,
+    ) -> dict[str, Any]:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
             "x-openclaw-agent-id": self.config.agent_id,
-            "x-openclaw-session-key": self.config.session_key,
+            "x-openclaw-session-key": session_key or self.config.session_key,
             "x-openclaw-message-channel": "telegram",
         }
         if self.config.gateway_token:
             headers["Authorization"] = f"Bearer {self.config.gateway_token}"
-        payload = self._post_json(self.config.responses_url, body, headers=headers, label="OpenClaw")
+        payload = self._post_json(
+            self.config.responses_url,
+            body,
+            headers=headers,
+            label="OpenClaw",
+            timeout_seconds=timeout_seconds,
+        )
         if not isinstance(payload, dict):
             raise TonyAgentGatewayError("OpenClaw returned an invalid response object")
         return payload
 
-    def _post_json(self, url: str, body: dict[str, Any], *, headers: dict[str, str], label: str) -> Any:
+    def _post_json(
+        self,
+        url: str,
+        body: dict[str, Any],
+        *,
+        headers: dict[str, str],
+        label: str,
+        timeout_seconds: float | None = None,
+    ) -> Any:
         request = Request(url, data=json.dumps(body).encode("utf-8"), headers=headers, method="POST")
         try:
-            with urlopen(request, timeout=self.config.timeout_seconds) as response:
+            with urlopen(request, timeout=timeout_seconds or self.config.timeout_seconds) as response:
                 raw = response.read().decode("utf-8")
         except HTTPError as exc:
             detail = exc.read().decode("utf-8", errors="replace")[:500]

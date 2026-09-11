@@ -4,6 +4,7 @@ The repository can install three per-user macOS LaunchAgents:
 
 - `com.narratiive.runtime` — authenticated Narratiive runtime gateway;
 - `com.narratiive.tony-http-bridge` — Tony HTTP bridge for n8n and Telegram;
+- `com.narratiive.tony-conversation-worker` — durable long-running Tony work and correlated Telegram follow-up;
 - `com.narratiive.service-supervisor` — health check and narrow recovery every 60 seconds.
 
 ## Secure environment file

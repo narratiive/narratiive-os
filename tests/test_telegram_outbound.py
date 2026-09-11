@@ -70,7 +70,7 @@ class TelegramSenderTests(unittest.TestCase):
         sender = self.sender()
         with patch("openclaw.telegram_outbound.urlopen") as mock_urlopen:
             mock_urlopen.return_value = _FakeResponse({"ok": True})
-            sender.send("12345", "Morning brief — healthy")
+            evidence = sender.send("12345", "Morning brief — healthy")
 
         request = mock_urlopen.call_args.args[0]
         self.assertEqual(
@@ -78,6 +78,7 @@ class TelegramSenderTests(unittest.TestCase):
         )
         body = json.loads(request.data.decode("utf-8"))
         self.assertEqual(body, {"chat_id": "12345", "text": "Morning brief — healthy"})
+        self.assertEqual(evidence, {})
 
     def test_raises_on_http_error(self):
         sender = self.sender()
