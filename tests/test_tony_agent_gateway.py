@@ -178,6 +178,18 @@ class TonyAgentGatewayTests(unittest.TestCase):
                     handle.write(
                         json.dumps(
                             {
+                                "timestamp": "2026-09-11T12:01:00Z",
+                                "message": {
+                                    "role": "user",
+                                    "content": [{"type": "text", "text": "Research specialist completed."}],
+                                },
+                            }
+                        )
+                        + "\n"
+                    )
+                    handle.write(
+                        json.dumps(
+                            {
                                 "timestamp": "2026-09-11T12:02:00Z",
                                 "message": {
                                     "role": "assistant",
@@ -221,6 +233,13 @@ class TonyAgentGatewayTests(unittest.TestCase):
                     {
                         "timestamp": "2026-09-11T12:02:00Z",
                         "message": {
+                            "role": "user",
+                            "content": [{"type": "text", "text": "Research specialist completed."}],
+                        },
+                    },
+                    {
+                        "timestamp": "2026-09-11T12:03:00Z",
+                        "message": {
                             "role": "assistant",
                             "stopReason": "stop",
                             "content": [{"type": "text", "text": "Recovered final result"}],
@@ -234,12 +253,51 @@ class TonyAgentGatewayTests(unittest.TestCase):
             self.assertEqual(reply, "Recovered final result")
             request.assert_not_called()
 
+    def test_yield_receipt_stop_is_not_a_specialist_completion(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram:work:telegram-abc"
+            self._write_work_session(
+                state_dir,
+                session_key,
+                [
+                    {
+                        "timestamp": "2026-09-11T12:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "toolUse",
+                            "content": [{"type": "toolCall", "name": "sessions_yield"}],
+                        },
+                    },
+                    {
+                        "timestamp": "2026-09-11T12:00:01Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "stop",
+                            "content": [{"type": "text", "text": "I delegated the research."}],
+                        },
+                    },
+                ],
+            )
+            gateway = TonyAgentGateway(
+                TonyAgentGatewayConfig(state_dir=state_dir, work_timeout_seconds=0.05, work_poll_seconds=0.01)
+            )
+            with mock.patch("openclaw.tony_agent_gateway.urlopen") as request:
+                with self.assertRaisesRegex(TonyAgentGatewayError, "did not produce a final Tony response"):
+                    gateway.converse_for_work("Research this", "telegram-abc")
+            request.assert_not_called()
+
     def test_research_and_strategy_specialists_use_claude(self):
         fleet_path = Path(__file__).resolve().parents[1] / "openclaw" / "openclaw.fleet.json"
         fleet = json.loads(fleet_path.read_text(encoding="utf-8"))
-        models = {agent["id"]: agent.get("model") for agent in fleet["agents"]["list"]}
+        agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
+        models = {agent_id: agent.get("model") for agent_id, agent in agents.items()}
         self.assertEqual(models["research"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(models["strategy"], "anthropic/claude-sonnet-4-6")
+        inherited = set(agents["tony"]["tools"]["alsoAllow"])
+        self.assertTrue({"web_search", "web_fetch"}.issubset(inherited))
+        sandbox_additions = set(agents["research"]["tools"]["sandbox"]["tools"]["alsoAllow"])
+        self.assertTrue({"web_search", "web_fetch"}.issubset(sandbox_additions))
 
     def test_environment_defaults_openresponses_user_to_session_key(self):
         config = TonyAgentGatewayConfig.from_env({"TONY_OPENCLAW_SESSION_KEY": "agent:tony:telegram:matt"})

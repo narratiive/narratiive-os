@@ -146,15 +146,16 @@ class TonyAgentGateway:
         if not safe_work_id:
             raise TonyAgentGatewayError("work_id is required")
         session_key = f"{self.config.session_key}:work:{safe_work_id}"
-        recovered = self._completed_yielded_reply(session_key)
+        yielded, recovered = self._yielded_work_state(session_key)
         if recovered:
             return recovered
-        self._converse(
-            self._durable_work_prompt(text),
-            user_id=session_key,
-            session_key=session_key,
-            timeout_seconds=self.config.work_timeout_seconds,
-        )
+        if not yielded:
+            self._converse(
+                self._durable_work_prompt(text),
+                user_id=session_key,
+                session_key=session_key,
+                timeout_seconds=self.config.work_timeout_seconds,
+            )
         return self._await_yielded_reply(session_key)
 
     @staticmethod
@@ -204,16 +205,12 @@ class TonyAgentGateway:
             time.sleep(max(0.01, self.config.work_poll_seconds))
         raise TonyAgentGatewayError("OpenClaw yielded work did not produce a final Tony response before the worker deadline")
 
-    def _completed_yielded_reply(self, session_key: str) -> str:
-        """Recover a completed pushed result without starting duplicate work."""
-        _yielded, completed = self._yielded_work_state(session_key)
-        return completed
-
     def _yielded_work_state(self, session_key: str) -> tuple[bool, str]:
         transcript = self._session_transcript(session_key)
         if transcript is None:
             return False, ""
         yielded_at = ""
+        pushed_at = ""
         completed = ""
         try:
             lines = transcript.read_text(encoding="utf-8").splitlines()
@@ -231,12 +228,15 @@ class TonyAgentGateway:
             content = message.get("content")
             if not isinstance(content, list):
                 continue
+            if yielded_at and message.get("role") == "user" and timestamp > yielded_at:
+                pushed_at = timestamp
             if message.get("role") == "assistant":
                 for part in content:
                     if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "sessions_yield":
                         yielded_at = timestamp
+                        pushed_at = ""
                         completed = ""
-                if yielded_at and timestamp > yielded_at and message.get("stopReason") == "stop":
+                if pushed_at and timestamp > pushed_at and message.get("stopReason") == "stop":
                     texts = [
                         str(part.get("text") or "").strip()
                         for part in content
