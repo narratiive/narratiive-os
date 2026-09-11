@@ -96,6 +96,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 "/approve safe-final-os-run because SAFE Blueprint Lite reviewed",
                 [],
                 principal_id="openclaw:native-approval",
+                inputs={"approval_token": initial.data["approval_token"]},
             )
             discovery = service.execute("/continue safe-final-os-run", [])
             discovery_run = discovery.data["run_id"]
@@ -106,6 +107,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 f"/reject {discovery_run} because add a stronger uncertainty statement",
                 [],
                 principal_id="openclaw:native-approval",
+                inputs={"approval_token": discovery.data["approval_token"]},
             )
             self.assertEqual(rejected.data["status"], "active")
             revised = service.execute(f"/continue {discovery_run}", [])
@@ -114,6 +116,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 f"/approve {discovery_run} because revised internal discovery preparation reviewed",
                 [],
                 principal_id="openclaw:native-approval",
+                inputs={"approval_token": revised.data["approval_token"]},
             )
 
             proposal = service.execute(
@@ -139,6 +142,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 f"/approve {proposal_run} because SAFE Growth Sprint scope reviewed",
                 [],
                 principal_id="openclaw:native-approval",
+                inputs={"approval_token": proposal.data["approval_token"]},
             )
 
             research = service.execute(
@@ -191,6 +195,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 f"/approve {blueprint_run} because SAFE internal Growth Blueprint draft reviewed",
                 [],
                 principal_id="openclaw:native-approval",
+                inputs={"approval_token": still_waiting.data["approval_token"]},
             )
             self.assertEqual(approved.data["status"], "complete")
             self.assertFalse(approved.data["external_action_taken"])

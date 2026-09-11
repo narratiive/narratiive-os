@@ -54,6 +54,7 @@ from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
+from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -141,8 +142,8 @@ class LeadAwareTonyApplication:
                     status = HTTPStatus.OK
                     payload = {
                         "ok": response.status != "error",
-                        "reply": response.message[:3500],
-                        "message": response.message[:3500],
+                        "reply": protect_telegram_output(response.message),
+                        "message": protect_telegram_output(response.message),
                         **response.to_dict(),
                     }
                 else:
@@ -150,14 +151,14 @@ class LeadAwareTonyApplication:
             else:
                 if self.conversation_ingress is not None and self.conversation_ingress.requires_durable_work(text):
                     accepted = self.conversation_ingress.accept(request, text)
-                    reply = accepted.acknowledgement
+                    reply = protect_telegram_output(accepted.acknowledgement)
                     status = HTTPStatus.OK
                     payload = {
                         "ok": True,
                         "command": "conversation",
                         "status": "accepted",
-                        "reply": reply[:3500],
-                        "message": reply[:3500],
+                        "reply": reply,
+                        "message": reply,
                         "data": {
                             "runtime": "narratiive_durable_work",
                             "work_id": accepted.work_id,
@@ -167,13 +168,14 @@ class LeadAwareTonyApplication:
                     }
                     return self._respond(start_response, status, payload)
                 reply = self.agent_gateway.converse(text)
+                reply = protect_telegram_output(reply)
                 status = HTTPStatus.OK
                 payload = {
                     "ok": True,
                     "command": "conversation",
                     "status": "ok",
-                    "reply": reply[:3500],
-                    "message": reply[:3500],
+                    "reply": reply,
+                    "message": reply,
                     "data": {"runtime": "openclaw", "external_action_taken": False},
                 }
         except TonyAgentGatewayError as exc:
@@ -207,6 +209,7 @@ class LeadAwareTonyApplication:
                 "projection": "projection",
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
+                "deliver-internal-review": "deliver-review",
             }
             command_name = commands.get(operation)
             if command_name is None:
@@ -216,15 +219,24 @@ class LeadAwareTonyApplication:
             inputs = request.get("inputs")
             if inputs is not None and not isinstance(inputs, dict):
                 raise ValueError("workflow inputs must be an object")
-            if inputs and operation not in {"continue", "additional-research"}:
-                raise ValueError("workflow inputs are only accepted for continue or additional research")
+            if inputs and operation not in {
+                "continue", "additional-research", "deliver-internal-review",
+                "approve", "reject", "request-revision",
+            }:
+                raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
                 raise ValueError("workflow reference is required")
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            approval_operations = {"approve", "reject", "request-revision", "sync-notion"}
-            principal = "openclaw:native-approval" if operation in approval_operations and request.get("approval_granted") is True else ""
+            if operation in {"approve", "reject", "request-revision"}:
+                if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
+                    raise ValueError("workflow decision requires the authorised Telegram principal")
+                principal = self.authorised_principal_id
+            elif operation == "sync-notion" and request.get("approval_granted") is True:
+                principal = "openclaw:native-approval"
+            else:
+                principal = ""
             response = self.workflow_command_service.execute(
                 command,
                 (),

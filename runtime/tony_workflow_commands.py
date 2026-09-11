@@ -11,20 +11,26 @@ from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.models import WorkflowState
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.tony_command_service import CommandResponse
+from runtime.tony_internal_review_delivery import (
+    INTERNAL_REVIEW_ADDRESS,
+    InternalReviewDeliveryService,
+    assert_current_approval_token,
+)
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 
 
 class WorkflowCommandBackend(Protocol):
     def list_states(self) -> tuple[WorkflowState, ...]: ...
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str) -> WorkflowState: ...
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str) -> WorkflowState: ...
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str) -> WorkflowState: ...
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def recover(self) -> int: ...
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
+    def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
     def commission_additional_research(
         self,
         state: WorkflowState,
@@ -74,12 +80,15 @@ class FileWorkflowCommandBackend:
             states.append(state)
         return tuple(states)
 
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str) -> WorkflowState:
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str) -> WorkflowState:
+        assert_current_approval_token(state, approval_token)
         runtime = self._runtime(state)
         runtime.approve(state.run_id, approver=approver, rationale=rationale)
         return runtime.runs.load_run(state.run_id)
 
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str) -> WorkflowState:
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str) -> WorkflowState:
+        if state.approval_status == "pending":
+            assert_current_approval_token(state, approval_token)
         runtime = self._runtime(state)
         runtime.reject_for_revision(state.run_id, reviewer=reviewer, rationale=rationale)
         return runtime.runs.load_run(state.run_id)
@@ -145,6 +154,11 @@ class FileWorkflowCommandBackend:
             approver=approver,
             rationale=rationale,
         )
+
+    def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]:
+        runtime = self._runtime(state)
+        service = InternalReviewDeliveryService(self.root, self.dispatchers.get("Gmail") if self.dispatchers else None)
+        return service.deliver(runtime, state, recipient=recipient)
 
     def commission_additional_research(
         self,
@@ -256,6 +270,7 @@ class TonyWorkflowCommandService:
         "workflow", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover",
         "projection", "sync-notion", "research",
+        "deliver-review",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -327,6 +342,30 @@ class TonyWorkflowCommandService:
                     + ("The returned record evidence verified this exact projection." if changed else "No new Notion write is being claimed.")
                 )
                 return CommandResponse(name, "healthy" if status in {"verified", "duplicate_suppressed"} else "blocked", message, projection)
+            if name == "deliver-review":
+                delivery = dict(
+                    self.backend.deliver_internal_review(
+                        state,
+                        recipient=str((inputs or {}).get("recipient") or INTERNAL_REVIEW_ADDRESS),
+                    )
+                )
+                if delivery.get("delivered") is not True:
+                    status = str(delivery.get("status") or "internal_review_delivery_failed")
+                    return CommandResponse(
+                        name,
+                        "blocked",
+                        "The full review artefact could not be verified as delivered. I have not claimed that it was emailed. "
+                        f"Delivery status: {status.replace('_', ' ')}. The workflow remains at its current gate.",
+                        delivery,
+                    )
+                conclusions = [str(item) for item in delivery.get("conclusions", []) if str(item).strip()][:4]
+                summary = " ".join(f"• {item}" for item in conclusions)
+                message = (
+                    f"{_artifact_label(state)} is ready. I sent the full review copy to {INTERNAL_REVIEW_ADDRESS}."
+                    + (f" {summary}" if summary else "")
+                    + " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
+                )
+                return CommandResponse(name, "healthy", message, delivery)
             if name == "research":
                 if not rationale:
                     return self._error(
@@ -365,10 +404,17 @@ class TonyWorkflowCommandService:
                     return self._error(name, "authorised_principal_required", "This decision requires an authenticated human identity.")
                 if not rationale:
                     return self._error(name, "rationale_required", f"Use /{name} <run or company> because <reason>.")
+                approval_token = str((inputs or {}).get("approval_token") or "").strip()
+                if state.approval_status == "pending" and not approval_token:
+                    return self._error(
+                        name,
+                        "approval_token_required",
+                        "Read the current workflow gate first and use its exact approval token; this prevents stale artefact approval.",
+                    )
                 if name == "approve":
-                    changed = self.backend.approve(state, approver=principal_id, rationale=rationale)
+                    changed = self.backend.approve(state, approver=principal_id, rationale=rationale, approval_token=approval_token)
                     return CommandResponse(name, "healthy", f"Approved {changed.run_id} for its exact proposed action. No external action was performed.", self._summary(changed))
-                changed = self.backend.reject(state, reviewer=principal_id, rationale=rationale)
+                changed = self.backend.reject(state, reviewer=principal_id, rationale=rationale, approval_token=approval_token)
                 return CommandResponse("reject", "healthy", f"Revision requested for {changed.run_id}; progression remains stopped until revised work passes quality.", self._summary(changed))
             if name == "resume":
                 changed = self.backend.resume(state)
@@ -486,6 +532,16 @@ def _output_excerpt(output: Mapping[str, Any]) -> str:
             compact = " ".join(value.split())
             return compact[:500] + ("…" if len(compact) > 500 else "")
     return ""
+
+
+def _artifact_label(state: WorkflowState) -> str:
+    labels = {
+        "growth_diagnostic_to_blueprint_lite": "Gate 1 — the Blueprint Lite",
+        "blueprint_lite_to_discovery_preparation": "The Discovery synthesis",
+        "discovery_evidence_to_growth_sprint_proposal": "The Growth Sprint proposal",
+        "research_to_growth_blueprint": "The Growth Blueprint",
+    }
+    return labels.get(state.workflow_id, "The review artefact")
 
 
 def _research_focus(focus: Mapping[str, Any]) -> tuple[str, str]:

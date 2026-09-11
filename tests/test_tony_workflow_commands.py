@@ -104,9 +104,11 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertNotIn("input_payload", status.data)
 
     def test_approval_requires_authenticated_principal_and_rationale(self) -> None:
+        token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
         denied = self.service.execute(
             "/approve safe-executive-run because reviewed synthetic work",
             [],
+            inputs={"approval_token": token},
         )
         missing_reason = self.service.execute(
             "/approve safe-executive-run",
@@ -117,6 +119,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "/approve safe-executive-run because reviewed synthetic work",
             [],
             principal_id="telegram:123",
+            inputs={"approval_token": token},
         )
 
         self.assertEqual(denied.data["error_code"], "authorised_principal_required")
@@ -130,10 +133,12 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertIn("No current proposed next action", proposed.message)
 
     def test_legacy_approved_snapshot_does_not_present_approved_action_as_current(self) -> None:
+        token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
         self.service.execute(
             "/approve safe-executive-run because reviewed synthetic work",
             [],
             principal_id="telegram:123",
+            inputs={"approval_token": token},
         )
         state = self.runtime.runs.load_run("safe-executive-run")
         approved_action = state.approval_history[-1]["proposed_next_action"]
@@ -148,10 +153,12 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertIsNone(projection.data["proposed_next_action"])
 
     def test_rejection_reopens_exact_producing_step_without_deleting_artefact(self) -> None:
+        token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
         rejected = self.service.execute(
             "/reject safe-executive-run because strengthen the evidence",
             [],
             principal_id="telegram:123",
+            inputs={"approval_token": token},
         )
         state = self.runtime.status("safe-executive-run")
 
@@ -268,17 +275,21 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(len(calls), 1)
 
     def test_continue_can_supply_provenanced_discovery_evidence_to_next_workflow(self) -> None:
+        token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
         self.service.execute(
             "/approve safe-executive-run because reviewed Blueprint Lite",
             [],
             principal_id="telegram:123",
+            inputs={"approval_token": token},
         )
         discovery = self.service.execute("/continue safe-executive-run", [])
         discovery_run = discovery.data["run_id"]
+        discovery_token = self.service.execute(f"/workflow {discovery_run}", []).data["approval_token"]
         self.service.execute(
             f"/approve {discovery_run} because reviewed discovery preparation",
             [],
             principal_id="telegram:123",
+            inputs={"approval_token": discovery_token},
         )
         proposal = self.service.execute(
             f"/continue {discovery_run}",

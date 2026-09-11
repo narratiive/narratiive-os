@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 import unittest
 from unittest import mock
@@ -161,6 +162,40 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertTrue(result["duplicate_suppressed"])
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
+
+    def test_gmail_internal_review_exception_is_exact_and_supports_attachment(self):
+        contract = {
+            "execution_mode": "authorised_internal_review_write",
+            "approval_scope": "narratiive_internal_artifact_review",
+            "idempotency_key": "safe-internal-review",
+            "payload": {
+                "kind": "internal_artifact_review_delivery",
+                "recipient_email": "hello@narratiive.com",
+                "subject": "SAFE internal review",
+                "body": "Review the attached immutable artefact.",
+                "attachments": [
+                    {
+                        "filename": "SAFE-Blueprint-Lite-v1.html",
+                        "mime_type": "text/html",
+                        "content_base64": base64.b64encode(b"<html>SAFE</html>").decode("ascii"),
+                    }
+                ],
+            },
+        }
+        router = Router([{"messages": []}, {"id": "sent-1", "threadId": "thread-1"}])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter(contract)
+
+        self.assertTrue(result["sent"])
+        raw = json.loads(router.requests[1].data)["raw"]
+        decoded = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4)).decode("utf-8")
+        self.assertIn("SAFE-Blueprint-Lite-v1.html", decoded)
+        self.assertIn("Content-Type: text/html", decoded)
+
+        rejected = {**contract, "payload": {**contract["payload"], "recipient_email": "outside@example.com"}}
+        with self.assertRaisesRegex(BusinessAdapterError, "scope_rejected"):
+            adapter(rejected)
 
     def test_calendar_freebusy_is_read_only_and_create_uses_deterministic_id(self):
         router = Router([

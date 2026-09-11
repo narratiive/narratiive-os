@@ -36,14 +36,17 @@ const WORKFLOW_OPERATIONS = [
   "status", "current_work", "approvals", "blockers", "latest_artifact",
   "proposed_next_action", "approve", "reject", "request_revision", "continue",
   "resume", "recover", "projection", "sync_notion",
-  "additional_research",
+  "additional_research", "deliver_internal_review",
 ];
-const WORKFLOW_APPROVAL_OPERATIONS = new Set(["approve", "reject", "request_revision", "sync_notion"]);
+const WORKFLOW_DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
+const WORKFLOW_NATIVE_APPROVAL_OPERATIONS = new Set(["sync_notion"]);
 const WORKFLOW_REFERENCE_OPTIONAL = new Set(["current_work", "approvals", "blockers", "recover"]);
 const WORKFLOW_SCHEMA = {
   operation: { type: "string", enum: WORKFLOW_OPERATIONS },
   reference: { type: "string", minLength: 1, maxLength: 500 },
   rationale: { type: "string", minLength: 1, maxLength: 1000 },
+  approval_token: { type: "string", minLength: 64, maxLength: 64 },
+  recipient: { type: "string", minLength: 1, maxLength: 320 },
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {
@@ -91,7 +94,9 @@ async function executeWorkflowControl(params) {
   const reference = String(params?.reference || "").trim();
   const rationale = String(params?.rationale || "").trim();
   if (!WORKFLOW_REFERENCE_OPTIONAL.has(operation) && !reference) throw new Error("workflow reference is required");
-  if (WORKFLOW_APPROVAL_OPERATIONS.has(operation) && !rationale) throw new Error("approved workflow decisions require a rationale");
+  if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation)) && !rationale) throw new Error("workflow decisions require a rationale");
+  const approvalToken = String(params?.approval_token || "").trim();
+  if (WORKFLOW_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
@@ -105,9 +110,13 @@ async function executeWorkflowControl(params) {
         operation,
         reference,
         rationale,
-        inputs: params?.inputs && typeof params.inputs === "object" && !Array.isArray(params.inputs) ? params.inputs : undefined,
-        approval_granted: WORKFLOW_APPROVAL_OPERATIONS.has(operation),
-        source: "openclaw_native_workflow_tool",
+        inputs: {
+          ...(params?.inputs && typeof params.inputs === "object" && !Array.isArray(params.inputs) ? params.inputs : {}),
+          ...(approvalToken ? { approval_token: approvalToken } : {}),
+          ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
+        },
+        approval_granted: WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation),
+        source: "openclaw_telegram_workflow_tool",
       }),
       signal: AbortSignal.timeout(timeoutMs),
     });
@@ -218,7 +227,7 @@ function approvalTool() {
 function workflowControlTool() {
   return {
     name: "narratiive_workflow_control",
-    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Reports persisted truth; approval, rejection and Notion projection use native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow. Additional research requires a focus (evidence_gap, question or hypothesis) and uses only explicitly approved sources.",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Interpret Matt's natural Telegram reply, but call approve, reject or request_revision only when intent is unambiguous and include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
     parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
     async execute(_id, params) {
       try {

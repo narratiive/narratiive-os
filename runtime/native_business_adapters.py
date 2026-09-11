@@ -221,9 +221,18 @@ class GmailDispatcher(GoogleAdapter):
         }
 
     def _send(self, contract: Mapping[str, Any]) -> dict[str, Any]:
-        _require_write(contract)
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
         recipient = _text(payload.get("recipient_email") or target.get("recipient_email") or target.get("email"))
+        internal_review = _text(contract.get("execution_mode")) == "authorised_internal_review_write"
+        if internal_review:
+            if (
+                _text(contract.get("approval_scope")) != "narratiive_internal_artifact_review"
+                or recipient.casefold() != "hello@narratiive.com"
+                or _text(payload.get("kind")) != "internal_artifact_review_delivery"
+            ):
+                raise BusinessAdapterError("gmail_internal_review_scope_rejected")
+        else:
+            _require_write(contract)
         subject = _text(payload.get("subject") or payload.get("email_subject") or target.get("subject"))
         body = _text(payload.get("body") or payload.get("email_body") or target.get("body"))
         if not recipient or "@" not in recipient or not subject or not body:
@@ -250,6 +259,25 @@ class GmailDispatcher(GoogleAdapter):
         email["Subject"] = subject
         email["Message-ID"] = message_header
         email.set_content(body)
+        attachments = payload.get("attachments")
+        if attachments is not None:
+            if not isinstance(attachments, list) or len(attachments) > 3:
+                raise BusinessAdapterError("gmail_attachments_invalid")
+            for attachment in attachments:
+                item = _mapping(attachment)
+                filename = _text(item.get("filename"))
+                mime_type = _text(item.get("mime_type"))
+                encoded = _text(item.get("content_base64"))
+                if not filename or "/" in filename or "\\" in filename or "/" not in mime_type or not encoded:
+                    raise BusinessAdapterError("gmail_attachment_invalid")
+                try:
+                    content = base64.b64decode(encoded, validate=True)
+                except (ValueError, TypeError) as exc:
+                    raise BusinessAdapterError("gmail_attachment_invalid") from exc
+                if len(content) > 5_000_000:
+                    raise BusinessAdapterError("gmail_attachment_too_large")
+                maintype, subtype = mime_type.split("/", 1)
+                email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
         raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
         sent = self.client.call(
             f"{self.api_base}/users/me/messages/send",
