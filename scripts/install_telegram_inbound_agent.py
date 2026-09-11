@@ -16,9 +16,9 @@ def main() -> None:
                 "label": LABEL,
                 "message": (
                     "Narratiive's standalone Telegram getUpdates poller is retired. "
-                    "OpenClaw now owns Telegram inbound and routes the default Telegram account directly to Tony."
+                    "The published n8n Telegram Trigger owns inbound and routes it through Tony's authenticated bridge."
                 ),
-                "next_command": f"{root / '.venv' / 'bin' / 'python'} {root / 'scripts' / 'install_openclaw_fleet.py'} --apply",
+                "next_command": f"See {root / 'docs' / 'operations' / 'TELEGRAM_INBOUND.md'} for the n8n ingress installer command.",
             },
             indent=2,
             sort_keys=True,

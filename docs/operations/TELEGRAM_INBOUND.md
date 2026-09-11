@@ -1,56 +1,81 @@
 # Tony Telegram inbound
 
-Tony's Telegram conversation is owned directly by OpenClaw. Narratiive OS no longer runs a second `getUpdates` poller for the same bot token.
-
-Flow:
+Tony's Telegram conversation is owned by the published n8n Telegram Trigger in
+`Narratiive Ops - Status Lookup - Formatted v2` (`s7TvzzAsJRKLRDU7`). OpenClaw's
+native Telegram channel and the retired standalone `getUpdates` poller must both
+remain disabled so only one component owns bot updates.
 
 ```text
-Telegram
-  -> OpenClaw native Telegram channel
-  -> managed default Telegram binding -> agent `tony`
-  -> Tony workspace + durable OpenClaw session
-  -> OpenClaw specialist/session tools as needed
-  -> Narratiive control-plane plugin for business state, approvals and evidence
-  -> Telegram reply from OpenClaw
+Telegram webhook
+  -> stable HTTPS ngrok endpoint
+  -> n8n Telegram Trigger
+  -> authenticated HTTP Request: POST http://127.0.0.1:8790/telegram/inbound
+  -> Tony bridge
+  -> OpenClaw agent `tony` and durable session
+  -> Tony bridge response
+  -> n8n formatter
+  -> Telegram Send node
+  -> reply in the originating chat
 ```
 
-This is deliberate. Telegram permits only one long-poll consumer per bot token, and OpenClaw's Telegram runtime already provides long polling, per-chat sequencing, durable channel/session context and direct routing into an agent workspace. Keeping Narratiive's historical `com.narratiive.telegram-inbound` LaunchAgent alive beside OpenClaw can create `getUpdates` conflicts and silent or lost turns.
+The Telegram credential remains in n8n. `TONY_BRIDGE_TOKEN` remains only in the
+mode-`0600` runtime environment file. The HTTP Request node must send this JSON
+header expression under n8n 2.20:
 
-## Activation
+```text
+={{ JSON.stringify({ Authorization: 'Bearer ' + $env.TONY_BRIDGE_TOKEN }) }}
+```
 
-Apply the managed OpenClaw fleet:
+The active workflow version must be published after changing a node. An edited
+draft is not the version n8n activates after restart.
+
+## Durable macOS startup
+
+Install the n8n and ngrok LaunchAgents with the canonical repository Python.
+Use the stable HTTPS n8n base URL, not the workflow-specific webhook path:
 
 ```bash
 cd ~/Documents/narratiive-os
-.venv/bin/python scripts/install_openclaw_fleet.py --apply
-openclaw gateway restart
+.venv/bin/python scripts/install_n8n_telegram_ingress.py \
+  --python .venv/bin/python \
+  --env-file "$HOME/.config/narratiive/runtime.env" \
+  --node "$HOME/.nvm/versions/node/v25.9.0/bin/node" \
+  --n8n "$HOME/.nvm/versions/node/v25.9.0/bin/n8n" \
+  --ngrok /opt/homebrew/bin/ngrok \
+  --webhook-url https://lushly-spoof-reheat.ngrok-free.dev/
 ```
 
-The fleet installer:
+The installer creates `com.narratiive.n8n-tunnel` and
+`com.narratiive.n8n`, both with `RunAtLoad` and `KeepAlive`. It pins:
 
-- preserves the existing Telegram channel/account configuration;
-- adds the default Telegram route binding to agent `tony` while preserving more-specific Telegram bindings;
-- installs Tony and the five specialist workspaces;
-- enables the Narratiive control-plane plugin; and
-- on macOS, retires and removes the legacy `com.narratiive.telegram-inbound` LaunchAgent only when the native OpenClaw Telegram channel is enabled.
+- `WEBHOOK_URL` to the HTTPS public n8n base URL so Telegram accepts activation;
+- `N8N_BLOCK_ENV_ACCESS_IN_NODE=false` so the bridge header can read the runtime
+  token without copying it into n8n or a plist; and
+- the selected Node binary directory in `PATH` so n8n's task broker can start
+  JavaScript workers under launchd; and
+- the stable ngrok hostname, so a restart does not change webhook ownership.
 
-The old `scripts/install_telegram_inbound_agent.py` entrypoint is intentionally deprecated and cannot reinstall a second poller.
+It refuses installation when OpenClaw native Telegram is enabled, validates the
+secure environment file, and removes the retired
+`com.narratiive.telegram-inbound` LaunchAgent. No credential value is written to
+the LaunchAgent files or command output. The audited `run_with_env.py` loader is
+copied to `~/Library/Application Support/Narratiive/` so launchd does not depend
+on interactive access to the repository under macOS's protected Documents
+folder.
 
 ## Verification
 
-After restarting the Gateway, verify both the route and the channel before testing Tony conversationally:
-
 ```bash
-openclaw agents list --bindings
-openclaw channels status --probe
+launchctl print "gui/$(id -u)/com.narratiive.n8n-tunnel"
+launchctl print "gui/$(id -u)/com.narratiive.n8n"
+curl -fsS http://127.0.0.1:5678/healthz
+curl -fsS http://127.0.0.1:8790/health
 ```
 
-The default Telegram account should route to `tony`, and Telegram should report healthy polling without a persistent `getUpdates` 409 conflict.
+Inspect n8n startup logs for successful activation of workflow
+`s7TvzzAsJRKLRDU7`, and inspect Telegram `getWebhookInfo` through a secret-safe
+credential check. Its URL must be the stable HTTPS host plus n8n's production
+webhook path, with no webhook error and no unexplained pending updates.
 
-Then test normal language in Telegram, for example:
-
-- `Morning Tony, anything important?`
-- `Tony - what should I be working on today?`
-- typo variants and contextual follow-ups such as `what did they say?`, `sort that out`, `use Thursday`, `send it`, and `did it go?`
-
-Only explicit `/slash` commands belong to Narratiive OS's deterministic command surface. Ordinary language must stay inside OpenClaw's conversational runtime.
+Then complete the live acceptance in `TELEGRAM_INBOUND_ACCEPTANCE.md`. A green
+unit test alone is not evidence that Telegram delivered a message.

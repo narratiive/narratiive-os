@@ -111,6 +111,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                     "narratiive_read_state",
                     "narratiive_execute_safe_read",
                     "narratiive_request_action_approval",
+                    "narratiive_manage_attention",
                     "narratiive_workflow_control",
                 },
             )
