@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import socket
 import tempfile
 import unittest
 from datetime import datetime, timedelta, timezone
@@ -75,6 +76,42 @@ class TonyConversationWorkTests(unittest.TestCase):
         self.assertEqual(calls, [accepted.work_id])
         events = (Path(self.temporary.name) / "events.jsonl").read_text(encoding="utf-8")
         self.assertIn("conversation_work.recovered", events)
+
+    def test_restart_immediately_recovers_live_lease_owned_by_dead_local_process(self) -> None:
+        store = FileConversationWorkStore(
+            Path(self.temporary.name),
+            clock=self.clock,
+            process_alive=lambda pid: pid != 41001,
+        )
+        ingress = TonyConversationIngress(store, workspace_id="narratiive")
+        accepted = ingress.accept(self.request(), "Please research a suitable company.")
+        first = store.claim_next(f"{socket.gethostname()}:41001", lease_seconds=2100)
+        self.assertEqual(first["state"], "running")
+
+        calls: list[str] = []
+        result = TonyConversationWorker(
+            store,
+            lambda text, work_id: calls.append(work_id) or "Recovered result",
+            lambda chat, text: None,
+            worker_id=f"{socket.gethostname()}:41002",
+        ).run_once()
+
+        self.assertEqual(result["state"], "completed")
+        self.assertEqual(calls, [accepted.work_id])
+        events = (Path(self.temporary.name) / "events.jsonl").read_text(encoding="utf-8")
+        self.assertIn("conversation_work.recovered", events)
+
+    def test_restart_does_not_steal_live_local_process_lease(self) -> None:
+        store = FileConversationWorkStore(
+            Path(self.temporary.name),
+            clock=self.clock,
+            process_alive=lambda _pid: True,
+        )
+        ingress = TonyConversationIngress(store, workspace_id="narratiive")
+        ingress.accept(self.request(), "Please research a suitable company.")
+        store.claim_next(f"{socket.gethostname()}:41001", lease_seconds=2100)
+
+        self.assertIsNone(store.claim_next(f"{socket.gethostname()}:41002", lease_seconds=2100))
 
     def test_specialist_failure_produces_useful_followup(self) -> None:
         self.ingress.accept(self.request(), "Please ask a specialist to investigate this.")

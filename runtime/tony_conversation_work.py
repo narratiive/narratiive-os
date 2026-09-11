@@ -24,6 +24,7 @@ class ConversationSender(Protocol):
 
 
 Clock = Callable[[], datetime]
+ProcessAlive = Callable[[int], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -79,12 +80,19 @@ class FileConversationWorkStore:
     transition is also fsynced to JSONL so recovery does not rewrite history.
     """
 
-    def __init__(self, root: Path, *, clock: Clock | None = None) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        clock: Clock | None = None,
+        process_alive: ProcessAlive | None = None,
+    ) -> None:
         self.root = root
         self.jobs = root / "jobs"
         self.events_path = root / "events.jsonl"
         self.lock_path = root / ".lock"
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.process_alive = process_alive or self._process_alive
         self.jobs.mkdir(parents=True, exist_ok=True)
 
     @staticmethod
@@ -159,7 +167,9 @@ class FileConversationWorkStore:
             for path in sorted(self.jobs.glob("*.json"), key=lambda item: item.stat().st_mtime):
                 record = self._read_path(path)
                 state = str(record.get("state") or "")
-                if state in {"running", "delivering"} and self._lease_active(record, now):
+                lease_active = self._lease_active(record, now)
+                owner_dead = self._lease_owner_is_dead_local(record)
+                if state in {"running", "delivering"} and lease_active and not owner_dead:
                     continue
                 if state in {"running", "delivering"}:
                     record["state"] = "queued" if state == "running" else "ready_to_deliver"
@@ -291,6 +301,33 @@ class FileConversationWorkStore:
     def _lease_active(record: Mapping[str, Any], now: datetime) -> bool:
         raw = str(record.get("lease_expires_at") or "")
         return bool(raw and datetime.fromisoformat(raw) > now)
+
+    def _lease_owner_is_dead_local(self, record: Mapping[str, Any]) -> bool:
+        """Return true only when a process lease is provably abandoned locally.
+
+        Worker identities use ``hostname:pid``. A restart can therefore reclaim
+        work immediately when the former PID no longer exists, while leases from
+        another host or a live local process remain protected until expiry.
+        """
+        owner = str(record.get("lease_owner") or "")
+        host, separator, raw_pid = owner.rpartition(":")
+        if not separator or host != socket.gethostname():
+            return False
+        try:
+            pid = int(raw_pid)
+        except ValueError:
+            return False
+        return pid > 0 and not self.process_alive(pid)
+
+    @staticmethod
+    def _process_alive(pid: int) -> bool:
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        return True
 
     def _now(self) -> str:
         return self.clock().astimezone(timezone.utc).isoformat()
