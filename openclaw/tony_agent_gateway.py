@@ -149,15 +149,37 @@ class TonyAgentGateway:
         recovered = self._completed_yielded_reply(session_key)
         if recovered:
             return recovered
-        reply = self._converse(
-            text,
+        self._converse(
+            self._durable_work_prompt(text),
             user_id=session_key,
             session_key=session_key,
             timeout_seconds=self.config.work_timeout_seconds,
         )
-        return self._await_yielded_reply(session_key, fallback=reply)
+        return self._await_yielded_reply(session_key)
 
-    def _await_yielded_reply(self, session_key: str, *, fallback: str) -> str:
+    @staticmethod
+    def _durable_work_prompt(text: str) -> str:
+        """Attach the execution protocol selected by the semantic ingress router.
+
+        This is not a behaviour prompt: Tony's workspace remains the canonical
+        behaviour contract. It tells OpenClaw which transport lifecycle is in
+        force so a direct model answer cannot accidentally close commissioned
+        specialist work without delegation evidence.
+        """
+        return (
+            f"{str(text).strip()}\n\n"
+            "[Durable work execution protocol]\n"
+            "The Telegram ingress has already acknowledged this commission. "
+            "Do not send another acknowledgement and do not answer the substantive "
+            "request from Tony's own unaided reasoning. Delegate the required "
+            "investigation or production to the appropriate specialist with "
+            "sessions_spawn, then call sessions_yield. After OpenClaw pushes the "
+            "specialist completion into this session, review its evidence and return "
+            "Tony's useful final result or a genuine human gate. The durable worker "
+            "will reject a final response that has no sessions_yield evidence."
+        )
+
+    def _await_yielded_reply(self, session_key: str) -> str:
         """Keep yielded specialist work open until Tony's resumed final turn.
 
         OpenClaw's responses endpoint returns when ``sessions_yield`` releases the
@@ -167,13 +189,18 @@ class TonyAgentGateway:
         reviewed the pushed result and produced a normal final response.
         """
         deadline = time.monotonic() + self.config.work_timeout_seconds
-        detection_deadline = min(deadline, time.monotonic() + 2.0)
+        detection_deadline = min(
+            deadline,
+            time.monotonic() + min(2.0, max(0.01, self.config.work_poll_seconds * 2)),
+        )
         while time.monotonic() < deadline:
             yielded, completed = self._yielded_work_state(session_key)
             if completed:
                 return completed
             if not yielded and time.monotonic() >= detection_deadline:
-                return fallback
+                raise TonyAgentGatewayError(
+                    "OpenClaw durable work ended without specialist delegation evidence"
+                )
             time.sleep(max(0.01, self.config.work_poll_seconds))
         raise TonyAgentGatewayError("OpenClaw yielded work did not produce a final Tony response before the worker deadline")
 
