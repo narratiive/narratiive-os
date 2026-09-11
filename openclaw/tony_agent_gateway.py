@@ -225,11 +225,11 @@ class TonyAgentGateway:
             if not isinstance(message, Mapping):
                 continue
             timestamp = str(entry.get("timestamp") or "")
+            if yielded_at and message.get("role") == "user" and timestamp > yielded_at:
+                pushed_at = timestamp
             content = message.get("content")
             if not isinstance(content, list):
                 continue
-            if yielded_at and message.get("role") == "user" and timestamp > yielded_at:
-                pushed_at = timestamp
             if message.get("role") == "assistant":
                 for part in content:
                     if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "sessions_yield":

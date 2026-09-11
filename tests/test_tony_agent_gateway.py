@@ -234,7 +234,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
                         "timestamp": "2026-09-11T12:02:00Z",
                         "message": {
                             "role": "user",
-                            "content": [{"type": "text", "text": "Research specialist completed."}],
+                            "content": "[System] Continue after the gateway restart.",
                         },
                     },
                     {
