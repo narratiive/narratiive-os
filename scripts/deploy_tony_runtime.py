@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import subprocess
 import sys
 import time
@@ -25,6 +26,8 @@ HEALTH_ENDPOINTS = (
 )
 DEPLOYMENT_STATE_PATH = Path("runtime-state") / "deployment.json"
 SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
+ENV_LOADER_PATH = Path("scripts") / "run_with_env.py"
+DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
 
 
 class DeploymentError(RuntimeError):
@@ -84,13 +87,35 @@ def check_health(endpoint: str, timeout_seconds: float) -> None:
         raise DeploymentError(f"health check reported unhealthy for {endpoint}")
 
 
-def run_smoke_check(root: Path, runner: CommandRunner = run_command) -> None:
+def run_smoke_check(
+    root: Path,
+    runner: CommandRunner = run_command,
+    *,
+    env_file: Path = DEFAULT_RUNTIME_ENV_PATH,
+) -> None:
     """Verify that the deployed bridge routes deterministic Tony commands correctly."""
     script = root / SMOKE_SCRIPT_PATH
     if not script.is_file():
         raise DeploymentError(f"Tony smoke check is missing: {script}")
+    loader = root / ENV_LOADER_PATH
+    if not loader.is_file():
+        raise DeploymentError(f"secure environment loader is missing: {loader}")
+    env_file = env_file.expanduser().resolve()
+    if not env_file.is_file():
+        raise DeploymentError(f"runtime environment file is missing: {env_file}")
+    if stat.S_IMODE(env_file.stat().st_mode) & 0o077:
+        raise DeploymentError("runtime environment file must use mode 600")
     try:
-        result = runner((sys.executable, str(script)), root)
+        result = runner(
+            (
+                sys.executable,
+                str(loader),
+                str(env_file),
+                sys.executable,
+                str(script),
+            ),
+            root,
+        )
     except subprocess.CalledProcessError as exc:
         detail = str(exc.stderr or exc.stdout or "smoke command failed").strip()[:500]
         raise DeploymentError(f"Tony command smoke check failed: {detail}") from exc

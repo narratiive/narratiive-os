@@ -96,24 +96,37 @@ class DeployTonyRuntimeTests(unittest.TestCase):
     def test_run_smoke_check_requires_script_and_valid_success_payload(self):
         root = self.repository()
         runner = FakeRunner()
+        env_file = root / "runtime.env"
+        env_file.write_text("TONY_BRIDGE_TOKEN=test-only\n", encoding="utf-8")
+        env_file.chmod(0o600)
         with self.assertRaisesRegex(DeploymentError, "smoke check is missing"):
-            run_smoke_check(root, runner)
+            run_smoke_check(root, runner, env_file=env_file)
 
         script = root / SMOKE_SCRIPT_PATH
         script.parent.mkdir(parents=True)
         script.write_text("# test\n", encoding="utf-8")
-        run_smoke_check(root, runner)
+        loader = root / "scripts" / "run_with_env.py"
+        loader.write_text("# test\n", encoding="utf-8")
+        run_smoke_check(root, runner, env_file=env_file)
         self.assertTrue(any(call[-1].endswith("smoke_tony_live.py") for call in runner.calls))
+        smoke_call = next(call for call in runner.calls if call[-1].endswith("smoke_tony_live.py"))
+        self.assertIn(str(loader), smoke_call)
+        self.assertIn(str(env_file.resolve()), smoke_call)
+        self.assertNotIn("test-only", " ".join(smoke_call))
 
     def test_run_smoke_check_rejects_command_failure(self):
         root = self.repository()
         script = root / SMOKE_SCRIPT_PATH
         script.parent.mkdir(parents=True)
         script.write_text("# test\n", encoding="utf-8")
+        (root / "scripts" / "run_with_env.py").write_text("# test\n", encoding="utf-8")
+        env_file = root / "runtime.env"
+        env_file.write_text("TONY_BRIDGE_TOKEN=test-only\n", encoding="utf-8")
+        env_file.chmod(0o600)
         runner = FakeRunner()
         runner.fail_smoke = True
         with self.assertRaisesRegex(DeploymentError, "command smoke check failed"):
-            run_smoke_check(root, runner)
+            run_smoke_check(root, runner, env_file=env_file)
 
     def test_write_deployment_state_is_machine_readable_and_atomic(self):
         root = self.repository()
