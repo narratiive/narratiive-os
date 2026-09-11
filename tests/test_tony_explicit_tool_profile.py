@@ -15,12 +15,14 @@ EXPECTED_TONY_ADDITIONS = {
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",
+    "narratiive_manage_attention",
     "narratiive_workflow_control",
 }
 EXPECTED_NARRATIIVE_TOOLS = {
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",
+    "narratiive_manage_attention",
     "narratiive_workflow_control",
 }
 
