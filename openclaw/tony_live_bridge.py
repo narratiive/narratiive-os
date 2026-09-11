@@ -53,6 +53,7 @@ from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCo
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
+from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -75,6 +76,7 @@ class LeadAwareTonyApplication:
         workflow_command_service: TonyWorkflowCommandService | None = None,
         authorised_principal_id: str = "",
         attention_service: LeadAttentionService | None = None,
+        conversation_ingress: TonyConversationIngress | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -83,6 +85,7 @@ class LeadAwareTonyApplication:
         self.workflow_command_service = workflow_command_service
         self.authorised_principal_id = authorised_principal_id.strip()
         self.attention_service = attention_service
+        self.conversation_ingress = conversation_ingress
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -145,6 +148,24 @@ class LeadAwareTonyApplication:
                 else:
                     status, payload = self.base._handle_telegram_command(text)
             else:
+                if self.conversation_ingress is not None and self.conversation_ingress.requires_durable_work(text):
+                    accepted = self.conversation_ingress.accept(request, text)
+                    reply = accepted.acknowledgement
+                    status = HTTPStatus.OK
+                    payload = {
+                        "ok": True,
+                        "command": "conversation",
+                        "status": "accepted",
+                        "reply": reply[:3500],
+                        "message": reply[:3500],
+                        "data": {
+                            "runtime": "narratiive_durable_work",
+                            "work_id": accepted.work_id,
+                            "replay": accepted.replay,
+                            "external_action_taken": False,
+                        },
+                    }
+                    return self._respond(start_response, status, payload)
                 reply = self.agent_gateway.converse(text)
                 status = HTTPStatus.OK
                 payload = {
@@ -388,6 +409,10 @@ def build_app() -> LeadAwareTonyApplication:
         workflow_backend,
     )
     blueprint_lite_service.recover_pending()
+    conversation_store = FileConversationWorkStore(
+        Path(os.getenv("TONY_CONVERSATION_WORK_ROOT", str(REPOSITORY_ROOT / ".runtime" / "conversation-work"))).resolve()
+    )
+    conversation_ingress = TonyConversationIngress(conversation_store, workspace_id=workspace_id)
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -400,6 +425,7 @@ def build_app() -> LeadAwareTonyApplication:
             else ""
         ),
         attention_service=attention_service,
+        conversation_ingress=conversation_ingress,
     )
 
 

@@ -11,11 +11,12 @@ Telegram webhook
   -> n8n Telegram Trigger
   -> authenticated HTTP Request: POST http://127.0.0.1:8790/telegram/inbound
   -> Tony bridge
-  -> OpenClaw agent `tony` and durable session
-  -> Tony bridge response
+  -> ordinary conversation: OpenClaw agent `tony` and synchronous bridge response
+  -> substantive work: durable correlated work item and immediate acknowledgement
   -> n8n formatter
   -> Telegram Send node
-  -> reply in the originating chat
+  -> acknowledgement in the originating chat
+  -> durable Tony worker -> OpenClaw/specialists -> proactive result in the same chat
 ```
 
 The Telegram credential remains in n8n. `TONY_BRIDGE_TOKEN` remains only in the
@@ -28,6 +29,18 @@ header expression under n8n 2.20:
 
 The active workflow version must be published after changing a node. An edited
 draft is not the version n8n activates after restart.
+
+The HTTP Request body must include `text`, `chat_id`, `message_id`, and
+`update_id`. The latter three fields give durable work a stable Telegram
+correlation and make an n8n replay resolve to the existing work item rather than
+commissioning duplicate model work. Substantive work is persisted beneath
+`TONY_CONVERSATION_WORK_ROOT` (default `.runtime/conversation-work`), with
+atomic current-state snapshots and an append-only `events.jsonl`. The
+`com.narratiive.tony-conversation-worker` LaunchAgent recovers expired work
+leases, keeps model execution outside the inbound HTTP lifetime, and retries
+generation and Telegram delivery independently. Ordinary conversation remains
+synchronous. This does not grant any external-action authority: consequential
+actions continue through the existing approval-gated command boundary.
 
 ## Durable macOS startup
 

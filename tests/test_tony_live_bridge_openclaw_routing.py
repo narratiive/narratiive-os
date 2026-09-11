@@ -11,11 +11,12 @@ from unittest import mock
 from openclaw.tony_agent_gateway import TonyAgentGatewayError
 from openclaw.tony_live_bridge import LeadAwareTonyApplication
 from runtime.inbound_leads import FileInboundLeadStore
+from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 
 
 class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
     def _request(self, app: LeadAwareTonyApplication, text: str) -> tuple[str, dict]:
-        body = json.dumps({"text": text, "source": "telegram"}).encode("utf-8")
+        body = json.dumps({"text": text, "source": "telegram", "chat_id": "123", "message_id": "7", "update_id": "9"}).encode("utf-8")
         environ = {
             "REQUEST_METHOD": "POST",
             "PATH_INFO": "/telegram/inbound",
@@ -96,6 +97,26 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
 
         self.assertTrue(status.startswith("503"))
         self.assertEqual(payload["error"]["code"], "openclaw_conversation_unavailable")
+        base._handle_telegram_command.assert_not_called()
+
+    def test_substantive_work_is_persisted_and_acknowledged_without_waiting_for_openclaw(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app, base, gateway = self._app(tmp)
+            app.conversation_ingress = TonyConversationIngress(
+                FileConversationWorkStore(Path(tmp) / "conversation-work"),
+                workspace_id="narratiive",
+            )
+            status, payload = self._request(
+                app,
+                "Commission the Research Analyst to investigate and propose a suitable real UK growth company.",
+            )
+
+        self.assertTrue(status.startswith("200"))
+        self.assertEqual(payload["status"], "accepted")
+        self.assertEqual(payload["data"]["runtime"], "narratiive_durable_work")
+        self.assertTrue(payload["data"]["work_id"].startswith("telegram-"))
+        self.assertIn("come back here", payload["reply"])
+        gateway.converse.assert_not_called()
         base._handle_telegram_command.assert_not_called()
 
 

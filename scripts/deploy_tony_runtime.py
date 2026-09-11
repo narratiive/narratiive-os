@@ -18,6 +18,7 @@ from typing import Callable, Sequence
 RUNTIME_LABELS = (
     "com.narratiive.runtime",
     "com.narratiive.tony-http-bridge",
+    "com.narratiive.tony-conversation-worker",
     "com.narratiive.service-supervisor",
 )
 HEALTH_ENDPOINTS = (

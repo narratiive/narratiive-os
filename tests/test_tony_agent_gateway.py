@@ -94,6 +94,33 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertTrue(all("instructions" not in body for body in bodies))
         self.assertTrue(all("previous_response_id" not in body for body in bodies))
 
+    def test_durable_work_uses_isolated_session_and_worker_deadline(self):
+        captured = {}
+
+        def fake_urlopen(request, timeout):
+            captured["headers"] = {key.casefold(): value for key, value in request.header_items()}
+            captured["body"] = json.loads(request.data)
+            captured["timeout"] = timeout
+            return _Response({"output_text": "Completed work"})
+
+        gateway = TonyAgentGateway(
+            TonyAgentGatewayConfig(
+                session_key="narratiive:tony:telegram",
+                timeout_seconds=120,
+                work_timeout_seconds=900,
+            )
+        )
+        with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
+            reply = gateway.converse_for_work("Research this", "telegram-abc")
+
+        self.assertEqual(reply, "Completed work")
+        self.assertEqual(captured["timeout"], 900)
+        self.assertEqual(captured["body"]["user"], "narratiive:tony:telegram:work:telegram-abc")
+        self.assertEqual(
+            captured["headers"]["x-openclaw-session-key"],
+            "narratiive:tony:telegram:work:telegram-abc",
+        )
+
     def test_environment_defaults_openresponses_user_to_session_key(self):
         config = TonyAgentGatewayConfig.from_env({"TONY_OPENCLAW_SESSION_KEY": "agent:tony:telegram:matt"})
         self.assertEqual(config.session_key, "agent:tony:telegram:matt")
