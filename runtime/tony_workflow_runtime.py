@@ -68,12 +68,31 @@ class TonyWorkflowRuntime:
         self._project(self.runs.load_run(run_id))
         return outcome
 
-    def approve(self, run_id: str, *, approver: str, rationale: str) -> dict[str, Any]:
-        state = self.coordinator.approve(run_id, approver=approver, rationale=rationale)
+    def approve(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        approval_binding: Mapping[str, object] | None = None,
+    ) -> dict[str, Any]:
+        state = self.coordinator.approve(
+            run_id,
+            approver=approver,
+            rationale=rationale,
+            approval_binding=approval_binding,
+        )
         self._project(state)
         return workflow_to_dict(state)
 
-    def reject_for_revision(self, run_id: str, *, reviewer: str, rationale: str) -> dict[str, Any]:
+    def reject_for_revision(
+        self,
+        run_id: str,
+        *,
+        reviewer: str,
+        rationale: str,
+        approval_binding: Mapping[str, object] | None = None,
+    ) -> dict[str, Any]:
         current = self.runs.load_run(run_id)
         if current.status is WorkflowStatus.BLOCKED:
             state = self.runs.request_blocked_revision(
@@ -82,7 +101,12 @@ class TonyWorkflowRuntime:
                 rationale=rationale,
             )
         else:
-            state = self.runs.reject_for_revision(run_id, reviewer=reviewer, rationale=rationale)
+            state = self.runs.reject_for_revision(
+                run_id,
+                reviewer=reviewer,
+                rationale=rationale,
+                approval_binding=approval_binding,
+            )
         self._project(state)
         return workflow_to_dict(state)
 

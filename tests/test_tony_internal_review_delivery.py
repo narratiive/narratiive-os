@@ -188,6 +188,46 @@ class TonyInternalReviewDeliveryTests(unittest.TestCase):
         self.assertIn("stale", stale.message)
         self.assertEqual(self.runtime.runs.load_run("safe-review-run").approval_status, "pending")
 
+    def test_approval_audit_persists_exact_gate_and_artifact_binding(self) -> None:
+        gate = self.service.execute("/workflow safe-review-run", []).data
+        token = gate["approval_token"]
+
+        approved = self.service.execute(
+            "/approve safe-review-run because the synthetic fixture is review-ready",
+            [],
+            principal_id="telegram:123",
+            inputs={"approval_token": token},
+        )
+
+        self.assertEqual(approved.data["approval_status"], "approved")
+        state = self.runtime.runs.load_run("safe-review-run")
+        artifact = state.stages[-1].output_artifacts[-1]
+        binding = state.approval_history[-1]["approval_binding"]
+        self.assertEqual(binding["workflow_id"], state.workflow_id)
+        self.assertEqual(binding["run_id"], state.run_id)
+        self.assertEqual(binding["artifact_id"], artifact.artifact_id)
+        self.assertEqual(binding["artifact_checksum"], artifact.checksum)
+        self.assertEqual(binding["artifact_version"], "v1")
+        self.assertEqual(binding["approval_binding_digest"], token)
+
+    def test_revision_audit_persists_rejected_artifact_binding(self) -> None:
+        gate = self.service.execute("/workflow safe-review-run", []).data
+        token = gate["approval_token"]
+
+        revised = self.service.execute(
+            "/reject safe-review-run because centre the opportunity on retention",
+            [],
+            principal_id="telegram:123",
+            inputs={"approval_token": token},
+        )
+
+        self.assertEqual(revised.data["approval_status"], "rejected")
+        state = self.runtime.runs.load_run("safe-review-run")
+        binding = state.approval_history[-1]["approval_binding"]
+        self.assertEqual(binding["artifact_id"], state.stages[-1].output_artifacts[-1].artifact_id)
+        self.assertEqual(binding["artifact_version"], "v1")
+        self.assertEqual(binding["approval_binding_digest"], token)
+
     def test_ambiguous_decision_without_gate_token_fails_safe(self) -> None:
         response = self.service.execute(
             "/approve safe-review-run because looks fine I suppose",

@@ -14,7 +14,7 @@ from runtime.tony_command_service import CommandResponse
 from runtime.tony_internal_review_delivery import (
     INTERNAL_REVIEW_ADDRESS,
     InternalReviewDeliveryService,
-    assert_current_approval_token,
+    approval_binding_evidence,
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
@@ -81,16 +81,27 @@ class FileWorkflowCommandBackend:
         return tuple(states)
 
     def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str) -> WorkflowState:
-        assert_current_approval_token(state, approval_token)
+        binding = approval_binding_evidence(state, approval_token)
         runtime = self._runtime(state)
-        runtime.approve(state.run_id, approver=approver, rationale=rationale)
+        runtime.approve(
+            state.run_id,
+            approver=approver,
+            rationale=rationale,
+            approval_binding=binding,
+        )
         return runtime.runs.load_run(state.run_id)
 
     def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str) -> WorkflowState:
+        binding = None
         if state.approval_status == "pending":
-            assert_current_approval_token(state, approval_token)
+            binding = approval_binding_evidence(state, approval_token)
         runtime = self._runtime(state)
-        runtime.reject_for_revision(state.run_id, reviewer=reviewer, rationale=rationale)
+        runtime.reject_for_revision(
+            state.run_id,
+            reviewer=reviewer,
+            rationale=rationale,
+            approval_binding=binding,
+        )
         return runtime.runs.load_run(state.run_id)
 
     def resume(self, state: WorkflowState) -> WorkflowState:

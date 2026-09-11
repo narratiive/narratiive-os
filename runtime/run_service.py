@@ -376,7 +376,14 @@ class WorkflowRunService:
         )
         return state
 
-    def approve(self, run_id: str, *, approver: str, rationale: str) -> WorkflowState:
+    def approve(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        approval_binding: Mapping[str, object] | None = None,
+    ) -> WorkflowState:
         state = self.repository.load(run_id)
         identity = approver.strip()
         reason = rationale.strip()
@@ -390,6 +397,8 @@ class WorkflowRunService:
             "approved_at": datetime.now(timezone.utc).isoformat(),
             "proposed_next_action": state.proposed_next_action,
         }
+        if approval_binding:
+            approval["approval_binding"] = dict(approval_binding)
         state.approval_history.append(approval)
         state.approval_status = "approved"
         state.proposed_next_action = None
@@ -404,6 +413,7 @@ class WorkflowRunService:
         *,
         reviewer: str,
         rationale: str,
+        approval_binding: Mapping[str, object] | None = None,
     ) -> WorkflowState:
         """Record an explicit rejection and reopen the producing step.
 
@@ -428,6 +438,8 @@ class WorkflowRunService:
             "rejected_at": datetime.now(timezone.utc).isoformat(),
             "proposed_next_action": state.proposed_next_action,
         }
+        if approval_binding:
+            rejection["approval_binding"] = dict(approval_binding)
         state.approval_history.append(rejection)
         state.approval_status = "rejected"
         state.status = WorkflowStatus.ACTIVE

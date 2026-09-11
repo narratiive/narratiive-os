@@ -51,7 +51,7 @@ def workflow_approval_token(state: WorkflowState) -> str | None:
             state.proposed_next_action or "",
             artifact.artifact_id,
             artifact.checksum or "",
-            str(artifact.metadata.get("version") or ""),
+            _artifact_version(artifact),
         )
     )
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
@@ -72,6 +72,25 @@ def assert_current_approval_token(state: WorkflowState, supplied: str) -> None:
         raise InternalReviewDeliveryError(
             "approval token is stale or does not match the current workflow gate and artefact version"
         )
+
+
+def approval_binding_evidence(state: WorkflowState, supplied: str) -> dict[str, str]:
+    """Return the exact, already-validated artefact/gate binding for the audit log."""
+
+    assert_current_approval_token(state, supplied)
+    artifact = latest_artifact(state)
+    if artifact is None:  # Kept defensive even though token validation requires one.
+        raise InternalReviewDeliveryError("workflow run has no current artefact approval gate")
+    return {
+        "workflow_id": state.workflow_id,
+        "run_id": state.run_id,
+        "stage_id": state.current_stage_id or "",
+        "proposed_next_action": state.proposed_next_action or "",
+        "artifact_id": artifact.artifact_id,
+        "artifact_checksum": artifact.checksum or "",
+        "artifact_version": _artifact_version(artifact),
+        "approval_binding_digest": supplied.strip(),
+    }
 
 
 class InternalReviewDeliveryService:
