@@ -37,7 +37,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertNotIn("entries", merged["agents"])
             self.assertNotIn("ownership", merged["agents"])
             agents = {agent["id"]: agent for agent in merged["agents"]["list"]}
-            self.assertEqual(agents["tony"]["model"], "ollama/qwen3.5")
+            self.assertEqual(agents["tony"]["model"], "anthropic/claude-sonnet-4-6")
             self.assertEqual(
                 set(agents["tony"]["subagents"]["allowAgents"]),
                 {"research", "strategy", "creative-director", "production", "operations"},

@@ -287,11 +287,12 @@ class TonyAgentGatewayTests(unittest.TestCase):
                     gateway.converse_for_work("Research this", "telegram-abc")
             request.assert_not_called()
 
-    def test_research_and_strategy_specialists_use_claude(self):
+    def test_tony_research_and_strategy_use_claude(self):
         fleet_path = Path(__file__).resolve().parents[1] / "openclaw" / "openclaw.fleet.json"
         fleet = json.loads(fleet_path.read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
         models = {agent_id: agent.get("model") for agent_id, agent in agents.items()}
+        self.assertEqual(models["tony"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(models["research"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(models["strategy"], "anthropic/claude-sonnet-4-6")
         inherited = set(agents["tony"]["tools"]["alsoAllow"])
