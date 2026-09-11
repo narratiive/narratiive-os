@@ -73,6 +73,9 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertIn("Never claim that an external action happened unless the control plane returns decision-grade evidence", contract)
         self.assertIn("You orchestrate five specialists", contract)
         self.assertIn("Do not make Matt restate a magic approval phrase", contract)
+        self.assertIn("the Telegram ingress has already acknowledged the commission", contract)
+        self.assertIn("Complete the explicitly requested safe milestone before returning", contract)
+        self.assertIn("use `sessions_yield` when its result is required", contract)
 
     def test_independent_telegram_turns_share_the_same_openresponses_user(self):
         bodies = []
