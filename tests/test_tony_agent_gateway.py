@@ -112,7 +112,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertTrue(all("instructions" not in body for body in bodies))
         self.assertTrue(all("previous_response_id" not in body for body in bodies))
 
-    def test_durable_work_uses_isolated_session_and_worker_deadline(self):
+    def test_durable_work_uses_isolated_session_worker_deadline_and_protocol(self):
         captured = {}
 
         def fake_urlopen(request, timeout):
@@ -129,15 +129,29 @@ class TonyAgentGatewayTests(unittest.TestCase):
             )
         )
         with mock.patch("openclaw.tony_agent_gateway.urlopen", side_effect=fake_urlopen):
-            reply = gateway.converse_for_work("Research this", "telegram-abc")
+            with self.assertRaisesRegex(TonyAgentGatewayError, "without specialist delegation evidence"):
+                gateway.converse_for_work("Research this", "telegram-abc")
 
-        self.assertEqual(reply, "Completed work")
         self.assertEqual(captured["timeout"], 900)
         self.assertEqual(captured["body"]["user"], "narratiive:tony:telegram:work:telegram-abc")
+        self.assertIn("Research this", captured["body"]["input"])
+        self.assertIn("sessions_spawn", captured["body"]["input"])
+        self.assertIn("sessions_yield", captured["body"]["input"])
         self.assertEqual(
             captured["headers"]["x-openclaw-session-key"],
             "narratiive:tony:telegram:work:telegram-abc",
         )
+
+    def test_durable_work_never_accepts_a_direct_unsupported_answer(self):
+        gateway = TonyAgentGateway(
+            TonyAgentGatewayConfig(work_timeout_seconds=0.05, work_poll_seconds=0.01)
+        )
+        with mock.patch(
+            "openclaw.tony_agent_gateway.urlopen",
+            return_value=_Response({"output_text": "An unsupported company proposal"}),
+        ):
+            with self.assertRaisesRegex(TonyAgentGatewayError, "without specialist delegation evidence"):
+                gateway.converse_for_work("Choose a company", "telegram-no-delegation")
 
     def test_durable_work_waits_for_tony_after_sessions_yield(self):
         with tempfile.TemporaryDirectory() as temp_dir:
