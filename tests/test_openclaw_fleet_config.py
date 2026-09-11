@@ -41,6 +41,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(set(self.agents), {"tony", *SPECIALISTS})
 
     def test_tony_can_delegate_only_to_canonical_specialists(self):
+        self.assertEqual(self.agents["tony"]["model"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(set(self.agents["tony"]["subagents"]["allowAgents"]), set(SPECIALISTS))
         self.assertTrue(self.agents["tony"]["subagents"]["requireAgentId"])
         self.assertEqual(self.agents["tony"]["subagents"]["delegationMode"], "prefer")
