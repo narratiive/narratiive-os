@@ -12,6 +12,8 @@ EXPECTED_TONY_ADDITIONS = {
     "sessions_spawn",
     "sessions_yield",
     "subagents",
+    "web_search",
+    "web_fetch",
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",

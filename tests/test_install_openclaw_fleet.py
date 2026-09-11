@@ -108,6 +108,8 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                     "sessions_yield",
                     "sessions_send",
                     "subagents",
+                    "web_search",
+                    "web_fetch",
                     "narratiive_read_state",
                     "narratiive_execute_safe_read",
                     "narratiive_request_action_approval",

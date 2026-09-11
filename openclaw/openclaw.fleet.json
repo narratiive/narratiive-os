@@ -40,6 +40,8 @@
             "sessions_yield",
             "sessions_send",
             "subagents",
+            "web_search",
+            "web_fetch",
             "narratiive_read_state",
             "narratiive_execute_safe_read",
             "narratiive_request_action_approval",
@@ -56,7 +58,8 @@
         "workspace": "~/.openclaw/workspace-research",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
-          "allow": ["read", "write", "edit", "apply_patch", "browser"],
+          "allow": ["read", "write", "edit", "apply_patch", "browser", "web_search", "web_fetch"],
+          "sandbox": {"tools": {"alsoAllow": ["web_search", "web_fetch"]}},
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },

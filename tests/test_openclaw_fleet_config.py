@@ -14,6 +14,8 @@ TONY_PROFILE_ADDITIONS = {
     "sessions_spawn",
     "sessions_yield",
     "subagents",
+    "web_search",
+    "web_fetch",
     "narratiive_read_state",
     "narratiive_execute_safe_read",
     "narratiive_request_action_approval",
@@ -75,7 +77,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
             with self.subTest(agent_id=agent_id):
                 self.assertNotIn("heartbeat", self.agents[agent_id])
 
-    def test_tony_tool_surface_is_only_orchestration_and_narratiive_control_plane(self):
+    def test_tony_tool_surface_is_orchestration_control_plane_and_safe_web_read(self):
         tools = self.agents["tony"]["tools"]
         additions = set(tools["alsoAllow"])
         denied = set(tools["deny"])
@@ -85,6 +87,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertNotIn("sessions_send", denied)
         self.assertTrue({"session_status", "message"}.issubset(denied))
         self.assertTrue({"read", "write", "edit", "browser"}.isdisjoint(additions))
+        self.assertTrue({"web_search", "web_fetch"}.issubset(additions))
         contract = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
         self.assertIn("direct tool surface is intentionally limited", contract)
         self.assertIn("bounded workspace research belongs with the specialist agents", contract)
