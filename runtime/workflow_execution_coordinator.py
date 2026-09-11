@@ -154,9 +154,21 @@ class WorkflowExecutionCoordinator:
                 input_payload=inputs,
             )
 
-    def approve(self, run_id: str, *, approver: str, rationale: str) -> WorkflowState:
+    def approve(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        approval_binding: Mapping[str, object] | None = None,
+    ) -> WorkflowState:
         with self._run_lock(run_id):
-            return self.runs.approve(run_id, approver=approver, rationale=rationale)
+            return self.runs.approve(
+                run_id,
+                approver=approver,
+                rationale=rationale,
+                approval_binding=approval_binding,
+            )
 
     def recover_pending(self) -> int:
         return self.runs.recover_interrupted_runs()
