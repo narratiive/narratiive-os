@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import tempfile
+import threading
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -23,6 +26,18 @@ class _Response:
 
 
 class TonyAgentGatewayTests(unittest.TestCase):
+    @staticmethod
+    def _write_work_session(state_dir: Path, session_key: str, entries: list[dict]) -> Path:
+        sessions_dir = state_dir / "agents" / "tony" / "sessions"
+        sessions_dir.mkdir(parents=True)
+        transcript = sessions_dir / "session-1.jsonl"
+        transcript.write_text("".join(json.dumps(entry) + "\n" for entry in entries), encoding="utf-8")
+        (sessions_dir / "sessions.json").write_text(
+            json.dumps({f"agent:tony:{session_key}": {"sessionId": "session-1", "sessionFile": str(transcript)}}),
+            encoding="utf-8",
+        )
+        return transcript
+
     def test_only_explicit_slash_commands_use_deterministic_surface(self):
         self.assertTrue(TonyAgentGateway.is_system_command("/health"))
         self.assertTrue(TonyAgentGateway.is_system_command("  /diagnostics"))
@@ -123,6 +138,94 @@ class TonyAgentGatewayTests(unittest.TestCase):
             captured["headers"]["x-openclaw-session-key"],
             "narratiive:tony:telegram:work:telegram-abc",
         )
+
+    def test_durable_work_waits_for_tony_after_sessions_yield(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram:work:telegram-abc"
+            transcript = self._write_work_session(
+                state_dir,
+                session_key,
+                [
+                    {
+                        "timestamp": "2026-09-11T12:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "toolUse",
+                            "content": [{"type": "toolCall", "name": "sessions_yield"}],
+                        },
+                    }
+                ],
+            )
+
+            def finish_after_yield():
+                time.sleep(0.03)
+                with transcript.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        json.dumps(
+                            {
+                                "timestamp": "2026-09-11T12:02:00Z",
+                                "message": {
+                                    "role": "assistant",
+                                    "stopReason": "stop",
+                                    "content": [{"type": "text", "text": "Verified company and rationale"}],
+                                },
+                            }
+                        )
+                        + "\n"
+                    )
+
+            gateway = TonyAgentGateway(
+                TonyAgentGatewayConfig(state_dir=state_dir, work_timeout_seconds=1, work_poll_seconds=0.01)
+            )
+            thread = threading.Thread(target=finish_after_yield)
+            thread.start()
+            with mock.patch(
+                "openclaw.tony_agent_gateway.urlopen",
+                return_value=_Response({"output_text": "transient sub-agent notice"}),
+            ):
+                reply = gateway.converse_for_work("Research this", "telegram-abc")
+            thread.join()
+            self.assertEqual(reply, "Verified company and rationale")
+
+    def test_restart_recovers_resumed_result_without_duplicate_openclaw_request(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram:work:telegram-abc"
+            self._write_work_session(
+                state_dir,
+                session_key,
+                [
+                    {
+                        "timestamp": "2026-09-11T12:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "toolUse",
+                            "content": [{"type": "toolCall", "name": "sessions_yield"}],
+                        },
+                    },
+                    {
+                        "timestamp": "2026-09-11T12:02:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "stop",
+                            "content": [{"type": "text", "text": "Recovered final result"}],
+                        },
+                    },
+                ],
+            )
+            gateway = TonyAgentGateway(TonyAgentGatewayConfig(state_dir=state_dir))
+            with mock.patch("openclaw.tony_agent_gateway.urlopen") as request:
+                reply = gateway.converse_for_work("Research this", "telegram-abc")
+            self.assertEqual(reply, "Recovered final result")
+            request.assert_not_called()
+
+    def test_research_and_strategy_specialists_use_claude(self):
+        fleet_path = Path(__file__).resolve().parents[1] / "openclaw" / "openclaw.fleet.json"
+        fleet = json.loads(fleet_path.read_text(encoding="utf-8"))
+        models = {agent["id"]: agent.get("model") for agent in fleet["agents"]["list"]}
+        self.assertEqual(models["research"], "anthropic/claude-sonnet-4-6")
+        self.assertEqual(models["strategy"], "anthropic/claude-sonnet-4-6")
 
     def test_environment_defaults_openresponses_user_to_session_key(self):
         config = TonyAgentGatewayConfig.from_env({"TONY_OPENCLAW_SESSION_KEY": "agent:tony:telegram:matt"})

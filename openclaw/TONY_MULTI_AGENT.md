@@ -6,6 +6,12 @@ Tony is the only user-facing executive agent. Research, Strategy, Creative Direc
 
 Configure the specialist IDs in `openclaw/specialists.json` as isolated OpenClaw agents with separate workspaces and agent directories. `agents_list` is Tony's configured/spawnable specialist roster; `subagents` is only the live/recent child-run ledger for Tony's requester tree. An empty child-run ledger must never be interpreted as an empty specialist fleet or empty business-work state. Tony discovers and delegates with OpenClaw's native `agents_list`, `sessions_spawn`, `sessions_history`, `sessions_yield` and `subagents` capabilities. Tony should use persistent visible sessions when Matt needs durable status visibility, and isolated background sessions for bounded work.
 
+Research and Strategy use the configured Claude specialist model. Their
+credentials remain in OpenClaw's runtime credential store and are never written
+to this repository. A durable Telegram work item that yields for a specialist
+remains incomplete until Tony's pushed completion turn has been captured; the
+yield receipt or an auto-announce transport notice is not a user result.
+
 Set Tony's sub-agent allow-list to the five specialist IDs. Do not grant specialist agents direct external messaging or consequential business-state writes. Safe research, reasoning and reversible preparation can run autonomously. Gmail sends, Calendar commitments, client-facing Drive changes and authoritative Notion mutations remain behind Narratiive OS approval/evidence boundaries.
 
 ## Inbound Growth Diagnostic contract
