@@ -155,8 +155,11 @@ that Notion changed without execution evidence.
    specifications and capability-routed Production Pack jobs only when every
    record traces to the exact approved Bible. Jobs require human review, the
    Production Pack requires Matt's exact-version approval, and neither the plan
-   nor its jobs can authorise publication or media spend. Planned Asset Manifest
-   generation remains the next production-foundation slice.
+   nor its jobs can authorise publication or media spend. An approved Production
+   Pack can now create a planned Asset Manifest with immutable asset IDs, initial
+   version numbers and exact job, specification, Bible and Production Pack
+   lineage. Planned records cannot claim files, approval, delivery, publication
+   or spend; generated-file version registration is the next production slice.
 6. **Production orchestration** — route jobs by declared capability, ingest
    generated files into Drive, register versions, validate technical
    specifications and stop at human asset approval.
