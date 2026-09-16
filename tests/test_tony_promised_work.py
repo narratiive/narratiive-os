@@ -11,6 +11,8 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_tony_workflow_commands import blueprint_output
 from tests.test_workflow_quality import proposal_output
+from runtime.workspaces import WorkspaceRuntimeManager
+from scripts.run_tony_conversation_worker import resolve_workflow_workspace_id
 
 
 def lifecycle() -> ClientLifecycleRecord:
@@ -177,6 +179,23 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(first.promised_work_delivery["status"], "attempting")
         self.assertIsNone(second)
         self.assertEqual(len(sends), 1)
+
+    def test_worker_resolves_registered_executive_workspace_to_workflow_tenant(self) -> None:
+        runtime_root = self.root / "runtime"
+        WorkspaceRuntimeManager(runtime_root, self.root).create(
+            "agency",
+            "narratiive",
+            "Narratiive executive workspace",
+        )
+
+        resolved = resolve_workflow_workspace_id(
+            {
+                "NARRATIIVE_RUNTIME_ROOT": str(runtime_root),
+                "TONY_EXECUTIVE_WORKSPACE_ID": "agency",
+            }
+        )
+
+        self.assertEqual(resolved, "narratiive")
 
 
 if __name__ == "__main__":
