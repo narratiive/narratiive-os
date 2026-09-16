@@ -159,7 +159,10 @@ that Notion changed without execution evidence.
    Pack can now create a planned Asset Manifest with immutable asset IDs, initial
    version numbers and exact job, specification, Bible and Production Pack
    lineage. Planned records cannot claim files, approval, delivery, publication
-   or spend; generated-file version registration is the next production slice.
+   or spend. Generated files can now be registered only as append-only versions
+   in Drive, with checksums and exact Asset Manifest/job lineage. Version numbers
+   cannot be overwritten or skipped, every generated version requires human
+   review, and generation cannot imply approval, delivery or publication.
 6. **Production orchestration** — route jobs by declared capability, ingest
    generated files into Drive, register versions, validate technical
    specifications and stop at human asset approval.
