@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html
 import json
 import time
 from dataclasses import dataclass
@@ -203,6 +204,8 @@ class GmailDispatcher(GoogleAdapter):
         operation = _text(contract.get("operation")).casefold()
         query_text = _text(target.get("query") or payload.get("query"))
         if operation in {"search", "list"}:
+            if operation == "list" and not query_text:
+                query_text = "in:inbox"
             if not query_text:
                 raise BusinessAdapterError("gmail_search_requires_query")
             max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
@@ -230,7 +233,12 @@ class GmailDispatcher(GoogleAdapter):
                     "to": headers.get("to", ""),
                     "subject": headers.get("subject", ""),
                     "date": headers.get("date", ""),
-                    "snippet": _text(message.get("snippet")),
+                    "snippet": html.unescape(_text(message.get("snippet"))),
+                    "label_ids": [str(label) for label in message.get("labelIds", [])][:20],
+                    "unread": "UNREAD" in {str(label).upper() for label in message.get("labelIds", [])},
+                    "auto_submitted": headers.get("auto-submitted", ""),
+                    "precedence": headers.get("precedence", ""),
+                    "list_unsubscribe": bool(headers.get("list-unsubscribe", "")),
                 })
             return {
                 "verified": True,
@@ -244,6 +252,37 @@ class GmailDispatcher(GoogleAdapter):
             }
         message_id = _text(payload.get("gmail_message_id") or target.get("message_id"))
         thread_id = _text(target.get("thread_id"))
+        if message_id and operation in {"lookup", "fetch", "inspect", "retrieve", "get_metadata", "get_content"}:
+            include_content = operation in {"fetch", "inspect", "retrieve", "get_content"}
+            message = self.client.call(
+                f"{self.api_base}/users/me/messages/{parse.quote(message_id, safe='')}?format={'full' if include_content else 'metadata'}",
+                headers=self._headers(),
+            )
+            headers = {
+                _text(item.get("name")).casefold(): _text(item.get("value"))
+                for item in _mapping(message.get("payload")).get("headers", [])
+                if isinstance(item, Mapping)
+            }
+            labels = [str(label) for label in message.get("labelIds", [])][:20]
+            snippet = html.unescape(_text(message.get("snippet")))
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": f"gmail:message:{message_id}",
+                "message_id": message_id,
+                "thread_id": _text(message.get("threadId")),
+                "sender": headers.get("from", ""),
+                "recipient": headers.get("to", ""),
+                "subject": headers.get("subject", ""),
+                "received_at": headers.get("date", ""),
+                "snippet": snippet,
+                "body": _gmail_message_body(message) if include_content else "",
+                "label_ids": labels,
+                "unread": "UNREAD" in {label.upper() for label in labels},
+                "content_included": include_content,
+                "summary": "The selected Gmail message was read without mutation.",
+            }
         if message_id and not thread_id:
             item = self.client.call(
                 f"{self.api_base}/users/me/messages/{parse.quote(message_id, safe='')}?format=metadata",
@@ -286,8 +325,8 @@ class GmailDispatcher(GoogleAdapter):
             "reply_found": latest is not None,
             "sender": headers.get("from", ""),
             "received_at": headers.get("date", ""),
-            "snippet": _text(_mapping(latest).get("snippet")),
-            "body": body or _text(_mapping(latest).get("snippet")),
+            "snippet": html.unescape(_text(_mapping(latest).get("snippet"))),
+            "body": body or html.unescape(_text(_mapping(latest).get("snippet"))),
             "summary": "A matching Gmail thread was read without mutation.",
         }
 

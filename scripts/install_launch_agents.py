@@ -30,6 +30,7 @@ LEGACY_AGENT_LABELS = (
 def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[AgentSpec, ...]:
     launcher = repo_root / "scripts" / "run_with_env.py"
     proactive_brief = repo_root / "scripts" / "run_proactive_brief.py"
+    gmail_inbox_watch = repo_root / "scripts" / "run_gmail_inbox_watch.py"
     return (
         AgentSpec(
             "com.narratiive.runtime",
@@ -69,6 +70,13 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
                 "--mode",
                 "escalation",
             ),
+            False,
+            start_interval=900,
+            run_at_load=False,
+        ),
+        AgentSpec(
+            "com.narratiive.gmail-inbox-watch",
+            (str(python_path), str(launcher), str(env_file), str(python_path), str(gmail_inbox_watch)),
             False,
             start_interval=900,
             run_at_load=False,
@@ -196,6 +204,8 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
         raise FileNotFoundError("Tony conversation worker not found")
     if not (repo_root / "scripts" / "run_proactive_brief.py").is_file():
         raise FileNotFoundError("proactive brief runner not found")
+    if not (repo_root / "scripts" / "run_gmail_inbox_watch.py").is_file():
+        raise FileNotFoundError("Gmail inbox watch runner not found")
     if not python_path.is_file():
         raise FileNotFoundError(f"Python executable not found: {python_path}")
     if not env_file.is_file():
@@ -230,6 +240,7 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
     for label in (
         "com.narratiive.proactive-evening",
         "com.narratiive.proactive-morning",
+        "com.narratiive.gmail-inbox-watch",
         "com.narratiive.proactive-watch",
         "com.narratiive.service-supervisor",
         "com.narratiive.tony-http-bridge",
