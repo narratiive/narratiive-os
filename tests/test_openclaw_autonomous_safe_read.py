@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import json
 import unittest
+import shutil
+import subprocess
+import sys
 from pathlib import Path
 
 from runtime.tony_structured_safe_read import StructuredSafeReadError
@@ -86,8 +89,31 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         client = (PLUGIN / "safe-read-client.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_execute_safe_read"', source)
         self.assertIn("executeSafeRead", source)
-        self.assertIn("execute_tony_safe_read.py", client)
+        self.assertIn('"-m", EXECUTOR_MODULE', client)
+        self.assertIn('"scripts.execute_tony_safe_read"', client)
+        self.assertNotIn('stdout.trim() || "{}"', client)
         self.assertNotIn('event.toolName !== "narratiive_execute_safe_read"', source)
+
+    def test_node_client_launches_executor_from_repository_module_path(self):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node is unavailable")
+        module_uri = (PLUGIN / "safe-read-client.js").resolve().as_uri()
+        script = (
+            f'import {{ executeSafeRead }} from {json.dumps(module_uri)}; '
+            f'const result = await executeSafeRead({json.dumps({"action": "List Gmail inbox", "surface": "gmail", "kind": "read", "operation": "list", "target": {}})}, '
+            f'{{python: {json.dumps(sys.executable)}}}); console.log(JSON.stringify(result));'
+        )
+        completed = subprocess.run(
+            [node, "--input-type=module", "-e", script],
+            cwd=ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        result = json.loads(completed.stdout)
+        self.assertEqual(result["status"], "dispatcher_unavailable")
+        self.assertEqual(result["execution_truth"], "not_dispatched")
 
     def test_chief_of_staff_contract_advances_safe_reads_and_keeps_preparation_with_specialists(self):
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")
