@@ -1,13 +1,20 @@
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import os from "node:os";
 import path from "node:path";
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(PLUGIN_DIR, "../../..");
 const EXECUTOR_MODULE = "scripts.execute_tony_safe_read";
+const ENV_LOADER = path.join(REPOSITORY_ROOT, "scripts", "run_with_env.py");
 
 export function executeSafeRead(params = {}, options = {}) {
   const python = String(options.python || process.env.TONY_PYTHON || "python3");
+  const envFile = String(
+    options.envFile
+      || process.env.NARRATIIVE_RUNTIME_ENV_FILE
+      || path.join(os.homedir(), ".config", "narratiive", "runtime.env"),
+  );
   const timeoutMs = Number(options.timeoutMs || process.env.TONY_SAFE_READ_TIMEOUT_MS || 30000);
   const payload = {
     action: params.action,
@@ -18,7 +25,7 @@ export function executeSafeRead(params = {}, options = {}) {
   };
 
   return new Promise((resolve) => {
-    const child = spawn(python, ["-m", EXECUTOR_MODULE], {
+    const child = spawn(python, [ENV_LOADER, envFile, python, "-m", EXECUTOR_MODULE], {
       cwd: REPOSITORY_ROOT,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
