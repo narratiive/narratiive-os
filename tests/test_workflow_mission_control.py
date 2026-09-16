@@ -9,6 +9,8 @@ from runtime.models import WorkflowStatus
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from runtime.workflow_mission_control import WorkflowMissionControlProjector
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
+from runtime.inbound_leads import InboundLead
 
 
 def _blueprint_output() -> dict:
@@ -163,6 +165,71 @@ class WorkflowMissionControlTests(unittest.TestCase):
             ).list_states()
 
             self.assertEqual([state.run_id for state in states], ["visible-run"])
+
+    def test_suppressed_entity_workflow_is_removed_before_executive_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = build_tony_workflow_runtime(
+                temporary,
+                workspace_id="narratiive",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            runtime.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "suppressed-run",
+                {"diagnostic_input_package": {"overall_score": 42}, "company": "SAFE hidden fixture"},
+                entity_id="suppressed-lead",
+                correlation_id="safe-correlation",
+            )
+            state = runtime.runs.load_run("suppressed-run")
+            state.status = WorkflowStatus.BLOCKED
+            state.blocker = "worker_unavailable:strategic_reasoning"
+            visible = ExecutiveVisibilityPolicy().visible_workflows(
+                (state,),
+                (InboundLead("suppressed-lead", "Test", disposition="suppressed"),),
+            )
+
+            view = WorkflowMissionControlProjector(workspace_id="narratiive").project(visible)
+
+            self.assertEqual(view.runs, ())
+            self.assertEqual(view.workstreams, ())
+            self.assertEqual(view.approvals_required, ())
+
+    def test_completed_work_remains_queryable_but_not_an_attention_workstream(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = build_tony_workflow_runtime(
+                temporary,
+                workspace_id="narratiive",
+                client_id="safe-client",
+                dispatchers={"Claude": lambda _: _blueprint_output()},
+                environ={},
+            )
+            runtime.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "completed-run",
+                {"diagnostic_input_package": {"overall_score": 42}, "company": "Finished Co"},
+                entity_id="finished-lead",
+                correlation_id="safe-correlation",
+            )
+            runtime.advance(
+                "completed-run",
+                ClientLifecycleRecord(
+                    client_id="safe-client",
+                    client_name="Finished Co",
+                    stage=ClientLifecycleStage.BLUEPRINT_LITE,
+                    owner="Tony",
+                    next_action="Review",
+                    evidence=("synthetic:test",),
+                ),
+            )
+            runtime.approve("completed-run", approver="matt", rationale="Synthetic approval")
+            state = runtime.runs.load_run("completed-run")
+
+            view = WorkflowMissionControlProjector(workspace_id="narratiive").project((state,))
+
+            self.assertEqual(view.runs[0]["status"], "complete")
+            self.assertEqual(view.workstreams, ())
 
 
 if __name__ == "__main__":

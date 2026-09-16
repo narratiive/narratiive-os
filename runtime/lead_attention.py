@@ -8,6 +8,7 @@ from typing import Callable
 from uuid import uuid4
 
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
 
 VALID_DISPOSITIONS = {"active", "watching", "needs_human_attention", "suppressed", "test", "archived"}
 
@@ -21,7 +22,7 @@ class LeadAttentionService:
         leads = self.store.read()
         if scope == "all": return leads
         if scope in {"suppressed", "test", "archived"}: return tuple(x for x in leads if x.disposition == scope)
-        return tuple(x for x in leads if x.disposition not in {"suppressed", "test", "archived"} and x.status.casefold() != "complete")
+        return ExecutiveVisibilityPolicy().visible_leads(leads)
 
     def mutate(self, reference: str, disposition: str, reason: str = "", actor: str | None = None) -> dict:
         disposition = disposition.casefold().replace("-", "_")

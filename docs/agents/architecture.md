@@ -259,6 +259,13 @@ repository progress, workstream state, connection state, approvals, and
 blockers. It reports `healthy`, `partial`, `blocked`, or `empty` from recorded
 state; it does not infer completion.
 
+Its attention queue and the morning/evening/proactive brief paths apply the
+shared executive-visibility policy before projection. Suppressed, archived,
+test and completed/no-action records remain in canonical storage for audit and
+direct lookup but cannot enter executive brief inputs. Persisted blockers and
+human-required decisions remain visible unless their owning record has an
+authoritative hidden disposition.
+
 The deterministic Tony command surface includes:
 
 - repository health, status/progress, client list/detail, and next-action
@@ -282,6 +289,13 @@ and do not depend on a managerial language model. Manager actions continue
 through `TonyOrchestrationAdapter` and the public runtime gateway.
 `openclaw/tony_live_bridge.py` composes executive brief and capability services
 onto the same bridge.
+
+Substantive future-work commitments use the workflow control plane's
+`commission` operation. It creates an idempotent downstream run with source
+artefact, conversation and commitment lineage before acknowledgement. The
+durable conversation worker advances commissioned work after the inbound HTTP
+turn has closed and proactively delivers its verified result, failure or next
+approval gate to the correlated Telegram conversation.
 
 Approved, Issue-bound engineering tasks may additionally enter the local
 Engineering Orchestrator when a versioned execution policy is configured.

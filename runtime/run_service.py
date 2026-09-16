@@ -498,6 +498,70 @@ class WorkflowRunService:
         )
         return state
 
+    def record_commission(
+        self,
+        run_id: str,
+        *,
+        source_run_id: str,
+        target_workflow_id: str,
+        commitment_id: str,
+    ) -> WorkflowState:
+        """Record a durable conversational commitment without executing it inline."""
+
+        state = self.repository.load(run_id)
+        payload = {
+            "source_run_id": source_run_id.strip(),
+            "target_workflow_id": target_workflow_id.strip(),
+            "commitment_id": commitment_id.strip(),
+        }
+        if not all(payload.values()):
+            raise ValueError("workflow commission requires source, target and commitment identity")
+        self._commit(state, "workflow.commissioned", payload)
+        return state
+
+    def begin_promised_delivery(self, run_id: str, *, delivery_key: str, kind: str) -> WorkflowState:
+        state = self.repository.load(run_id)
+        key = delivery_key.strip()
+        if not key or not kind.strip():
+            raise ValueError("promised delivery requires key and kind")
+        existing = state.promised_work_delivery
+        if existing:
+            if existing.get("delivery_key") != key:
+                raise ValueError("a different promised-work delivery is already recorded")
+            return state
+        state.promised_work_delivery = {
+            "delivery_key": key,
+            "kind": kind.strip(),
+            "status": "attempting",
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "evidence": {},
+        }
+        state.touch()
+        self._commit(state, "promised_work.delivery_started", dict(state.promised_work_delivery))
+        return state
+
+    def finish_promised_delivery(
+        self,
+        run_id: str,
+        *,
+        delivery_key: str,
+        evidence: Mapping[str, object],
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        current = state.promised_work_delivery
+        if current.get("delivery_key") != delivery_key.strip() or current.get("status") != "attempting":
+            raise ValueError("promised-work delivery intent does not match")
+        state.promised_work_delivery = {
+            **current,
+            "status": "delivered",
+            "delivered_at": datetime.now(timezone.utc).isoformat(),
+            "evidence": dict(evidence),
+        }
+        state.external_action_taken = True
+        state.touch()
+        self._commit(state, "promised_work.delivered", dict(state.promised_work_delivery))
+        return state
+
     def recover_interrupted_runs(self) -> int:
         recovered = 0
         for run_id in self.repository.list_run_ids():

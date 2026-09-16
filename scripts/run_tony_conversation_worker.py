@@ -17,6 +17,9 @@ from runtime.tony_conversation_work import (  # noqa: E402
     FileConversationWorkStore,
     TonyConversationWorker,
 )
+from runtime.tony_dispatch_adapters import build_http_dispatchers  # noqa: E402
+from runtime.tony_promised_work import TonyPromisedWorkWorker  # noqa: E402
+from runtime.tony_workflow_commands import FileWorkflowCommandBackend  # noqa: E402
 
 
 def build_worker() -> TonyConversationWorker:
@@ -37,14 +40,40 @@ def build_worker() -> TonyConversationWorker:
     )
 
 
+def build_promised_work_worker() -> TonyPromisedWorkWorker:
+    workflow_root = Path(
+        os.getenv(
+            "TONY_WORKFLOW_RUNTIME_ROOT",
+            str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"),
+        )
+    ).resolve()
+    workspace_id = (
+        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
+        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
+        or "narratiive"
+    )
+    telegram = TelegramSender(TelegramConfig.from_env(os.environ))
+    backend = FileWorkflowCommandBackend(
+        workflow_root,
+        dispatchers=build_http_dispatchers(),
+        workspace_id=workspace_id,
+    )
+    return TonyPromisedWorkWorker(
+        backend,
+        lambda text: telegram.send(telegram.config.default_chat_id, text),
+    )
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Tony's durable conversational work queue")
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--poll-seconds", type=float, default=1.0)
     args = parser.parse_args()
     worker = build_worker()
+    promised_worker = build_promised_work_worker()
     if args.once:
         worker.run_once()
+        promised_worker.run_once()
         return
 
     stopping = False
@@ -56,7 +85,9 @@ def main() -> None:
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
     while not stopping:
-        if worker.run_once() is None:
+        conversation = worker.run_once()
+        promised = promised_worker.run_once()
+        if conversation is None and promised is None:
             time.sleep(max(0.1, args.poll_seconds))
 
 

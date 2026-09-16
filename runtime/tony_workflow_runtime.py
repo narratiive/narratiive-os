@@ -185,6 +185,93 @@ class TonyWorkflowRuntime:
         self._project(self.runs.load_run(run_id))
         return self.advance(next_run_id, lifecycle)
 
+    def commission(
+        self,
+        source_run_id: str,
+        target_workflow_id: str,
+        additional_inputs: Mapping[str, Any],
+        *,
+        commitment_id: str,
+    ) -> tuple[WorkflowState, bool]:
+        """Persist authorised future work before Tony says it is underway.
+
+        Execution is deliberately left to the restart-safe promised-work worker.
+        The target must be downstream of the source in the registered workflow
+        chain, so this cannot manufacture an unrelated work item.
+        """
+
+        source = self.runs.load_run(source_run_id)
+        if source.status is not WorkflowStatus.COMPLETE:
+            raise ValueError("source workflow must be complete before commissioning downstream work")
+        if source.approval_required and source.approval_status != "approved":
+            raise ValueError("source workflow requires explicit approval before commissioning downstream work")
+        target_id = target_workflow_id.strip()
+        definition = self.coordinator.registry.resolve(source.workflow_id)
+        reachable: set[str] = set()
+        cursor = definition.next_workflow_id
+        while cursor and cursor not in reachable:
+            reachable.add(cursor)
+            cursor = self.coordinator.registry.resolve(cursor).next_workflow_id
+        if target_id not in reachable:
+            raise ValueError("commissioned workflow must be downstream of the source workflow")
+
+        artifacts = [artifact for stage in source.stages for artifact in stage.output_artifacts]
+        if not artifacts:
+            raise ValueError("workflow commission requires a persisted source artefact")
+        try:
+            source_output = json.loads(Path(artifacts[-1].location).read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("workflow commission source artefact is unreadable") from exc
+        if not isinstance(source_output, Mapping):
+            raise ValueError("workflow commission source artefact must be structured")
+
+        target = self.coordinator.registry.resolve(target_id)
+        required = target.stages[0].input_contract.required_fields
+        supplied = {**dict(source_output), **dict(additional_inputs)}
+        supplied["_lineage"] = {
+            "parent_workflow_id": source.workflow_id,
+            "parent_run_id": source.run_id,
+            "parent_artifact_ids": [artifact.artifact_id for artifact in artifacts],
+            "recovered_intermediate_evidence": target_id != definition.next_workflow_id,
+        }
+        supplied["_promised_work"] = {
+            "commitment_id": commitment_id.strip(),
+            "source_run_id": source.run_id,
+            "delivery_channel": "telegram",
+            "state": "commissioned",
+        }
+        if "commercial_context" in required and not isinstance(supplied.get("commercial_context"), Mapping):
+            supplied["commercial_context"] = {
+                "company": str(source.input_payload.get("company") or source.input_payload.get("company_name") or "").strip(),
+                "source_ref": f"workflow_run:{source.run_id}",
+            }
+        missing = [field for field in required if field not in supplied or supplied[field] in (None, "", [], {})]
+        if missing:
+            raise ValueError(f"commissioned workflow requires additional inputs: {','.join(missing)}")
+
+        next_run_id = f"{source.run_id}-{target_id}"
+        replay = self.runs.repository.exists(next_run_id)
+        if replay:
+            existing = self.runs.load_run(next_run_id)
+            existing_commitment = existing.input_payload.get("_promised_work", {})
+            if not isinstance(existing_commitment, Mapping) or existing_commitment.get("commitment_id") != commitment_id.strip():
+                raise ValueError("a different durable work item already exists for this workflow transition")
+            return existing, True
+        self.enqueue(
+            target_id,
+            next_run_id,
+            supplied,
+            entity_id=source.entity_id,
+            correlation_id=source.correlation_id,
+        )
+        commissioned = self.runs.record_commission(
+            next_run_id,
+            source_run_id=source.run_id,
+            target_workflow_id=target_id,
+            commitment_id=commitment_id,
+        )
+        return commissioned, False
+
     def list_run_ids(self) -> list[str]:
         return self.runs.repository.list_run_ids()
 
