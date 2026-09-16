@@ -97,6 +97,18 @@ class OpenClawActionPolicyTests(unittest.TestCase):
                 self.assertEqual(proposal["effective_kind"], "read")
                 self.assertFalse(proposal["approval_required"])
 
+    def test_sender_language_does_not_false_positive_as_send_intent(self):
+        proposal = self._proposal(
+            {
+                "action": "List inbox messages and return the sender, subject and snippet",
+                "surface": "gmail",
+                "kind": "read",
+                "operation": "list",
+            }
+        )["proposal"]
+        self.assertEqual(proposal["effective_kind"], "read")
+        self.assertFalse(proposal["approval_required"])
+
     def test_move_and_send_still_cannot_be_downgraded_to_reads(self):
         for action in ("Move the Drive file", "Send the Gmail message"):
             with self.subTest(action=action):

@@ -171,6 +171,58 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["results"][0]["subject"], "KatKin")
         self.assertIn("q=KatKin", router.requests[0].full_url)
 
+    def test_gmail_list_defaults_to_inbox_and_reports_unread_state(self):
+        router = Router([
+            {"messages": [{"id": "m1", "threadId": "t1"}]},
+            {
+                "id": "m1",
+                "threadId": "t1",
+                "labelIds": ["INBOX", "UNREAD"],
+                "snippet": "Hello &amp; welcome",
+                "payload": {"headers": [{"name": "From", "value": "lead@example.invalid"}]},
+            },
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({"execution_mode": "autonomous_read", "operation": "list", "target": {}})
+
+        self.assertEqual(result["query"], "in:inbox")
+        self.assertEqual(result["results"][0]["snippet"], "Hello & welcome")
+        self.assertTrue(result["results"][0]["unread"])
+        self.assertIn("q=in%3Ainbox", router.requests[0].full_url)
+
+    def test_gmail_get_content_reads_the_selected_inbound_message(self):
+        encoded = base64.urlsafe_b64encode(b"Can we arrange a call next week?").decode("ascii").rstrip("=")
+        router = Router([{
+            "id": "inbound-1",
+            "threadId": "thread-1",
+            "labelIds": ["INBOX"],
+            "snippet": "Can we arrange a call next week?",
+            "payload": {
+                "mimeType": "text/plain",
+                "body": {"data": encoded},
+                "headers": [
+                    {"name": "From", "value": "lead@example.invalid"},
+                    {"name": "To", "value": "hello@narratiive.com"},
+                    {"name": "Subject", "value": "New project"},
+                ],
+            },
+        }])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "get_content",
+            "target": {"message_id": "inbound-1"},
+        })
+
+        self.assertEqual(result["message_id"], "inbound-1")
+        self.assertEqual(result["thread_id"], "thread-1")
+        self.assertEqual(result["body"], "Can we arrange a call next week?")
+        self.assertTrue(result["content_included"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(len(router.requests), 1)
+
     def test_gmail_write_requires_approval_and_suppresses_duplicate_send(self):
         adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=Router([]))
         with self.assertRaisesRegex(BusinessAdapterError, "approval"):

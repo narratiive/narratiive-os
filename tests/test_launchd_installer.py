@@ -35,6 +35,7 @@ class LaunchdInstallerTests(unittest.TestCase):
                 "com.narratiive.tony-conversation-worker",
                 "com.narratiive.service-supervisor",
                 "com.narratiive.proactive-watch",
+                "com.narratiive.gmail-inbox-watch",
                 "com.narratiive.proactive-morning",
                 "com.narratiive.proactive-evening",
             ],
@@ -49,12 +50,15 @@ class LaunchdInstallerTests(unittest.TestCase):
         self.assertEqual(specs[4].start_interval, 900)
         self.assertEqual(specs[4].arguments[-1], "escalation")
         self.assertFalse(specs[4].run_at_load)
-        self.assertEqual(specs[5].start_calendar_interval, {"Hour": 8, "Minute": 0})
-        self.assertEqual(specs[5].arguments[-1], "morning")
+        self.assertEqual(specs[5].start_interval, 900)
+        self.assertTrue(specs[5].arguments[-1].endswith("run_gmail_inbox_watch.py"))
         self.assertFalse(specs[5].run_at_load)
-        self.assertEqual(specs[6].start_calendar_interval, {"Hour": 18, "Minute": 0})
-        self.assertEqual(specs[6].arguments[-1], "evening")
+        self.assertEqual(specs[6].start_calendar_interval, {"Hour": 8, "Minute": 0})
+        self.assertEqual(specs[6].arguments[-1], "morning")
         self.assertFalse(specs[6].run_at_load)
+        self.assertEqual(specs[7].start_calendar_interval, {"Hour": 18, "Minute": 0})
+        self.assertEqual(specs[7].arguments[-1], "evening")
+        self.assertFalse(specs[7].run_at_load)
 
     def test_plist_contains_no_secret_values(self) -> None:
         spec = installer.build_specs(Path("/repo"), Path("/python"), Path("/secure/runtime.env"))[0]
@@ -67,16 +71,18 @@ class LaunchdInstallerTests(unittest.TestCase):
     def test_proactive_plists_use_expected_schedules_without_run_at_load(self) -> None:
         specs = installer.build_specs(Path("/repo"), Path("/python"), Path("/secure/runtime.env"))
         watch = plistlib.loads(installer.render_plist(specs[4], Path("/repo"), Path("/logs")))
-        morning = plistlib.loads(installer.render_plist(specs[5], Path("/repo"), Path("/logs")))
-        evening = plistlib.loads(installer.render_plist(specs[6], Path("/repo"), Path("/logs")))
+        inbox = plistlib.loads(installer.render_plist(specs[5], Path("/repo"), Path("/logs")))
+        morning = plistlib.loads(installer.render_plist(specs[6], Path("/repo"), Path("/logs")))
+        evening = plistlib.loads(installer.render_plist(specs[7], Path("/repo"), Path("/logs")))
         self.assertEqual(watch["StartInterval"], 900)
+        self.assertEqual(inbox["StartInterval"], 900)
         self.assertEqual(morning["StartCalendarInterval"], {"Hour": 8, "Minute": 0})
         self.assertEqual(evening["StartCalendarInterval"], {"Hour": 18, "Minute": 0})
         self.assertFalse(watch["RunAtLoad"])
         self.assertFalse(morning["RunAtLoad"])
         self.assertFalse(evening["RunAtLoad"])
 
-    def test_install_writes_seven_valid_plists_without_activation(self) -> None:
+    def test_install_writes_eight_valid_plists_without_activation(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repo = root / "repo"
@@ -89,6 +95,7 @@ class LaunchdInstallerTests(unittest.TestCase):
                 repo / "scripts" / "service_supervisor.py",
                 repo / "scripts" / "run_with_env.py",
                 repo / "scripts" / "run_proactive_brief.py",
+                repo / "scripts" / "run_gmail_inbox_watch.py",
                 repo / "scripts" / "run_tony_conversation_worker.py",
             ):
                 path.write_text("", encoding="utf-8")
@@ -99,7 +106,7 @@ class LaunchdInstallerTests(unittest.TestCase):
             env_file.chmod(0o600)
             home = root / "home"
             written = installer.install(repo, python_path, env_file, home, activate=False)
-            self.assertEqual(len(written), 7)
+            self.assertEqual(len(written), 8)
             for path in written:
                 self.assertTrue(path.exists())
                 plistlib.loads(path.read_bytes())
@@ -116,6 +123,7 @@ class LaunchdInstallerTests(unittest.TestCase):
                 repo / "openclaw" / "tony_live_bridge.py",
                 repo / "scripts" / "run_with_env.py",
                 repo / "scripts" / "run_proactive_brief.py",
+                repo / "scripts" / "run_gmail_inbox_watch.py",
                 repo / "scripts" / "run_tony_conversation_worker.py",
             ):
                 path.write_text("", encoding="utf-8")
@@ -148,6 +156,7 @@ class LaunchdInstallerTests(unittest.TestCase):
             (repo / "openclaw" / "tony_live_bridge.py").write_text("", encoding="utf-8")
             (repo / "scripts").mkdir(parents=True)
             (repo / "scripts" / "run_proactive_brief.py").write_text("", encoding="utf-8")
+            (repo / "scripts" / "run_gmail_inbox_watch.py").write_text("", encoding="utf-8")
             (repo / "scripts" / "run_tony_conversation_worker.py").write_text("", encoding="utf-8")
             python_path = root / "python3"
             python_path.write_text("", encoding="utf-8")
@@ -183,12 +192,13 @@ class LaunchdInstallerTests(unittest.TestCase):
                 "com.narratiive.tony-conversation-worker",
                 "com.narratiive.service-supervisor",
                 "com.narratiive.proactive-watch",
+                "com.narratiive.gmail-inbox-watch",
                 "com.narratiive.proactive-morning",
                 "com.narratiive.proactive-evening",
             ):
                 (agents / f"{label}.plist").write_text("test", encoding="utf-8")
             removed = installer.uninstall(home, deactivate=False)
-            self.assertEqual(len(removed), 7)
+            self.assertEqual(len(removed), 8)
             self.assertFalse(any(path.exists() for path in removed))
 
 

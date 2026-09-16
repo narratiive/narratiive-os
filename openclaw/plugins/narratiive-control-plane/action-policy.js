@@ -1,8 +1,8 @@
 const WRITE_MARKERS = [
-  "send", "reply to", "follow up with", "follow-up with", "book ", "schedule ",
+  "send", "sending", "reply to", "follow up with", "follow-up with", "book", "schedule",
   "reschedule", "cancel", "invite", "update", "change", "create", "delete",
   "remove", "publish", "deploy", "merge", "commit", "push", "edit", "fix",
-  "repair", "implement", "build", "write to", "add to", "share", "move ",
+  "repair", "implement", "build", "write to", "add to", "share", "move",
 ];
 
 const SAFE_READ_SURFACES = new Set(["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"]);
@@ -22,7 +22,10 @@ function isExplicitDraftOnly(action) {
 
 function containsWriteIntent(action) {
   const lowered = normalise(action).toLowerCase();
-  return WRITE_MARKERS.some((marker) => lowered.includes(marker));
+  return WRITE_MARKERS.some((marker) => {
+    const phrase = marker.trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&").replace(/\s+/g, "\\s+");
+    return new RegExp(`(?:^|[^a-z0-9])${phrase}(?=$|[^a-z0-9])`, "i").test(lowered);
+  });
 }
 
 export function buildActionProposal(params = {}) {
