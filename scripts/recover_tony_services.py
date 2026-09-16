@@ -34,6 +34,8 @@ class RecoveryResult:
     exit_code_before: int
     exit_code_after: int
     attempted_at: str
+    failed_services: tuple[str, ...] = ()
+    deployed_revision: str = ""
 
     def to_dict(self) -> dict[str, object]:
         return {
@@ -43,6 +45,8 @@ class RecoveryResult:
             "exit_code_before": self.exit_code_before,
             "exit_code_after": self.exit_code_after,
             "attempted_at": self.attempted_at,
+            "failed_services": list(self.failed_services),
+            "deployed_revision": self.deployed_revision,
         }
 
 
@@ -112,6 +116,7 @@ def recover(
     )
     deployment = before.get("deployment", {})
     deployment_healthy = bool(deployment.get("healthy", False))
+    deployed_revision = str(deployment.get("deployed_revision") or "")
     unhealthy_names = [
         str(service.get("name", ""))
         for service in before.get("services", [])
@@ -120,7 +125,16 @@ def recover(
 
     if not unhealthy_names:
         status = "healthy" if deployment_healthy else "deployment_action_required"
-        result = RecoveryResult(status, (), deployment_healthy, before_code, before_code, _utc_now())
+        result = RecoveryResult(
+            status,
+            (),
+            deployment_healthy,
+            before_code,
+            before_code,
+            _utc_now(),
+            (),
+            deployed_revision,
+        )
         write_recovery_state(root, result)
         return result
 
@@ -155,6 +169,8 @@ def recover(
                 before_code,
                 after_code,
                 _utc_now(),
+                tuple(unhealthy_names),
+                str(deployment_after.get("deployed_revision") or deployed_revision),
             )
             write_recovery_state(root, result)
             return result
@@ -164,7 +180,16 @@ def recover(
         for service in after.get("services", [])
         if not bool(service.get("healthy", False))
     ]
-    result = RecoveryResult("failed", restarted, deployment_healthy, before_code, after_code, _utc_now())
+    result = RecoveryResult(
+        "failed",
+        restarted,
+        deployment_healthy,
+        before_code,
+        after_code,
+        _utc_now(),
+        tuple(unhealthy_names),
+        deployed_revision,
+    )
     write_recovery_state(root, result)
     raise RecoveryError(f"services remained unhealthy after restart: {', '.join(failed)}")
 

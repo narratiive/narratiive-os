@@ -31,7 +31,11 @@ def report(*, gateway=True, bridge=True, deployment=True):
             {"name": "runtime-gateway", "healthy": gateway},
             {"name": "tony-http-bridge", "healthy": bridge},
         ],
-        "deployment": {"name": "deployment-state", "healthy": deployment},
+        "deployment": {
+            "name": "deployment-state",
+            "healthy": deployment,
+            "deployed_revision": "safe-revision",
+        },
     }
 
 
@@ -76,6 +80,9 @@ class RecoveryTests(unittest.TestCase):
             self.assertEqual(result.restarted_services, ("com.narratiive.runtime",))
             self.assertEqual(calls[0][0][:3], ("launchctl", "kickstart", "-k"))
             self.assertTrue(calls[0][0][3].endswith("/com.narratiive.runtime"))
+            receipt = json.loads((root / "runtime-state/recovery.json").read_text())
+            self.assertEqual(receipt["failed_services"], ["runtime-gateway"])
+            self.assertEqual(receipt["deployed_revision"], "safe-revision")
 
     def test_restarts_only_failed_bridge(self):
         with tempfile.TemporaryDirectory() as temporary:
