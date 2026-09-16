@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -40,6 +41,21 @@ def report(*, gateway=True, bridge=True, deployment=True):
 
 
 class RecoveryTests(unittest.TestCase):
+    def test_documented_direct_script_entrypoint_loads_repository_imports(self):
+        root = Path(__file__).resolve().parents[1]
+        completed = subprocess.run(
+            [sys.executable, str(root / "scripts/recover_tony_services.py")],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        payload = json.loads(completed.stdout)
+        self.assertEqual(payload["status"], "ready")
+        self.assertEqual(payload["mode"], "dry-run")
+        self.assertIn("scripts/recover_tony_services.py --apply", payload["next_command"])
+
     def runner(self, calls):
         def run(command, cwd):
             calls.append((tuple(command), cwd))

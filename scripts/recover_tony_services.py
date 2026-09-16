@@ -11,6 +11,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Mapping, Sequence
 
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+if str(REPOSITORY_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPOSITORY_ROOT))
+
 from scripts.deploy_tony_runtime import HEALTH_ENDPOINTS, RUNTIME_LABELS, check_health, run_command
 from scripts.service_doctor import ServiceDoctor
 
@@ -198,7 +202,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Safely restart failed Narratiive OS services without deploying code.",
     )
-    parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--repository", type=Path, default=REPOSITORY_ROOT)
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -217,7 +221,7 @@ def main() -> int:
             "repository": str(root),
             "service_mapping": SERVICE_LABEL_BY_NAME,
             "deployment_policy": "never auto-deploy; use deploy_tony_runtime.py --apply",
-            "next_command": f"{sys.executable} {Path(__file__).name} --apply",
+            "next_command": f"{sys.executable} {Path(__file__).resolve()} --apply",
         }, indent=2, sort_keys=True))
         return 0
     try:
