@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
-from runtime.campaign_engine import CampaignEngineState, CampaignPortfolio
+from runtime.campaign_engine import CampaignEngineState, CampaignPortfolio, CampaignWorldSelectionBrief
 from runtime.execution_journal import ExecutionJournal, ExecutionJournalError
 from runtime.mission_control import MissionControlSnapshot
 from runtime.mission_control_service import MissionControlService
@@ -149,6 +149,7 @@ class TonyCommandService:
                 },
             )
         state = matches[0]
+        selection_brief = CampaignWorldSelectionBrief.build(state)
         return CommandResponse(
             "campaign",
             "awaiting_matt" if state.requires_matt else "ready",
@@ -163,6 +164,7 @@ class TonyCommandService:
                 "requires_matt": state.requires_matt,
                 "publication_authorised": state.publication_authorised,
                 "media_spend_authorised": state.media_spend_authorised,
+                "campaign_world_selection": selection_brief,
             },
         )
 

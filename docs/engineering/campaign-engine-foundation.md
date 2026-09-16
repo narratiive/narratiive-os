@@ -131,8 +131,11 @@ that Notion changed without execution evidence.
 2. **Tony control surface** — the authenticated read surface now exposes the
    multi-client Campaign Engine portfolio, current stage, next action and human
    gate through deterministic commands and Tony's native state-read tool.
-   Candidate comparison, recommendation, exact approval operations and explicit
-   Notion projections remain the next control-surface work.
+   Candidate comparison is now included in campaign detail as an exact-version
+   selection brief: quality verdict, Tony disposition, rationale, checksum and
+   readiness are visible while automatic selection remains forbidden. Exact
+   approval operations and explicit Notion projections remain the next
+   control-surface work.
 3. **Campaign World generation** — reconcile the existing Campaign World agent
    and template with multiple candidate generation, a quality rubric and Tony's
    bounded taste review. Prove the flow from one approved Growth Blueprint.
