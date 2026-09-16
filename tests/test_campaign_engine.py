@@ -3,10 +3,12 @@ from __future__ import annotations
 import unittest
 import json
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 from runtime.campaign_engine import (
+    AssetLifecycleStatus,
     ChannelAssetSpecification,
     CampaignEngine,
     CampaignEngineApplicationService,
@@ -22,6 +24,8 @@ from runtime.campaign_engine import (
     ProductionJob,
     ProductionMethod,
     ProductionPlan,
+    PlannedAssetManifest,
+    PlannedAssetRecord,
     QualityReview,
     QualityVerdict,
     TonyDisposition,
@@ -135,6 +139,35 @@ def production_plan(bible: VersionedArtifact) -> ProductionPlan:
     )
 
 
+def planned_asset_manifest(plan: ProductionPlan) -> PlannedAssetManifest:
+    specification = plan.channel_specifications[0]
+    job = plan.jobs[0]
+    pack = plan.production_pack
+    return PlannedAssetManifest(
+        manifest_artifact=artifact("asset-manifest-1", "asset_manifest", "manifest-checksum"),
+        source_production_pack_id=pack.artifact_id,
+        source_production_pack_version=pack.version,
+        source_production_pack_checksum=pack.checksum,
+        assets=(
+            PlannedAssetRecord(
+                asset_id="ast_safe-client_safe-campaign_0001",
+                asset_key="paid-social_meta-reels_9x16_v01",
+                production_job_id=job.job_id,
+                specification_id=specification.specification_id,
+                channel=specification.channel,
+                placement=specification.placement,
+                market=specification.market,
+                language=specification.language,
+                asset_type=specification.asset_type,
+                source_production_pack_id=pack.artifact_id,
+                source_production_pack_version=pack.version,
+                source_production_pack_checksum=pack.checksum,
+                source_bible_checksum=plan.source_bible_checksum,
+            ),
+        ),
+    )
+
+
 class CampaignEngineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = CampaignEngine()
@@ -165,6 +198,12 @@ class CampaignEngineTests(unittest.TestCase):
             tony_review=tony(bible.checksum),
         )
         return self.engine.approve_creative_bible(current, approval(bible))
+
+    def _production_ready_state(self) -> CampaignEngineState:
+        current = self._production_planning_state()
+        plan = production_plan(current.creative_bible)
+        current = self.engine.submit_production_plan(current, plan)
+        return self.engine.approve_production_plan(current, approval(plan.production_pack))
 
     def test_campaign_identity_requires_client_brand_market_product_and_campaign(self) -> None:
         with self.assertRaisesRegex(CampaignEngineError, "market_id"):
@@ -540,6 +579,76 @@ class CampaignEngineTests(unittest.TestCase):
             )
 
             self.assertEqual(repository.load("safe-client", "safe-campaign"), ready)
+
+    def test_planned_asset_manifest_registers_exactly_one_asset_per_job(self) -> None:
+        current = self._production_ready_state()
+        manifest = planned_asset_manifest(current.production_plan)
+
+        started = self.engine.start_asset_production(current, manifest)
+
+        self.assertEqual(started.stage, CampaignEngineStage.ASSET_PRODUCTION)
+        self.assertEqual(started.asset_manifest.assets[0].status, AssetLifecycleStatus.PLANNED)
+        self.assertEqual(started.asset_manifest.assets[0].version_number, 1)
+        self.assertFalse(started.asset_manifest.delivery_authorised)
+        self.assertFalse(started.asset_manifest.publication_authorised)
+        self.assertFalse(started.asset_manifest.media_spend_authorised)
+        self.assertEqual(CampaignEngineState.from_dict(started.to_dict()), started)
+
+    def test_planned_asset_manifest_rejects_missing_jobs_and_channel_drift(self) -> None:
+        current = self._production_ready_state()
+        manifest = planned_asset_manifest(current.production_plan)
+        with self.assertRaisesRegex(CampaignEngineError, "exactly one planned asset"):
+            self.engine.start_asset_production(
+                current,
+                PlannedAssetManifest(
+                    manifest_artifact=manifest.manifest_artifact,
+                    source_production_pack_id=manifest.source_production_pack_id,
+                    source_production_pack_version=manifest.source_production_pack_version,
+                    source_production_pack_checksum=manifest.source_production_pack_checksum,
+                    assets=(
+                        manifest.assets[0],
+                        replace(
+                            manifest.assets[0],
+                            asset_id="ast_safe-client_safe-campaign_0002",
+                            asset_key="paid-social_meta-reels_9x16_v02",
+                        ),
+                    ),
+                ),
+            )
+
+        drifted = replace(manifest.assets[0], placement="stories")
+        with self.assertRaisesRegex(CampaignEngineError, "channel fields"):
+            self.engine.start_asset_production(
+                current,
+                replace(manifest, assets=(drifted,)),
+            )
+
+    def test_planned_asset_cannot_claim_a_file_or_external_authority(self) -> None:
+        current = self._production_ready_state()
+        manifest = planned_asset_manifest(current.production_plan)
+        with self.assertRaisesRegex(CampaignEngineError, "cannot claim"):
+            replace(manifest.assets[0], approved_uri="drive://approved/file")
+        with self.assertRaisesRegex(CampaignEngineError, "cannot authorise"):
+            replace(manifest, publication_authorised=True)
+
+    def test_asset_production_transition_is_append_only_and_guarded(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            ready = self._production_ready_state()
+            repository.save(ready, transition_id="production-ready")
+            started = self.engine.start_asset_production(
+                ready,
+                planned_asset_manifest(ready.production_plan),
+            )
+
+            service.persist_transition(
+                ready,
+                started,
+                transition_id="asset-manifest-planned",
+            )
+
+            self.assertEqual(repository.load("safe-client", "safe-campaign"), started)
 
     def test_campaign_bootstrap_requires_exact_blueprint_approval_and_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

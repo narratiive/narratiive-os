@@ -30,6 +30,7 @@ class CampaignEngineStage(str, Enum):
     PRODUCTION_PLANNING = "production_planning"
     PRODUCTION_PLAN_APPROVAL_REQUIRED = "production_plan_approval_required"
     PRODUCTION_READY = "production_ready"
+    ASSET_PRODUCTION = "asset_production"
 
 
 class QualityVerdict(str, Enum):
@@ -51,6 +52,19 @@ class ProductionMethod(str, Enum):
     ADAPTATION = "adaptation"
     LOCALISATION = "localisation"
     COMPOSITE = "composite"
+
+
+class AssetLifecycleStatus(str, Enum):
+    PLANNED = "planned"
+    QUEUED = "queued"
+    IN_PRODUCTION = "in_production"
+    GENERATED = "generated"
+    IN_REVIEW = "in_review"
+    CHANGES_REQUESTED = "changes_requested"
+    APPROVED = "approved"
+    DELIVERED = "delivered"
+    SUPERSEDED = "superseded"
+    BLOCKED = "blocked"
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,6 +297,105 @@ class ProductionPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class PlannedAssetRecord:
+    asset_id: str
+    asset_key: str
+    production_job_id: str
+    specification_id: str
+    channel: str
+    placement: str
+    market: str
+    language: str
+    asset_type: str
+    source_production_pack_id: str
+    source_production_pack_version: str
+    source_production_pack_checksum: str
+    source_bible_checksum: str
+    version_number: int = 1
+    status: AssetLifecycleStatus = AssetLifecycleStatus.PLANNED
+    file_checksum: str | None = None
+    working_uri: str | None = None
+    review_uri: str | None = None
+    approved_uri: str | None = None
+    delivered_uri: str | None = None
+
+    def __post_init__(self) -> None:
+        required = (
+            self.asset_id,
+            self.asset_key,
+            self.production_job_id,
+            self.specification_id,
+            self.channel,
+            self.placement,
+            self.market,
+            self.language,
+            self.asset_type,
+            self.source_production_pack_id,
+            self.source_production_pack_version,
+            self.source_production_pack_checksum,
+            self.source_bible_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("planned asset fields must not be empty")
+        if self.version_number != 1:
+            raise CampaignEngineError("planned assets must begin at version 1")
+        if self.status is not AssetLifecycleStatus.PLANNED:
+            raise CampaignEngineError("new Asset Manifest records must begin as planned")
+        if any(
+            value
+            for value in (
+                self.file_checksum,
+                self.working_uri,
+                self.review_uri,
+                self.approved_uri,
+                self.delivered_uri,
+            )
+        ):
+            raise CampaignEngineError("planned assets cannot claim generated, approved or delivered files")
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedAssetManifest:
+    manifest_artifact: VersionedArtifact
+    source_production_pack_id: str
+    source_production_pack_version: str
+    source_production_pack_checksum: str
+    assets: tuple[PlannedAssetRecord, ...]
+    publication_authorised: bool = False
+    delivery_authorised: bool = False
+    media_spend_authorised: bool = False
+
+    def __post_init__(self) -> None:
+        if self.manifest_artifact.artifact_type != "asset_manifest":
+            raise CampaignEngineError("planned assets require an Asset Manifest artefact")
+        if not self.assets:
+            raise CampaignEngineError("Asset Manifest requires at least one planned asset")
+        if self.publication_authorised or self.delivery_authorised or self.media_spend_authorised:
+            raise CampaignEngineError("planned Asset Manifest cannot authorise delivery, publication or media spend")
+        source = (
+            self.source_production_pack_id,
+            self.source_production_pack_version,
+            self.source_production_pack_checksum,
+        )
+        if any(not value.strip() for value in source):
+            raise CampaignEngineError("Asset Manifest requires exact Production Pack lineage")
+        asset_ids = [asset.asset_id for asset in self.assets]
+        asset_keys = [asset.asset_key for asset in self.assets]
+        if len(asset_ids) != len(set(asset_ids)):
+            raise CampaignEngineError("Asset Manifest asset IDs must be unique")
+        if len(asset_keys) != len(set(asset_keys)):
+            raise CampaignEngineError("Asset Manifest asset keys must be unique")
+        for asset in self.assets:
+            asset_source = (
+                asset.source_production_pack_id,
+                asset.source_production_pack_version,
+                asset.source_production_pack_checksum,
+            )
+            if asset_source != source:
+                raise CampaignEngineError("planned asset lineage must match the Production Pack")
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEngineState:
     identity: CampaignIdentity
     approved_blueprint: VersionedArtifact
@@ -300,6 +413,7 @@ class CampaignEngineState:
     creative_bible_source_world_checksum: str = ""
     production_plan: ProductionPlan | None = None
     production_plan_approval: HumanApproval | None = None
+    asset_manifest: PlannedAssetManifest | None = None
     publication_authorised: bool = False
     media_spend_authorised: bool = False
 
@@ -324,6 +438,7 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         }
         if self.stage in world_stages and len(self.campaign_world_candidates) < 2:
             raise CampaignEngineError("campaign state requires multiple Campaign World candidates")
@@ -339,6 +454,7 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         }
         if self.stage in bible_stages:
             if self.selected_campaign_world is None or self.campaign_world_approval is None:
@@ -350,6 +466,7 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         } and self.creative_bible is None:
             raise CampaignEngineError("Creative Bible review stages require a Creative Director's Bible")
         if self.creative_bible is not None:
@@ -374,6 +491,7 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         }:
             if not (
                 self.creative_bible_quality_review
@@ -386,6 +504,7 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         }:
             if self.creative_bible is None or self.creative_bible_approval is None:
                 raise CampaignEngineError("production planning requires an approved Creative Director's Bible")
@@ -393,6 +512,7 @@ class CampaignEngineState:
         if self.stage in {
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
         }:
             if self.production_plan is None or self.creative_bible is None:
                 raise CampaignEngineError("production plan approval requires a Production Plan")
@@ -408,7 +528,10 @@ class CampaignEngineState:
             )
             if plan_source != bible_source:
                 raise CampaignEngineError("Production Plan lineage must match the approved Bible")
-        if self.stage is CampaignEngineStage.PRODUCTION_READY:
+        if self.stage in {
+            CampaignEngineStage.PRODUCTION_READY,
+            CampaignEngineStage.ASSET_PRODUCTION,
+        }:
             if self.production_plan is None or self.production_plan_approval is None:
                 raise CampaignEngineError("production readiness requires an approved Production Pack")
             _require_matt_approval(self.production_plan_approval, "Production Pack")
@@ -416,6 +539,17 @@ class CampaignEngineState:
                 self.production_plan.production_pack,
                 self.production_plan_approval,
             )
+        if self.stage is CampaignEngineStage.ASSET_PRODUCTION:
+            if self.asset_manifest is None or self.production_plan is None:
+                raise CampaignEngineError("asset production requires a planned Asset Manifest")
+            manifest_source = (
+                self.asset_manifest.source_production_pack_id,
+                self.asset_manifest.source_production_pack_version,
+                self.asset_manifest.source_production_pack_checksum,
+            )
+            pack = self.production_plan.production_pack
+            if manifest_source != (pack.artifact_id, pack.version, pack.checksum):
+                raise CampaignEngineError("Asset Manifest lineage must match the approved Production Pack")
 
     @property
     def requires_matt(self) -> bool:
@@ -444,7 +578,10 @@ class CampaignEngineState:
                 "Matt approves the exact Production Pack version"
             ),
             CampaignEngineStage.PRODUCTION_READY: (
-                "route approved jobs to production capabilities; retain human asset review"
+                "create the planned Asset Manifest from approved Production Pack jobs"
+            ),
+            CampaignEngineStage.ASSET_PRODUCTION: (
+                "route approved jobs and register generated asset versions for human review"
             ),
         }
         return actions[self.stage]
@@ -502,6 +639,7 @@ class CampaignEngineState:
                 ),
                 production_plan=_production_plan_from_dict(value.get("production_plan")),
                 production_plan_approval=_approval_from_dict(value.get("production_plan_approval")),
+                asset_manifest=_planned_asset_manifest_from_dict(value.get("asset_manifest")),
                 publication_authorised=bool(value.get("publication_authorised", False)),
                 media_spend_authorised=bool(value.get("media_spend_authorised", False)),
             )
@@ -636,7 +774,10 @@ class FileCampaignEngineRepository:
         CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED: {
             CampaignEngineStage.PRODUCTION_READY,
         },
-        CampaignEngineStage.PRODUCTION_READY: set(),
+        CampaignEngineStage.PRODUCTION_READY: {
+            CampaignEngineStage.ASSET_PRODUCTION,
+        },
+        CampaignEngineStage.ASSET_PRODUCTION: set(),
     }
 
     def __init__(self, root: str | Path, *, workspace_id: str) -> None:
@@ -1073,6 +1214,57 @@ class CampaignEngine:
             production_plan_approval=approval,
         )
 
+    def start_asset_production(
+        self,
+        state: CampaignEngineState,
+        asset_manifest: PlannedAssetManifest,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.PRODUCTION_READY)
+        if state.production_plan is None:
+            raise CampaignEngineError("asset production requires an approved Production Pack")
+        pack = state.production_plan.production_pack
+        source = (
+            asset_manifest.source_production_pack_id,
+            asset_manifest.source_production_pack_version,
+            asset_manifest.source_production_pack_checksum,
+        )
+        if source != (pack.artifact_id, pack.version, pack.checksum):
+            raise CampaignEngineError("Asset Manifest lineage must match the approved Production Pack")
+        jobs = {job.job_id: job for job in state.production_plan.jobs}
+        specifications = {
+            item.specification_id: item
+            for item in state.production_plan.channel_specifications
+        }
+        represented_jobs = [asset.production_job_id for asset in asset_manifest.assets]
+        if set(represented_jobs) != set(jobs) or len(represented_jobs) != len(jobs):
+            raise CampaignEngineError("Asset Manifest must contain exactly one planned asset per Production Pack job")
+        for asset in asset_manifest.assets:
+            job = jobs[asset.production_job_id]
+            specification = specifications[job.specification_id]
+            if asset.specification_id != job.specification_id:
+                raise CampaignEngineError("planned asset specification does not match its Production Pack job")
+            if (
+                asset.channel,
+                asset.placement,
+                asset.market,
+                asset.language,
+                asset.asset_type,
+            ) != (
+                specification.channel,
+                specification.placement,
+                specification.market,
+                specification.language,
+                specification.asset_type,
+            ):
+                raise CampaignEngineError("planned asset channel fields do not match its specification")
+            if asset.source_bible_checksum != state.production_plan.source_bible_checksum:
+                raise CampaignEngineError("planned asset Bible lineage does not match the Production Plan")
+        return replace(
+            state,
+            stage=CampaignEngineStage.ASSET_PRODUCTION,
+            asset_manifest=asset_manifest,
+        )
+
     @staticmethod
     def _require_stage(state: CampaignEngineState, expected: CampaignEngineStage) -> None:
         if state.stage is not expected:
@@ -1167,6 +1359,29 @@ def _production_plan_from_dict(value: Any) -> ProductionPlan | None:
             for item in value.get("jobs", [])
         ),
         publication_authorised=bool(value.get("publication_authorised", False)),
+        media_spend_authorised=bool(value.get("media_spend_authorised", False)),
+    )
+
+
+def _planned_asset_manifest_from_dict(value: Any) -> PlannedAssetManifest | None:
+    if not isinstance(value, dict):
+        return None
+    return PlannedAssetManifest(
+        manifest_artifact=VersionedArtifact(**value["manifest_artifact"]),
+        source_production_pack_id=value["source_production_pack_id"],
+        source_production_pack_version=value["source_production_pack_version"],
+        source_production_pack_checksum=value["source_production_pack_checksum"],
+        assets=tuple(
+            PlannedAssetRecord(
+                **{
+                    **item,
+                    "status": AssetLifecycleStatus(item.get("status", "planned")),
+                }
+            )
+            for item in value.get("assets", [])
+        ),
+        publication_authorised=bool(value.get("publication_authorised", False)),
+        delivery_authorised=bool(value.get("delivery_authorised", False)),
         media_spend_authorised=bool(value.get("media_spend_authorised", False)),
     )
 
