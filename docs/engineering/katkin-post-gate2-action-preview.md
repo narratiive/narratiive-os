@@ -1,6 +1,8 @@
 # KatKin post–Gate 2 action-preview repair
 
-Status: implemented and repository-tested; live send remains human-gated.
+Status: deployed and live-preview accepted; simulated send remains human-gated.
+
+Deployed revision: `837ac06afa6e45bb2b85e20f88a32d18d692cdb0`.
 
 ## Observed state
 
@@ -64,9 +66,9 @@ approval-gated.
 | --- | --- | --- |
 | Authoritative artefact detail | checksum and lineage tests | resolved against preserved KatKin run |
 | Full proposed communication | workflow preview test | resolved from KatKin artefact |
-| Gmail/Notion/Drive reads | classification and adapter regression tests | pending post-deploy live probe |
+| Gmail/Notion/Drive reads | classification and adapter regression tests | verified read-only; zero mutations |
 | Writes remain governed | policy/runtime regression tests | existing gate retained |
-| Complete simulation preview | digest-bound preview test | resolved, not dispatched |
+| Complete simulation preview | digest-bound preview test | Tony resolved digest `5bc74c0a…89c7a`; not dispatched |
 | Correct polished PDF | PDF checksum/attachment test | resolved to eight-page review PDF |
 | No CRM contamination | workflow-state assertion | no override recorded as client email |
 | Conversational approval | authenticated workflow operation | pending Matt decision |
@@ -77,3 +79,18 @@ approval-gated.
 No KatKin person, address or domain has been contacted. The live acceptance
 must stop at the resolved preview until Matt explicitly approves that exact
 simulation action.
+
+## Live evidence
+
+After deployment, the workflow HTTP control returned the approved artefact and
+complete preview from the preserved run. OpenClaw Tony session
+`e8ce9a72-f36b-444d-b207-05900de42b7d` independently called workflow control,
+reported the recipient override, subject, eight-page PDF, artefact/version,
+simulation status and pending digest, and explicitly reported that nothing was
+dispatched. All tool calls completed without failure.
+
+Bounded live searches returned verified `read_only=true`, `mutation_count=0`
+evidence for Gmail, Notion and Drive. Gmail found the known KatKin internal
+review message IDs `1a0a8c1ea972b72f` and `1a0a8a2cf5caa54d`; Notion and Drive
+returned valid zero-result searches. No CRM/client record was mutated, and the
+simulation override remains absent from KatKin identity data.
