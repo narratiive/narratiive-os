@@ -151,8 +151,12 @@ that Notion changed without execution evidence.
    review and revision. The runtime now binds every submitted Bible version to
    the exact selected Campaign World ID, version and checksum; revision clears
    stale reviews rather than carrying them onto new creative work.
-5. **Production planning** — generate channel specifications, Production Pack
-   jobs and a planned Asset Manifest from the approved Bible.
+5. **Production planning** — the state machine now accepts versioned channel
+   specifications and capability-routed Production Pack jobs only when every
+   record traces to the exact approved Bible. Jobs require human review, the
+   Production Pack requires Matt's exact-version approval, and neither the plan
+   nor its jobs can authorise publication or media spend. Planned Asset Manifest
+   generation remains the next production-foundation slice.
 6. **Production orchestration** — route jobs by declared capability, ingest
    generated files into Drive, register versions, validate technical
    specifications and stop at human asset approval.

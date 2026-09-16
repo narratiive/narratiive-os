@@ -7,6 +7,7 @@ from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 from runtime.campaign_engine import (
+    ChannelAssetSpecification,
     CampaignEngine,
     CampaignEngineApplicationService,
     CampaignEngineError,
@@ -18,6 +19,9 @@ from runtime.campaign_engine import (
     CampaignIdentity,
     CampaignWorldCandidate,
     HumanApproval,
+    ProductionJob,
+    ProductionMethod,
+    ProductionPlan,
     QualityReview,
     QualityVerdict,
     TonyDisposition,
@@ -93,6 +97,44 @@ def approval(item: VersionedArtifact) -> HumanApproval:
     )
 
 
+def production_plan(bible: VersionedArtifact) -> ProductionPlan:
+    specification = ChannelAssetSpecification(
+        specification_id="spec-meta-reels-9x16",
+        channel="meta",
+        placement="reels",
+        market="uk",
+        language="en",
+        asset_type="video",
+        file_format="mp4",
+        aspect_ratio="9:16",
+        width_px=1080,
+        height_px=1920,
+        duration_seconds=15,
+        source_bible_id=bible.artifact_id,
+        source_bible_version=bible.version,
+        source_bible_checksum=bible.checksum,
+        platform_requirements_version="meta-2026-09-16",
+        constraints=("captions_required", "safe_area_required"),
+    )
+    return ProductionPlan(
+        production_pack=artifact("production-pack-1", "production_pack", "pack-checksum"),
+        source_bible_id=bible.artifact_id,
+        source_bible_version=bible.version,
+        source_bible_checksum=bible.checksum,
+        channel_specifications=(specification,),
+        jobs=(
+            ProductionJob(
+                job_id="job-meta-reels-1",
+                specification_id=specification.specification_id,
+                production_method=ProductionMethod.AI_ASSISTED_PRODUCTION,
+                required_capability="short_form_video_production",
+                source_bible_checksum=bible.checksum,
+                expected_variants=3,
+            ),
+        ),
+    )
+
+
 class CampaignEngineTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = CampaignEngine()
@@ -103,6 +145,26 @@ class CampaignEngineTests(unittest.TestCase):
             current,
             (candidate("a", "checksum-a"), candidate("b", "checksum-b")),
         )
+
+    def _production_planning_state(self) -> CampaignEngineState:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        current = self.engine.select_campaign_world(current, "a", approval(selected))
+        bible = artifact("bible-1", "creative_directors_bible", "bible-checksum")
+        current = self.engine.submit_creative_bible(current, bible)
+        current = self.engine.review_creative_bible(
+            current,
+            quality_review=quality(bible.checksum),
+            tony_review=tony(bible.checksum),
+        )
+        return self.engine.approve_creative_bible(current, approval(bible))
 
     def test_campaign_identity_requires_client_brand_market_product_and_campaign(self) -> None:
         with self.assertRaisesRegex(CampaignEngineError, "market_id"):
@@ -382,6 +444,102 @@ class CampaignEngineTests(unittest.TestCase):
                 blueprint_approval=current.blueprint_approval,
                 publication_authorised=True,
             )
+
+    def test_production_plan_requires_channel_specs_jobs_and_exact_bible_lineage(self) -> None:
+        current = self._production_planning_state()
+        plan = production_plan(current.creative_bible)
+
+        submitted = self.engine.submit_production_plan(current, plan)
+
+        self.assertEqual(submitted.stage, CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED)
+        self.assertTrue(submitted.requires_matt)
+        self.assertFalse(submitted.production_plan.publication_authorised)
+        self.assertFalse(submitted.production_plan.media_spend_authorised)
+        self.assertTrue(submitted.production_plan.jobs[0].human_review_required)
+        self.assertEqual(
+            submitted.production_plan.channel_specifications[0].source_bible_checksum,
+            current.creative_bible.checksum,
+        )
+
+    def test_production_plan_rejects_unknown_specification_and_autonomous_review(self) -> None:
+        current = self._production_planning_state()
+        plan = production_plan(current.creative_bible)
+        with self.assertRaisesRegex(CampaignEngineError, "unknown channel specification"):
+            ProductionPlan(
+                production_pack=plan.production_pack,
+                source_bible_id=plan.source_bible_id,
+                source_bible_version=plan.source_bible_version,
+                source_bible_checksum=plan.source_bible_checksum,
+                channel_specifications=plan.channel_specifications,
+                jobs=(
+                    ProductionJob(
+                        job_id="orphan-job",
+                        specification_id="missing-spec",
+                        production_method=ProductionMethod.AI_GENERATION,
+                        required_capability="image_generation",
+                        source_bible_checksum=plan.source_bible_checksum,
+                    ),
+                ),
+            )
+        with self.assertRaisesRegex(CampaignEngineError, "must require human review"):
+            ProductionJob(
+                job_id="unsafe-job",
+                specification_id="spec-meta-reels-9x16",
+                production_method=ProductionMethod.AI_GENERATION,
+                required_capability="video_generation",
+                source_bible_checksum=plan.source_bible_checksum,
+                human_review_required=False,
+            )
+
+    def test_production_plan_approval_is_exact_matt_bound_and_round_trips(self) -> None:
+        current = self._production_planning_state()
+        plan = production_plan(current.creative_bible)
+        current = self.engine.submit_production_plan(current, plan)
+        delegated = HumanApproval(
+            approver="tony",
+            rationale="Tony cannot approve the Production Pack.",
+            artifact_id=plan.production_pack.artifact_id,
+            artifact_version=plan.production_pack.version,
+            artifact_checksum=plan.production_pack.checksum,
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "Production Pack approval requires Matt"):
+            self.engine.approve_production_plan(current, delegated)
+
+        ready = self.engine.approve_production_plan(current, approval(plan.production_pack))
+        restored = CampaignEngineState.from_dict(ready.to_dict())
+
+        self.assertEqual(ready.stage, CampaignEngineStage.PRODUCTION_READY)
+        self.assertFalse(ready.requires_matt)
+        self.assertEqual(restored, ready)
+        self.assertEqual(restored.production_plan.jobs[0].expected_variants, 3)
+
+    def test_production_plan_transitions_persist_through_guarded_repository(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            planning = self._production_planning_state()
+            repository.save(planning, transition_id="production-planning-start")
+            submitted = self.engine.submit_production_plan(
+                planning,
+                production_plan(planning.creative_bible),
+            )
+            service.persist_transition(
+                planning,
+                submitted,
+                transition_id="production-plan-submitted",
+            )
+            ready = self.engine.approve_production_plan(
+                submitted,
+                approval(submitted.production_plan.production_pack),
+            )
+
+            service.persist_transition(
+                submitted,
+                ready,
+                transition_id="production-pack-approved",
+            )
+
+            self.assertEqual(repository.load("safe-client", "safe-campaign"), ready)
 
     def test_campaign_bootstrap_requires_exact_blueprint_approval_and_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

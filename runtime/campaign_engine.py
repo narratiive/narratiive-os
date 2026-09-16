@@ -28,6 +28,8 @@ class CampaignEngineStage(str, Enum):
     CREATIVE_BIBLE_IN_QUALITY_REVIEW = "creative_bible_in_quality_review"
     CREATIVE_BIBLE_APPROVAL_REQUIRED = "creative_bible_approval_required"
     PRODUCTION_PLANNING = "production_planning"
+    PRODUCTION_PLAN_APPROVAL_REQUIRED = "production_plan_approval_required"
+    PRODUCTION_READY = "production_ready"
 
 
 class QualityVerdict(str, Enum):
@@ -39,6 +41,16 @@ class QualityVerdict(str, Enum):
 class TonyDisposition(str, Enum):
     FORWARD = "forward"
     RETURN = "return"
+
+
+class ProductionMethod(str, Enum):
+    HUMAN_PRODUCTION = "human_production"
+    AI_GENERATION = "ai_generation"
+    AI_ASSISTED_PRODUCTION = "ai_assisted_production"
+    TEMPLATE_RENDER = "template_render"
+    ADAPTATION = "adaptation"
+    LOCALISATION = "localisation"
+    COMPOSITE = "composite"
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +171,118 @@ class CampaignWorldCandidate:
 
 
 @dataclass(frozen=True, slots=True)
+class ChannelAssetSpecification:
+    specification_id: str
+    channel: str
+    placement: str
+    market: str
+    language: str
+    asset_type: str
+    file_format: str
+    aspect_ratio: str
+    source_bible_id: str
+    source_bible_version: str
+    source_bible_checksum: str
+    platform_requirements_version: str
+    width_px: int | None = None
+    height_px: int | None = None
+    duration_seconds: float | None = None
+    constraints: tuple[str, ...] = ()
+
+    def __post_init__(self) -> None:
+        required = (
+            self.specification_id,
+            self.channel,
+            self.placement,
+            self.market,
+            self.language,
+            self.asset_type,
+            self.file_format,
+            self.aspect_ratio,
+            self.source_bible_id,
+            self.source_bible_version,
+            self.source_bible_checksum,
+            self.platform_requirements_version,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("channel asset specification fields must not be empty")
+        if self.width_px is not None and self.width_px <= 0:
+            raise CampaignEngineError("channel asset width must be positive")
+        if self.height_px is not None and self.height_px <= 0:
+            raise CampaignEngineError("channel asset height must be positive")
+        if self.duration_seconds is not None and self.duration_seconds <= 0:
+            raise CampaignEngineError("channel asset duration must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionJob:
+    job_id: str
+    specification_id: str
+    production_method: ProductionMethod
+    required_capability: str
+    source_bible_checksum: str
+    expected_variants: int = 1
+    human_review_required: bool = True
+
+    def __post_init__(self) -> None:
+        required = (
+            self.job_id,
+            self.specification_id,
+            self.required_capability,
+            self.source_bible_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("production job fields must not be empty")
+        if self.expected_variants < 1:
+            raise CampaignEngineError("production job requires at least one expected variant")
+        if not self.human_review_required:
+            raise CampaignEngineError("production jobs must require human review")
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionPlan:
+    production_pack: VersionedArtifact
+    source_bible_id: str
+    source_bible_version: str
+    source_bible_checksum: str
+    channel_specifications: tuple[ChannelAssetSpecification, ...]
+    jobs: tuple[ProductionJob, ...]
+    publication_authorised: bool = False
+    media_spend_authorised: bool = False
+
+    def __post_init__(self) -> None:
+        if self.production_pack.artifact_type != "production_pack":
+            raise CampaignEngineError("production plan requires a Production Pack artefact")
+        if not self.channel_specifications or not self.jobs:
+            raise CampaignEngineError("production plan requires channel specifications and jobs")
+        if self.publication_authorised or self.media_spend_authorised:
+            raise CampaignEngineError("production plan cannot authorise publication or media spend")
+        source = (self.source_bible_id, self.source_bible_version, self.source_bible_checksum)
+        if any(not value.strip() for value in source):
+            raise CampaignEngineError("production plan requires exact Creative Director's Bible lineage")
+        specification_ids = [item.specification_id for item in self.channel_specifications]
+        job_ids = [item.job_id for item in self.jobs]
+        if len(specification_ids) != len(set(specification_ids)):
+            raise CampaignEngineError("channel specification IDs must be unique")
+        if len(job_ids) != len(set(job_ids)):
+            raise CampaignEngineError("production job IDs must be unique")
+        known_specifications = set(specification_ids)
+        for specification in self.channel_specifications:
+            specification_source = (
+                specification.source_bible_id,
+                specification.source_bible_version,
+                specification.source_bible_checksum,
+            )
+            if specification_source != source:
+                raise CampaignEngineError("channel specification lineage must match the approved Bible")
+        for job in self.jobs:
+            if job.specification_id not in known_specifications:
+                raise CampaignEngineError("production job references an unknown channel specification")
+            if job.source_bible_checksum != self.source_bible_checksum:
+                raise CampaignEngineError("production job lineage must match the approved Bible")
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEngineState:
     identity: CampaignIdentity
     approved_blueprint: VersionedArtifact
@@ -174,6 +298,8 @@ class CampaignEngineState:
     creative_bible_source_world_id: str = ""
     creative_bible_source_world_version: str = ""
     creative_bible_source_world_checksum: str = ""
+    production_plan: ProductionPlan | None = None
+    production_plan_approval: HumanApproval | None = None
     publication_authorised: bool = False
     media_spend_authorised: bool = False
 
@@ -196,6 +322,8 @@ class CampaignEngineState:
             CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLANNING,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
         }
         if self.stage in world_stages and len(self.campaign_world_candidates) < 2:
             raise CampaignEngineError("campaign state requires multiple Campaign World candidates")
@@ -209,6 +337,8 @@ class CampaignEngineState:
             CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLANNING,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
         }
         if self.stage in bible_stages:
             if self.selected_campaign_world is None or self.campaign_world_approval is None:
@@ -218,6 +348,8 @@ class CampaignEngineState:
             CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLANNING,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
         } and self.creative_bible is None:
             raise CampaignEngineError("Creative Bible review stages require a Creative Director's Bible")
         if self.creative_bible is not None:
@@ -240,6 +372,8 @@ class CampaignEngineState:
         if self.stage in {
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLANNING,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
         }:
             if not (
                 self.creative_bible_quality_review
@@ -248,16 +382,47 @@ class CampaignEngineState:
                 and self.creative_bible_tony_review.disposition is TonyDisposition.FORWARD
             ):
                 raise CampaignEngineError("Creative Bible approval gate requires quality and Tony clearance")
-        if self.stage is CampaignEngineStage.PRODUCTION_PLANNING:
+        if self.stage in {
+            CampaignEngineStage.PRODUCTION_PLANNING,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
+        }:
             if self.creative_bible is None or self.creative_bible_approval is None:
                 raise CampaignEngineError("production planning requires an approved Creative Director's Bible")
             _require_approval_matches(self.creative_bible, self.creative_bible_approval)
+        if self.stage in {
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_READY,
+        }:
+            if self.production_plan is None or self.creative_bible is None:
+                raise CampaignEngineError("production plan approval requires a Production Plan")
+            plan_source = (
+                self.production_plan.source_bible_id,
+                self.production_plan.source_bible_version,
+                self.production_plan.source_bible_checksum,
+            )
+            bible_source = (
+                self.creative_bible.artifact_id,
+                self.creative_bible.version,
+                self.creative_bible.checksum,
+            )
+            if plan_source != bible_source:
+                raise CampaignEngineError("Production Plan lineage must match the approved Bible")
+        if self.stage is CampaignEngineStage.PRODUCTION_READY:
+            if self.production_plan is None or self.production_plan_approval is None:
+                raise CampaignEngineError("production readiness requires an approved Production Pack")
+            _require_matt_approval(self.production_plan_approval, "Production Pack")
+            _require_approval_matches(
+                self.production_plan.production_pack,
+                self.production_plan_approval,
+            )
 
     @property
     def requires_matt(self) -> bool:
         return self.stage in {
             CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
         }
 
     @property
@@ -275,6 +440,12 @@ class CampaignEngineState:
                 "Matt approves the exact Creative Director's Bible version"
             ),
             CampaignEngineStage.PRODUCTION_PLANNING: "prepare channel specifications and Production Pack jobs",
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED: (
+                "Matt approves the exact Production Pack version"
+            ),
+            CampaignEngineStage.PRODUCTION_READY: (
+                "route approved jobs to production capabilities; retain human asset review"
+            ),
         }
         return actions[self.stage]
 
@@ -329,6 +500,8 @@ class CampaignEngineState:
                     value.get("creative_bible_source_world_checksum")
                     or (selected_campaign_world.checksum if creative_bible and selected_campaign_world else "")
                 ),
+                production_plan=_production_plan_from_dict(value.get("production_plan")),
+                production_plan_approval=_approval_from_dict(value.get("production_plan_approval")),
                 publication_authorised=bool(value.get("publication_authorised", False)),
                 media_spend_authorised=bool(value.get("media_spend_authorised", False)),
             )
@@ -457,7 +630,13 @@ class FileCampaignEngineRepository:
         CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED: {
             CampaignEngineStage.PRODUCTION_PLANNING,
         },
-        CampaignEngineStage.PRODUCTION_PLANNING: set(),
+        CampaignEngineStage.PRODUCTION_PLANNING: {
+            CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+        },
+        CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED: {
+            CampaignEngineStage.PRODUCTION_READY,
+        },
+        CampaignEngineStage.PRODUCTION_READY: set(),
     }
 
     def __init__(self, root: str | Path, *, workspace_id: str) -> None:
@@ -851,6 +1030,49 @@ class CampaignEngine:
             creative_bible_approval=approval,
         )
 
+    def submit_production_plan(
+        self,
+        state: CampaignEngineState,
+        production_plan: ProductionPlan,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.PRODUCTION_PLANNING)
+        if state.creative_bible is None:
+            raise CampaignEngineError("Production Plan requires an approved Creative Director's Bible")
+        source = (
+            production_plan.source_bible_id,
+            production_plan.source_bible_version,
+            production_plan.source_bible_checksum,
+        )
+        expected = (
+            state.creative_bible.artifact_id,
+            state.creative_bible.version,
+            state.creative_bible.checksum,
+        )
+        if source != expected:
+            raise CampaignEngineError("Production Plan lineage must match the approved Bible")
+        return replace(
+            state,
+            stage=CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            production_plan=production_plan,
+            production_plan_approval=None,
+        )
+
+    def approve_production_plan(
+        self,
+        state: CampaignEngineState,
+        approval: HumanApproval,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED)
+        if state.production_plan is None:
+            raise CampaignEngineError("Production Plan is missing")
+        _require_matt_approval(approval, "Production Pack")
+        self._require_approval_binding(state.production_plan.production_pack, approval)
+        return replace(
+            state,
+            stage=CampaignEngineStage.PRODUCTION_READY,
+            production_plan_approval=approval,
+        )
+
     @staticmethod
     def _require_stage(state: CampaignEngineState, expected: CampaignEngineStage) -> None:
         if state.stage is not expected:
@@ -916,6 +1138,37 @@ def _tony_from_dict(value: Any) -> TonyTasteReview | None:
 
 def _approval_from_dict(value: Any) -> HumanApproval | None:
     return HumanApproval(**value) if isinstance(value, dict) else None
+
+
+def _production_plan_from_dict(value: Any) -> ProductionPlan | None:
+    if not isinstance(value, dict):
+        return None
+    return ProductionPlan(
+        production_pack=VersionedArtifact(**value["production_pack"]),
+        source_bible_id=value["source_bible_id"],
+        source_bible_version=value["source_bible_version"],
+        source_bible_checksum=value["source_bible_checksum"],
+        channel_specifications=tuple(
+            ChannelAssetSpecification(
+                **{
+                    **item,
+                    "constraints": tuple(item.get("constraints", ())),
+                }
+            )
+            for item in value.get("channel_specifications", [])
+        ),
+        jobs=tuple(
+            ProductionJob(
+                **{
+                    **item,
+                    "production_method": ProductionMethod(item["production_method"]),
+                }
+            )
+            for item in value.get("jobs", [])
+        ),
+        publication_authorised=bool(value.get("publication_authorised", False)),
+        media_spend_authorised=bool(value.get("media_spend_authorised", False)),
+    )
 
 
 def _safe_identifier(value: str) -> bool:
