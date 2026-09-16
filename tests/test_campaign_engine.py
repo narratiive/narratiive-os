@@ -24,6 +24,7 @@ from runtime.campaign_engine import (
     ProductionJob,
     ProductionMethod,
     ProductionPlan,
+    ProducedAssetVersion,
     PlannedAssetManifest,
     PlannedAssetRecord,
     QualityReview,
@@ -165,6 +166,24 @@ def planned_asset_manifest(plan: ProductionPlan) -> PlannedAssetManifest:
                 source_bible_checksum=plan.source_bible_checksum,
             ),
         ),
+    )
+
+
+def produced_asset_version(
+    manifest: PlannedAssetManifest,
+    *,
+    version_number: int = 1,
+) -> ProducedAssetVersion:
+    asset = manifest.assets[0]
+    return ProducedAssetVersion(
+        asset_version_id=f"{asset.asset_id}-v{version_number}",
+        asset_id=asset.asset_id,
+        version_number=version_number,
+        file_checksum=f"asset-file-checksum-{version_number}",
+        drive_uri=f"drive://campaign-assets/{asset.asset_id}/v{version_number}.mp4",
+        producer="production-specialist",
+        production_job_id=asset.production_job_id,
+        source_manifest_checksum=manifest.manifest_artifact.checksum,
     )
 
 
@@ -649,6 +668,76 @@ class CampaignEngineTests(unittest.TestCase):
             )
 
             self.assertEqual(repository.load("safe-client", "safe-campaign"), started)
+
+    def test_generated_asset_versions_are_append_only_drive_records(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        first = self.engine.register_asset_version(
+            started,
+            produced_asset_version(started.asset_manifest),
+        )
+        second = self.engine.register_asset_version(
+            first,
+            produced_asset_version(started.asset_manifest, version_number=2),
+        )
+
+        self.assertEqual([item.version_number for item in second.asset_versions], [1, 2])
+        self.assertEqual(second.asset_versions[-1].status, AssetLifecycleStatus.GENERATED)
+        self.assertTrue(second.asset_versions[-1].human_review_required)
+        self.assertFalse(second.asset_versions[-1].publication_authorised)
+        self.assertFalse(second.asset_versions[-1].delivery_authorised)
+        self.assertEqual(CampaignEngineState.from_dict(second.to_dict()), second)
+
+    def test_asset_version_registration_rejects_overwrite_unknown_asset_and_non_drive_file(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        first_version = produced_asset_version(started.asset_manifest)
+        current = self.engine.register_asset_version(started, first_version)
+
+        with self.assertRaisesRegex(CampaignEngineError, "next append-only version: 2"):
+            self.engine.register_asset_version(
+                current,
+                replace(first_version, asset_version_id="different-version-id"),
+            )
+        with self.assertRaisesRegex(CampaignEngineError, "unknown planned asset"):
+            self.engine.register_asset_version(
+                current,
+                replace(
+                    produced_asset_version(started.asset_manifest, version_number=2),
+                    asset_id="unknown-asset",
+                ),
+            )
+        with self.assertRaisesRegex(CampaignEngineError, "Drive repository"):
+            replace(first_version, drive_uri="https://temporary-provider.invalid/file.mp4")
+
+    def test_asset_version_registration_persists_as_guarded_same_stage_transition(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            ready = self._production_ready_state()
+            started = self.engine.start_asset_production(
+                ready,
+                planned_asset_manifest(ready.production_plan),
+            )
+            repository.save(started, transition_id="asset-production-started")
+            produced = self.engine.register_asset_version(
+                started,
+                produced_asset_version(started.asset_manifest),
+            )
+
+            service.persist_transition(
+                started,
+                produced,
+                transition_id="asset-version-1-registered",
+            )
+
+            self.assertEqual(repository.load("safe-client", "safe-campaign"), produced)
 
     def test_campaign_bootstrap_requires_exact_blueprint_approval_and_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

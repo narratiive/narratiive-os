@@ -396,6 +396,48 @@ class PlannedAssetManifest:
 
 
 @dataclass(frozen=True, slots=True)
+class ProducedAssetVersion:
+    asset_version_id: str
+    asset_id: str
+    version_number: int
+    file_checksum: str
+    drive_uri: str
+    producer: str
+    production_job_id: str
+    source_manifest_checksum: str
+    status: AssetLifecycleStatus = AssetLifecycleStatus.GENERATED
+    human_review_required: bool = True
+    publication_authorised: bool = False
+    delivery_authorised: bool = False
+
+    def __post_init__(self) -> None:
+        required = (
+            self.asset_version_id,
+            self.asset_id,
+            self.file_checksum,
+            self.drive_uri,
+            self.producer,
+            self.production_job_id,
+            self.source_manifest_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("produced asset version fields must not be empty")
+        if self.version_number < 1:
+            raise CampaignEngineError("produced asset version number must be positive")
+        if not (
+            self.drive_uri.startswith("drive://")
+            or self.drive_uri.startswith("https://drive.google.com/")
+        ):
+            raise CampaignEngineError("produced asset version must use the Drive repository")
+        if self.status is not AssetLifecycleStatus.GENERATED:
+            raise CampaignEngineError("new asset versions must begin as generated")
+        if not self.human_review_required:
+            raise CampaignEngineError("generated asset versions require human review")
+        if self.publication_authorised or self.delivery_authorised:
+            raise CampaignEngineError("generated asset versions cannot authorise publication or delivery")
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEngineState:
     identity: CampaignIdentity
     approved_blueprint: VersionedArtifact
@@ -414,6 +456,7 @@ class CampaignEngineState:
     production_plan: ProductionPlan | None = None
     production_plan_approval: HumanApproval | None = None
     asset_manifest: PlannedAssetManifest | None = None
+    asset_versions: tuple[ProducedAssetVersion, ...] = ()
     publication_authorised: bool = False
     media_spend_authorised: bool = False
 
@@ -550,6 +593,26 @@ class CampaignEngineState:
             pack = self.production_plan.production_pack
             if manifest_source != (pack.artifact_id, pack.version, pack.checksum):
                 raise CampaignEngineError("Asset Manifest lineage must match the approved Production Pack")
+            planned_assets = {asset.asset_id: asset for asset in self.asset_manifest.assets}
+            version_ids: set[str] = set()
+            version_keys: set[tuple[str, int]] = set()
+            for version in self.asset_versions:
+                if version.asset_version_id in version_ids:
+                    raise CampaignEngineError("asset version IDs must be unique")
+                version_ids.add(version.asset_version_id)
+                version_key = (version.asset_id, version.version_number)
+                if version_key in version_keys:
+                    raise CampaignEngineError("asset version number cannot be overwritten")
+                version_keys.add(version_key)
+                planned = planned_assets.get(version.asset_id)
+                if planned is None:
+                    raise CampaignEngineError("asset version references an unknown planned asset")
+                if version.production_job_id != planned.production_job_id:
+                    raise CampaignEngineError("asset version job does not match its planned asset")
+                if version.source_manifest_checksum != self.asset_manifest.manifest_artifact.checksum:
+                    raise CampaignEngineError("asset version lineage must match the Asset Manifest")
+        elif self.asset_versions:
+            raise CampaignEngineError("asset versions require the asset-production stage")
 
     @property
     def requires_matt(self) -> bool:
@@ -640,6 +703,10 @@ class CampaignEngineState:
                 production_plan=_production_plan_from_dict(value.get("production_plan")),
                 production_plan_approval=_approval_from_dict(value.get("production_plan_approval")),
                 asset_manifest=_planned_asset_manifest_from_dict(value.get("asset_manifest")),
+                asset_versions=tuple(
+                    _produced_asset_version_from_dict(item)
+                    for item in value.get("asset_versions", [])
+                ),
                 publication_authorised=bool(value.get("publication_authorised", False)),
                 media_spend_authorised=bool(value.get("media_spend_authorised", False)),
             )
@@ -777,7 +844,9 @@ class FileCampaignEngineRepository:
         CampaignEngineStage.PRODUCTION_READY: {
             CampaignEngineStage.ASSET_PRODUCTION,
         },
-        CampaignEngineStage.ASSET_PRODUCTION: set(),
+        CampaignEngineStage.ASSET_PRODUCTION: {
+            CampaignEngineStage.ASSET_PRODUCTION,
+        },
     }
 
     def __init__(self, root: str | Path, *, workspace_id: str) -> None:
@@ -1263,7 +1332,40 @@ class CampaignEngine:
             state,
             stage=CampaignEngineStage.ASSET_PRODUCTION,
             asset_manifest=asset_manifest,
+            asset_versions=(),
         )
+
+    def register_asset_version(
+        self,
+        state: CampaignEngineState,
+        version: ProducedAssetVersion,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if state.asset_manifest is None:
+            raise CampaignEngineError("asset version registration requires an Asset Manifest")
+        planned = next(
+            (asset for asset in state.asset_manifest.assets if asset.asset_id == version.asset_id),
+            None,
+        )
+        if planned is None:
+            raise CampaignEngineError("asset version references an unknown planned asset")
+        if version.production_job_id != planned.production_job_id:
+            raise CampaignEngineError("asset version job does not match its planned asset")
+        if version.source_manifest_checksum != state.asset_manifest.manifest_artifact.checksum:
+            raise CampaignEngineError("asset version lineage must match the Asset Manifest")
+        if any(item.asset_version_id == version.asset_version_id for item in state.asset_versions):
+            raise CampaignEngineError("asset version ID already exists")
+        existing_numbers = [
+            item.version_number
+            for item in state.asset_versions
+            if item.asset_id == version.asset_id
+        ]
+        expected_number = max(existing_numbers, default=0) + 1
+        if version.version_number != expected_number:
+            raise CampaignEngineError(
+                f"asset version number must be the next append-only version: {expected_number}"
+            )
+        return replace(state, asset_versions=(*state.asset_versions, version))
 
     @staticmethod
     def _require_stage(state: CampaignEngineState, expected: CampaignEngineStage) -> None:
@@ -1383,6 +1485,17 @@ def _planned_asset_manifest_from_dict(value: Any) -> PlannedAssetManifest | None
         publication_authorised=bool(value.get("publication_authorised", False)),
         delivery_authorised=bool(value.get("delivery_authorised", False)),
         media_spend_authorised=bool(value.get("media_spend_authorised", False)),
+    )
+
+
+def _produced_asset_version_from_dict(value: Any) -> ProducedAssetVersion:
+    if not isinstance(value, dict):
+        raise CampaignEngineStoreError("asset version must be an object")
+    return ProducedAssetVersion(
+        **{
+            **value,
+            "status": AssetLifecycleStatus(value.get("status", "generated")),
+        }
     )
 
 
