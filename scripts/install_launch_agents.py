@@ -184,7 +184,9 @@ def _write_deployment_receipt(repo_root: Path) -> Path:
 
 def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, activate: bool) -> list[Path]:
     repo_root = repo_root.expanduser().resolve()
-    python_path = python_path.expanduser().resolve()
+    # Preserve the virtual-environment entry-point path. Resolving its symlink
+    # selects the base interpreter and silently drops the venv site-packages.
+    python_path = Path(os.path.abspath(str(python_path.expanduser())))
     env_file = env_file.expanduser().resolve()
     if not (repo_root / "runtime" / "server.py").is_file():
         raise FileNotFoundError("runtime/server.py not found in repository root")
