@@ -250,6 +250,9 @@ class CampaignEngineTests(unittest.TestCase):
         current = self.engine.select_campaign_world(current, "a", approval(selected))
         bible = artifact("bible-1", "creative_directors_bible", "bible-checksum")
         current = self.engine.submit_creative_bible(current, bible)
+        self.assertEqual(current.creative_bible_source_world_id, selected.artifact_id)
+        self.assertEqual(current.creative_bible_source_world_version, selected.version)
+        self.assertEqual(current.creative_bible_source_world_checksum, selected.checksum)
         current = self.engine.review_creative_bible(
             current,
             quality_review=quality("bible-checksum"),
@@ -259,6 +262,86 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertTrue(current.requires_matt)
         current = self.engine.approve_creative_bible(current, approval(bible))
         self.assertEqual(current.stage, CampaignEngineStage.PRODUCTION_PLANNING)
+
+    def test_creative_bible_lineage_cannot_be_detached_from_selected_world(self) -> None:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        current = self.engine.select_campaign_world(current, "a", approval(selected))
+        bible = artifact("bible-1", "creative_directors_bible", "bible-checksum")
+        current = self.engine.submit_creative_bible(current, bible)
+
+        with self.assertRaisesRegex(CampaignEngineStoreError, "lineage must match"):
+            CampaignEngineState.from_dict(
+                {
+                    **current.to_dict(),
+                    "creative_bible_source_world_checksum": "different-world-checksum",
+                }
+            )
+
+    def test_revised_creative_bible_clears_prior_reviews_and_retains_world_lineage(self) -> None:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        current = self.engine.select_campaign_world(current, "a", approval(selected))
+        first = artifact("bible-1", "creative_directors_bible", "bible-checksum-1")
+        current = self.engine.submit_creative_bible(current, first)
+        current = self.engine.review_creative_bible(
+            current,
+            quality_review=quality("bible-checksum-1", QualityVerdict.REVISE),
+            tony_review=tony("bible-checksum-1", TonyDisposition.RETURN),
+        )
+        revised = VersionedArtifact(
+            artifact_id="bible-1",
+            artifact_type="creative_directors_bible",
+            version="1.1",
+            checksum="bible-checksum-2",
+            location="drive://narratiive/bible-1-v1.1",
+        )
+
+        current = self.engine.submit_creative_bible(current, revised)
+
+        self.assertIsNone(current.creative_bible_quality_review)
+        self.assertIsNone(current.creative_bible_tony_review)
+        self.assertIsNone(current.creative_bible_approval)
+        self.assertEqual(current.creative_bible_source_world_checksum, selected.checksum)
+
+    def test_legacy_creative_bible_state_derives_selected_world_lineage(self) -> None:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        current = self.engine.select_campaign_world(current, "a", approval(selected))
+        current = self.engine.submit_creative_bible(
+            current,
+            artifact("bible-1", "creative_directors_bible", "bible-checksum"),
+        )
+        legacy = current.to_dict()
+        legacy.pop("creative_bible_source_world_id")
+        legacy.pop("creative_bible_source_world_version")
+        legacy.pop("creative_bible_source_world_checksum")
+
+        restored = CampaignEngineState.from_dict(legacy)
+
+        self.assertEqual(restored.creative_bible_source_world_id, selected.artifact_id)
+        self.assertEqual(restored.creative_bible_source_world_checksum, selected.checksum)
 
     def test_tony_cannot_approve_creative_bible_for_matt(self) -> None:
         current = self._world_review_state()

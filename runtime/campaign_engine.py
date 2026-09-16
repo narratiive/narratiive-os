@@ -171,6 +171,9 @@ class CampaignEngineState:
     creative_bible_quality_review: QualityReview | None = None
     creative_bible_tony_review: TonyTasteReview | None = None
     creative_bible_approval: HumanApproval | None = None
+    creative_bible_source_world_id: str = ""
+    creative_bible_source_world_version: str = ""
+    creative_bible_source_world_checksum: str = ""
     publication_authorised: bool = False
     media_spend_authorised: bool = False
 
@@ -217,6 +220,23 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLANNING,
         } and self.creative_bible is None:
             raise CampaignEngineError("Creative Bible review stages require a Creative Director's Bible")
+        if self.creative_bible is not None:
+            if self.selected_campaign_world is None:
+                raise CampaignEngineError("Creative Director's Bible requires a selected Campaign World")
+            source = (
+                self.creative_bible_source_world_id,
+                self.creative_bible_source_world_version,
+                self.creative_bible_source_world_checksum,
+            )
+            expected_source = (
+                self.selected_campaign_world.artifact_id,
+                self.selected_campaign_world.version,
+                self.selected_campaign_world.checksum,
+            )
+            if source != expected_source:
+                raise CampaignEngineError(
+                    "Creative Director's Bible lineage must match the exact selected Campaign World"
+                )
         if self.stage in {
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLANNING,
@@ -283,18 +303,32 @@ class CampaignEngineState:
                 )
                 for item in value.get("campaign_world_candidates", [])
             )
+            selected_campaign_world = _artifact_from_dict(value.get("selected_campaign_world"))
+            creative_bible = _artifact_from_dict(value.get("creative_bible"))
             return cls(
                 identity=identity,
                 approved_blueprint=blueprint,
                 blueprint_approval=HumanApproval(**value["blueprint_approval"]),
                 stage=CampaignEngineStage(value.get("stage", CampaignEngineStage.STRATEGY_APPROVED.value)),
                 campaign_world_candidates=candidates,
-                selected_campaign_world=_artifact_from_dict(value.get("selected_campaign_world")),
+                selected_campaign_world=selected_campaign_world,
                 campaign_world_approval=_approval_from_dict(value.get("campaign_world_approval")),
-                creative_bible=_artifact_from_dict(value.get("creative_bible")),
+                creative_bible=creative_bible,
                 creative_bible_quality_review=_quality_from_dict(value.get("creative_bible_quality_review")),
                 creative_bible_tony_review=_tony_from_dict(value.get("creative_bible_tony_review")),
                 creative_bible_approval=_approval_from_dict(value.get("creative_bible_approval")),
+                creative_bible_source_world_id=str(
+                    value.get("creative_bible_source_world_id")
+                    or (selected_campaign_world.artifact_id if creative_bible and selected_campaign_world else "")
+                ),
+                creative_bible_source_world_version=str(
+                    value.get("creative_bible_source_world_version")
+                    or (selected_campaign_world.version if creative_bible and selected_campaign_world else "")
+                ),
+                creative_bible_source_world_checksum=str(
+                    value.get("creative_bible_source_world_checksum")
+                    or (selected_campaign_world.checksum if creative_bible and selected_campaign_world else "")
+                ),
                 publication_authorised=bool(value.get("publication_authorised", False)),
                 media_spend_authorised=bool(value.get("media_spend_authorised", False)),
             )
@@ -490,7 +524,6 @@ class FileCampaignEngineRepository:
         path = self._path(expected.identity.client_id, expected.identity.campaign_id)
         proposed_payload = proposed.to_dict()
         proposed_hash = _canonical_hash(proposed_payload)
-        expected_hash = _canonical_hash(expected.to_dict())
         with self._file_lock(path, exclusive=True):
             records = self._read_records(path)
             existing = next((record for record in records if record["transition_id"] == transition_id), None)
@@ -500,7 +533,8 @@ class FileCampaignEngineRepository:
                 return CampaignEngineState.from_dict(existing["state"])
             if not records:
                 raise CampaignEngineStoreError("campaign transition requires persisted current state")
-            if records[-1]["state_hash"] != expected_hash:
+            persisted_current = CampaignEngineState.from_dict(records[-1]["state"])
+            if persisted_current != expected:
                 raise CampaignEngineStoreError("campaign transition expected state is stale")
             previous_hash = records[-1]["record_hash"]
             record = {
@@ -764,10 +798,18 @@ class CampaignEngine:
         self._require_stage(state, CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT)
         if creative_bible.artifact_type != "creative_directors_bible":
             raise CampaignEngineError("expected a Creative Director's Bible artefact")
+        if state.selected_campaign_world is None:
+            raise CampaignEngineError("Creative Director's Bible requires a selected Campaign World")
         return replace(
             state,
             stage=CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW,
             creative_bible=creative_bible,
+            creative_bible_quality_review=None,
+            creative_bible_tony_review=None,
+            creative_bible_approval=None,
+            creative_bible_source_world_id=state.selected_campaign_world.artifact_id,
+            creative_bible_source_world_version=state.selected_campaign_world.version,
+            creative_bible_source_world_checksum=state.selected_campaign_world.checksum,
         )
 
     def review_creative_bible(
