@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -43,7 +44,7 @@ class RecoveryTests(unittest.TestCase):
     def test_documented_direct_script_entrypoint_loads_repository_imports(self):
         root = Path(__file__).resolve().parents[1]
         completed = subprocess.run(
-            [str(root / ".venv/bin/python"), str(root / "scripts/recover_tony_services.py")],
+            [sys.executable, str(root / "scripts/recover_tony_services.py")],
             cwd=root,
             capture_output=True,
             text=True,
