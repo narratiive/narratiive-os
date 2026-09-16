@@ -7,9 +7,10 @@ const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(PLUGIN_DIR, "../../..");
 const EXECUTOR_MODULE = "scripts.execute_tony_safe_read";
 const ENV_LOADER = path.join(REPOSITORY_ROOT, "scripts", "run_with_env.py");
+const REPOSITORY_PYTHON = path.join(REPOSITORY_ROOT, ".venv", "bin", "python");
 
 export function executeSafeRead(params = {}, options = {}) {
-  const python = String(options.python || process.env.TONY_PYTHON || "python3");
+  const python = String(options.python || process.env.TONY_PYTHON || REPOSITORY_PYTHON);
   const envFile = String(
     options.envFile
       || process.env.NARRATIIVE_RUNTIME_ENV_FILE
