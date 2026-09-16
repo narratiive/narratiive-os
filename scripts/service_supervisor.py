@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import subprocess
+import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -98,6 +99,14 @@ def _command_from_env(name: str) -> list[str] | None:
     return value
 
 
+def _doctor_command() -> list[str]:
+    configured = _command_from_env("NARRATIIVE_DOCTOR_COMMAND")
+    if configured:
+        return configured
+    python = os.getenv("PYTHON", "").strip() or sys.executable
+    return [python, "scripts/service_doctor.py"]
+
+
 def _append_event(path: str, report: dict) -> None:
     target = Path(path).expanduser()
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -106,10 +115,7 @@ def _append_event(path: str, report: dict) -> None:
 
 
 def main() -> None:
-    doctor_command = _command_from_env("NARRATIIVE_DOCTOR_COMMAND") or [
-        os.getenv("PYTHON", "python3"),
-        "scripts/service_doctor.py",
-    ]
+    doctor_command = _doctor_command()
     completed = subprocess.run(
         doctor_command,
         capture_output=True,

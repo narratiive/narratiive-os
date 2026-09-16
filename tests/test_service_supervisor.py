@@ -112,6 +112,27 @@ class ServiceSupervisorTests(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     service_supervisor._command_from_env("TEST_COMMAND")
 
+    def test_doctor_defaults_to_the_running_virtualenv_interpreter(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {"NARRATIIVE_DOCTOR_COMMAND": "", "PYTHON": ""},
+            clear=False,
+        ):
+            self.assertEqual(
+                service_supervisor._doctor_command(),
+                [sys.executable, "scripts/service_doctor.py"],
+            )
+
+    def test_explicit_doctor_command_remains_authoritative(self) -> None:
+        with mock.patch.dict(
+            "os.environ",
+            {"NARRATIIVE_DOCTOR_COMMAND": '["/safe/python", "doctor.py"]'},
+        ):
+            self.assertEqual(
+                service_supervisor._doctor_command(),
+                ["/safe/python", "doctor.py"],
+            )
+
     def test_event_log_is_append_only_json_lines(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "events" / "supervisor.jsonl"
