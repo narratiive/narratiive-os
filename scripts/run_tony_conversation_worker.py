@@ -20,6 +20,7 @@ from runtime.tony_conversation_work import (  # noqa: E402
 from runtime.tony_dispatch_adapters import build_http_dispatchers  # noqa: E402
 from runtime.tony_promised_work import TonyPromisedWorkWorker  # noqa: E402
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend  # noqa: E402
+from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager  # noqa: E402
 
 
 def build_worker() -> TonyConversationWorker:
@@ -40,6 +41,25 @@ def build_worker() -> TonyConversationWorker:
     )
 
 
+def resolve_workflow_workspace_id(environ=None) -> str:
+    env = os.environ if environ is None else environ
+    executive_workspace_id = (
+        str(env.get("TONY_EXECUTIVE_WORKSPACE_ID", "")).strip()
+        or str(env.get("TONY_GITHUB_WORKSPACE_ID", "")).strip()
+        or "narratiive"
+    )
+    runtime_root = Path(
+        str(env.get("NARRATIIVE_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime")))
+    ).resolve()
+    try:
+        return WorkspaceRuntimeManager(
+            runtime_root,
+            REPOSITORY_ROOT,
+        ).repository.get(executive_workspace_id).client_id
+    except WorkspaceNotFound:
+        return executive_workspace_id
+
+
 def build_promised_work_worker() -> TonyPromisedWorkWorker:
     workflow_root = Path(
         os.getenv(
@@ -47,11 +67,7 @@ def build_promised_work_worker() -> TonyPromisedWorkWorker:
             str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"),
         )
     ).resolve()
-    workspace_id = (
-        os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip()
-        or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip()
-        or "narratiive"
-    )
+    workspace_id = resolve_workflow_workspace_id()
     telegram = TelegramSender(TelegramConfig.from_env(os.environ))
     backend = FileWorkflowCommandBackend(
         workflow_root,
