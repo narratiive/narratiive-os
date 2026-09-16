@@ -549,7 +549,9 @@ class GoogleDriveDispatcher(GoogleAdapter):
             operation = _text(contract.get("operation")).casefold()
             file_id = _text(target.get("file_id") or payload.get("file_id"))
             query_text = _text(target.get("query") or payload.get("query"))
-            if operation in {"search", "list"}:
+            list_operation = operation == "list" or (operation == "get_metadata" and not file_id)
+            search_operation = operation == "search" or (operation == "get_metadata" and bool(query_text))
+            if list_operation or search_operation:
                 if operation == "search" and not query_text:
                     raise BusinessAdapterError("drive_search_requires_query")
                 max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
@@ -560,7 +562,7 @@ class GoogleDriveDispatcher(GoogleAdapter):
                     query_clause = "trashed=false"
                 q = parse.quote(query_clause, safe="")
                 fields = parse.quote("files(id,name,mimeType,modifiedTime,webViewLink,parents)", safe="(),")
-                order = "&orderBy=modifiedTime%20desc" if operation == "list" else ""
+                order = "&orderBy=modifiedTime%20desc" if list_operation and not query_text else ""
                 result = self.client.call(
                     f"{self.api_base}/files?q={q}&pageSize={max_results}{order}&fields={fields}",
                     headers=self._headers(),
@@ -577,11 +579,11 @@ class GoogleDriveDispatcher(GoogleAdapter):
                     "verified": True,
                     "read_only": True,
                     "mutation_count": 0,
-                    "source_id": "drive:list" if operation == "list" else "drive:search",
+                    "source_id": "drive:list" if list_operation and not query_text else "drive:search",
                     "query": query_text,
                     "files": files,
                     "result_count": len(files),
-                    "summary": "Drive metadata was listed without mutation." if operation == "list" else "Drive metadata was searched without mutation.",
+                    "summary": "Drive metadata was listed without mutation." if list_operation and not query_text else "Drive metadata was searched without mutation.",
                 }
             if not file_id:
                 raise BusinessAdapterError("drive_read_requires_file_id")
