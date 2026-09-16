@@ -98,6 +98,9 @@ class TonyPromisedWorkWorker:
                 "The promised work has reached its review gate, but I couldn’t verify delivery of the full review copy. "
                 "I’ve kept the gate pending and won’t claim it was emailed."
             )
+        notification = str(delivery.get("telegram_notification") or "").strip()
+        if notification:
+            return notification[:3500]
         conclusions = [
             " ".join(str(item).split())[:320]
             for item in delivery.get("conclusions", [])

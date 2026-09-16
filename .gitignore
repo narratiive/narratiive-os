@@ -7,5 +7,9 @@ __pycache__/
 .runtime/
 runtime-state/
 
+# Generated review outputs and PDF visual-QA intermediates
+output/pdf/
+tmp/pdfs/
+
 # macOS
 .DS_Store

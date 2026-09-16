@@ -201,6 +201,26 @@ a second client-send approval, but it must be idempotent and backed by verified
 Gmail message evidence recorded against the run. Every other recipient remains
 subject to the existing external-action approval contract.
 
+Document-based gates use three distinct artefact layers. The authoritative
+artefact contains the complete structured work product, evidence lineage and
+execution metadata and remains immutable. A product-aware presentation renderer
+selects only review-relevant content from that exact checksum and creates a new,
+immutable human-review PDF with explicit parent lineage; the review copy may
+express material uncertainty but never exposes raw JSON, provider/model,
+worker, policy, source-reference or workflow implementation metadata. The
+email is a delivery receipt, not storage. A client-facing artefact or release is
+separate again and can occur only after the relevant authorised-human approval
+for its exact version.
+
+Blueprint Lite, Growth Sprint Proposal, applicable research/Strategy Thesis and
+Growth Blueprint workflows each have an explicit presentation contract. Full
+Growth Blueprint presentation production continues through the existing
+editable deck and visual-QA boundary; the presentation layer does not invent or
+rewrite strategy. Rendering or delivery failure leaves the gate pending and is
+reported to Tony. Re-render and delivery retries use the source checksum,
+renderer version and recipient in their identities so restart cannot silently
+replace a review copy or create an unexpected duplicate email.
+
 Conversational workflow decisions bind to the exact current run, gate and
 artefact checksum/version. The control plane issues an opaque approval token for
 that snapshot. An authenticated Matt Telegram turn may supply the judgement and

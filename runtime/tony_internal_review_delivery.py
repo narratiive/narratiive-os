@@ -3,13 +3,17 @@ from __future__ import annotations
 import base64
 import hashlib
 import hmac
-import html
 import json
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
 
 from runtime.models import ArtifactRef, WorkflowState, WorkflowStatus
+from runtime.human_review_artifacts import (
+    HumanReviewArtifact,
+    HumanReviewArtifactStore,
+    HumanReviewPresentationService,
+)
 
 
 INTERNAL_REVIEW_ADDRESS = "hello@narratiive.com"
@@ -130,7 +134,11 @@ class InternalReviewDeliveryService:
             }
 
         output = self._read_artifact(artifact)
-        key = self._idempotency_key(state, artifact, address)
+        review = HumanReviewPresentationService(
+            HumanReviewArtifactStore(self.workflow_root / "human-review-artifacts"),
+            allowed_source_root=self.workflow_root,
+        ).produce(state=state, source=artifact, output=output)
+        key = self._idempotency_key(state, artifact, review, address)
         prior = next(
             (
                 item.get("receipt")
@@ -151,10 +159,9 @@ class InternalReviewDeliveryService:
             }
 
         company = _company_name(state)
-        title = _artifact_title(state, artifact)
-        conclusions = _conclusions(output)
-        review_copy = _render_review_copy(company, title, state, artifact, output)
-        filename = f"{_safe_filename(company)}-{_safe_filename(title)}-{_artifact_version(artifact)}.html"
+        title = review.product
+        conclusions = list(review.focus_points)
+        review_copy = Path(review.location).read_bytes()
         contract = {
             "worker": "Gmail",
             "execution_mode": "authorised_internal_review_write",
@@ -171,12 +178,12 @@ class InternalReviewDeliveryService:
                 "kind": "internal_artifact_review_delivery",
                 "recipient_email": INTERNAL_REVIEW_ADDRESS,
                 "subject": f"{company} — {title} review",
-                "body": _email_body(company, title, conclusions),
+                "body": _email_body(company, review),
                 "attachments": [
                     {
-                        "filename": filename,
-                        "mime_type": "text/html",
-                        "content_base64": base64.b64encode(review_copy.encode("utf-8")).decode("ascii"),
+                        "filename": review.filename,
+                        "mime_type": review.mime_type,
+                        "content_base64": base64.b64encode(review_copy).decode("ascii"),
                     }
                 ],
             },
@@ -209,11 +216,20 @@ class InternalReviewDeliveryService:
             "artifact_id": artifact.artifact_id,
             "artifact_checksum": artifact.checksum,
             "artifact_version": _artifact_version(artifact),
+            "review_artifact_id": review.review_artifact_id,
+            "review_artifact_checksum": review.checksum,
+            "review_renderer_id": review.renderer_id,
+            "review_renderer_version": review.renderer_version,
+            "review_page_count": review.page_count,
             "message_id": str(evidence.get("message_id") or ""),
             "thread_id": str(evidence.get("thread_id") or ""),
             "duplicate_suppressed": evidence.get("duplicate_suppressed") is True,
-            "attachment_filename": filename,
+            "attachment_filename": review.filename,
+            "attachment_mime_type": review.mime_type,
             "conclusions": conclusions,
+            "decision_prompt": review.decision_prompt,
+            "next_if_approved": review.next_if_approved,
+            "telegram_notification": review.telegram_notification,
         }
         runtime.runs.record_external_action(state.run_id, idempotency_key=key, receipt=receipt)
         current = runtime.runs.load_run(state.run_id)
@@ -231,6 +247,11 @@ class InternalReviewDeliveryService:
             raise InternalReviewDeliveryError("workflow artefact is unreadable") from exc
         if not isinstance(value, Mapping):
             raise InternalReviewDeliveryError("workflow artefact must be structured")
+        checksum = hashlib.sha256(
+            json.dumps(dict(value), sort_keys=True, separators=(",", ":")).encode("utf-8")
+        ).hexdigest()
+        if not artifact.checksum or not hmac.compare_digest(artifact.checksum, checksum):
+            raise InternalReviewDeliveryError("workflow artefact checksum does not match its immutable record")
         return value
 
     @staticmethod
@@ -242,10 +263,16 @@ class InternalReviewDeliveryService:
             "blueprint_lite_to_discovery_preparation",
             "discovery_evidence_to_growth_sprint_proposal",
             "research_to_growth_blueprint",
+            "growth_blueprint_deliverable_production",
         }
 
     @staticmethod
-    def _idempotency_key(state: WorkflowState, artifact: ArtifactRef, recipient: str) -> str:
+    def _idempotency_key(
+        state: WorkflowState,
+        artifact: ArtifactRef,
+        review: HumanReviewArtifact,
+        recipient: str,
+    ) -> str:
         material = "\0".join(
             (
                 INTERNAL_REVIEW_APPROVAL_SCOPE,
@@ -254,6 +281,9 @@ class InternalReviewDeliveryService:
                 state.run_id,
                 artifact.artifact_id,
                 artifact.checksum or "",
+                review.review_artifact_id,
+                review.checksum,
+                review.renderer_version,
                 recipient,
             )
         )
@@ -278,9 +308,19 @@ class InternalReviewDeliveryService:
             "artifact_id": artifact.artifact_id,
             "artifact_checksum": artifact.checksum,
             "artifact_version": _artifact_version(artifact),
+            "review_artifact_id": str(receipt.get("review_artifact_id") or ""),
+            "review_artifact_checksum": str(receipt.get("review_artifact_checksum") or ""),
+            "review_renderer_id": str(receipt.get("review_renderer_id") or ""),
+            "review_renderer_version": str(receipt.get("review_renderer_version") or ""),
+            "review_page_count": int(receipt.get("review_page_count") or 0),
+            "attachment_filename": str(receipt.get("attachment_filename") or ""),
+            "attachment_mime_type": str(receipt.get("attachment_mime_type") or ""),
             "message_id": str(receipt.get("message_id") or ""),
             "thread_id": str(receipt.get("thread_id") or ""),
             "conclusions": list(receipt.get("conclusions") or []),
+            "decision_prompt": str(receipt.get("decision_prompt") or ""),
+            "next_if_approved": str(receipt.get("next_if_approved") or ""),
+            "telegram_notification": str(receipt.get("telegram_notification") or ""),
             "approval_token": workflow_approval_token(state),
             "external_action_taken": not duplicate,
         }
@@ -298,6 +338,7 @@ def _company_name(state: WorkflowState) -> str:
     for value in (
         payload.get("company"),
         payload.get("company_name"),
+        (payload.get("commercial_context") or {}).get("company") if isinstance(payload.get("commercial_context"), Mapping) else None,
         (payload.get("client_context") or {}).get("name") if isinstance(payload.get("client_context"), Mapping) else None,
     ):
         if str(value or "").strip():
@@ -305,115 +346,22 @@ def _company_name(state: WorkflowState) -> str:
     return state.entity_id or state.client_id
 
 
-def _artifact_title(state: WorkflowState, artifact: ArtifactRef) -> str:
-    names = {
-        "blueprint_lite": "Blueprint Lite",
-        "discovery_synthesis": "Discovery synthesis",
-        "growth_sprint_proposal": "Growth Sprint proposal",
-        "strategy_thesis": "Strategy Thesis",
-        "growth_blueprint": "Growth Blueprint",
-        "campaign_world": "Campaign World",
-        "creative_directors_bible": "Creative Director's Bible",
-        "research_report": "research report",
-    }
-    workflow_names = {
-        "growth_diagnostic_to_blueprint_lite": "Blueprint Lite",
-        "blueprint_lite_to_discovery_preparation": "Discovery synthesis",
-        "discovery_evidence_to_growth_sprint_proposal": "Growth Sprint proposal",
-        "research_to_growth_blueprint": "Growth Blueprint",
-    }
-    return names.get(
-        artifact.artifact_type.casefold(),
-        workflow_names.get(state.workflow_id, artifact.artifact_type.replace("_", " ").title()),
-    )
-
-
-def _conclusions(output: Mapping[str, Any]) -> list[str]:
-    candidates = (
-        "central_diagnosis",
-        "growth_tension",
-        "provisional_opportunity",
-        "growth_opportunity",
-        "strategy_thesis",
-        "recommendation",
-    )
-    result: list[str] = []
-    for key in candidates:
-        text = _compact_value(output.get(key))
-        if text and text.casefold() not in {item.casefold() for item in result}:
-            result.append(text[:420].rstrip())
-        if len(result) == 4:
-            break
-    if len(result) < 2:
-        for key, value in output.items():
-            if key in {"source_backed_evidence", "sources", "fact_interpretation_hypothesis_lineage", "blueprint_lite"}:
-                continue
-            text = _compact_value(value)
-            if text and text.casefold() not in {item.casefold() for item in result}:
-                result.append(text[:420].rstrip())
-            if len(result) == 4:
-                break
-    return result[:4]
-
-
-def _compact_value(value: Any) -> str:
-    if isinstance(value, str):
-        return " ".join(value.split())
-    if isinstance(value, list):
-        return "; ".join(" ".join(str(item).split()) for item in value[:3] if str(item).strip())
-    if isinstance(value, Mapping):
-        return "; ".join(
-            f"{str(key).replace('_', ' ')}: {_compact_value(item)}"
-            for key, item in list(value.items())[:3]
-            if _compact_value(item)
-        )
-    return ""
-
-
-def _email_body(company: str, title: str, conclusions: list[str]) -> str:
+def _email_body(company: str, review: HumanReviewArtifact) -> str:
     lines = [
-        f"The {title} for {company} is ready for internal review.",
+        f"The {review.product} for {company} is ready for internal review.",
         "",
-        "The full immutable review copy is attached. Narratiive OS remains the source of truth for the artefact and approval state.",
+        "The polished PDF review copy is attached.",
     ]
-    if conclusions:
-        lines.extend(("", "Review focus:"))
-        lines.extend(f"- {item}" for item in conclusions)
-    lines.extend(("", "Please give the approval, rejection or revision direction to Tony in Telegram."))
-    return "\n".join(lines)
-
-
-def _render_review_copy(
-    company: str,
-    title: str,
-    state: WorkflowState,
-    artifact: ArtifactRef,
-    output: Mapping[str, Any],
-) -> str:
-    sections = "".join(
-        f"<section><h2>{html.escape(str(key).replace('_', ' ').title())}</h2>{_html_value(value)}</section>"
-        for key, value in output.items()
-    )
-    return f"""<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>{html.escape(company)} — {html.escape(title)}</title>
-<style>
-body{{margin:0;background:#f4f1e9;color:#181818;font:16px/1.55 Arial,sans-serif}}main{{max-width:820px;margin:0 auto;background:#fff;min-height:100vh;padding:64px 72px;box-sizing:border-box}}header{{border-bottom:5px solid #181818;padding-bottom:28px;margin-bottom:42px}}.eyebrow{{font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#6b665d}}h1{{font:700 42px/1.05 Georgia,serif;margin:12px 0}}h2{{font:700 23px/1.2 Georgia,serif;margin:0 0 12px}}section{{border-top:1px solid #d8d3c8;padding:28px 0}}ul{{padding-left:22px}}li{{margin:8px 0}}.meta{{color:#6b665d;font-size:13px}}code{{font-size:12px}}@media(max-width:700px){{main{{padding:36px 24px}}h1{{font-size:34px}}}}
-</style></head><body><main><header><div class="eyebrow">Narratiive internal review · not for client distribution</div><h1>{html.escape(company)}<br>{html.escape(title)}</h1><div class="meta">Workflow {html.escape(state.run_id)} · {_artifact_version(artifact)} · artefact {html.escape(artifact.artifact_id)}</div></header>{sections}</main></body></html>"""
-
-
-def _html_value(value: Any) -> str:
-    if isinstance(value, Mapping):
-        return "".join(
-            f"<h3>{html.escape(str(key).replace('_', ' ').title())}</h3>{_html_value(item)}"
-            for key, item in value.items()
+    if review.focus_points:
+        lines.extend(("", "Please pay particular attention to:"))
+        lines.extend(f"- {item}" for item in review.focus_points[:4])
+    lines.extend(
+        (
+            "",
+            "Approval status: Pending.",
+            f"If approved: {review.next_if_approved}",
+            "",
+            "Please give Tony your approval, rejection or revision direction in Telegram.",
         )
-    if isinstance(value, list):
-        return "<ul>" + "".join(f"<li>{_html_value(item)}</li>" for item in value) + "</ul>"
-    text = html.escape(str(value if value is not None else ""))
-    return "".join(f"<p>{line}</p>" for line in text.splitlines() if line.strip()) or "<p>—</p>"
-
-
-def _safe_filename(value: str) -> str:
-    cleaned = "-".join("".join(character for character in word if character.isalnum()) for word in value.split())
-    return cleaned.strip("-")[:80] or "Narratiive-review"
+    )
+    return "\n".join(lines)

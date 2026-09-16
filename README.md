@@ -1,5 +1,15 @@
 # Narratiive OS
 
+## Local runtime setup
+
+Narratiive OS requires Python 3.10 or newer and uses the repository virtual
+environment for local operation. Install the pinned runtime and test
+dependencies with:
+
+```bash
+.venv/bin/python -m pip install -r requirements.txt
+```
+
 ## Deterministic Growth Blueprint run
 
 Run the five specialist stages against the synthetic RAVE fixture:
