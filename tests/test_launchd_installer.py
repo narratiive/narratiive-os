@@ -104,6 +104,40 @@ class LaunchdInstallerTests(unittest.TestCase):
                 self.assertTrue(path.exists())
                 plistlib.loads(path.read_bytes())
 
+    def test_install_preserves_virtual_environment_python_symlink(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            (repo / "runtime").mkdir(parents=True)
+            (repo / "openclaw").mkdir(parents=True)
+            (repo / "scripts").mkdir(parents=True)
+            for path in (
+                repo / "runtime" / "server.py",
+                repo / "openclaw" / "tony_live_bridge.py",
+                repo / "scripts" / "run_with_env.py",
+                repo / "scripts" / "run_proactive_brief.py",
+                repo / "scripts" / "run_tony_conversation_worker.py",
+            ):
+                path.write_text("", encoding="utf-8")
+            base_python = root / "base-python"
+            base_python.write_text("", encoding="utf-8")
+            venv_python = root / "repo" / ".venv" / "bin" / "python"
+            venv_python.parent.mkdir(parents=True)
+            venv_python.symlink_to(base_python)
+            env_file = root / "runtime.env"
+            env_file.write_text("NARRATIIVE_API_KEY=test\n", encoding="utf-8")
+            env_file.chmod(0o600)
+
+            written = installer.install(
+                repo, venv_python, env_file, root / "home", activate=False
+            )
+
+            runtime_plist = plistlib.loads(written[0].read_bytes())
+            arguments = runtime_plist["ProgramArguments"]
+            self.assertEqual(arguments[0], str(venv_python))
+            self.assertEqual(arguments[3], str(venv_python))
+            self.assertNotEqual(arguments[0], str(base_python))
+
     def test_install_rejects_insecure_environment_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
