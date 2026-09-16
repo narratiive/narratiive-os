@@ -162,6 +162,7 @@ class CampaignWorldCandidate:
 class CampaignEngineState:
     identity: CampaignIdentity
     approved_blueprint: VersionedArtifact
+    blueprint_approval: HumanApproval
     stage: CampaignEngineStage = CampaignEngineStage.STRATEGY_APPROVED
     campaign_world_candidates: tuple[CampaignWorldCandidate, ...] = ()
     selected_campaign_world: VersionedArtifact | None = None
@@ -176,6 +177,7 @@ class CampaignEngineState:
     def __post_init__(self) -> None:
         if self.approved_blueprint.artifact_type != "growth_blueprint":
             raise CampaignEngineError("campaign engine requires an approved Growth Blueprint")
+        _require_approval_matches(self.approved_blueprint, self.blueprint_approval)
         if self.publication_authorised or self.media_spend_authorised:
             raise CampaignEngineError(
                 "campaign preparation state cannot authorise publication or media spend"
@@ -283,6 +285,7 @@ class CampaignEngineState:
             return cls(
                 identity=identity,
                 approved_blueprint=blueprint,
+                blueprint_approval=HumanApproval(**value["blueprint_approval"]),
                 stage=CampaignEngineStage(value.get("stage", CampaignEngineStage.STRATEGY_APPROVED.value)),
                 campaign_world_candidates=candidates,
                 selected_campaign_world=_artifact_from_dict(value.get("selected_campaign_world")),
@@ -400,6 +403,11 @@ class FileCampaignEngineRepository:
             raise CampaignEngineStoreError("campaign state identity does not match its repository path")
         return state
 
+    def exists(self, client_id: str, campaign_id: str) -> bool:
+        path = self._path(client_id, campaign_id)
+        with self._file_lock(path, exclusive=False):
+            return bool(self._read_records(path))
+
     def list_states(self) -> tuple[CampaignEngineState, ...]:
         states = []
         if not self.root.exists():
@@ -474,6 +482,36 @@ class FileCampaignEngineRepository:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
         except OSError as exc:
             raise CampaignEngineStoreError(f"campaign state lock failed closed: {exc}") from exc
+
+
+class CampaignEngineApplicationService:
+    """Create one campaign from an exact approved Growth Blueprint."""
+
+    def __init__(self, repository: FileCampaignEngineRepository) -> None:
+        self.repository = repository
+
+    def start_campaign(
+        self,
+        *,
+        identity: CampaignIdentity,
+        approved_blueprint: VersionedArtifact,
+        blueprint_approval: HumanApproval,
+        transition_id: str,
+    ) -> tuple[CampaignEngineState, bool]:
+        proposed = CampaignEngineState(
+            identity=identity,
+            approved_blueprint=approved_blueprint,
+            blueprint_approval=blueprint_approval,
+        )
+        if self.repository.exists(identity.client_id, identity.campaign_id):
+            current = self.repository.load(identity.client_id, identity.campaign_id)
+            if current == proposed:
+                return current, True
+            raise CampaignEngineStoreError(
+                "campaign already exists with different identity or Blueprint evidence"
+            )
+        self.repository.save(proposed, transition_id=transition_id)
+        return proposed, False
 
 
 class CampaignEngine:

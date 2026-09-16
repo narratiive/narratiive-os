@@ -8,6 +8,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from runtime.campaign_engine import (
     CampaignEngine,
+    CampaignEngineApplicationService,
     CampaignEngineError,
     CampaignEngineStage,
     CampaignEngineState,
@@ -36,6 +37,7 @@ def artifact(artifact_id: str, artifact_type: str, checksum: str) -> VersionedAr
 
 
 def state() -> CampaignEngineState:
+    blueprint = artifact("blueprint-1", "growth_blueprint", "blueprint-checksum")
     return CampaignEngineState(
         identity=CampaignIdentity(
             workspace_id="agency",
@@ -45,7 +47,14 @@ def state() -> CampaignEngineState:
             product_ids=("safe-product",),
             campaign_id="safe-campaign",
         ),
-        approved_blueprint=artifact("blueprint-1", "growth_blueprint", "blueprint-checksum"),
+        approved_blueprint=blueprint,
+        blueprint_approval=HumanApproval(
+            approver="matt",
+            rationale="Approved strategy for campaign development.",
+            artifact_id=blueprint.artifact_id,
+            artifact_version=blueprint.version,
+            artifact_checksum=blueprint.checksum,
+        ),
     )
 
 
@@ -190,8 +199,69 @@ class CampaignEngineTests(unittest.TestCase):
             CampaignEngineState(
                 identity=current.identity,
                 approved_blueprint=current.approved_blueprint,
+                blueprint_approval=current.blueprint_approval,
                 publication_authorised=True,
             )
+
+    def test_campaign_bootstrap_requires_exact_blueprint_approval_and_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            proposed = state()
+            created, replay = service.start_campaign(
+                identity=proposed.identity,
+                approved_blueprint=proposed.approved_blueprint,
+                blueprint_approval=proposed.blueprint_approval,
+                transition_id="campaign-start-1",
+            )
+            self.assertFalse(replay)
+            self.assertEqual(created.stage, CampaignEngineStage.STRATEGY_APPROVED)
+            replayed, replay = service.start_campaign(
+                identity=proposed.identity,
+                approved_blueprint=proposed.approved_blueprint,
+                blueprint_approval=proposed.blueprint_approval,
+                transition_id="campaign-start-retry",
+            )
+            self.assertTrue(replay)
+            self.assertEqual(replayed, created)
+
+    def test_campaign_bootstrap_rejects_stale_approval_and_conflicting_reuse(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            proposed = state()
+            stale = HumanApproval(
+                approver="matt",
+                rationale="Stale approval.",
+                artifact_id=proposed.approved_blueprint.artifact_id,
+                artifact_version=proposed.approved_blueprint.version,
+                artifact_checksum="stale-checksum",
+            )
+            with self.assertRaisesRegex(CampaignEngineError, "exact artefact version"):
+                service.start_campaign(
+                    identity=proposed.identity,
+                    approved_blueprint=proposed.approved_blueprint,
+                    blueprint_approval=stale,
+                    transition_id="campaign-start-stale",
+                )
+            service.start_campaign(
+                identity=proposed.identity,
+                approved_blueprint=proposed.approved_blueprint,
+                blueprint_approval=proposed.blueprint_approval,
+                transition_id="campaign-start-1",
+            )
+            different_blueprint = artifact(
+                "blueprint-2",
+                "growth_blueprint",
+                "blueprint-checksum-2",
+            )
+            with self.assertRaisesRegex(CampaignEngineStoreError, "already exists"):
+                service.start_campaign(
+                    identity=proposed.identity,
+                    approved_blueprint=different_blueprint,
+                    blueprint_approval=approval(different_blueprint),
+                    transition_id="campaign-start-2",
+                )
 
     def test_repository_persists_and_replays_workspace_scoped_state(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

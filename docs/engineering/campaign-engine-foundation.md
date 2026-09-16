@@ -125,7 +125,9 @@ that Notion changed without execution evidence.
 1. **Campaign foundation** — implement and verify campaign identity, state
    transitions, exact-version gates, append-only persistence and multi-client
    portfolio projection. This slice is now implemented in
-   `runtime/campaign_engine.py`.
+   `runtime/campaign_engine.py`. Campaign bootstrap now requires and persists
+   Matt's approval bound to the exact Growth Blueprint ID, version and checksum;
+   retries are idempotent and conflicting campaign reuse fails closed.
 2. **Tony control surface** — the authenticated read surface now exposes the
    multi-client Campaign Engine portfolio, current stage, next action and human
    gate through deterministic commands and Tony's native state-read tool.
