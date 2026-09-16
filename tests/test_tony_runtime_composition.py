@@ -13,6 +13,7 @@ from runtime.campaign_engine import (
     CampaignEngineState,
     CampaignIdentity,
     FileCampaignEngineRepository,
+    HumanApproval,
     VersionedArtifact,
 )
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
@@ -31,6 +32,13 @@ class TonyRuntimeCompositionTests(unittest.TestCase):
                 campaign_root,
                 workspace_id="agency",
             )
+            blueprint = VersionedArtifact(
+                artifact_id="safe-blueprint",
+                artifact_type="growth_blueprint",
+                version="1.0",
+                checksum="safe-checksum",
+                location="drive://safe/blueprint",
+            )
             repository.save(
                 CampaignEngineState(
                     identity=CampaignIdentity(
@@ -41,12 +49,13 @@ class TonyRuntimeCompositionTests(unittest.TestCase):
                         product_ids=("safe-product",),
                         campaign_id="safe-campaign",
                     ),
-                    approved_blueprint=VersionedArtifact(
-                        artifact_id="safe-blueprint",
-                        artifact_type="growth_blueprint",
-                        version="1.0",
-                        checksum="safe-checksum",
-                        location="drive://safe/blueprint",
+                    approved_blueprint=blueprint,
+                    blueprint_approval=HumanApproval(
+                        approver="matt",
+                        rationale="Approved for campaign development.",
+                        artifact_id=blueprint.artifact_id,
+                        artifact_version=blueprint.version,
+                        artifact_checksum=blueprint.checksum,
                     ),
                 ),
                 transition_id="safe-created",

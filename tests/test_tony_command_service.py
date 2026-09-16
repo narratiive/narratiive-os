@@ -7,6 +7,7 @@ from pathlib import Path
 from runtime.campaign_engine import (
     CampaignEngineState,
     CampaignIdentity,
+    HumanApproval,
     VersionedArtifact,
 )
 from runtime.execution_journal import ExecutionJournal
@@ -74,6 +75,13 @@ def campaign_state(
     brand_id: str = "rave-coffee",
     campaign_id: str = "national-growth",
 ) -> CampaignEngineState:
+    blueprint = VersionedArtifact(
+        artifact_id=f"blueprint-{client_id}",
+        artifact_type="growth_blueprint",
+        version="1.0",
+        checksum=f"checksum-{client_id}",
+        location=f"drive://{client_id}/blueprint",
+    )
     return CampaignEngineState(
         identity=CampaignIdentity(
             workspace_id="narratiive",
@@ -83,12 +91,13 @@ def campaign_state(
             product_ids=("coffee",),
             campaign_id=campaign_id,
         ),
-        approved_blueprint=VersionedArtifact(
-            artifact_id=f"blueprint-{client_id}",
-            artifact_type="growth_blueprint",
-            version="1.0",
-            checksum=f"checksum-{client_id}",
-            location=f"drive://{client_id}/blueprint",
+        approved_blueprint=blueprint,
+        blueprint_approval=HumanApproval(
+            approver="matt",
+            rationale="Approved for campaign development.",
+            artifact_id=blueprint.artifact_id,
+            artifact_version=blueprint.version,
+            artifact_checksum=blueprint.checksum,
         ),
     )
 
