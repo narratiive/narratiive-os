@@ -95,7 +95,11 @@ Approved Growth Blueprint
 Tony may return work below the Narratiive bar, and may recommend a quality-passed
 option, but cannot approve it or silently rewrite specialist work. A candidate
 cannot reach Matt unless it passes independent quality review and Tony forwards
-it. Approval is invalid when the artefact ID, version or checksum changes.
+it. Growth Blueprint approval, Campaign World selection and Creative Director's
+Bible approval are explicitly bound to Matt; a Tony-authored approval is rejected.
+Approval is invalid when the artefact ID, version or checksum changes. Matt's
+Campaign World selection now has an application-service operation that persists
+the exact approved candidate through the compare-and-swap boundary.
 
 Campaign state is append-only, hash-chained, idempotent, workspace-scoped and
 safe under concurrent updates. Persisted stage transitions now use an atomic
