@@ -148,7 +148,9 @@ that Notion changed without execution evidence.
    bounded taste review. Prove the flow from one approved Growth Blueprint.
 4. **Creative Director's Bible** — reconcile the v2 draft specification with
    the stable template, persist one approved Bible, and prove version-bound
-   review and revision.
+   review and revision. The runtime now binds every submitted Bible version to
+   the exact selected Campaign World ID, version and checksum; revision clears
+   stale reviews rather than carrying them onto new creative work.
 5. **Production planning** — generate channel specifications, Production Pack
    jobs and a planned Asset Manifest from the approved Bible.
 6. **Production orchestration** — route jobs by declared capability, ingest
