@@ -5,9 +5,15 @@ import unittest
 from pathlib import Path
 
 from runtime.campaign_engine import (
+    CampaignEngine,
     CampaignEngineState,
     CampaignIdentity,
+    CampaignWorldCandidate,
     HumanApproval,
+    QualityReview,
+    QualityVerdict,
+    TonyDisposition,
+    TonyTasteReview,
     VersionedArtifact,
 )
 from runtime.execution_journal import ExecutionJournal
@@ -271,6 +277,54 @@ class TonyCommandServiceTests(unittest.TestCase):
         self.assertEqual(response.data["stage"], "strategy_approved")
         self.assertFalse(response.data["publication_authorised"])
         self.assertFalse(response.data["media_spend_authorised"])
+        self.assertFalse(response.data["campaign_world_selection"]["auto_selection_authorised"])
+
+    def test_campaign_detail_exposes_exact_candidate_comparison_for_matt(self):
+        engine = CampaignEngine()
+        current = engine.commission_campaign_worlds(campaign_state())
+        candidates = tuple(
+            CampaignWorldCandidate(
+                candidate_id=candidate_id,
+                artifact=VersionedArtifact(
+                    artifact_id=f"world-{candidate_id}",
+                    artifact_type="campaign_world",
+                    version="1.0",
+                    checksum=checksum,
+                    location=f"drive://world-{candidate_id}",
+                ),
+            )
+            for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b"))
+        )
+        current = engine.submit_campaign_worlds(current, candidates)
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=QualityReview(
+                    verdict=QualityVerdict.PASS,
+                    reviewer="quality-reviewer",
+                    rationale=f"{candidate_id} passes the independent quality bar.",
+                    reviewed_artifact_checksum=checksum,
+                ),
+                tony_review=TonyTasteReview(
+                    disposition=TonyDisposition.FORWARD if candidate_id == "a" else TonyDisposition.RETURN,
+                    rationale=f"Tony disposition for {candidate_id}.",
+                    reviewed_artifact_checksum=checksum,
+                ),
+            )
+        service = TonyCommandService(
+            self.progress_engine,
+            campaign_state_loader=lambda: (current,),
+        )
+
+        response = service.execute("/campaign rave", [])
+        brief = response.data["campaign_world_selection"]
+
+        self.assertEqual(response.status, "awaiting_matt")
+        self.assertEqual(brief["ready_candidate_ids"], ["a"])
+        self.assertEqual(brief["revision_candidate_ids"], ["b"])
+        self.assertEqual(brief["candidates"][0]["artifact_checksum"], "checksum-a")
+        self.assertFalse(brief["auto_selection_authorised"])
 
     def test_campaign_commands_fail_closed_without_trusted_state(self):
         unavailable = self.service.execute("/campaigns", [])

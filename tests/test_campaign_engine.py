@@ -14,6 +14,7 @@ from runtime.campaign_engine import (
     CampaignEngineState,
     CampaignEngineStoreError,
     CampaignPortfolio,
+    CampaignWorldSelectionBrief,
     CampaignIdentity,
     CampaignWorldCandidate,
     HumanApproval,
@@ -329,6 +330,31 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertEqual(snapshot.human_gate_count, 1)
         self.assertEqual(snapshot.campaigns[0].client_id, "safe-client")
         self.assertTrue(snapshot.campaigns[0].requires_matt)
+
+    def test_selection_brief_compares_exact_versions_without_selecting_for_matt(self) -> None:
+        current = self._world_review_state()
+        current = self.engine.review_campaign_world(
+            current,
+            "a",
+            quality_review=quality("checksum-a"),
+            tony_review=tony("checksum-a"),
+        )
+        current = self.engine.review_campaign_world(
+            current,
+            "b",
+            quality_review=quality("checksum-b", QualityVerdict.REVISE),
+            tony_review=tony("checksum-b", TonyDisposition.RETURN),
+        )
+
+        brief = CampaignWorldSelectionBrief.build(current)
+
+        self.assertTrue(brief["selection_required"])
+        self.assertFalse(brief["auto_selection_authorised"])
+        self.assertEqual(brief["human_selector"], "matt")
+        self.assertEqual(brief["ready_candidate_ids"], ["a"])
+        self.assertEqual(brief["revision_candidate_ids"], ["b"])
+        self.assertEqual(brief["candidates"][0]["artifact_checksum"], "checksum-a")
+        self.assertEqual(brief["candidates"][0]["tony_disposition"], "forward")
 
 
 if __name__ == "__main__":

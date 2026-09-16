@@ -353,6 +353,47 @@ class CampaignPortfolio:
         return CampaignPortfolioSnapshot(items)
 
 
+class CampaignWorldSelectionBrief:
+    """Build Tony's evidence-bound comparison without selecting for Matt."""
+
+    @staticmethod
+    def build(state: CampaignEngineState) -> dict[str, Any]:
+        candidates = []
+        ready_candidate_ids = []
+        revision_candidate_ids = []
+        for candidate in state.campaign_world_candidates:
+            quality_review = candidate.quality_review
+            tony_review = candidate.tony_review
+            review_complete = quality_review is not None and tony_review is not None
+            if candidate.ready_for_matt:
+                ready_candidate_ids.append(candidate.candidate_id)
+            elif review_complete:
+                revision_candidate_ids.append(candidate.candidate_id)
+            candidates.append(
+                {
+                    "candidate_id": candidate.candidate_id,
+                    "artifact_id": candidate.artifact.artifact_id,
+                    "artifact_version": candidate.artifact.version,
+                    "artifact_checksum": candidate.artifact.checksum,
+                    "artifact_location": candidate.artifact.location,
+                    "quality_verdict": quality_review.verdict.value if quality_review else None,
+                    "quality_rationale": quality_review.rationale if quality_review else None,
+                    "tony_disposition": tony_review.disposition.value if tony_review else None,
+                    "tony_rationale": tony_review.rationale if tony_review else None,
+                    "review_complete": review_complete,
+                    "ready_for_matt": candidate.ready_for_matt,
+                }
+            )
+        return {
+            "selection_required": state.stage is CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED,
+            "human_selector": "matt",
+            "auto_selection_authorised": False,
+            "ready_candidate_ids": ready_candidate_ids,
+            "revision_candidate_ids": revision_candidate_ids,
+            "candidates": candidates,
+        }
+
+
 class FileCampaignEngineRepository:
     """Append-only, hash-chained campaign state scoped to one workspace."""
 
