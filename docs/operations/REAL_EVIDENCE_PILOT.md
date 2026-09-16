@@ -92,6 +92,14 @@ browser session or manually copied unprovenanced data.
    provenance, contradictions and gaps. Use Tony's `additional_research`
    operation for a specific gap/question/hypothesis when necessary; do not use
    an internal runtime invocation.
+   If an OpenClaw Research specialist has already completed the substantive
+   work, promote that final completed session result with
+   `scripts/import_openclaw_research_evidence.py` instead of running it again.
+   The import requires an explicit approver and rationale, accepts only the
+   canonical Research session store, and creates an immutable, checksum-backed
+   source descriptor inside the scoped Research Engine workspace. Treat the
+   imported report as specialist synthesis: material claims still require
+   verification against its cited primary sources.
 7. Continue to Growth Blueprint. Confirm the substantive quality contract and
    lineage passed. Leave the result at human review unless a separate,
    authorised internal approval is deliberately recorded.
