@@ -108,6 +108,21 @@ At every checkpoint use Tony's status, approvals, blockers and latest-artefact
 operations. Runtime state is execution truth; Notion is a separately approved
 business projection.
 
+Project the live acceptance programme without creating a second state store:
+
+```bash
+.venv/bin/python scripts/acceptance_programme_status.py \
+  --scenario-client-id <persisted-client-id> \
+  --format text
+```
+
+Use `--format json` for machine-readable status. The projection reports the
+deployed revision, service health, current scenario, last quality-verified
+checkpoint, failures, required human decisions, architectural conflicts and
+capability evidence. It derives those claims from workflow snapshots,
+artefacts, receipts, conversation-work records and the deployment receipt; it
+does not mutate or supersede any of them.
+
 ## 4. Acceptance check
 
 ```bash
