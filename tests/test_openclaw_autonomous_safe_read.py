@@ -94,6 +94,8 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         self.assertIn('ENV_LOADER, envFile, python, "-m", EXECUTOR_MODULE', client)
         self.assertIn('"scripts.execute_tony_safe_read"', client)
         self.assertIn('".config", "narratiive", "runtime.env"', client)
+        self.assertIn('".venv", "bin", "python"', client)
+        self.assertNotIn('process.env.TONY_PYTHON || "python3"', client)
         self.assertNotIn('stdout.trim() || "{}"', client)
         self.assertNotIn('event.toolName !== "narratiive_execute_safe_read"', source)
 
