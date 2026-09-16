@@ -290,6 +290,36 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(len(created["event_id"]), 32)
         self.assertIn("sendUpdates=none", router.requests[2].full_url)
 
+    def test_calendar_read_accepts_tony_natural_range_shapes(self):
+        router = Router([
+            {"calendars": {"primary": {"busy": []}}},
+            {"calendars": {"primary": {"busy": []}}},
+        ])
+        adapter = GoogleCalendarDispatcher(
+            GoogleOAuthConfig(access_token="synthetic"),
+            opener=router,
+            clock=lambda: datetime(2026, 9, 16, 16, 0, tzinfo=timezone.utc),
+        )
+
+        relative = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "list",
+            "target": {"days_ahead": 7},
+        })
+        dated = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "list",
+            "target": {"start_date": "2026-09-17", "end_date": "2026-09-23"},
+        })
+
+        self.assertEqual(relative["timezone"], "Europe/London")
+        self.assertTrue(relative["time_min"].startswith("2026-09-16T17:00:00"))
+        self.assertTrue(relative["time_max"].startswith("2026-09-23T17:00:00"))
+        self.assertTrue(dated["time_min"].startswith("2026-09-17T00:00:00"))
+        self.assertTrue(dated["time_max"].startswith("2026-09-24T00:00:00"))
+        self.assertEqual(json.loads(router.requests[0].data)["timeMin"], relative["time_min"])
+        self.assertEqual(relative["mutation_count"], 0)
+
     def test_calendar_create_suppresses_replay_when_deterministic_event_exists(self):
         event_id = "9d8fd3c31bae4a086b8fb32933732535"
         router = Router([{"id": event_id, "htmlLink": "https://calendar.google.invalid/event"}])
@@ -330,6 +360,17 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(result["files"][0]["name"], "KatKin Proposal.pdf")
         self.assertIn("pageSize=10", router.requests[0].full_url)
+
+    def test_drive_list_defaults_to_recent_non_trashed_files(self):
+        router = Router([{"files": [{"id": "file-1", "name": "Recent strategy.pdf"}]}])
+        adapter = GoogleDriveDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({"execution_mode": "autonomous_read", "operation": "list", "target": {"max_results": 5}})
+
+        self.assertEqual(result["source_id"], "drive:list")
+        self.assertEqual(result["files"][0]["name"], "Recent strategy.pdf")
+        self.assertIn("q=trashed%3Dfalse", router.requests[0].full_url)
+        self.assertIn("orderBy=modifiedTime%20desc", router.requests[0].full_url)
 
     def test_drive_workspace_replay_repairs_only_missing_child_folders(self):
         router = Router(
@@ -481,6 +522,22 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(json.loads(router.requests[0].data)["variables"]["skip"], 0)
         self.assertEqual(json.loads(router.requests[1].data)["variables"]["skip"], 50)
         self.assertNotIn("mutation", json.loads(router.requests[0].data)["query"].casefold())
+
+    def test_fireflies_safe_read_list_operation_maps_target_to_discovery(self):
+        router = Router([{"data": {"transcripts": [{"id": "transcript-1", "title": "Discovery"}]}}])
+        adapter = FirefliesDispatcher("synthetic", opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "list",
+            "target": {"max_results": 3, "keyword": "Discovery"},
+        })
+
+        self.assertEqual(result["source_id"], "fireflies:transcripts")
+        self.assertEqual(result["returned_count"], 1)
+        variables = json.loads(router.requests[0].data)["variables"]
+        self.assertEqual(variables["limit"], 3)
+        self.assertEqual(variables["keyword"], "Discovery")
 
     def test_fireflies_retries_rate_limit_and_classifies_provider_errors(self):
         rate_limit = HTTPError("https://api.fireflies.ai/graphql", 429, "rate", {"Retry-After": "0"}, None)

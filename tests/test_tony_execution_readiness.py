@@ -80,6 +80,9 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertIn("send_reviewed_email", integrations["Gmail"].approval_gated_operations)
         self.assertIn("create_recipient_confirmed_meeting", integrations["Google Calendar"].approval_gated_operations)
         self.assertIn("project_workflow_state", integrations["Notion"].approval_gated_operations)
+        self.assertIn("read_repository_work", integrations["GitHub"].autonomous_operations)
+        self.assertIn("read_workflow_metadata", integrations["n8n"].autonomous_operations)
+        self.assertFalse(integrations["GitHub"].configured)
         self.assertNotIn("send_reviewed_email", integrations["Gmail"].autonomous_operations)
 
 

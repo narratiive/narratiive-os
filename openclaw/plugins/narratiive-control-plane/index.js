@@ -21,7 +21,7 @@ const ACTION_SCHEMA = {
 
 const SAFE_READ_SCHEMA = {
   action: { type: "string", minLength: 1, maxLength: 4000 },
-  surface: { type: "string", enum: ["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"] },
+  surface: { type: "string", enum: ["gmail", "calendar", "notion", "drive", "fireflies", "github", "n8n", "replit"] },
   kind: { type: "string", enum: ["read"] },
   operation: { type: "string", enum: ["search", "lookup", "fetch", "inspect", "retrieve", "list", "get_metadata", "get_content"] },
   target: { type: "object", additionalProperties: true },

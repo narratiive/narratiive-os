@@ -10,6 +10,7 @@ SAFE_READ_WORKERS = {
     "calendar": "Google Calendar",
     "notion": "Notion",
     "drive": "Google Drive",
+    "fireflies": "Fireflies",
     "github": "GitHub",
     "n8n": "n8n",
     "replit": "Replit",

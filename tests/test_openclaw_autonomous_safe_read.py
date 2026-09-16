@@ -91,6 +91,7 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         client = (PLUGIN / "safe-read-client.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_execute_safe_read"', source)
         self.assertIn("executeSafeRead", source)
+        self.assertIn('"fireflies"', source)
         self.assertIn('ENV_LOADER, envFile, python, "-m", EXECUTOR_MODULE', client)
         self.assertIn('"scripts.execute_tony_safe_read"', client)
         self.assertIn('".config", "narratiive", "runtime.env"', client)
