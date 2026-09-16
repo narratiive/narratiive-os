@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import json
+import os
 import unittest
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 from runtime.tony_structured_safe_read import StructuredSafeReadError
@@ -89,8 +91,9 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         client = (PLUGIN / "safe-read-client.js").read_text(encoding="utf-8")
         self.assertIn('name: "narratiive_execute_safe_read"', source)
         self.assertIn("executeSafeRead", source)
-        self.assertIn('"-m", EXECUTOR_MODULE', client)
+        self.assertIn('ENV_LOADER, envFile, python, "-m", EXECUTOR_MODULE', client)
         self.assertIn('"scripts.execute_tony_safe_read"', client)
+        self.assertIn('".config", "narratiive", "runtime.env"', client)
         self.assertNotIn('stdout.trim() || "{}"', client)
         self.assertNotIn('event.toolName !== "narratiive_execute_safe_read"', source)
 
@@ -99,18 +102,25 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         module_uri = (PLUGIN / "safe-read-client.js").resolve().as_uri()
-        script = (
-            f'import {{ executeSafeRead }} from {json.dumps(module_uri)}; '
-            f'const result = await executeSafeRead({json.dumps({"action": "List Gmail inbox", "surface": "gmail", "kind": "read", "operation": "list", "target": {}})}, '
-            f'{{python: {json.dumps(sys.executable)}}}); console.log(JSON.stringify(result));'
-        )
-        completed = subprocess.run(
-            [node, "--input-type=module", "-e", script],
-            cwd=ROOT,
-            check=True,
-            capture_output=True,
-            text=True,
-        )
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", delete=False) as handle:
+            handle.write("SAFE_READ_TEST=1\n")
+            env_file = handle.name
+        os.chmod(env_file, 0o600)
+        try:
+            script = (
+                f'import {{ executeSafeRead }} from {json.dumps(module_uri)}; '
+                f'const result = await executeSafeRead({json.dumps({"action": "List Gmail inbox", "surface": "gmail", "kind": "read", "operation": "list", "target": {}})}, '
+                f'{{python: {json.dumps(sys.executable)}, envFile: {json.dumps(env_file)}}}); console.log(JSON.stringify(result));'
+            )
+            completed = subprocess.run(
+                [node, "--input-type=module", "-e", script],
+                cwd=ROOT,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        finally:
+            os.unlink(env_file)
         result = json.loads(completed.stdout)
         self.assertEqual(result["status"], "dispatcher_unavailable")
         self.assertEqual(result["execution_truth"], "not_dispatched")
