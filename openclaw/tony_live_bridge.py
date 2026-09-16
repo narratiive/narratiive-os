@@ -205,6 +205,9 @@ class LeadAwareTonyApplication:
                 "approvals": "approvals",
                 "blockers": "blockers",
                 "latest-artifact": "artefact",
+                "artifact-detail": "artifact-detail",
+                "action-preview": "action-preview",
+                "execute-action": "execute-action",
                 "proposed-next-action": "proposed",
                 "approve": "approve",
                 "reject": "reject",
@@ -228,7 +231,7 @@ class LeadAwareTonyApplication:
                 raise ValueError("workflow inputs must be an object")
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
-                "approve", "reject", "request-revision", "commission",
+                "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
@@ -236,7 +239,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 principal = self.authorised_principal_id

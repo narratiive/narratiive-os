@@ -17,6 +17,7 @@ from runtime.tony_internal_review_delivery import (
     approval_binding_evidence,
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
+from runtime.workflow_action_preview import WorkflowActionPreviewService
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 
 
@@ -28,6 +29,13 @@ class WorkflowCommandBackend(Protocol):
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def recover(self) -> int: ...
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
+    def artifact_detail(self, state: WorkflowState) -> Mapping[str, Any]: ...
+    def action_preview(
+        self, state: WorkflowState, *, simulation_mode: bool, delivery_override: str
+    ) -> Mapping[str, Any]: ...
+    def execute_action(
+        self, state: WorkflowState, *, action_digest: str, approver: str, rationale: str
+    ) -> Mapping[str, Any]: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
@@ -199,6 +207,48 @@ class FileWorkflowCommandBackend:
             return None
         return value if isinstance(value, Mapping) else None
 
+    def artifact_detail(self, state: WorkflowState) -> Mapping[str, Any]:
+        return WorkflowActionPreviewService(
+            self.root,
+            self.dispatchers.get("Gmail") if self.dispatchers else None,
+        ).artifact_detail(state)
+
+    def action_preview(
+        self,
+        state: WorkflowState,
+        *,
+        simulation_mode: bool,
+        delivery_override: str,
+    ) -> Mapping[str, Any]:
+        return WorkflowActionPreviewService(
+            self.root,
+            self.dispatchers.get("Gmail") if self.dispatchers else None,
+        ).preview_simulated_email(
+            state,
+            simulation_mode=simulation_mode,
+            delivery_override=delivery_override,
+        )
+
+    def execute_action(
+        self,
+        state: WorkflowState,
+        *,
+        action_digest: str,
+        approver: str,
+        rationale: str,
+    ) -> Mapping[str, Any]:
+        runtime = self._runtime(state)
+        return WorkflowActionPreviewService(
+            self.root,
+            self.dispatchers.get("Gmail") if self.dispatchers else None,
+        ).execute_simulated_email(
+            runtime,
+            state,
+            action_digest=action_digest,
+            approver=approver,
+            rationale=rationale,
+        )
+
     def projection(self, state: WorkflowState) -> Mapping[str, Any]:
         runtime = self._runtime(state)
         if runtime.business_projection is None:
@@ -329,6 +379,7 @@ class TonyWorkflowCommandService:
         "projection", "sync-notion", "research",
         "deliver-review",
         "commission",
+        "artefact-detail", "artifact-detail", "action-preview", "execute-action",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -378,6 +429,52 @@ class TonyWorkflowCommandService:
                 return self._blocker(state)
             if name in {"artefact", "artifact"}:
                 return self._artefact(state)
+            if name in {"artefact-detail", "artifact-detail"}:
+                detail = dict(self.backend.artifact_detail(state))
+                return CommandResponse(name, "healthy", f"Authoritative artefact detail resolved for {state.run_id}.", detail)
+            if name == "action-preview":
+                supplied = dict(inputs or {})
+                if supplied.get("simulation_mode") is not True:
+                    return self._error(
+                        name,
+                        "simulation_mode_required",
+                        "This acceptance action requires explicit simulation_mode=true.",
+                    )
+                preview = dict(
+                    self.backend.action_preview(
+                        state,
+                        simulation_mode=True,
+                        delivery_override=str(supplied.get("delivery_override") or ""),
+                    )
+                )
+                message = (
+                    f"SIMULATION — {preview['intended_client']}. Delivery is overridden to "
+                    f"{preview['delivery_override']}; no external client contact will occur. "
+                    f"Proposed email: {preview['subject']} with {preview['attachments'][0]['filename']}."
+                )
+                return CommandResponse(name, "healthy", message, preview)
+            if name == "execute-action":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "This send requires Matt's authenticated Telegram approval.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "The approved action requires a decision rationale.")
+                action_digest = str((inputs or {}).get("action_digest") or "").strip()
+                if not action_digest:
+                    return self._error(name, "action_digest_required", "Read the action preview first and approve its exact action digest.")
+                result = dict(
+                    self.backend.execute_action(
+                        state,
+                        action_digest=action_digest,
+                        approver=principal_id,
+                        rationale=rationale,
+                    )
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    f"Verified simulated delivery to {result['delivery_override']} with Gmail message {result['message_id']}.",
+                    result,
+                )
             if name == "proposed":
                 return self._proposed(state)
             if name == "projection":

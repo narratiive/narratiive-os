@@ -14,6 +14,12 @@ SAFE_READ_WORKERS = {
     "n8n": "n8n",
     "replit": "Replit",
 }
+SAFE_READ_OPERATIONS = frozenset(
+    {"search", "lookup", "fetch", "inspect", "retrieve", "list", "get_metadata", "get_content"}
+)
+MUTATION_TARGET_KEYS = frozenset(
+    {"recipient_email", "cc", "bcc", "subject", "body", "attachments", "content", "properties", "status"}
+)
 
 
 class StructuredSafeReadError(ValueError):
@@ -39,12 +45,20 @@ class TonyStructuredSafeReadExecutor:
         action = str(payload.get("action") or "").strip()
         surface = str(payload.get("surface") or "").strip().casefold()
         kind = str(payload.get("kind") or "").strip().casefold()
+        operation = str(payload.get("operation") or "").strip().casefold()
         target = payload.get("target") if isinstance(payload.get("target"), dict) else {}
 
         if not action:
             raise StructuredSafeReadError("action is required")
         if kind != "read":
             raise StructuredSafeReadError("safe execution accepts read-only actions only")
+        if operation not in SAFE_READ_OPERATIONS:
+            raise StructuredSafeReadError("safe execution requires an explicit supported read operation")
+        forbidden = sorted(MUTATION_TARGET_KEYS.intersection(target))
+        if forbidden:
+            raise StructuredSafeReadError(
+                "safe read target contains mutation-shaped fields: " + ", ".join(forbidden)
+            )
         worker = SAFE_READ_WORKERS.get(surface)
         if worker is None:
             raise StructuredSafeReadError(f"unsupported safe-read surface: {surface or 'missing'}")
@@ -62,6 +76,7 @@ class TonyStructuredSafeReadExecutor:
             "worker": worker,
             "surface": surface,
             "action": action,
+            "operation": operation,
             "instruction": action,
             "target": dict(target),
             "execution_mode": "autonomous_read",

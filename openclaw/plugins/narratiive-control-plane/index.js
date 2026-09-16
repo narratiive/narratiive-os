@@ -23,6 +23,7 @@ const SAFE_READ_SCHEMA = {
   action: { type: "string", minLength: 1, maxLength: 4000 },
   surface: { type: "string", enum: ["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"] },
   kind: { type: "string", enum: ["read"] },
+  operation: { type: "string", enum: ["search", "lookup", "fetch", "inspect", "retrieve", "list", "get_metadata", "get_content"] },
   target: { type: "object", additionalProperties: true },
 };
 
@@ -37,9 +38,10 @@ const WORKFLOW_OPERATIONS = [
   "proposed_next_action", "approve", "reject", "request_revision", "continue",
   "resume", "recover", "projection", "sync_notion",
   "additional_research", "deliver_internal_review",
-  "commission",
+  "commission", "artifact_detail", "action_preview", "execute_action",
 ];
-const WORKFLOW_DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
+const WORKFLOW_ARTIFACT_DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
+const WORKFLOW_DECISION_OPERATIONS = new Set([...WORKFLOW_ARTIFACT_DECISION_OPERATIONS, "execute_action"]);
 const WORKFLOW_NATIVE_APPROVAL_OPERATIONS = new Set(["sync_notion"]);
 const WORKFLOW_REFERENCE_OPTIONAL = new Set(["current_work", "approvals", "blockers", "recover"]);
 const WORKFLOW_SCHEMA = {
@@ -47,6 +49,7 @@ const WORKFLOW_SCHEMA = {
   reference: { type: "string", minLength: 1, maxLength: 500 },
   rationale: { type: "string", minLength: 1, maxLength: 1000 },
   approval_token: { type: "string", minLength: 64, maxLength: 64 },
+  action_digest: { type: "string", minLength: 64, maxLength: 64 },
   recipient: { type: "string", minLength: 1, maxLength: 320 },
   workflow_id: { type: "string", minLength: 1, maxLength: 200 },
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
@@ -100,7 +103,9 @@ async function executeWorkflowControl(params) {
   if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation) || operation === "commission") && !rationale) throw new Error("workflow decisions require a rationale");
   if (operation === "commission" && (!params?.workflow_id || !params?.commitment_id)) throw new Error("commission requires workflow_id and commitment_id");
   const approvalToken = String(params?.approval_token || "").trim();
-  if (WORKFLOW_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
+  if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
+  const actionDigest = String(params?.action_digest || "").trim();
+  if (operation === "execute_action" && !actionDigest) throw new Error("action execution requires the exact preview action digest");
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
@@ -117,6 +122,7 @@ async function executeWorkflowControl(params) {
         inputs: {
           ...(params?.inputs && typeof params.inputs === "object" && !Array.isArray(params.inputs) ? params.inputs : {}),
           ...(approvalToken ? { approval_token: approvalToken } : {}),
+          ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),
           ...(params?.commitment_id ? { commitment_id: String(params.commitment_id) } : {}),
@@ -186,7 +192,7 @@ function safeReadTool() {
   return {
     name: "narratiive_execute_safe_read",
     description: "Execute one bounded read-only inspection through Narratiive OS without approval. This tool refuses writes or preparation, requires evidence proving no mutation occurred, and returns verified source evidence or a fail-closed result.",
-    parameters: schema(SAFE_READ_SCHEMA, ["action", "surface", "kind"]),
+    parameters: schema(SAFE_READ_SCHEMA, ["action", "surface", "kind", "operation"]),
     async execute(_id, params) {
       try {
         const proposal = buildActionProposal(params || {});
@@ -233,7 +239,7 @@ function approvalTool() {
 function workflowControlTool() {
   return {
     name: "narratiive_workflow_control",
-    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Interpret Matt's natural Telegram reply, but call approve, reject or request_revision only when intent is unambiguous and include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Use artifact_detail for authoritative business fields. Before proposing a client-facing send, use action_preview and show the complete resolved action; never ask for blind approval. For the KatKin acceptance simulation, pass inputs with simulation_mode=true and delivery_override=hello@narratiive.com; the preview must show that override. Real client delivery is not enabled by this simulation path. Call execute_action only after Matt unambiguously approves that preview in Telegram, using its exact action_digest; changed payloads fail closed and verified execution is idempotent. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Interpret Matt's natural Telegram reply, but call approve, reject or request_revision only when intent is unambiguous and include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
     parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
     async execute(_id, params) {
       try {

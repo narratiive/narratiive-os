@@ -30,6 +30,7 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
                 "action": "Check my availability on Thursday.",
                 "surface": "calendar",
                 "kind": "read",
+                "operation": "inspect",
                 "target": {"day": "Thursday"},
             },
             {"Google Calendar": calendar},
@@ -49,6 +50,7 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
                 "action": "Check my availability on Thursday.",
                 "surface": "calendar",
                 "kind": "read",
+                "operation": "inspect",
             },
             {"Google Calendar": lambda _dispatch: {"ok": True, "event_id": "evt-1"}},
         )
@@ -62,6 +64,7 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
                 "action": "Read the current Notion record.",
                 "surface": "notion",
                 "kind": "read",
+                "operation": "fetch",
             },
             {"Notion": lambda _dispatch: {"ok": True, "read_only": True, "summary": "record exists"}},
         )
@@ -72,7 +75,7 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         for kind in ("prepare", "write"):
             with self.subTest(kind=kind), self.assertRaises(StructuredSafeReadError):
                 execute_payload(
-                    {"action": "Do something", "surface": "gmail", "kind": kind},
+                    {"action": "Do something", "surface": "gmail", "kind": kind, "operation": "inspect"},
                     {"Gmail": lambda _dispatch: {}},
                 )
 
@@ -93,6 +96,24 @@ class OpenClawAutonomousSafeReadTests(unittest.TestCase):
         self.assertIn("reversible internal preparation", prompt)
         self.assertIn("delegate it to the appropriate OpenClaw specialist", prompt)
         self.assertIn("read-only", prompt)
+
+    def test_explicit_read_operation_is_required_and_mutation_payloads_fail_closed(self):
+        with self.assertRaisesRegex(StructuredSafeReadError, "explicit supported read operation"):
+            execute_payload(
+                {"action": "Find the email thread", "surface": "gmail", "kind": "read"},
+                {"Gmail": lambda _dispatch: {}},
+            )
+        with self.assertRaisesRegex(StructuredSafeReadError, "mutation-shaped"):
+            execute_payload(
+                {
+                    "action": "Inspect Gmail",
+                    "surface": "gmail",
+                    "kind": "read",
+                    "operation": "search",
+                    "target": {"query": "KatKin", "subject": "mutating field"},
+                },
+                {"Gmail": lambda _dispatch: {}},
+            )
 
 
 if __name__ == "__main__":
