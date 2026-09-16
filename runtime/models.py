@@ -96,6 +96,7 @@ class WorkflowState:
     approval_status: str = "not_required"
     approval_history: list[dict[str, Any]] = field(default_factory=list)
     external_action_receipts: list[dict[str, Any]] = field(default_factory=list)
+    promised_work_delivery: dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if not self.workflow_id.strip():

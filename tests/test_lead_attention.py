@@ -6,6 +6,7 @@ from pathlib import Path
 from runtime.agency_state_projection import AgencyStateProjector
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
 
 
 class LeadAttentionTests(unittest.TestCase):
@@ -37,6 +38,22 @@ class LeadAttentionTests(unittest.TestCase):
         self.service.mutate("safe-1", "suppressed")
         state = AgencyStateProjector().project(type("S", (), {"workstreams": (), "approvals_required": (), "generated_at": "now"})(), self.store.read(), lead_source_available=True)
         self.assertFalse(any("safe-1" in item.item_id for item in state.executive_items))
+
+    def test_executive_inputs_exclude_hidden_and_completed_without_deleting_them(self):
+        self.store.replace([
+            InboundLead("suppressed", "Test", company="SAFE fixture", disposition="suppressed"),
+            InboundLead("archived", "Test", company="Archived fixture", disposition="archived"),
+            InboundLead("complete", "Alex", company="Finished Co", status="Completed"),
+            InboundLead("active", "Sam", company="Active Co", status="New"),
+        ])
+
+        visible = ExecutiveVisibilityPolicy().visible_leads(self.store.read())
+
+        self.assertEqual([lead.lead_id for lead in visible], ["active"])
+        self.assertEqual(
+            {lead.lead_id for lead in FileInboundLeadStore(self.store.path).read()},
+            {"suppressed", "archived", "complete", "active"},
+        )
 
 
 if __name__ == "__main__": unittest.main()

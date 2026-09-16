@@ -265,11 +265,27 @@ evidence-backed. They report repository/runtime state and do not infer
 completion from chat. Missing configuration is shown as unavailable or blocked,
 not guessed.
 
+Executive projections consume executive-visible state, not raw current-state
+collections. Suppressed, archived, test and closed/completed-with-no-action
+records are removed before morning/evening briefs, proactive summaries and
+attention-queue projections are constructed. Their source records, events and
+direct lookup remain intact. An old workflow that is still blocked or requires
+human judgement remains visible unless its owning record is explicitly hidden
+under the authoritative attention disposition.
+
 `openclaw/tony_http_bridge.py` is the authenticated OpenClaw, Telegram, and n8n
 boundary. Telegram slash commands use deterministic Tony services; managerial
 actions continue through `TonyOrchestrationAdapter` and the public gateway.
 `openclaw/tony_live_bridge.py` composes the live executive and capability
 services without expanding their authority.
+
+An explicit conversational commitment to perform authorised substantive work
+must be backed by a canonical, correlated workflow run before Tony describes it
+as commissioned or underway. The durable worker advances that run independently
+of the inbound request, records specialist and quality evidence, survives
+restart, and proactively reports either the next human gate or a useful failure.
+Retries must reuse the commitment identity and may not duplicate work or
+delivery. Conversation text alone is never evidence that future work exists.
 
 Telegram carries concise conversation, summaries, alerts and approval
 requests. Blueprint Lite, substantial Discovery synthesis, Growth Sprint

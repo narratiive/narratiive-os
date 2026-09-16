@@ -4,6 +4,7 @@ from typing import Iterable
 
 from runtime.agency_state import AgencyArea, AgencyItem, AgencyState
 from runtime.inbound_leads import InboundLead
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 
 
@@ -42,11 +43,8 @@ class AgencyStateProjector:
     ) -> AgencyState:
         items = [self._project_workstream(item) for item in snapshot.workstreams]
 
-        for lead in leads:
-            # Completed leads remain in Notion history but should not clutter the
-            # daily commercial brief. Active/new/waiting leads stay visible.
-            if lead.status.casefold() != "complete" and lead.disposition not in {"suppressed", "test", "archived"}:
-                items.append(lead.to_agency_item())
+        for lead in ExecutiveVisibilityPolicy().visible_leads(leads):
+            items.append(lead.to_agency_item())
 
         for index, approval in enumerate(snapshot.approvals_required):
             items.append(

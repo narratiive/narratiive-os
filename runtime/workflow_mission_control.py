@@ -100,7 +100,13 @@ class WorkflowMissionControlProjector:
         scoped.sort(key=lambda state: (state.updated_at, state.run_id), reverse=True)
 
         summaries = tuple(workflow_state_summary(state) for state in scoped)
-        workstreams = tuple(self._workstream(state) for state in scoped)
+        # Completed runs remain directly queryable in ``runs`` and in their
+        # append-only histories, but no longer recur as attention workstreams.
+        workstreams = tuple(
+            self._workstream(state)
+            for state in scoped
+            if state.status.value != "complete"
+        )
         approvals = tuple(
             sorted(
                 f"workflow:{state.run_id}:{state.current_proposed_next_action() or 'Review the persisted artefact'}"

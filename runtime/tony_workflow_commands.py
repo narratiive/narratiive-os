@@ -31,6 +31,16 @@ class WorkflowCommandBackend(Protocol):
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
+    def commission(
+        self,
+        state: WorkflowState,
+        *,
+        target_workflow_id: str,
+        inputs: Mapping[str, Any],
+        commitment_id: str,
+    ) -> tuple[WorkflowState, bool]: ...
+    def begin_promised_delivery(self, state: WorkflowState, *, delivery_key: str, kind: str) -> WorkflowState: ...
+    def finish_promised_delivery(self, state: WorkflowState, *, delivery_key: str, evidence: Mapping[str, Any]) -> WorkflowState: ...
     def commission_additional_research(
         self,
         state: WorkflowState,
@@ -126,6 +136,42 @@ class FileWorkflowCommandBackend:
             raise ValueError("additional inputs can only be supplied to an approved cross-workflow handoff")
         runtime.advance(state.run_id, lifecycle)
         return runtime.runs.load_run(state.run_id)
+
+    def commission(
+        self,
+        state: WorkflowState,
+        *,
+        target_workflow_id: str,
+        inputs: Mapping[str, Any],
+        commitment_id: str,
+    ) -> tuple[WorkflowState, bool]:
+        runtime = self._runtime(state)
+        return runtime.commission(
+            state.run_id,
+            target_workflow_id,
+            inputs,
+            commitment_id=commitment_id,
+        )
+
+    def begin_promised_delivery(self, state: WorkflowState, *, delivery_key: str, kind: str) -> WorkflowState:
+        return self._runtime(state).runs.begin_promised_delivery(
+            state.run_id,
+            delivery_key=delivery_key,
+            kind=kind,
+        )
+
+    def finish_promised_delivery(
+        self,
+        state: WorkflowState,
+        *,
+        delivery_key: str,
+        evidence: Mapping[str, Any],
+    ) -> WorkflowState:
+        return self._runtime(state).runs.finish_promised_delivery(
+            state.run_id,
+            delivery_key=delivery_key,
+            evidence=evidence,
+        )
 
     def recover(self) -> int:
         recovered = 0
@@ -282,6 +328,7 @@ class TonyWorkflowCommandService:
         "proposed", "approve", "reject", "revise", "resume", "recover",
         "projection", "sync-notion", "research",
         "deliver-review",
+        "commission",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -377,6 +424,31 @@ class TonyWorkflowCommandService:
                     + " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
                 )
                 return CommandResponse(name, "healthy", message, delivery)
+            if name == "commission":
+                supplied = dict(inputs or {})
+                target_workflow_id = str(supplied.pop("target_workflow_id", "")).strip()
+                commitment_id = str(supplied.pop("commitment_id", "")).strip()
+                if not target_workflow_id or not commitment_id:
+                    return self._error(
+                        name,
+                        "commission_identity_required",
+                        "Durable work requires an exact target workflow and commitment identity.",
+                    )
+                commissioned, replay = self.backend.commission(
+                    state,
+                    target_workflow_id=target_workflow_id,
+                    inputs=supplied,
+                    commitment_id=commitment_id,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    (
+                        "I’ve commissioned that work against the persisted evidence and will return here "
+                        "when it reaches the next review gate."
+                    ),
+                    {**self._summary(commissioned), "commissioned": True, "replay": replay},
+                )
             if name == "research":
                 if not rationale:
                     return self._error(

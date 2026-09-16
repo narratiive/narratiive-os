@@ -99,6 +99,17 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
         self.assertEqual(payload["error"]["code"], "openclaw_conversation_unavailable")
         base._handle_telegram_command.assert_not_called()
 
+    def test_openclaw_no_reply_sentinel_never_becomes_telegram_silence(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _, gateway = self._app(tmp)
+            gateway.converse.return_value = "NO_REPLY"
+            gateway.converse.side_effect = None
+            status, payload = self._request(app, "Tony? Anything on the work?")
+
+        self.assertTrue(status.startswith("200"))
+        self.assertNotEqual(payload["reply"], "NO_REPLY")
+        self.assertIn("persisted work", payload["reply"])
+
     def test_substantive_work_is_persisted_and_acknowledged_without_waiting_for_openclaw(self):
         with tempfile.TemporaryDirectory() as tmp:
             app, base, gateway = self._app(tmp)

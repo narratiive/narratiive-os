@@ -16,6 +16,7 @@ from openclaw.tony_http_bridge import (
     build_app as build_base_app,
 )
 from runtime.executive_memory import ExecutiveMemoryStore
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
 from runtime.notion_leads import build_authoritative_lead_loader
@@ -168,6 +169,11 @@ class LeadAwareTonyApplication:
                     }
                     return self._respond(start_response, status, payload)
                 reply = self.agent_gateway.converse(text)
+                if not reply.strip() or reply.strip().upper() == "NO_REPLY":
+                    reply = (
+                        "I’m here, but I don’t have a verified update I can stand behind yet. "
+                        "I’m checking the persisted work rather than pretending it has progressed."
+                    )
                 reply = protect_telegram_output(reply)
                 status = HTTPStatus.OK
                 payload = {
@@ -210,6 +216,7 @@ class LeadAwareTonyApplication:
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
                 "deliver-internal-review": "deliver-review",
+                "commission": "commission",
             }
             command_name = commands.get(operation)
             if command_name is None:
@@ -221,7 +228,7 @@ class LeadAwareTonyApplication:
                 raise ValueError("workflow inputs must be an object")
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
-                "approve", "reject", "request-revision",
+                "approve", "reject", "request-revision", "commission",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
@@ -229,7 +236,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision"}:
+            if operation in {"approve", "reject", "request-revision", "commission"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 principal = self.authorised_principal_id
@@ -352,7 +359,14 @@ def build_app() -> LeadAwareTonyApplication:
     lead_store = FileInboundLeadStore(lead_path)
     attention_service = LeadAttentionService(lead_store, Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))))
     authoritative_lead_loader = build_authoritative_lead_loader(lead_store)
-    executive_service = TonyExecutiveCommandService(app.command_service, brief_archive=app.brief_archive, friday_record_loader=lambda: load_friday_review_records(records_root), workspace_id=workspace_id, inbound_lead_loader=authoritative_lead_loader)
+    visibility = ExecutiveVisibilityPolicy()
+    executive_service = TonyExecutiveCommandService(
+        app.command_service,
+        brief_archive=app.brief_archive,
+        friday_record_loader=lambda: load_friday_review_records(records_root),
+        workspace_id=workspace_id,
+        inbound_lead_loader=lambda: visibility.visible_leads(authoritative_lead_loader()),
+    )
     capability_service = TonyCapabilityCommandService(executive_service)
     commercial_watch_service = TonyCommercialWatchCommandService(capability_service, store_path=Path(os.getenv("TONY_COMMERCIAL_COMMITMENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-commitments.json"))))
     agency_focus_service = TonyPersistentAgencyFocusCommandService(commercial_watch_service, store_path=Path(os.getenv("TONY_AGENCY_FOCUS_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "agency-focus-context.json"))))

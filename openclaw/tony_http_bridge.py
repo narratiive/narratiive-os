@@ -19,6 +19,7 @@ from runtime.composition import RuntimeComponents, compose_local_runtime
 from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.engineering_orchestrator import EngineeringRunSnapshot
 from runtime.executive_brief import ExecutiveBriefArchive
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.github_work import (
     GitHubConfig,
     GitHubRESTClient,
@@ -598,6 +599,19 @@ def compose_tony_runtime(
         if gateway_health_endpoint is None
         else gateway_health_endpoint
     )
+    lead_path = Path(
+        os.getenv(
+            "TONY_INBOUND_LEADS_PATH",
+            str(repository_root / ".runtime" / "inbound-leads.json"),
+        )
+    ).resolve()
+    lead_store = FileInboundLeadStore(lead_path)
+    lead_loader = build_authoritative_lead_loader(lead_store)
+    visibility = ExecutiveVisibilityPolicy()
+
+    def executive_workflow_states():
+        return visibility.visible_workflows(workflow_backend.list_states(), lead_store.read())
+
     mission_control_loader = build_mission_control_loader(
         progress_engine,
         object_loader,
@@ -606,7 +620,7 @@ def compose_tony_runtime(
         engineering_handoff_loader,
         engineering_run_loader,
         proactive_status_loader,
-        workflow_backend.list_states,
+        executive_workflow_states,
         workflow_workspace_id,
         request_surface,
     )
@@ -617,7 +631,7 @@ def compose_tony_runtime(
         workspace_id=canonical_workspace,
         snapshot_loader=lambda requested: mission_control_loader(),
         domain_values_loader=lambda requested: workflow_projector.project(
-            workflow_backend.list_states()
+            executive_workflow_states()
         ).domain_values,
     )
     command_service = TonyCommandService(
@@ -625,18 +639,10 @@ def compose_tony_runtime(
         mission_control_loader=mission_control_loader,
         github_configured=github_work_loader is not None,
     )
-    lead_path = Path(
-        os.getenv(
-            "TONY_INBOUND_LEADS_PATH",
-            str(repository_root / ".runtime" / "inbound-leads.json"),
-        )
-    ).resolve()
     executive_service = TonyExecutiveCommandService(
         command_service,
         brief_archive=brief_archive,
-        inbound_lead_loader=build_authoritative_lead_loader(
-            FileInboundLeadStore(lead_path)
-        ),
+        inbound_lead_loader=lambda: visibility.visible_leads(lead_loader()),
         workspace_id=canonical_workspace,
     )
     return TonyRuntimeComposition(
