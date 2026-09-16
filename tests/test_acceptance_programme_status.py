@@ -165,6 +165,69 @@ class AcceptanceProgrammeStatusTests(unittest.TestCase):
                 capability = next(item for item in status["capabilities"] if item["capability"] == "Restart/recovery")
                 self.assertEqual(capability["status"], "IMPLEMENTED")
 
+    def test_matching_attention_receipt_proves_live_suppression(self) -> None:
+        status = self.builder.build(
+            (completed_state("growth_diagnostic_to_blueprint_lite", "safe-blueprint"),),
+            scenario_client_id="safe-katkin",
+            deployment={"deployed_revision": "safe-revision", "status": "deployed"},
+            attention={
+                "status": "accepted",
+                "checked_at": "2026-09-16T08:00:00+00:00",
+                "deployed_revision": "safe-revision",
+                "raw_lead_count": 3,
+                "visible_lead_count": 1,
+                "hidden_lead_count": 2,
+                "visible_lead_ids": ["visible"],
+                "hidden_lead_ids": ["hidden-a", "hidden-b"],
+                "morning_command_status": "healthy",
+                "lead_command_status": "healthy",
+                "duplicate_status": "duplicate_suppressed",
+                "duplicate_attempts": 0,
+                "external_action_taken": False,
+                "client_workflow_mutations": 0,
+            },
+        )
+
+        capability = next(item for item in status["capabilities"] if item["capability"] == "Attention suppression")
+        self.assertEqual(capability["status"], "LIVE_PROVEN")
+        self.assertIn("hidden_records:2", capability["evidence"])
+
+    def test_stale_or_unsafe_attention_receipt_does_not_prove_suppression(self) -> None:
+        base = {
+            "status": "accepted",
+            "deployed_revision": "safe-revision",
+            "raw_lead_count": 2,
+            "visible_lead_count": 1,
+            "hidden_lead_count": 1,
+            "visible_lead_ids": ["visible"],
+            "hidden_lead_ids": ["hidden"],
+            "morning_command_status": "healthy",
+            "lead_command_status": "healthy",
+            "duplicate_status": "duplicate_suppressed",
+            "duplicate_attempts": 0,
+            "external_action_taken": False,
+            "client_workflow_mutations": 0,
+        }
+        for change in (
+            {"deployed_revision": "stale"},
+            {"duplicate_attempts": 1},
+            {"external_action_taken": True},
+            {"hidden_lead_ids": []},
+            {"hidden_lead_ids": [{"invalid": "shape"}]},
+            {"raw_lead_count": "2"},
+            {"visible_lead_count": 0},
+        ):
+            with self.subTest(change=change):
+                receipt = {**base, **change}
+                status = self.builder.build(
+                    (completed_state("growth_diagnostic_to_blueprint_lite", "safe-blueprint"),),
+                    scenario_client_id="safe-katkin",
+                    deployment={"deployed_revision": "safe-revision", "status": "deployed"},
+                    attention=receipt,
+                )
+                capability = next(item for item in status["capabilities"] if item["capability"] == "Attention suppression")
+                self.assertEqual(capability["status"], "IMPLEMENTED")
+
     def test_missing_scenario_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "no persisted workflow runs"):
             self.builder.build(

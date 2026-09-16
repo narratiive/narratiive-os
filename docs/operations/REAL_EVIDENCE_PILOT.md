@@ -123,6 +123,22 @@ capability evidence. It derives those claims from workflow snapshots,
 artefacts, receipts, conversation-work records and the deployment receipt; it
 does not mutate or supersede any of them.
 
+To prove executive attention suppression against the deployed bridge, first
+confirm that the current day's scheduled morning brief has already completed.
+Then run the acceptance probe through the protected runtime environment:
+
+```bash
+.venv/bin/python scripts/run_with_env.py ~/.config/narratiive/runtime.env \
+  .venv/bin/python scripts/accept_attention_suppression.py --apply
+```
+
+The probe fails closed unless today's delivery key already exists, so it cannot
+initiate a new brief. It verifies that persisted suppressed/archived/test or
+completed leads remain absent from both the live morning projection and direct
+lead view, then proves a repeated scheduled delivery is stopped before
+transport. Its revision-bound receipt is consumed by the existing acceptance
+programme projection.
+
 ## 4. Acceptance check
 
 ```bash
