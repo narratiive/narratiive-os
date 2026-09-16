@@ -397,6 +397,34 @@ class CampaignWorldSelectionBrief:
 class FileCampaignEngineRepository:
     """Append-only, hash-chained campaign state scoped to one workspace."""
 
+    _ALLOWED_STAGE_TRANSITIONS = {
+        CampaignEngineStage.STRATEGY_APPROVED: {
+            CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT,
+        },
+        CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT: {
+            CampaignEngineStage.CAMPAIGN_WORLDS_IN_QUALITY_REVIEW,
+        },
+        CampaignEngineStage.CAMPAIGN_WORLDS_IN_QUALITY_REVIEW: {
+            CampaignEngineStage.CAMPAIGN_WORLDS_IN_QUALITY_REVIEW,
+            CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED,
+            CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT,
+        },
+        CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED: {
+            CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT,
+        },
+        CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT: {
+            CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW,
+        },
+        CampaignEngineStage.CREATIVE_BIBLE_IN_QUALITY_REVIEW: {
+            CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
+            CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT,
+        },
+        CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED: {
+            CampaignEngineStage.PRODUCTION_PLANNING,
+        },
+        CampaignEngineStage.PRODUCTION_PLANNING: set(),
+    }
+
     def __init__(self, root: str | Path, *, workspace_id: str) -> None:
         if not _safe_identifier(workspace_id):
             raise CampaignEngineStoreError("workspace_id must be a safe identifier")
@@ -432,6 +460,61 @@ class FileCampaignEngineRepository:
             record["record_hash"] = _canonical_hash(record)
             self._append(path, record)
         return state
+
+    def save_transition(
+        self,
+        expected: CampaignEngineState,
+        proposed: CampaignEngineState,
+        *,
+        transition_id: str,
+    ) -> CampaignEngineState:
+        """Atomically append one legal transition from the exact current state."""
+        if expected.identity != proposed.identity:
+            raise CampaignEngineStoreError("campaign transition cannot change campaign identity")
+        if (
+            expected.approved_blueprint != proposed.approved_blueprint
+            or expected.blueprint_approval != proposed.blueprint_approval
+        ):
+            raise CampaignEngineStoreError("campaign transition cannot replace approved Blueprint evidence")
+        if proposed.identity.workspace_id != self.workspace_id:
+            raise CampaignEngineStoreError("campaign belongs to a different workspace")
+        if not _safe_identifier(transition_id):
+            raise CampaignEngineStoreError("transition_id must be a safe identifier")
+        allowed = self._ALLOWED_STAGE_TRANSITIONS.get(expected.stage, set())
+        if proposed.stage not in allowed:
+            raise CampaignEngineStoreError(
+                f"illegal persisted campaign transition: {expected.stage.value} -> {proposed.stage.value}"
+            )
+
+        path = self._path(expected.identity.client_id, expected.identity.campaign_id)
+        proposed_payload = proposed.to_dict()
+        proposed_hash = _canonical_hash(proposed_payload)
+        expected_hash = _canonical_hash(expected.to_dict())
+        with self._file_lock(path, exclusive=True):
+            records = self._read_records(path)
+            existing = next((record for record in records if record["transition_id"] == transition_id), None)
+            if existing:
+                if existing["state_hash"] != proposed_hash:
+                    raise CampaignEngineStoreError("transition_id replay conflicts with persisted state")
+                return CampaignEngineState.from_dict(existing["state"])
+            if not records:
+                raise CampaignEngineStoreError("campaign transition requires persisted current state")
+            if records[-1]["state_hash"] != expected_hash:
+                raise CampaignEngineStoreError("campaign transition expected state is stale")
+            previous_hash = records[-1]["record_hash"]
+            record = {
+                "sequence": len(records) + 1,
+                "transition_id": transition_id,
+                "workspace_id": self.workspace_id,
+                "client_id": proposed.identity.client_id,
+                "campaign_id": proposed.identity.campaign_id,
+                "state_hash": proposed_hash,
+                "previous_hash": previous_hash,
+                "state": proposed_payload,
+            }
+            record["record_hash"] = _canonical_hash(record)
+            self._append(path, record)
+        return proposed
 
     def load(self, client_id: str, campaign_id: str) -> CampaignEngineState:
         path = self._path(client_id, campaign_id)
@@ -553,6 +636,20 @@ class CampaignEngineApplicationService:
             )
         self.repository.save(proposed, transition_id=transition_id)
         return proposed, False
+
+    def persist_transition(
+        self,
+        expected: CampaignEngineState,
+        proposed: CampaignEngineState,
+        *,
+        transition_id: str,
+    ) -> CampaignEngineState:
+        """Persist a pure-engine transition with stale-state protection."""
+        return self.repository.save_transition(
+            expected,
+            proposed,
+            transition_id=transition_id,
+        )
 
 
 class CampaignEngine:

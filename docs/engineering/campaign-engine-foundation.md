@@ -98,8 +98,11 @@ cannot reach Matt unless it passes independent quality review and Tony forwards
 it. Approval is invalid when the artefact ID, version or checksum changes.
 
 Campaign state is append-only, hash-chained, idempotent, workspace-scoped and
-safe under concurrent updates. The portfolio projection prioritises campaigns
-waiting on Matt while retaining the next action for every active campaign.
+safe under concurrent updates. Persisted stage transitions now use an atomic
+compare-and-swap boundary: stale callers, illegal stage skips, identity changes
+and attempts to replace approved Blueprint evidence fail closed. The portfolio
+projection prioritises campaigns waiting on Matt while retaining the next action
+for every active campaign.
 
 The Campaign Engine preparation state cannot authorise publication or media
 spend. Those authorities remain false by construction. Future deployment

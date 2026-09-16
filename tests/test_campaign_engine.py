@@ -282,6 +282,93 @@ class CampaignEngineTests(unittest.TestCase):
             with self.assertRaisesRegex(CampaignEngineStoreError, "conflicts"):
                 repository.save(changed, transition_id="transition-1")
 
+    def test_application_service_persists_only_from_exact_current_state(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            current = state()
+            repository.save(current, transition_id="campaign-start")
+            commissioned = self.engine.commission_campaign_worlds(current)
+
+            persisted = service.persist_transition(
+                current,
+                commissioned,
+                transition_id="commission-worlds",
+            )
+
+            self.assertEqual(persisted, commissioned)
+            self.assertEqual(repository.load("safe-client", "safe-campaign"), commissioned)
+            with self.assertRaisesRegex(CampaignEngineStoreError, "stale"):
+                service.persist_transition(
+                    current,
+                    commissioned,
+                    transition_id="stale-commission",
+                )
+
+    def test_persisted_transition_rejects_stage_skips_and_blueprint_replacement(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            current = state()
+            repository.save(current, transition_id="campaign-start")
+            skipped = CampaignEngineState(
+                identity=current.identity,
+                approved_blueprint=current.approved_blueprint,
+                blueprint_approval=current.blueprint_approval,
+                stage=CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT,
+            )
+            skipped = self.engine.submit_campaign_worlds(
+                skipped,
+                (candidate("a", "checksum-a"), candidate("b", "checksum-b")),
+            )
+            with self.assertRaisesRegex(CampaignEngineStoreError, "illegal persisted"):
+                repository.save_transition(current, skipped, transition_id="skip-quality")
+
+            replacement = artifact("blueprint-2", "growth_blueprint", "checksum-2")
+            replaced = CampaignEngineState(
+                identity=current.identity,
+                approved_blueprint=replacement,
+                blueprint_approval=approval(replacement),
+                stage=CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT,
+            )
+            with self.assertRaisesRegex(CampaignEngineStoreError, "Blueprint evidence"):
+                repository.save_transition(current, replaced, transition_id="replace-blueprint")
+
+    def test_competing_campaign_reviews_cannot_silently_overwrite_each_other(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            expected = self._world_review_state()
+            repository.save(expected, transition_id="quality-review-start")
+            proposed = (
+                self.engine.review_campaign_world(
+                    expected,
+                    "a",
+                    quality_review=quality("checksum-a"),
+                    tony_review=tony("checksum-a"),
+                ),
+                self.engine.review_campaign_world(
+                    expected,
+                    "b",
+                    quality_review=quality("checksum-b"),
+                    tony_review=tony("checksum-b"),
+                ),
+            )
+
+            def persist(index: int):
+                try:
+                    repository.save_transition(
+                        expected,
+                        proposed[index],
+                        transition_id=f"candidate-review-{index}",
+                    )
+                except CampaignEngineStoreError as exc:
+                    return str(exc)
+                return "saved"
+
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                outcomes = sorted(pool.map(persist, range(2)))
+
+            self.assertEqual(outcomes, ["campaign transition expected state is stale", "saved"])
+
     def test_repository_detects_tampered_history(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
