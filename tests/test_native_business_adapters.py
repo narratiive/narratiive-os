@@ -372,6 +372,21 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertIn("q=trashed%3Dfalse", router.requests[0].full_url)
         self.assertIn("orderBy=modifiedTime%20desc", router.requests[0].full_url)
 
+    def test_drive_get_metadata_without_file_id_lists_recent_files(self):
+        router = Router([{"files": [{"id": "file-1", "name": "Recent strategy.pdf"}]}])
+        adapter = GoogleDriveDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "get_metadata",
+            "target": {"max_results": 10, "fields": ["name", "mimeType", "modifiedTime"]},
+        })
+
+        self.assertEqual(result["source_id"], "drive:list")
+        self.assertEqual(result["files"][0]["name"], "Recent strategy.pdf")
+        self.assertIn("orderBy=modifiedTime%20desc", router.requests[0].full_url)
+        self.assertEqual(result["mutation_count"], 0)
+
     def test_drive_workspace_replay_repairs_only_missing_child_folders(self):
         router = Router(
             [
