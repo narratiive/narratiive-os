@@ -39,6 +39,11 @@ def parser() -> argparse.ArgumentParser:
         type=Path,
         default=REPOSITORY_ROOT / "runtime-state" / "recovery.json",
     )
+    value.add_argument(
+        "--attention-receipt",
+        type=Path,
+        default=REPOSITORY_ROOT / "runtime-state" / "attention-acceptance.json",
+    )
     value.add_argument("--format", choices=("json", "text"), default="json")
     return value
 
@@ -47,6 +52,7 @@ def main() -> int:
     args = parser().parse_args()
     deployment = _json_object(args.deployment_receipt)
     recovery = _json_object(args.recovery_receipt) if args.recovery_receipt.is_file() else {}
+    attention = _json_object(args.attention_receipt) if args.attention_receipt.is_file() else {}
     conversations = tuple(
         _json_object(path)
         for path in sorted(args.conversation_root.glob("*.json"))
@@ -61,6 +67,7 @@ def main() -> int:
         service_health=health,
         conversation_work=conversations,
         recovery=recovery,
+        attention=attention,
     )
     if args.format == "json":
         print(json.dumps(status, indent=2, sort_keys=True))

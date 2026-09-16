@@ -59,6 +59,7 @@ class AcceptanceProgrammeStatusBuilder:
         service_health: Iterable[Mapping[str, Any]] = (),
         conversation_work: Iterable[Mapping[str, Any]] = (),
         recovery: Mapping[str, Any] | None = None,
+        attention: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         all_states = tuple(states)
         scenario = tuple(state for state in all_states if state.client_id == scenario_client_id)
@@ -68,12 +69,14 @@ class AcceptanceProgrammeStatusBuilder:
         health = tuple(dict(item) for item in service_health)
         conversations = tuple(dict(item) for item in conversation_work)
         recovery_evidence = dict(recovery or {})
+        attention_evidence = dict(attention or {})
         capabilities = self._capabilities(
             all_states,
             scenario,
             health,
             conversations,
             recovery_evidence,
+            attention_evidence,
             deployment,
         )
         checkpoint = self._last_verified_checkpoint(scenario)
@@ -142,6 +145,7 @@ class AcceptanceProgrammeStatusBuilder:
                 "workflow": "Narratiive OS persisted workflow snapshots and append-only events",
                 "deployment": "Narratiive OS deployment receipt",
                 "recovery": "Narratiive OS recovery receipt",
+                "attention": "Narratiive OS live attention-acceptance receipt",
                 "projection_only": True,
             },
         }
@@ -153,6 +157,7 @@ class AcceptanceProgrammeStatusBuilder:
         health: tuple[dict[str, Any], ...],
         conversations: tuple[dict[str, Any], ...],
         recovery: Mapping[str, Any],
+        attention: Mapping[str, Any],
         deployment: Mapping[str, Any],
     ) -> tuple[CapabilityEvidence, ...]:
         result: list[CapabilityEvidence] = []
@@ -194,6 +199,7 @@ class AcceptanceProgrammeStatusBuilder:
             )
         )
         recovery_proven = self._recovery_proven(recovery, deployment, healthy_services)
+        attention_proven = self._attention_proven(attention, deployment)
         recovery_evidence = (
             (
                 f"recovery:{recovery.get('attempted_at')}",
@@ -217,8 +223,18 @@ class AcceptanceProgrammeStatusBuilder:
                 ),
                 CapabilityEvidence(
                     "Attention suppression",
-                    "IMPLEMENTED",
-                    ("implementation:runtime/lead_attention.py",),
+                    "LIVE_PROVEN" if attention_proven else "IMPLEMENTED",
+                    (
+                        (
+                            f"attention:{attention.get('checked_at')}",
+                            f"hidden_records:{attention.get('hidden_lead_count')}",
+                            f"visible_records:{attention.get('visible_lead_count')}",
+                            f"delivery:{attention.get('duplicate_status')}",
+                        )
+                        if attention_proven
+                        else ("implementation:runtime/lead_attention.py",)
+                    ),
+                    "" if attention_proven else "No valid live attention receipt matches the deployed revision.",
                 ),
             )
         )
@@ -308,6 +324,43 @@ class AcceptanceProgrammeStatusBuilder:
             and recovery.get("deployment_healthy") is True
             and bool(healthy_services)
             and str(recovery.get("deployed_revision") or "")
+            == str(deployment.get("deployed_revision") or "")
+        )
+
+    @staticmethod
+    def _attention_proven(
+        attention: Mapping[str, Any],
+        deployment: Mapping[str, Any],
+    ) -> bool:
+        visible_ids = attention.get("visible_lead_ids")
+        hidden_ids = attention.get("hidden_lead_ids")
+        raw_count = attention.get("raw_lead_count")
+        visible_count = attention.get("visible_lead_count")
+        hidden_count = attention.get("hidden_lead_count")
+        if (
+            not isinstance(visible_ids, list)
+            or not all(isinstance(item, str) for item in visible_ids)
+            or not isinstance(hidden_ids, list)
+            or not all(isinstance(item, str) for item in hidden_ids)
+            or not isinstance(raw_count, int)
+            or not isinstance(visible_count, int)
+            or not isinstance(hidden_count, int)
+        ):
+            return False
+        return (
+            attention.get("status") == "accepted"
+            and bool(hidden_ids)
+            and not set(visible_ids).intersection(hidden_ids)
+            and raw_count == visible_count + hidden_count
+            and visible_count == len(visible_ids)
+            and hidden_count == len(hidden_ids)
+            and attention.get("morning_command_status") in {"healthy", "attention"}
+            and attention.get("lead_command_status") == "healthy"
+            and attention.get("duplicate_status") == "duplicate_suppressed"
+            and attention.get("duplicate_attempts") == 0
+            and attention.get("external_action_taken") is False
+            and attention.get("client_workflow_mutations") == 0
+            and str(attention.get("deployed_revision") or "")
             == str(deployment.get("deployed_revision") or "")
         )
 
