@@ -5,7 +5,7 @@ const WRITE_MARKERS = [
   "repair", "implement", "build", "write to", "add to", "share", "move",
 ];
 
-const SAFE_READ_SURFACES = new Set(["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"]);
+const SAFE_READ_SURFACES = new Set(["gmail", "calendar", "notion", "drive", "fireflies", "github", "n8n", "replit"]);
 const INTERNAL_PREP_SURFACES = new Set(["research", "strategy", "creative", "production", "other"]);
 const PREP_MARKERS = ["prepare", "draft"];
 const NO_SEND_MARKERS = ["do not send", "don't send", "without sending", "without send", "not send"];

@@ -6,11 +6,12 @@ import html
 import json
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from email.message import EmailMessage
 from typing import Any, Callable, Mapping
 from urllib import parse, request
 from urllib.error import HTTPError, URLError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 OpenUrl = Callable[..., Any]
@@ -404,9 +405,23 @@ class GmailDispatcher(GoogleAdapter):
 class GoogleCalendarDispatcher(GoogleAdapter):
     api_base = "https://www.googleapis.com/calendar/v3"
 
-    def __init__(self, oauth: GoogleOAuthConfig, *, calendar_id: str = "primary", opener: OpenUrl = request.urlopen) -> None:
+    def __init__(
+        self,
+        oauth: GoogleOAuthConfig,
+        *,
+        calendar_id: str = "primary",
+        timezone_name: str = "Europe/London",
+        opener: OpenUrl = request.urlopen,
+        clock: Callable[[], datetime] | None = None,
+    ) -> None:
         super().__init__(oauth, opener=opener)
         self.calendar_id = calendar_id
+        try:
+            self.local_timezone = ZoneInfo(timezone_name)
+        except ZoneInfoNotFoundError as exc:
+            raise BusinessAdapterError("calendar_timezone_invalid") from exc
+        self.timezone_name = timezone_name
+        self.clock = clock or (lambda: datetime.now(timezone.utc))
 
     def probe(self) -> dict[str, Any]:
         calendar_id = parse.quote(self.calendar_id, safe="")
@@ -418,10 +433,7 @@ class GoogleCalendarDispatcher(GoogleAdapter):
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
         if mode == "autonomous_read":
             _require_read(contract)
-            time_min = _text(target.get("time_min") or payload.get("time_min"))
-            time_max = _text(target.get("time_max") or payload.get("time_max"))
-            if not time_min or not time_max:
-                raise BusinessAdapterError("calendar_read_requires_time_range")
+            time_min, time_max = self._read_range(target, payload)
             result = self.client.call(
                 f"{self.api_base}/freeBusy",
                 method="POST",
@@ -429,7 +441,19 @@ class GoogleCalendarDispatcher(GoogleAdapter):
                 body={"timeMin": time_min, "timeMax": time_max, "items": [{"id": self.calendar_id}]},
             )
             busy = _mapping(_mapping(result.get("calendars")).get(self.calendar_id)).get("busy", [])
-            return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"calendar:{self.calendar_id}", "event_ids": [], "busy": busy, "summary": "Calendar availability was read without mutation."}
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": f"calendar:{self.calendar_id}",
+                "event_ids": [],
+                "time_min": time_min,
+                "time_max": time_max,
+                "timezone": self.timezone_name,
+                "busy": busy,
+                "busy_count": len(busy) if isinstance(busy, list) else 0,
+                "summary": "Calendar availability was read without mutation.",
+            }
         _require_write(contract)
         slot = _mapping(payload.get("slot"))
         start = _text(slot.get("start") or target.get("start"))
@@ -476,6 +500,39 @@ class GoogleCalendarDispatcher(GoogleAdapter):
             raise BusinessAdapterError("calendar_write_unverified")
         return {"verified": True, "created": True, "mutation_count": 1, "event_id": returned_id, "url": _text(created.get("htmlLink"))}
 
+    def _read_range(
+        self,
+        target: Mapping[str, Any],
+        payload: Mapping[str, Any],
+    ) -> tuple[str, str]:
+        time_min = _text(target.get("time_min") or payload.get("time_min"))
+        time_max = _text(target.get("time_max") or payload.get("time_max"))
+        if time_min and time_max:
+            return time_min, time_max
+
+        start_text = _text(target.get("start_date") or payload.get("start_date"))
+        end_text = _text(target.get("end_date") or payload.get("end_date"))
+        if start_text and end_text:
+            try:
+                start_date = date.fromisoformat(start_text)
+                end_date = date.fromisoformat(end_text)
+            except ValueError as exc:
+                raise BusinessAdapterError("calendar_read_time_range_invalid") from exc
+            if end_date < start_date or (end_date - start_date).days > 31:
+                raise BusinessAdapterError("calendar_read_time_range_invalid")
+            start = datetime.combine(start_date, datetime_time.min, self.local_timezone)
+            end = datetime.combine(end_date + timedelta(days=1), datetime_time.min, self.local_timezone)
+            return start.isoformat(), end.isoformat()
+
+        try:
+            days_ahead = int(target.get("days_ahead") or payload.get("days_ahead") or 0)
+        except (TypeError, ValueError) as exc:
+            raise BusinessAdapterError("calendar_read_time_range_invalid") from exc
+        if 1 <= days_ahead <= 31:
+            start = self.clock().astimezone(self.local_timezone).replace(microsecond=0)
+            return start.isoformat(), (start + timedelta(days=days_ahead)).isoformat()
+        raise BusinessAdapterError("calendar_read_requires_time_range")
+
 
 class GoogleDriveDispatcher(GoogleAdapter):
     api_base = "https://www.googleapis.com/drive/v3"
@@ -493,14 +550,19 @@ class GoogleDriveDispatcher(GoogleAdapter):
             file_id = _text(target.get("file_id") or payload.get("file_id"))
             query_text = _text(target.get("query") or payload.get("query"))
             if operation in {"search", "list"}:
-                if not query_text:
+                if operation == "search" and not query_text:
                     raise BusinessAdapterError("drive_search_requires_query")
                 max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
-                escaped = query_text.replace("\\", "\\\\").replace("'", "\\'")
-                q = parse.quote(f"name contains '{escaped}' and trashed=false", safe="")
+                if query_text:
+                    escaped = query_text.replace("\\", "\\\\").replace("'", "\\'")
+                    query_clause = f"name contains '{escaped}' and trashed=false"
+                else:
+                    query_clause = "trashed=false"
+                q = parse.quote(query_clause, safe="")
                 fields = parse.quote("files(id,name,mimeType,modifiedTime,webViewLink,parents)", safe="(),")
+                order = "&orderBy=modifiedTime%20desc" if operation == "list" else ""
                 result = self.client.call(
-                    f"{self.api_base}/files?q={q}&pageSize={max_results}&fields={fields}",
+                    f"{self.api_base}/files?q={q}&pageSize={max_results}{order}&fields={fields}",
                     headers=self._headers(),
                 )
                 files = [
@@ -515,11 +577,11 @@ class GoogleDriveDispatcher(GoogleAdapter):
                     "verified": True,
                     "read_only": True,
                     "mutation_count": 0,
-                    "source_id": "drive:search",
+                    "source_id": "drive:list" if operation == "list" else "drive:search",
                     "query": query_text,
                     "files": files,
                     "result_count": len(files),
-                    "summary": "Drive metadata was searched without mutation.",
+                    "summary": "Drive metadata was listed without mutation." if operation == "list" else "Drive metadata was searched without mutation.",
                 }
             if not file_id:
                 raise BusinessAdapterError("drive_read_requires_file_id")
@@ -657,33 +719,38 @@ class NotionWorkflowProjectionDispatcher:
             _require_read(contract)
             operation = _text(contract.get("operation")).casefold()
             query_text = _text(target.get("query") or payload.get("query"))
-            if operation in {"search", "list"} and query_text:
+            if operation in {"search", "list"}:
                 max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
                 result = self.client.call(
-                    f"{self.api_base}/v1/search",
+                    f"{self.api_base}/v1/data_sources/{self.data_source_id}/query",
                     method="POST",
                     headers=self._headers(),
-                    body={"query": query_text, "page_size": max_results, "filter": {"property": "object", "value": "page"}},
+                    body={"page_size": min(max(max_results * 10, 20), 100)},
                 )
-                pages = [
-                    {
+                pages = []
+                for item in result.get("results", []):
+                    if not isinstance(item, Mapping) or not _text(item.get("id")):
+                        continue
+                    properties = _notion_read_properties(_mapping(item.get("properties")))
+                    if query_text and query_text.casefold() not in json.dumps(properties, default=str).casefold():
+                        continue
+                    pages.append({
                         "page_id": _text(item.get("id")),
                         "url": _text(item.get("url")),
-                        "properties": _notion_read_properties(_mapping(item.get("properties"))),
-                    }
-                    for item in result.get("results", [])
-                    if isinstance(item, Mapping) and _text(item.get("id"))
-                ][:max_results]
+                        "properties": properties,
+                    })
+                    if len(pages) >= max_results:
+                        break
                 return {
                     "verified": True,
                     "read_only": True,
                     "mutation_count": 0,
-                    "source_id": "notion:search",
+                    "source_id": "notion:search" if query_text else f"notion:data_source:{self.data_source_id}",
                     "query": query_text,
                     "pages": pages,
                     "record_ids": [item["page_id"] for item in pages],
                     "result_count": len(pages),
-                    "summary": "Notion was searched without mutation.",
+                    "summary": "The canonical Notion data source was searched without mutation." if query_text else "The canonical Notion data source was listed without mutation.",
                 }
             if page_id:
                 page = self.client.call(f"{self.api_base}/v1/pages/{parse.quote(page_id, safe='')}", headers=self._headers())
@@ -801,9 +868,13 @@ class FirefliesDispatcher:
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         _require_read(contract)
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
+        operation = _text(contract.get("operation")).casefold()
         kind = _text(payload.get("kind")).casefold()
-        if kind in {"fireflies_transcript_discovery", "transcript_discovery", "list_transcripts"}:
-            return self._list_transcripts(payload)
+        if operation in {"list", "search"} or kind in {"fireflies_transcript_discovery", "transcript_discovery", "list_transcripts"}:
+            listing = {**dict(target), **dict(payload)}
+            if "limit" not in listing and target.get("max_results") is not None:
+                listing["limit"] = target.get("max_results")
+            return self._list_transcripts(listing)
         transcript_id = _text(payload.get("transcript_id") or target.get("transcript_id") or target.get("meeting_id"))
         calendar_event_id = _text(payload.get("calendar_event_id") or target.get("calendar_event_id"))
         if not transcript_id and calendar_event_id:
@@ -928,8 +999,20 @@ class FirefliesDispatcher:
         }
 
     def _transcript_page(self, *, limit: int, skip: int, filters: Mapping[str, Any]) -> list[Mapping[str, Any]]:
-        declarations = ["$limit: Int", "$skip: Int", "$mine: Boolean", "$keyword: String", "$fromDate: DateTime", "$toDate: DateTime", "$organizers: [String]", "$participants: [String]", "$user_id: String"]
-        arguments = ["limit: $limit", "skip: $skip", "mine: $mine", "keyword: $keyword", "fromDate: $fromDate", "toDate: $toDate", "organizers: $organizers", "participants: $participants", "user_id: $user_id"]
+        declarations = ["$limit: Int", "$skip: Int", "$mine: Boolean"]
+        arguments = ["limit: $limit", "skip: $skip", "mine: $mine"]
+        optional = {
+            "keyword": "String",
+            "fromDate": "DateTime",
+            "toDate": "DateTime",
+            "organizers": "[String]",
+            "participants": "[String]",
+            "user_id": "String",
+        }
+        for name, graphql_type in optional.items():
+            if filters.get(name) not in (None, "", []):
+                declarations.append(f"${name}: {graphql_type}")
+                arguments.append(f"{name}: ${name}")
         query = f"query Transcripts({', '.join(declarations)}) {{ transcripts({', '.join(arguments)}) {{ id title date duration calendar_id cal_id transcript_url meeting_link participants speakers {{ id name }} }} }}"
         variables = {"limit": limit, "skip": skip, **dict(filters)}
         result = self._graphql(query, variables)

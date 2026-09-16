@@ -100,6 +100,14 @@ def build_controlled_integration_report(environ: Mapping[str, str]) -> tuple[Con
             ("read_verified_transcript",),
             (),
         ),
+        "GitHub": (
+            ("read_repository_work", "read_pull_request_checks"),
+            (),
+        ),
+        "n8n": (
+            ("read_workflow_metadata",),
+            (),
+        ),
     }
     return tuple(
         ControlledIntegration(
@@ -145,6 +153,25 @@ def _worker_readiness(worker: str, environ: Mapping[str, str]) -> WorkerReadines
             configured=configured,
             mode="fireflies_api",
             missing=() if configured else ("TONY_FIREFLIES_API_KEY or FIREFLIES_API_KEY",),
+        )
+    if worker == "GitHub":
+        required = ("TONY_GITHUB_REPOSITORY", "TONY_GITHUB_WORKSPACE_ID", "TONY_GITHUB_MATT_LOGIN", "TONY_GITHUB_TOKEN")
+        missing = tuple(name for name in required if not str(environ.get(name, "")).strip())
+        return WorkerReadiness(
+            worker=worker,
+            configured=not missing,
+            mode="github_api",
+            missing=missing,
+        )
+    if worker == "n8n" and native_mode == "local_sqlite":
+        from pathlib import Path
+
+        path = Path(str(environ.get("TONY_N8N_DATABASE_PATH", Path.home() / ".n8n" / "database.sqlite"))).expanduser()
+        return WorkerReadiness(
+            worker=worker,
+            configured=path.is_file(),
+            mode="local_sqlite",
+            missing=() if path.is_file() else ("TONY_N8N_DATABASE_PATH",),
         )
 
     if worker == "Claude":
