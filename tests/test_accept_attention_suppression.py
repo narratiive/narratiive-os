@@ -84,7 +84,12 @@ class AttentionSuppressionAcceptanceTests(unittest.TestCase):
             "workspace_id": "agency",
             "bridge_url": "http://bridge/",
             "bridge_token": "secret",
-            "deployment": {"status": "deployed", "deployed_revision": "safe-revision"},
+            "deployment": {
+                "status": "healthy",
+                "smoke_check": "passed",
+                "rolled_back": False,
+                "deployed_revision": "safe-revision",
+            },
             "receipt_path": self.root / "receipt.json",
             "opener": self.opener,
             "brief_runner": lambda **kwargs: {
@@ -123,6 +128,26 @@ class AttentionSuppressionAcceptanceTests(unittest.TestCase):
     def test_refuses_to_run_when_today_has_not_already_been_delivered(self):
         with self.assertRaisesRegex(AttentionAcceptanceError, "refusing a probe that could send"):
             self.accept(runtime_root=self.root / "empty")
+
+    def test_requires_the_canonical_healthy_deployment_receipt(self):
+        for deployment in (
+            {"status": "deployed", "deployed_revision": "safe-revision"},
+            {
+                "status": "healthy",
+                "smoke_check": "failed",
+                "rolled_back": False,
+                "deployed_revision": "safe-revision",
+            },
+            {
+                "status": "healthy",
+                "smoke_check": "passed",
+                "rolled_back": True,
+                "deployed_revision": "safe-revision",
+            },
+        ):
+            with self.subTest(deployment=deployment):
+                with self.assertRaisesRegex(AttentionAcceptanceError, "healthy deployment"):
+                    self.accept(deployment=deployment)
 
     def test_fails_when_hidden_record_escapes_live_projection(self):
         def unsafe_opener(probe, **kwargs):

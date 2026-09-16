@@ -47,7 +47,12 @@ def accept_attention_suppression(
     if not bridge_token.strip():
         raise AttentionAcceptanceError("TONY_BRIDGE_TOKEN is required")
     deployed_revision = str(deployment.get("deployed_revision") or "").strip()
-    if deployment.get("status") != "deployed" or not deployed_revision:
+    if (
+        deployment.get("status") != "healthy"
+        or deployment.get("smoke_check") != "passed"
+        or deployment.get("rolled_back") is not False
+        or not deployed_revision
+    ):
         raise AttentionAcceptanceError("a healthy deployment receipt is required")
 
     raw_leads = FileInboundLeadStore(lead_path).read()
