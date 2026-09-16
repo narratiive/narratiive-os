@@ -85,6 +85,27 @@ class OpenClawActionPolicyTests(unittest.TestCase):
         self.assertTrue(proposal["approval_required"])
         self.assertEqual(proposal["execution_mode"], "approval_gated_write")
 
+    def test_email_address_and_email_thread_are_read_data_not_write_intent(self):
+        for action, surface in (
+            ("Find the KatKin contact name and email address in Notion", "notion"),
+            ("Search Gmail for an existing KatKin email thread", "gmail"),
+        ):
+            with self.subTest(action=action):
+                proposal = self._proposal(
+                    {"action": action, "surface": surface, "kind": "read", "operation": "search"}
+                )["proposal"]
+                self.assertEqual(proposal["effective_kind"], "read")
+                self.assertFalse(proposal["approval_required"])
+
+    def test_move_and_send_still_cannot_be_downgraded_to_reads(self):
+        for action in ("Move the Drive file", "Send the Gmail message"):
+            with self.subTest(action=action):
+                proposal = self._proposal(
+                    {"action": action, "surface": "drive", "kind": "read", "operation": "fetch"}
+                )["proposal"]
+                self.assertEqual(proposal["effective_kind"], "write")
+                self.assertTrue(proposal["approval_required"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -145,6 +145,32 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["message_id"], "reply-1")
         self.assertEqual(result["mutation_count"], 0)
 
+    def test_gmail_search_returns_bounded_metadata_without_mutation(self):
+        router = Router([
+            {"messages": [{"id": "m1", "threadId": "t1"}]},
+            {
+                "id": "m1",
+                "threadId": "t1",
+                "snippet": "SAFE proposal",
+                "payload": {"headers": [
+                    {"name": "From", "value": "hello@narratiive.com"},
+                    {"name": "Subject", "value": "KatKin"},
+                ]},
+            },
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": "KatKin", "max_results": 3},
+        })
+
+        self.assertTrue(result["read_only"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(result["results"][0]["subject"], "KatKin")
+        self.assertIn("q=KatKin", router.requests[0].full_url)
+
     def test_gmail_write_requires_approval_and_suppresses_duplicate_send(self):
         adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=Router([]))
         with self.assertRaisesRegex(BusinessAdapterError, "approval"):
@@ -238,6 +264,21 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["folder_id"], "folder-1")
         self.assertEqual(result["mutation_count"], 0)
 
+    def test_drive_search_is_bounded_and_read_only(self):
+        router = Router([{"files": [{"id": "file-1", "name": "KatKin Proposal.pdf", "mimeType": "application/pdf"}]}])
+        adapter = GoogleDriveDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": "KatKin", "max_results": 50},
+        })
+
+        self.assertTrue(result["read_only"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(result["files"][0]["name"], "KatKin Proposal.pdf")
+        self.assertIn("pageSize=10", router.requests[0].full_url)
+
     def test_drive_workspace_replay_repairs_only_missing_child_folders(self):
         router = Router(
             [
@@ -292,6 +333,31 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertTrue(result["duplicate_suppressed"])
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
+
+    def test_notion_search_returns_plain_business_properties_without_mutation(self):
+        router = Router([{
+            "results": [{
+                "id": "page-1",
+                "url": "https://notion.invalid/page-1",
+                "properties": {
+                    "Company": {"type": "title", "title": [{"plain_text": "KatKin"}]},
+                    "Email": {"type": "email", "email": "safe@example.invalid"},
+                },
+            }]
+        }])
+        adapter = NotionWorkflowProjectionDispatcher("synthetic", "source-1", opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": "KatKin"},
+        })
+
+        self.assertTrue(result["read_only"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(result["pages"][0]["properties"]["Company"], "KatKin")
+        self.assertEqual(result["pages"][0]["properties"]["Email"], "safe@example.invalid")
+        self.assertEqual(router.requests[0].method, "POST")
 
     def test_notion_projection_maps_only_canonical_business_fields(self):
         router = Router([

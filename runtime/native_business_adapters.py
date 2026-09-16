@@ -27,6 +27,35 @@ def _text(value: Any) -> str:
     return str(value or "").strip()
 
 
+def _bounded_result_count(value: Any, *, default: int = 5, maximum: int = 10) -> int:
+    try:
+        count = int(value or default)
+    except (TypeError, ValueError):
+        count = default
+    return min(max(count, 1), maximum)
+
+
+def _notion_read_properties(properties: Mapping[str, Any]) -> dict[str, Any]:
+    """Return bounded, plain business values without leaking provider internals."""
+
+    result: dict[str, Any] = {}
+    for name, raw in list(properties.items())[:30]:
+        item = _mapping(raw)
+        kind = _text(item.get("type"))
+        value: Any = None
+        if kind in {"title", "rich_text"}:
+            value = "".join(_text(part.get("plain_text")) for part in item.get(kind, []) if isinstance(part, Mapping))
+        elif kind in {"email", "phone_number", "url", "number", "checkbox"}:
+            value = item.get(kind)
+        elif kind in {"select", "status"}:
+            value = _text(_mapping(item.get(kind)).get("name"))
+        elif kind == "multi_select":
+            value = [_text(part.get("name")) for part in item.get(kind, []) if isinstance(part, Mapping)]
+        if value not in (None, "", []):
+            result[str(name)[:200]] = value
+    return result
+
+
 def _require_read(contract: Mapping[str, Any]) -> None:
     if _text(contract.get("execution_mode")) != "autonomous_read":
         raise BusinessAdapterError("adapter operation is not an authorised read")
@@ -171,6 +200,48 @@ class GmailDispatcher(GoogleAdapter):
     def _read(self, contract: Mapping[str, Any]) -> dict[str, Any]:
         _require_read(contract)
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
+        operation = _text(contract.get("operation")).casefold()
+        query_text = _text(target.get("query") or payload.get("query"))
+        if operation in {"search", "list"}:
+            if not query_text:
+                raise BusinessAdapterError("gmail_search_requires_query")
+            max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
+            query = parse.urlencode({"q": query_text, "maxResults": str(max_results)})
+            result = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
+            matches = [item for item in result.get("messages", []) if isinstance(item, Mapping)][:max_results]
+            items = []
+            for match in matches:
+                message_id = _text(match.get("id"))
+                if not message_id:
+                    continue
+                message = self.client.call(
+                    f"{self.api_base}/users/me/messages/{parse.quote(message_id, safe='')}?format=metadata",
+                    headers=self._headers(),
+                )
+                headers = {
+                    _text(item.get("name")).casefold(): _text(item.get("value"))
+                    for item in _mapping(message.get("payload")).get("headers", [])
+                    if isinstance(item, Mapping)
+                }
+                items.append({
+                    "message_id": message_id,
+                    "thread_id": _text(message.get("threadId") or match.get("threadId")),
+                    "from": headers.get("from", ""),
+                    "to": headers.get("to", ""),
+                    "subject": headers.get("subject", ""),
+                    "date": headers.get("date", ""),
+                    "snippet": _text(message.get("snippet")),
+                })
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": "gmail:search",
+                "query": query_text,
+                "results": items,
+                "result_count": len(items),
+                "summary": "Gmail was searched without mutation.",
+            }
         message_id = _text(payload.get("gmail_message_id") or target.get("message_id"))
         thread_id = _text(target.get("thread_id"))
         if message_id and not thread_id:
@@ -379,7 +450,38 @@ class GoogleDriveDispatcher(GoogleAdapter):
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
         if mode == "autonomous_read":
             _require_read(contract)
+            operation = _text(contract.get("operation")).casefold()
             file_id = _text(target.get("file_id") or payload.get("file_id"))
+            query_text = _text(target.get("query") or payload.get("query"))
+            if operation in {"search", "list"}:
+                if not query_text:
+                    raise BusinessAdapterError("drive_search_requires_query")
+                max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
+                escaped = query_text.replace("\\", "\\\\").replace("'", "\\'")
+                q = parse.quote(f"name contains '{escaped}' and trashed=false", safe="")
+                fields = parse.quote("files(id,name,mimeType,modifiedTime,webViewLink,parents)", safe="(),")
+                result = self.client.call(
+                    f"{self.api_base}/files?q={q}&pageSize={max_results}&fields={fields}",
+                    headers=self._headers(),
+                )
+                files = [
+                    {
+                        key: item.get(key)
+                        for key in ("id", "name", "mimeType", "modifiedTime", "webViewLink", "parents")
+                    }
+                    for item in result.get("files", [])
+                    if isinstance(item, Mapping)
+                ][:max_results]
+                return {
+                    "verified": True,
+                    "read_only": True,
+                    "mutation_count": 0,
+                    "source_id": "drive:search",
+                    "query": query_text,
+                    "files": files,
+                    "result_count": len(files),
+                    "summary": "Drive metadata was searched without mutation.",
+                }
             if not file_id:
                 raise BusinessAdapterError("drive_read_requires_file_id")
             fields = parse.quote("id,name,mimeType,modifiedTime,webViewLink,parents", safe=",")
@@ -514,9 +616,39 @@ class NotionWorkflowProjectionDispatcher:
         page_id = _text(target.get("record_id") or target.get("page_id") or target.get("lead_id") or payload.get("lead_id"))
         if mode == "autonomous_read":
             _require_read(contract)
+            operation = _text(contract.get("operation")).casefold()
+            query_text = _text(target.get("query") or payload.get("query"))
+            if operation in {"search", "list"} and query_text:
+                max_results = _bounded_result_count(target.get("max_results") or payload.get("max_results"))
+                result = self.client.call(
+                    f"{self.api_base}/v1/search",
+                    method="POST",
+                    headers=self._headers(),
+                    body={"query": query_text, "page_size": max_results, "filter": {"property": "object", "value": "page"}},
+                )
+                pages = [
+                    {
+                        "page_id": _text(item.get("id")),
+                        "url": _text(item.get("url")),
+                        "properties": _notion_read_properties(_mapping(item.get("properties"))),
+                    }
+                    for item in result.get("results", [])
+                    if isinstance(item, Mapping) and _text(item.get("id"))
+                ][:max_results]
+                return {
+                    "verified": True,
+                    "read_only": True,
+                    "mutation_count": 0,
+                    "source_id": "notion:search",
+                    "query": query_text,
+                    "pages": pages,
+                    "record_ids": [item["page_id"] for item in pages],
+                    "result_count": len(pages),
+                    "summary": "Notion was searched without mutation.",
+                }
             if page_id:
                 page = self.client.call(f"{self.api_base}/v1/pages/{parse.quote(page_id, safe='')}", headers=self._headers())
-                return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"notion:page:{page_id}", "record_id": _text(page.get("id")), "summary": "Notion record was read without mutation."}
+                return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"notion:page:{page_id}", "record_id": _text(page.get("id")), "properties": _notion_read_properties(_mapping(page.get("properties"))), "summary": "Notion record was read without mutation."}
             result = self.client.call(f"{self.api_base}/v1/data_sources/{self.data_source_id}/query", method="POST", headers=self._headers(), body={"page_size": 1})
             ids = [_text(item.get("id")) for item in result.get("results", []) if isinstance(item, Mapping) and _text(item.get("id"))]
             return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"notion:data_source:{self.data_source_id}", "record_ids": ids, "summary": "The canonical Notion data source was read without mutation."}

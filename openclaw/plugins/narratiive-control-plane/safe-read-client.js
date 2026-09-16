@@ -13,6 +13,7 @@ export function executeSafeRead(params = {}, options = {}) {
     action: params.action,
     surface: params.surface,
     kind: params.kind,
+    operation: params.operation,
     target: params.target && typeof params.target === "object" && !Array.isArray(params.target) ? params.target : {},
   };
 

@@ -2,7 +2,7 @@ const WRITE_MARKERS = [
   "send", "reply to", "follow up with", "follow-up with", "book ", "schedule ",
   "reschedule", "cancel", "invite", "update", "change", "create", "delete",
   "remove", "publish", "deploy", "merge", "commit", "push", "edit", "fix",
-  "repair", "implement", "build", "write to", "add to", "share", "email ",
+  "repair", "implement", "build", "write to", "add to", "share", "move ",
 ];
 
 const SAFE_READ_SURFACES = new Set(["gmail", "calendar", "notion", "drive", "github", "n8n", "replit"]);
