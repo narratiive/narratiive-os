@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import io
 import tempfile
 import unittest
 from pathlib import Path
+
+from pypdf import PdfReader
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_internal_review_delivery import workflow_approval_token
@@ -135,6 +139,23 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(len(self.gmail_calls), 1)
         self.assertEqual(len(self.telegram_messages), 1)
         self.assertIn("Gate 2 is ready", self.telegram_messages[0])
+        self.assertLess(len(self.telegram_messages[0]), 900)
+        attachment = self.gmail_calls[0]["payload"]["attachments"][0]
+        self.assertEqual(attachment["mime_type"], "application/pdf")
+        self.assertTrue(attachment["filename"].endswith(".pdf"))
+        self.assertLess(len(self.gmail_calls[0]["payload"]["body"]), 3000)
+        visible = "\n".join(
+            page.extract_text() or ""
+            for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
+        )
+        self.assertIn("Growth Sprint Proposal", visible)
+        self.assertIn("The growth challenge", visible)
+        self.assertIn("Proposed workstreams", visible)
+        for internal in (
+            "provider_message_id", "worker_execution", "selection_reason",
+            "source_refs", "artifact-", "safe-promised-source",
+        ):
+            self.assertNotIn(internal, visible)
         self.assertIsNone(replay)
         persisted = next(item for item in backend_after_restart.list_states() if item.run_id == state.run_id)
         self.assertEqual(persisted.status.value, "awaiting_approval")

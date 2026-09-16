@@ -297,6 +297,16 @@ durable conversation worker advances commissioned work after the inbound HTTP
 turn has closed and proactively delivers its verified result, failure or next
 approval gate to the correlated Telegram conversation.
 
+Document-producing human gates have a dedicated presentation boundary. The
+structured workflow output remains the authoritative artefact and retains full
+evidence and execution lineage. `HumanReviewPresentationService` maps registered
+product fields into a restrained review document, and
+`HumanReviewArtifactStore` records a content-addressed PDF and manifest bound to
+the source artefact checksum and renderer version. Internal Gmail delivery uses
+that PDF; Telegram carries only the contextual decision summary. Approval state
+is unchanged by rendering or delivery. Client-facing production and release
+remain separate downstream operations and retain their own human gate.
+
 Approved, Issue-bound engineering tasks may additionally enter the local
 Engineering Orchestrator when a versioned execution policy is configured.
 `EngineeringOrchestrationService` derives durable run state from the

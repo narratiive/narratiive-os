@@ -418,11 +418,13 @@ class TonyWorkflowCommandService:
                     )
                 conclusions = [str(item) for item in delivery.get("conclusions", []) if str(item).strip()][:4]
                 summary = " ".join(f"• {item}" for item in conclusions)
-                message = (
-                    f"{_artifact_label(state)} is ready. I sent the full review copy to {INTERNAL_REVIEW_ADDRESS}."
-                    + (f" {summary}" if summary else "")
-                    + " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
-                )
+                message = str(delivery.get("telegram_notification") or "").strip()
+                if not message:
+                    message = (
+                        f"{_artifact_label(state)} is ready. I sent the full review copy to {INTERNAL_REVIEW_ADDRESS}."
+                        + (f" {summary}" if summary else "")
+                        + " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
+                    )
                 return CommandResponse(name, "healthy", message, delivery)
             if name == "commission":
                 supplied = dict(inputs or {})

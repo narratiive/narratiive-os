@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+import base64
+import io
 import tempfile
 import unittest
 from pathlib import Path
+
+from pypdf import PdfReader
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
@@ -92,6 +96,9 @@ class TonyInternalReviewDeliveryTests(unittest.TestCase):
         self.temporary.cleanup()
 
     def test_substantial_artifact_is_attached_and_telegram_response_stays_concise(self) -> None:
+        state_before = self.runtime.runs.load_run("safe-review-run")
+        authoritative = Path(state_before.stages[-1].output_artifacts[-1].location)
+        authoritative_before = authoritative.read_bytes()
         response = self.service.execute(
             "/deliver-review safe-review-run",
             [],
@@ -102,12 +109,28 @@ class TonyInternalReviewDeliveryTests(unittest.TestCase):
         self.assertTrue(response.data["delivered"])
         self.assertLess(len(response.message), 3500)
         self.assertNotIn("A substantial internal review artefact", response.message)
-        self.assertIn("hello@narratiive.com", response.message)
+        self.assertIn("emailed you", response.message)
         self.assertEqual(len(self.gmail_calls), 1)
         payload = self.gmail_calls[0]["payload"]
         self.assertEqual(payload["recipient_email"], "hello@narratiive.com")
-        self.assertEqual(payload["attachments"][0]["mime_type"], "text/html")
+        self.assertEqual(payload["attachments"][0]["mime_type"], "application/pdf")
+        self.assertTrue(payload["attachments"][0]["filename"].endswith(".pdf"))
         self.assertNotIn("blueprint_lite", payload["body"])
+        self.assertLess(len(payload["body"]), 2400)
+        pdf = base64.b64decode(payload["attachments"][0]["content_base64"])
+        reader = PdfReader(io.BytesIO(pdf))
+        visible = "\n".join(page.extract_text() or "" for page in reader.pages)
+        self.assertIn("SAFE Review Company", visible)
+        self.assertIn("Blueprint Lite", visible)
+        self.assertIn("The growth tension", visible)
+        self.assertNotIn("provider_message_id", visible)
+        self.assertNotIn("worker_execution", visible)
+        self.assertNotIn("safe-review-run", visible)
+        self.assertEqual(authoritative.read_bytes(), authoritative_before)
+        self.assertTrue(response.data["review_artifact_id"].startswith("review-"))
+        self.assertEqual(response.data["attachment_mime_type"], "application/pdf")
+        self.assertEqual(self.runtime.runs.load_run("safe-review-run").approval_status, "pending")
+        self.assertFalse(self.gmail_calls[0]["approval_granted"])
 
     def test_delivery_is_exactly_once_across_restart(self) -> None:
         first = self.service.execute("/deliver-review safe-review-run", [])
@@ -123,6 +146,7 @@ class TonyInternalReviewDeliveryTests(unittest.TestCase):
         self.assertEqual(len(self.gmail_calls), 1)
         state = self.runtime.runs.load_run("safe-review-run")
         self.assertEqual(len(state.external_action_receipts), 1)
+        self.assertEqual(state.approval_status, "pending")
 
     def test_non_allowlisted_recipient_fails_closed(self) -> None:
         response = self.service.execute(
