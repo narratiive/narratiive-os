@@ -178,6 +178,7 @@ class CampaignEngineState:
         if self.approved_blueprint.artifact_type != "growth_blueprint":
             raise CampaignEngineError("campaign engine requires an approved Growth Blueprint")
         _require_approval_matches(self.approved_blueprint, self.blueprint_approval)
+        _require_matt_approval(self.blueprint_approval, "Growth Blueprint")
         if self.publication_authorised or self.media_spend_authorised:
             raise CampaignEngineError(
                 "campaign preparation state cannot authorise publication or media spend"
@@ -651,6 +652,26 @@ class CampaignEngineApplicationService:
             transition_id=transition_id,
         )
 
+    def select_campaign_world(
+        self,
+        expected: CampaignEngineState,
+        candidate_id: str,
+        approval: HumanApproval,
+        *,
+        transition_id: str,
+    ) -> CampaignEngineState:
+        """Persist Matt's exact-version Campaign World selection."""
+        proposed = CampaignEngine().select_campaign_world(
+            expected,
+            candidate_id,
+            approval,
+        )
+        return self.persist_transition(
+            expected,
+            proposed,
+            transition_id=transition_id,
+        )
+
 
 class CampaignEngine:
     """Pure transition engine for the approved-strategy-to-production boundary.
@@ -726,6 +747,7 @@ class CampaignEngine:
         ]
         if not candidate.ready_for_matt:
             raise CampaignEngineError("Matt may select only a quality-passed candidate forwarded by Tony")
+        _require_matt_approval(approval, "Campaign World")
         self._require_approval_binding(candidate.artifact, approval)
         return replace(
             state,
@@ -779,6 +801,7 @@ class CampaignEngine:
         self._require_stage(state, CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED)
         if state.creative_bible is None:
             raise CampaignEngineError("Creative Director's Bible artefact is missing")
+        _require_matt_approval(approval, "Creative Director's Bible")
         self._require_approval_binding(state.creative_bible, approval)
         return replace(
             state,
@@ -870,6 +893,11 @@ def _require_approval_matches(artifact: VersionedArtifact, approval: HumanApprov
         or approval.artifact_checksum != artifact.checksum
     ):
         raise CampaignEngineError("approval does not match the exact artefact version")
+
+
+def _require_matt_approval(approval: HumanApproval, artifact_name: str) -> None:
+    if approval.approver.strip().casefold() != "matt":
+        raise CampaignEngineError(f"{artifact_name} approval requires Matt")
 
 
 def _canonical_hash(value: Any) -> str:

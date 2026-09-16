@@ -108,6 +108,22 @@ class CampaignEngineTests(unittest.TestCase):
         with self.assertRaisesRegex(CampaignEngineError, "market_id"):
             CampaignIdentity("agency", "client", "brand", (), ("product",), "campaign")
 
+    def test_campaign_bootstrap_requires_matt_blueprint_approval(self) -> None:
+        current = state()
+        delegated = HumanApproval(
+            approver="tony",
+            rationale="Tony cannot approve strategy.",
+            artifact_id=current.approved_blueprint.artifact_id,
+            artifact_version=current.approved_blueprint.version,
+            artifact_checksum=current.approved_blueprint.checksum,
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "Growth Blueprint approval requires Matt"):
+            CampaignEngineState(
+                identity=current.identity,
+                approved_blueprint=current.approved_blueprint,
+                blueprint_approval=delegated,
+            )
+
     def test_multiple_campaign_worlds_are_required(self) -> None:
         current = self.engine.commission_campaign_worlds(state())
         with self.assertRaisesRegex(CampaignEngineError, "at least two"):
@@ -169,6 +185,58 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertEqual(current.stage, CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT)
         self.assertEqual(current.selected_campaign_world, selected)
 
+    def test_tony_cannot_approve_campaign_world_selection_for_matt(self) -> None:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        delegated = HumanApproval(
+            "tony",
+            "Tony recommends but may not select.",
+            selected.artifact_id,
+            selected.version,
+            selected.checksum,
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "Campaign World approval requires Matt"):
+            self.engine.select_campaign_world(current, "a", delegated)
+
+    def test_application_service_persists_idempotent_matt_selection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            current = self._world_review_state()
+            for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+                current = self.engine.review_campaign_world(
+                    current,
+                    candidate_id,
+                    quality_review=quality(checksum),
+                    tony_review=tony(checksum),
+                )
+            repository.save(current, transition_id="selection-ready")
+            selected = current.campaign_world_candidates[0].artifact
+
+            persisted = service.select_campaign_world(
+                current,
+                "a",
+                approval(selected),
+                transition_id="matt-selects-a",
+            )
+            replayed = service.select_campaign_world(
+                current,
+                "a",
+                approval(selected),
+                transition_id="matt-selects-a",
+            )
+
+            self.assertEqual(persisted, replayed)
+            self.assertEqual(persisted.selected_campaign_world, selected)
+            self.assertEqual(persisted.stage, CampaignEngineStage.CREATIVE_BIBLE_IN_DEVELOPMENT)
+
     def test_creative_bible_must_pass_quality_and_tony_before_matt(self) -> None:
         current = self._world_review_state()
         for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
@@ -191,6 +259,34 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertTrue(current.requires_matt)
         current = self.engine.approve_creative_bible(current, approval(bible))
         self.assertEqual(current.stage, CampaignEngineStage.PRODUCTION_PLANNING)
+
+    def test_tony_cannot_approve_creative_bible_for_matt(self) -> None:
+        current = self._world_review_state()
+        for candidate_id, checksum in (("a", "checksum-a"), ("b", "checksum-b")):
+            current = self.engine.review_campaign_world(
+                current,
+                candidate_id,
+                quality_review=quality(checksum),
+                tony_review=tony(checksum),
+            )
+        selected = current.campaign_world_candidates[0].artifact
+        current = self.engine.select_campaign_world(current, "a", approval(selected))
+        bible = artifact("bible-1", "creative_directors_bible", "bible-checksum")
+        current = self.engine.submit_creative_bible(current, bible)
+        current = self.engine.review_creative_bible(
+            current,
+            quality_review=quality("bible-checksum"),
+            tony_review=tony("bible-checksum"),
+        )
+        delegated = HumanApproval(
+            "tony",
+            "Tony recommends but may not approve.",
+            bible.artifact_id,
+            bible.version,
+            bible.checksum,
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "Creative Director's Bible approval requires Matt"):
+            self.engine.approve_creative_bible(current, delegated)
 
     def test_campaign_preparation_never_authorises_publication_or_spend(self) -> None:
         current = state()
