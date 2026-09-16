@@ -155,8 +155,13 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn('name: "narratiive_read_state"', source)
         self.assertIn('name: "narratiive_workflow_control"', source)
         self.assertIn('"additional_research"', source)
-        self.assertIn('["executive_brief", "current_leads", "open_work", "recent_execution"]', source)
+        self.assertIn(
+            '["executive_brief", "current_leads", "open_work", '
+            '"campaign_portfolio", "recent_execution"]',
+            source,
+        )
         self.assertIn('if (view === "open_work") return "/mission";', source)
+        self.assertIn('if (view === "campaign_portfolio") return "/campaigns";', source)
         self.assertNotIn('return "/what\'s the status"', source)
         self.assertIn("TONY_CONTROL_PLANE_TIMEOUT_MS", source)
         self.assertIn("AbortSignal.timeout(timeoutMs)", source)

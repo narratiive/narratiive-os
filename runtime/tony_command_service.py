@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable
 
+from runtime.campaign_engine import CampaignEngineState, CampaignPortfolio
 from runtime.execution_journal import ExecutionJournal, ExecutionJournalError
 from runtime.mission_control import MissionControlSnapshot
 from runtime.mission_control_service import MissionControlService
@@ -10,6 +11,7 @@ from runtime.progress_engine import CampaignProgress, RepositoryProgressEngine
 
 
 MissionControlLoader = Callable[[], MissionControlSnapshot]
+CampaignStateLoader = Callable[[], Iterable[CampaignEngineState]]
 
 
 @dataclass(frozen=True)
@@ -37,11 +39,13 @@ class TonyCommandService:
         execution_journal: ExecutionJournal | None = None,
         mission_control_loader: MissionControlLoader | None = None,
         github_configured: bool = False,
+        campaign_state_loader: CampaignStateLoader | None = None,
     ) -> None:
         self.progress_engine = progress_engine
         self.execution_journal = execution_journal
         self.mission_control_loader = mission_control_loader
         self.github_configured = github_configured
+        self.campaign_state_loader = campaign_state_loader
         self.mission_control_service = MissionControlService()
 
     def execute(
@@ -63,6 +67,10 @@ class TonyCommandService:
             return self._github()
         if name in {"mission", "mission_control", "brief"}:
             return self._mission_control(name)
+        if name == "campaigns":
+            return self._campaigns()
+        if name == "campaign":
+            return self._campaign(argument)
 
         snapshot = self.progress_engine.build_snapshot(objects)
 
@@ -78,6 +86,104 @@ class TonyCommandService:
             return self._next(name, snapshot)
 
         return self._error(name, "unsupported_command", f"Unsupported command: {name}")
+
+    def _campaigns(self) -> CommandResponse:
+        states = self._load_campaign_states("campaigns")
+        if isinstance(states, CommandResponse):
+            return states
+        snapshot = CampaignPortfolio.build(states)
+        payload = snapshot.to_dict()
+        status = "ready" if snapshot.campaigns else "empty"
+        return CommandResponse(
+            "campaigns",
+            status,
+            (
+                f"{len(snapshot.campaigns)} Campaign Engine campaign(s); "
+                f"{snapshot.human_gate_count} awaiting Matt."
+            ),
+            payload,
+        )
+
+    def _campaign(self, query: str) -> CommandResponse:
+        if not query:
+            return self._error(
+                "campaign",
+                "missing_argument",
+                "Client, brand or campaign id is required.",
+            )
+        states = self._load_campaign_states("campaign")
+        if isinstance(states, CommandResponse):
+            return states
+        needle = query.casefold()
+        matches = [
+            state
+            for state in states
+            if needle
+            in {
+                state.identity.client_id.casefold(),
+                state.identity.brand_id.casefold(),
+                state.identity.campaign_id.casefold(),
+                f"{state.identity.client_id} {state.identity.campaign_id}".casefold(),
+            }
+        ]
+        if not matches:
+            return self._error(
+                "campaign",
+                "campaign_not_found",
+                f"No Campaign Engine campaign matched: {query}",
+            )
+        if len(matches) > 1:
+            return self._error(
+                "campaign",
+                "ambiguous_campaign",
+                f"Multiple Campaign Engine campaigns matched: {query}",
+                {
+                    "matches": [
+                        {
+                            "client_id": state.identity.client_id,
+                            "brand_id": state.identity.brand_id,
+                            "campaign_id": state.identity.campaign_id,
+                        }
+                        for state in matches
+                    ]
+                },
+            )
+        state = matches[0]
+        return CommandResponse(
+            "campaign",
+            "awaiting_matt" if state.requires_matt else "ready",
+            (
+                f"{state.identity.client_id} / {state.identity.campaign_id}: "
+                f"{state.stage.value}. Next: {state.next_action}."
+            ),
+            {
+                "campaign": state.to_dict(),
+                "stage": state.stage.value,
+                "next_action": state.next_action,
+                "requires_matt": state.requires_matt,
+                "publication_authorised": state.publication_authorised,
+                "media_spend_authorised": state.media_spend_authorised,
+            },
+        )
+
+    def _load_campaign_states(
+        self,
+        command: str,
+    ) -> tuple[CampaignEngineState, ...] | CommandResponse:
+        if self.campaign_state_loader is None:
+            return self._error(
+                command,
+                "campaign_engine_unavailable",
+                "Campaign Engine state is not configured.",
+            )
+        try:
+            return tuple(self.campaign_state_loader())
+        except Exception:
+            return self._error(
+                command,
+                "campaign_engine_untrusted",
+                "Campaign Engine state could not be verified.",
+            )
 
     def _status(self, command: str, snapshot: Any) -> CommandResponse:
         campaigns = [campaign.to_dict() for campaign in snapshot.campaigns]
