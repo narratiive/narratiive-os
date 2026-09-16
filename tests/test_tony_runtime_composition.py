@@ -9,6 +9,12 @@ from unittest import mock
 
 from openclaw import tony_http_bridge, tony_live_bridge
 from runtime import server
+from runtime.campaign_engine import (
+    CampaignEngineState,
+    CampaignIdentity,
+    FileCampaignEngineRepository,
+    VersionedArtifact,
+)
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_commands import TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
@@ -17,6 +23,57 @@ from tests.test_workflow_mission_control import _blueprint_output
 
 
 class TonyRuntimeCompositionTests(unittest.TestCase):
+    def test_composition_exposes_persisted_campaign_engine_portfolio(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            campaign_root = root / "campaign-engine"
+            repository = FileCampaignEngineRepository(
+                campaign_root,
+                workspace_id="agency",
+            )
+            repository.save(
+                CampaignEngineState(
+                    identity=CampaignIdentity(
+                        workspace_id="agency",
+                        client_id="safe-client",
+                        brand_id="safe-brand",
+                        market_ids=("uk",),
+                        product_ids=("safe-product",),
+                        campaign_id="safe-campaign",
+                    ),
+                    approved_blueprint=VersionedArtifact(
+                        artifact_id="safe-blueprint",
+                        artifact_type="growth_blueprint",
+                        version="1.0",
+                        checksum="safe-checksum",
+                        location="drive://safe/blueprint",
+                    ),
+                ),
+                transition_id="safe-created",
+            )
+            with mock.patch.dict(
+                "os.environ",
+                {
+                    "TONY_CAMPAIGN_ENGINE_ROOT": str(campaign_root),
+                    "TONY_OBJECTS_ROOT": str(root / "objects"),
+                },
+                clear=True,
+            ):
+                composition = tony_http_bridge.compose_tony_runtime(
+                    runtime_root=root / "runtime",
+                    repository_root=Path(__file__).resolve().parents[1],
+                    workspace_id="agency",
+                    gateway_health_endpoint="",
+                )
+
+            response = composition.command_service.execute("/campaigns", [])
+            self.assertEqual(response.status, "ready")
+            self.assertEqual(response.data["campaign_count"], 1)
+            self.assertEqual(
+                response.data["campaigns"][0]["campaign_id"],
+                "safe-campaign",
+            )
+
     def test_registered_executive_workspace_reads_only_its_bound_workflow_tenant(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

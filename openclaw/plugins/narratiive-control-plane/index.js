@@ -28,7 +28,7 @@ const SAFE_READ_SCHEMA = {
 };
 
 const STATE_READ_SCHEMA = {
-  view: { type: "string", enum: ["executive_brief", "current_leads", "open_work", "recent_execution"] },
+  view: { type: "string", enum: ["executive_brief", "current_leads", "open_work", "campaign_portfolio", "recent_execution"] },
   period: { type: "string", enum: ["morning", "evening"] },
   scope: { type: "string", enum: ["execution", "outcome"] },
 };
@@ -71,6 +71,7 @@ function commandForStateRead(params) {
   }
   if (view === "current_leads") return "/leads";
   if (view === "open_work") return "/mission";
+  if (view === "campaign_portfolio") return "/campaigns";
   if (view === "recent_execution") {
     const scope = String(params?.scope || "execution").toLowerCase();
     if (!new Set(["execution", "outcome"]).has(scope)) throw new Error("scope must be execution or outcome");
@@ -176,7 +177,7 @@ function renderToolResult(payload) {
 function stateReadTool() {
   return {
     name: "narratiive_read_state",
-    description: "Read one authoritative Narratiive OS state view: executive brief, current leads, open work, or recent execution/outcome evidence. This tool is read-only and never mutates external systems.",
+    description: "Read one authoritative Narratiive OS state view: executive brief, current leads, open work, Campaign Engine portfolio, or recent execution/outcome evidence. This tool is read-only and never mutates external systems.",
     parameters: schema(STATE_READ_SCHEMA, ["view"]),
     async execute(_id, params) {
       try {

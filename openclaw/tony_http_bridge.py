@@ -15,6 +15,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from runtime.campaign_engine import FileCampaignEngineRepository
 from runtime.composition import RuntimeComponents, compose_local_runtime
 from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.engineering_orchestrator import EngineeringRunSnapshot
@@ -356,6 +357,20 @@ class TonyHTTPBridge:
                 current = campaigns[0]
                 lines.append(f"Stage: {current.get('current_stage', 'unknown')}")
                 lines.append(f"Next: {current.get('next_action', 'No action available')}")
+        elif response.command == "campaigns":
+            lines.append(f"Campaign Engine: {data.get('campaign_count', 0)}")
+            lines.append(f"Awaiting Matt: {data.get('human_gate_count', 0)}")
+            for campaign in data.get("campaigns", [])[:5]:
+                if isinstance(campaign, dict):
+                    lines.append(
+                        f"- {campaign.get('client_id')} / {campaign.get('campaign_id')}: "
+                        f"{campaign.get('stage')} — {campaign.get('next_action')}"
+                    )
+        elif response.command == "campaign":
+            lines.append(f"Stage: {data.get('stage', 'unknown')}")
+            lines.append(f"Next: {data.get('next_action', 'No action available')}")
+            if data.get("requires_matt"):
+                lines.append("Decision: Matt required")
         elif response.command in {"next", "what_next", "continue"}:
             primary = data.get("primary", {})
             if primary:
@@ -638,6 +653,15 @@ def compose_tony_runtime(
         progress_engine,
         mission_control_loader=mission_control_loader,
         github_configured=github_work_loader is not None,
+        campaign_state_loader=FileCampaignEngineRepository(
+            Path(
+                os.getenv(
+                    "TONY_CAMPAIGN_ENGINE_ROOT",
+                    str(repository_root / ".runtime" / "campaign-engine"),
+                )
+            ),
+            workspace_id=canonical_workspace,
+        ).list_states,
     )
     executive_service = TonyExecutiveCommandService(
         command_service,

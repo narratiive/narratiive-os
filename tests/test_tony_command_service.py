@@ -4,6 +4,11 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from runtime.campaign_engine import (
+    CampaignEngineState,
+    CampaignIdentity,
+    VersionedArtifact,
+)
 from runtime.execution_journal import ExecutionJournal
 from runtime.progress_engine import RepositoryProgressEngine
 from runtime.repository_validator import GrowthObjectValidator
@@ -61,6 +66,31 @@ def reciprocal(records):
             continue
         roots[(record["client_id"], record["campaign_id"])]["child_object_ids"].append(record["id"])
     return records
+
+
+def campaign_state(
+    *,
+    client_id: str = "rave",
+    brand_id: str = "rave-coffee",
+    campaign_id: str = "national-growth",
+) -> CampaignEngineState:
+    return CampaignEngineState(
+        identity=CampaignIdentity(
+            workspace_id="narratiive",
+            client_id=client_id,
+            brand_id=brand_id,
+            market_ids=("uk",),
+            product_ids=("coffee",),
+            campaign_id=campaign_id,
+        ),
+        approved_blueprint=VersionedArtifact(
+            artifact_id=f"blueprint-{client_id}",
+            artifact_type="growth_blueprint",
+            version="1.0",
+            checksum=f"checksum-{client_id}",
+            location=f"drive://{client_id}/blueprint",
+        ),
+    )
 
 
 class TonyCommandServiceTests(unittest.TestCase):
@@ -204,6 +234,44 @@ class TonyCommandServiceTests(unittest.TestCase):
         response = self.service.execute("/invent", [])
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["error_code"], "unsupported_command")
+
+    def test_campaigns_reports_multi_client_engine_state(self):
+        service = TonyCommandService(
+            self.progress_engine,
+            campaign_state_loader=lambda: (
+                campaign_state(),
+                campaign_state(
+                    client_id="maeving",
+                    brand_id="maeving-motorcycles",
+                    campaign_id="launch",
+                ),
+            ),
+        )
+        response = service.execute("/campaigns", [])
+        self.assertEqual(response.status, "ready")
+        self.assertEqual(response.data["campaign_count"], 2)
+        self.assertEqual(response.data["human_gate_count"], 0)
+
+    def test_campaign_detail_exposes_stage_and_external_authority(self):
+        service = TonyCommandService(
+            self.progress_engine,
+            campaign_state_loader=lambda: (campaign_state(),),
+        )
+        response = service.execute("/campaign rave", [])
+        self.assertEqual(response.status, "ready")
+        self.assertEqual(response.data["stage"], "strategy_approved")
+        self.assertFalse(response.data["publication_authorised"])
+        self.assertFalse(response.data["media_spend_authorised"])
+
+    def test_campaign_commands_fail_closed_without_trusted_state(self):
+        unavailable = self.service.execute("/campaigns", [])
+        self.assertEqual(unavailable.data["error_code"], "campaign_engine_unavailable")
+        service = TonyCommandService(
+            self.progress_engine,
+            campaign_state_loader=lambda: (_ for _ in ()).throw(RuntimeError("corrupt")),
+        )
+        untrusted = service.execute("/campaigns", [])
+        self.assertEqual(untrusted.data["error_code"], "campaign_engine_untrusted")
 
     def test_response_is_json_compatible(self):
         response = self.service.execute("what_next", [])
