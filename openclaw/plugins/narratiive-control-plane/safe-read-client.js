@@ -4,7 +4,7 @@ import path from "node:path";
 
 const PLUGIN_DIR = path.dirname(fileURLToPath(import.meta.url));
 const REPOSITORY_ROOT = path.resolve(PLUGIN_DIR, "../../..");
-const EXECUTOR = path.join(REPOSITORY_ROOT, "scripts", "execute_tony_safe_read.py");
+const EXECUTOR_MODULE = "scripts.execute_tony_safe_read";
 
 export function executeSafeRead(params = {}, options = {}) {
   const python = String(options.python || process.env.TONY_PYTHON || "python3");
@@ -18,7 +18,7 @@ export function executeSafeRead(params = {}, options = {}) {
   };
 
   return new Promise((resolve) => {
-    const child = spawn(python, [EXECUTOR], {
+    const child = spawn(python, ["-m", EXECUTOR_MODULE], {
       cwd: REPOSITORY_ROOT,
       env: process.env,
       stdio: ["pipe", "pipe", "pipe"],
@@ -52,15 +52,36 @@ export function executeSafeRead(params = {}, options = {}) {
       error: String(error?.message || error),
       execution_truth: "not_dispatched",
     }));
-    child.on("close", () => {
+    child.on("close", (code) => {
+      const output = stdout.trim();
+      if (!output) {
+        finish({
+          ok: false,
+          status: "safe_read_executor_failed",
+          error: code
+            ? `Narratiive safe-read executor exited with code ${code}`
+            : "Narratiive safe-read executor returned no result",
+          execution_truth: "dispatch_attempted_unverified",
+        });
+        return;
+      }
       let parsed;
       try {
-        parsed = JSON.parse(stdout.trim() || "{}");
+        parsed = JSON.parse(output);
       } catch {
         finish({
           ok: false,
           status: "safe_read_invalid_response",
           error: stderr.trim() || "Narratiive safe-read executor returned invalid JSON",
+          execution_truth: "dispatch_attempted_unverified",
+        });
+        return;
+      }
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed) || Object.keys(parsed).length === 0) {
+        finish({
+          ok: false,
+          status: "safe_read_invalid_response",
+          error: "Narratiive safe-read executor returned an empty result",
           execution_truth: "dispatch_attempted_unverified",
         });
         return;
