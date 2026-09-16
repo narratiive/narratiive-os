@@ -58,6 +58,7 @@ class AcceptanceProgrammeStatusBuilder:
         deployment: Mapping[str, Any],
         service_health: Iterable[Mapping[str, Any]] = (),
         conversation_work: Iterable[Mapping[str, Any]] = (),
+        recovery: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         all_states = tuple(states)
         scenario = tuple(state for state in all_states if state.client_id == scenario_client_id)
@@ -66,7 +67,15 @@ class AcceptanceProgrammeStatusBuilder:
 
         health = tuple(dict(item) for item in service_health)
         conversations = tuple(dict(item) for item in conversation_work)
-        capabilities = self._capabilities(all_states, scenario, health, conversations)
+        recovery_evidence = dict(recovery or {})
+        capabilities = self._capabilities(
+            all_states,
+            scenario,
+            health,
+            conversations,
+            recovery_evidence,
+            deployment,
+        )
         checkpoint = self._last_verified_checkpoint(scenario)
         failing = self._failing_transition(scenario)
         thesis_present = {
@@ -132,6 +141,7 @@ class AcceptanceProgrammeStatusBuilder:
             "source_of_truth": {
                 "workflow": "Narratiive OS persisted workflow snapshots and append-only events",
                 "deployment": "Narratiive OS deployment receipt",
+                "recovery": "Narratiive OS recovery receipt",
                 "projection_only": True,
             },
         }
@@ -142,6 +152,8 @@ class AcceptanceProgrammeStatusBuilder:
         scenario: tuple[WorkflowState, ...],
         health: tuple[dict[str, Any], ...],
         conversations: tuple[dict[str, Any], ...],
+        recovery: Mapping[str, Any],
+        deployment: Mapping[str, Any],
     ) -> tuple[CapabilityEvidence, ...]:
         result: list[CapabilityEvidence] = []
         healthy_services = tuple(
@@ -181,6 +193,15 @@ class AcceptanceProgrammeStatusBuilder:
                 promised or ("implementation:runtime/tony_promised_work.py",),
             )
         )
+        recovery_proven = self._recovery_proven(recovery, deployment, healthy_services)
+        recovery_evidence = (
+            (
+                f"recovery:{recovery.get('attempted_at')}",
+                *(f"restarted:{label}" for label in recovery.get("restarted_services", [])),
+            )
+            if recovery_proven
+            else ("implementation:runtime/run_service.py", "implementation:scripts/recover_tony_services.py")
+        )
         result.extend(
             (
                 CapabilityEvidence(
@@ -190,9 +211,9 @@ class AcceptanceProgrammeStatusBuilder:
                 ),
                 CapabilityEvidence(
                     "Restart/recovery",
-                    "IMPLEMENTED",
-                    ("implementation:runtime/run_service.py", "implementation:scripts/service_supervisor.py"),
-                    "No standalone live recovery receipt is inferred from healthy services.",
+                    "LIVE_PROVEN" if recovery_proven else "IMPLEMENTED",
+                    tuple(recovery_evidence),
+                    "" if recovery_proven else "No valid live recovery receipt matches the deployed revision and current healthy services.",
                 ),
                 CapabilityEvidence(
                     "Attention suppression",
@@ -267,6 +288,28 @@ class AcceptanceProgrammeStatusBuilder:
             )
         )
         return tuple(result)
+
+    @staticmethod
+    def _recovery_proven(
+        recovery: Mapping[str, Any],
+        deployment: Mapping[str, Any],
+        healthy_services: tuple[str, ...],
+    ) -> bool:
+        restarted = recovery.get("restarted_services")
+        failed = recovery.get("failed_services")
+        return (
+            recovery.get("status") == "recovered"
+            and isinstance(restarted, list)
+            and bool(restarted)
+            and isinstance(failed, list)
+            and bool(failed)
+            and int(recovery.get("exit_code_before") or 0) != 0
+            and recovery.get("exit_code_after") == 0
+            and recovery.get("deployment_healthy") is True
+            and bool(healthy_services)
+            and str(recovery.get("deployed_revision") or "")
+            == str(deployment.get("deployed_revision") or "")
+        )
 
     def _workflow_capability(
         self,

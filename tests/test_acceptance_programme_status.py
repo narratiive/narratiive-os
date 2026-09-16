@@ -113,7 +113,57 @@ class AcceptanceProgrammeStatusTests(unittest.TestCase):
         capabilities = {item["capability"]: item for item in status["capabilities"]}
         self.assertEqual(capabilities["Runtime services"]["status"], "LIVE_PROVEN")
         self.assertEqual(capabilities["Restart/recovery"]["status"], "IMPLEMENTED")
-        self.assertIn("No standalone live recovery receipt", capabilities["Restart/recovery"]["note"])
+        self.assertIn("No valid live recovery receipt", capabilities["Restart/recovery"]["note"])
+
+    def test_matching_recovery_receipt_proves_live_restart_recovery(self) -> None:
+        status = self.builder.build(
+            (completed_state("growth_diagnostic_to_blueprint_lite", "safe-blueprint"),),
+            scenario_client_id="safe-katkin",
+            deployment={"deployed_revision": "safe-revision", "status": "healthy"},
+            service_health=(
+                {"name": "runtime-gateway", "healthy": True},
+                {"name": "tony-http-bridge", "healthy": True},
+            ),
+            recovery={
+                "status": "recovered",
+                "restarted_services": ["com.narratiive.tony-http-bridge"],
+                "failed_services": ["tony-http-bridge"],
+                "deployment_healthy": True,
+                "exit_code_before": 20,
+                "exit_code_after": 0,
+                "attempted_at": "2026-09-16T07:00:00Z",
+                "deployed_revision": "safe-revision",
+            },
+        )
+
+        capability = next(item for item in status["capabilities"] if item["capability"] == "Restart/recovery")
+        self.assertEqual(capability["status"], "LIVE_PROVEN")
+        self.assertIn("restarted:com.narratiive.tony-http-bridge", capability["evidence"])
+
+    def test_stale_or_healthy_only_recovery_receipt_does_not_prove_recovery(self) -> None:
+        for recovery in (
+            {"status": "healthy", "deployed_revision": "safe-revision"},
+            {
+                "status": "recovered",
+                "restarted_services": ["com.narratiive.tony-http-bridge"],
+                "failed_services": ["tony-http-bridge"],
+                "deployment_healthy": True,
+                "exit_code_before": 20,
+                "exit_code_after": 0,
+                "attempted_at": "2026-09-16T07:00:00Z",
+                "deployed_revision": "stale-revision",
+            },
+        ):
+            with self.subTest(recovery=recovery):
+                status = self.builder.build(
+                    (completed_state("growth_diagnostic_to_blueprint_lite", "safe-blueprint"),),
+                    scenario_client_id="safe-katkin",
+                    deployment={"deployed_revision": "safe-revision", "status": "healthy"},
+                    service_health=({"name": "runtime-gateway", "healthy": True},),
+                    recovery=recovery,
+                )
+                capability = next(item for item in status["capabilities"] if item["capability"] == "Restart/recovery")
+                self.assertEqual(capability["status"], "IMPLEMENTED")
 
     def test_missing_scenario_fails_closed(self) -> None:
         with self.assertRaisesRegex(ValueError, "no persisted workflow runs"):
