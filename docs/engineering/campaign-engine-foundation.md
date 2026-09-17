@@ -171,8 +171,13 @@ that Notion changed without execution evidence.
    delivery, publication or media-spend authority.
 6. **Production orchestration** — route jobs by declared capability, ingest
    generated files into Drive, register versions and validate technical
-   specifications. The exact-version human asset-approval stop is implemented;
-   provider routing and technical-file validation remain bounded follow-on work.
+   specifications. A Drive file-probe receipt can now create an append-only
+   technical validation bound to the exact asset checksum and channel
+   specification. File existence/readability, type, dimensions, aspect ratio,
+   duration, checksum and Production Pack lineage are critical checks; a missing
+   or failed latest validation blocks the human review gate. The exact-version
+   human asset-approval stop is implemented. Provider routing and live probe
+   execution remain bounded follow-on work.
 7. **Delivery and deployment preparation** — assemble the approved client asset
    suite. Add Meta, TikTok and Google adapters only after exact action-preview,
    approval, idempotency and reconciliation contracts are proven. No adapter
