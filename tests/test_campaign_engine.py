@@ -9,6 +9,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from runtime.campaign_engine import (
     AssetLifecycleStatus,
+    AssetFileProbe,
     AssetReviewDecision,
     AssetVersionReview,
     ChannelAssetSpecification,
@@ -201,6 +202,29 @@ def asset_review(
         reviewer=reviewer,
         decision=decision,
         rationale="Reviewed the exact Drive file against the approved Production Pack.",
+    )
+
+
+def asset_file_probe(
+    version: ProducedAssetVersion,
+    *,
+    file_exists: bool = True,
+    file_readable: bool = True,
+    file_format: str = "mp4",
+    width_px: int = 1080,
+    height_px: int = 1920,
+    duration_seconds: float = 15,
+) -> AssetFileProbe:
+    return AssetFileProbe(
+        asset_version_id=version.asset_version_id,
+        file_checksum=version.file_checksum,
+        probe_receipt_id=f"drive-probe-{version.asset_version_id}",
+        file_exists=file_exists,
+        file_readable=file_readable,
+        file_format=file_format,
+        width_px=width_px,
+        height_px=height_px,
+        duration_seconds=duration_seconds,
     )
 
 
@@ -756,6 +780,90 @@ class CampaignEngineTests(unittest.TestCase):
 
             self.assertEqual(repository.load("safe-client", "safe-campaign"), produced)
 
+    def test_asset_technical_validation_records_probe_evidence_and_exact_spec_checks(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, version)
+        validated = self.engine.validate_asset_version(
+            produced,
+            validation_id="validation-v1",
+            probe=asset_file_probe(version),
+        )
+
+        validation = validated.asset_validations[-1]
+        self.assertTrue(validation.passed)
+        self.assertEqual(validation.probe_receipt_id, f"drive-probe-{version.asset_version_id}")
+        self.assertEqual(
+            {check.name for check in validation.checks},
+            {
+                "file_exists",
+                "file_readable",
+                "expected_file_type",
+                "expected_dimensions",
+                "expected_aspect_ratio",
+                "expected_duration",
+                "checksum_recorded",
+                "production_pack_lineage_valid",
+            },
+        )
+        self.assertEqual(CampaignEngineState.from_dict(validated.to_dict()), validated)
+        incomplete = replace(
+            validation,
+            checks=tuple(
+                check for check in validation.checks if check.name != "file_readable"
+            ),
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "required critical checks"):
+            replace(validated, asset_validations=(incomplete,))
+
+    def test_failed_or_missing_technical_validation_blocks_human_review(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, version)
+
+        with self.assertRaisesRegex(CampaignEngineError, "passing technical validation"):
+            self.engine.submit_asset_suite_for_review(produced, cycle_id="review-unvalidated")
+
+        failed = self.engine.validate_asset_version(
+            produced,
+            validation_id="validation-v1",
+            probe=asset_file_probe(version, width_px=1000),
+        )
+        self.assertFalse(failed.asset_validations[-1].passed)
+        self.assertFalse(
+            next(
+                check
+                for check in failed.asset_validations[-1].checks
+                if check.name == "expected_dimensions"
+            ).passed
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "passing technical validation"):
+            self.engine.submit_asset_suite_for_review(failed, cycle_id="review-failed")
+
+    def test_asset_file_probe_must_bind_to_registered_file_checksum(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, version)
+
+        with self.assertRaisesRegex(CampaignEngineError, "exact file checksum"):
+            self.engine.validate_asset_version(
+                produced,
+                validation_id="validation-v1",
+                probe=replace(asset_file_probe(version), file_checksum="stale-checksum"),
+            )
+
     def test_asset_suite_requires_matt_to_approve_every_exact_version(self) -> None:
         ready = self._production_ready_state()
         started = self.engine.start_asset_production(
@@ -764,6 +872,11 @@ class CampaignEngineTests(unittest.TestCase):
         )
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
+        produced = self.engine.validate_asset_version(
+            produced,
+            validation_id="validation-v1",
+            probe=asset_file_probe(version),
+        )
         in_review = self.engine.submit_asset_suite_for_review(
             produced,
             cycle_id="asset-review-1",
@@ -787,6 +900,11 @@ class CampaignEngineTests(unittest.TestCase):
         )
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
+        produced = self.engine.validate_asset_version(
+            produced,
+            validation_id="validation-v1",
+            probe=asset_file_probe(version),
+        )
         in_review = self.engine.submit_asset_suite_for_review(produced, cycle_id="asset-review-1")
 
         with self.assertRaisesRegex(CampaignEngineError, "requires Matt"):
@@ -808,6 +926,11 @@ class CampaignEngineTests(unittest.TestCase):
         )
         first_version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, first_version)
+        produced = self.engine.validate_asset_version(
+            produced,
+            validation_id="validation-v1",
+            probe=asset_file_probe(first_version),
+        )
         first_review = self.engine.submit_asset_suite_for_review(
             produced,
             cycle_id="asset-review-1",
@@ -820,6 +943,11 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertEqual(returned.stage, CampaignEngineStage.ASSET_PRODUCTION)
         second_version = produced_asset_version(started.asset_manifest, version_number=2)
         revised = self.engine.register_asset_version(returned, second_version)
+        revised = self.engine.validate_asset_version(
+            revised,
+            validation_id="validation-v2",
+            probe=asset_file_probe(second_version),
+        )
         second_review = self.engine.submit_asset_suite_for_review(
             revised,
             cycle_id="asset-review-2",
@@ -851,6 +979,11 @@ class CampaignEngineTests(unittest.TestCase):
             )
             version = produced_asset_version(started.asset_manifest)
             produced = self.engine.register_asset_version(started, version)
+            produced = self.engine.validate_asset_version(
+                produced,
+                validation_id="validation-v1",
+                probe=asset_file_probe(version),
+            )
             repository.save(produced, transition_id="asset-version-produced")
             in_review = self.engine.submit_asset_suite_for_review(
                 produced,

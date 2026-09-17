@@ -445,6 +445,78 @@ class ProducedAssetVersion:
 
 
 @dataclass(frozen=True, slots=True)
+class AssetFileProbe:
+    asset_version_id: str
+    file_checksum: str
+    probe_receipt_id: str
+    file_exists: bool
+    file_readable: bool
+    file_format: str
+    width_px: int | None = None
+    height_px: int | None = None
+    duration_seconds: float | None = None
+
+    def __post_init__(self) -> None:
+        required = (
+            self.asset_version_id,
+            self.file_checksum,
+            self.probe_receipt_id,
+            self.file_format,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("asset file probe fields must not be empty")
+        if self.width_px is not None and self.width_px <= 0:
+            raise CampaignEngineError("probed asset width must be positive")
+        if self.height_px is not None and self.height_px <= 0:
+            raise CampaignEngineError("probed asset height must be positive")
+        if self.duration_seconds is not None and self.duration_seconds <= 0:
+            raise CampaignEngineError("probed asset duration must be positive")
+
+
+@dataclass(frozen=True, slots=True)
+class AssetTechnicalCheck:
+    name: str
+    passed: bool
+    expected: str
+    observed: str
+    critical: bool = True
+
+    def __post_init__(self) -> None:
+        if not self.name.strip() or not self.expected.strip() or not self.observed.strip():
+            raise CampaignEngineError("asset technical check fields must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class AssetTechnicalValidation:
+    validation_id: str
+    asset_version_id: str
+    file_checksum: str
+    specification_id: str
+    probe_receipt_id: str
+    checks: tuple[AssetTechnicalCheck, ...]
+
+    def __post_init__(self) -> None:
+        required = (
+            self.validation_id,
+            self.asset_version_id,
+            self.file_checksum,
+            self.specification_id,
+            self.probe_receipt_id,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("asset technical validation fields must not be empty")
+        if not self.checks:
+            raise CampaignEngineError("asset technical validation requires checks")
+        names = [check.name for check in self.checks]
+        if len(names) != len(set(names)):
+            raise CampaignEngineError("asset technical validation check names must be unique")
+
+    @property
+    def passed(self) -> bool:
+        return not any(check.critical and not check.passed for check in self.checks)
+
+
+@dataclass(frozen=True, slots=True)
 class AssetVersionReview:
     asset_version_id: str
     file_checksum: str
@@ -504,6 +576,7 @@ class CampaignEngineState:
     production_plan_approval: HumanApproval | None = None
     asset_manifest: PlannedAssetManifest | None = None
     asset_versions: tuple[ProducedAssetVersion, ...] = ()
+    asset_validations: tuple[AssetTechnicalValidation, ...] = ()
     asset_review_cycles: tuple[AssetReviewCycle, ...] = ()
     publication_authorised: bool = False
     media_spend_authorised: bool = False
@@ -679,6 +752,46 @@ class CampaignEngineState:
                     raise CampaignEngineError("asset version lineage must match the Asset Manifest")
             cycle_ids: set[str] = set()
             versions_by_id = {version.asset_version_id: version for version in self.asset_versions}
+            specifications = {
+                item.specification_id: item
+                for item in self.production_plan.channel_specifications
+            }
+            validation_ids: set[str] = set()
+            for validation in self.asset_validations:
+                if validation.validation_id in validation_ids:
+                    raise CampaignEngineError("asset technical validation IDs must be unique")
+                validation_ids.add(validation.validation_id)
+                version = versions_by_id.get(validation.asset_version_id)
+                if version is None:
+                    raise CampaignEngineError("asset technical validation references an unknown version")
+                if validation.file_checksum != version.file_checksum:
+                    raise CampaignEngineError(
+                        "asset technical validation does not match the exact file checksum"
+                    )
+                planned = planned_assets[version.asset_id]
+                if validation.specification_id != planned.specification_id:
+                    raise CampaignEngineError(
+                        "asset technical validation does not match the planned specification"
+                    )
+                specification = specifications[planned.specification_id]
+                required_checks = {
+                    "file_exists",
+                    "file_readable",
+                    "expected_file_type",
+                    "expected_dimensions",
+                    "expected_aspect_ratio",
+                    "checksum_recorded",
+                    "production_pack_lineage_valid",
+                }
+                if specification.duration_seconds is not None:
+                    required_checks.add("expected_duration")
+                checks_by_name = {check.name: check for check in validation.checks}
+                if not required_checks.issubset(checks_by_name) or any(
+                    not checks_by_name[name].critical for name in required_checks
+                ):
+                    raise CampaignEngineError(
+                        "asset technical validation is missing required critical checks"
+                    )
             for cycle in self.asset_review_cycles:
                 if cycle.cycle_id in cycle_ids:
                     raise CampaignEngineError("asset review cycle IDs must be unique")
@@ -720,6 +833,16 @@ class CampaignEngineState:
                 }
                 if set(active_cycle.asset_version_ids) != latest_version_ids:
                     raise CampaignEngineError("asset review must bind the latest exact version of every asset")
+                for version_id in active_cycle.asset_version_ids:
+                    validations = [
+                        validation
+                        for validation in self.asset_validations
+                        if validation.asset_version_id == version_id
+                    ]
+                    if not validations or not validations[-1].passed:
+                        raise CampaignEngineError(
+                            "asset review requires a passing technical validation for every exact version"
+                        )
                 if self.stage is CampaignEngineStage.ASSET_SUITE_APPROVED:
                     if len(reviewed_versions) != len(active_cycle.asset_version_ids) or any(
                         review.decision is not AssetReviewDecision.APPROVE
@@ -728,6 +851,8 @@ class CampaignEngineState:
                         raise CampaignEngineError("approved asset suite requires Matt's approval of every exact version")
         elif self.asset_versions:
             raise CampaignEngineError("asset versions require the asset-production stage")
+        elif self.asset_validations:
+            raise CampaignEngineError("asset technical validations require the asset-production stage")
         elif self.asset_review_cycles:
             raise CampaignEngineError("asset reviews require the asset-production stage")
 
@@ -828,6 +953,10 @@ class CampaignEngineState:
                 asset_versions=tuple(
                     _produced_asset_version_from_dict(item)
                     for item in value.get("asset_versions", [])
+                ),
+                asset_validations=tuple(
+                    _asset_technical_validation_from_dict(item)
+                    for item in value.get("asset_validations", [])
                 ),
                 asset_review_cycles=tuple(
                     _asset_review_cycle_from_dict(item)
@@ -1466,6 +1595,8 @@ class CampaignEngine:
             stage=CampaignEngineStage.ASSET_PRODUCTION,
             asset_manifest=asset_manifest,
             asset_versions=(),
+            asset_validations=(),
+            asset_review_cycles=(),
         )
 
     def register_asset_version(
@@ -1500,6 +1631,130 @@ class CampaignEngine:
             )
         return replace(state, asset_versions=(*state.asset_versions, version))
 
+    def validate_asset_version(
+        self,
+        state: CampaignEngineState,
+        *,
+        validation_id: str,
+        probe: AssetFileProbe,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if state.asset_manifest is None or state.production_plan is None:
+            raise CampaignEngineError("asset technical validation requires production state")
+        if not validation_id.strip():
+            raise CampaignEngineError("asset technical validation ID must not be empty")
+        if any(item.validation_id == validation_id for item in state.asset_validations):
+            raise CampaignEngineError("asset technical validation ID already exists")
+        version = next(
+            (
+                item
+                for item in state.asset_versions
+                if item.asset_version_id == probe.asset_version_id
+            ),
+            None,
+        )
+        if version is None:
+            raise CampaignEngineError("asset technical validation references an unknown version")
+        if probe.file_checksum != version.file_checksum:
+            raise CampaignEngineError(
+                "asset file probe does not match the exact file checksum"
+            )
+        planned = next(
+            item for item in state.asset_manifest.assets if item.asset_id == version.asset_id
+        )
+        specification = next(
+            item
+            for item in state.production_plan.channel_specifications
+            if item.specification_id == planned.specification_id
+        )
+        expected_dimensions = f"{specification.width_px or '*'}x{specification.height_px or '*'}"
+        observed_dimensions = f"{probe.width_px or '*'}x{probe.height_px or '*'}"
+        dimensions_passed = (
+            (specification.width_px is None or probe.width_px == specification.width_px)
+            and (specification.height_px is None or probe.height_px == specification.height_px)
+        )
+        checks = [
+            AssetTechnicalCheck(
+                name="file_exists",
+                passed=probe.file_exists,
+                expected="true",
+                observed=str(probe.file_exists).lower(),
+            ),
+            AssetTechnicalCheck(
+                name="file_readable",
+                passed=probe.file_readable,
+                expected="true",
+                observed=str(probe.file_readable).lower(),
+            ),
+            AssetTechnicalCheck(
+                name="expected_file_type",
+                passed=_normalise_file_format(probe.file_format)
+                == _normalise_file_format(specification.file_format),
+                expected=specification.file_format,
+                observed=probe.file_format,
+            ),
+            AssetTechnicalCheck(
+                name="expected_dimensions",
+                passed=dimensions_passed,
+                expected=expected_dimensions,
+                observed=observed_dimensions,
+            ),
+            AssetTechnicalCheck(
+                name="expected_aspect_ratio",
+                passed=_aspect_ratio_matches(
+                    specification.aspect_ratio,
+                    probe.width_px,
+                    probe.height_px,
+                ),
+                expected=specification.aspect_ratio,
+                observed=(
+                    f"{probe.width_px}:{probe.height_px}"
+                    if probe.width_px is not None and probe.height_px is not None
+                    else "unavailable"
+                ),
+            ),
+            AssetTechnicalCheck(
+                name="checksum_recorded",
+                passed=probe.file_checksum == version.file_checksum,
+                expected=version.file_checksum,
+                observed=probe.file_checksum,
+            ),
+            AssetTechnicalCheck(
+                name="production_pack_lineage_valid",
+                passed=True,
+                expected=planned.specification_id,
+                observed=specification.specification_id,
+            ),
+        ]
+        if specification.duration_seconds is not None:
+            checks.append(
+                AssetTechnicalCheck(
+                    name="expected_duration",
+                    passed=(
+                        probe.duration_seconds is not None
+                        and abs(probe.duration_seconds - specification.duration_seconds) <= 0.05
+                    ),
+                    expected=f"{specification.duration_seconds:g}",
+                    observed=(
+                        f"{probe.duration_seconds:g}"
+                        if probe.duration_seconds is not None
+                        else "unavailable"
+                    ),
+                )
+            )
+        validation = AssetTechnicalValidation(
+            validation_id=validation_id,
+            asset_version_id=version.asset_version_id,
+            file_checksum=version.file_checksum,
+            specification_id=specification.specification_id,
+            probe_receipt_id=probe.probe_receipt_id,
+            checks=tuple(checks),
+        )
+        return replace(
+            state,
+            asset_validations=(*state.asset_validations, validation),
+        )
+
     def submit_asset_suite_for_review(
         self,
         state: CampaignEngineState,
@@ -1525,6 +1780,15 @@ class CampaignEngine:
                     "asset review requires a generated version for every planned asset"
                 )
             latest = max(versions, key=lambda version: version.version_number)
+            validations = [
+                validation
+                for validation in state.asset_validations
+                if validation.asset_version_id == latest.asset_version_id
+            ]
+            if not validations or not validations[-1].passed:
+                raise CampaignEngineError(
+                    "asset review requires a passing technical validation for every exact version"
+                )
             selected_ids.append(latest.asset_version_id)
         cycle = AssetReviewCycle(
             cycle_id=cycle_id,
@@ -1701,6 +1965,28 @@ def _produced_asset_version_from_dict(value: Any) -> ProducedAssetVersion:
     )
 
 
+def _asset_technical_validation_from_dict(value: Any) -> AssetTechnicalValidation:
+    if not isinstance(value, dict):
+        raise CampaignEngineStoreError("asset technical validation must be an object")
+    return AssetTechnicalValidation(
+        validation_id=value["validation_id"],
+        asset_version_id=value["asset_version_id"],
+        file_checksum=value["file_checksum"],
+        specification_id=value["specification_id"],
+        probe_receipt_id=value["probe_receipt_id"],
+        checks=tuple(
+            AssetTechnicalCheck(
+                name=check["name"],
+                passed=bool(check["passed"]),
+                expected=check["expected"],
+                observed=check["observed"],
+                critical=bool(check.get("critical", True)),
+            )
+            for check in value.get("checks", ())
+        ),
+    )
+
+
 def _asset_review_cycle_from_dict(value: Any) -> AssetReviewCycle:
     if not isinstance(value, dict):
         raise CampaignEngineStoreError("asset review cycle must be an object")
@@ -1719,6 +2005,30 @@ def _asset_review_cycle_from_dict(value: Any) -> AssetReviewCycle:
             for review in value.get("reviews", ())
         ),
     )
+
+
+def _normalise_file_format(value: str) -> str:
+    return value.strip().casefold().removeprefix(".")
+
+
+def _aspect_ratio_matches(
+    expected: str,
+    width_px: int | None,
+    height_px: int | None,
+) -> bool:
+    if width_px is None or height_px is None:
+        return False
+    parts = expected.replace("/", ":").split(":")
+    if len(parts) != 2:
+        return False
+    try:
+        expected_width = float(parts[0].strip())
+        expected_height = float(parts[1].strip())
+    except ValueError:
+        return False
+    if expected_width <= 0 or expected_height <= 0:
+        return False
+    return abs((width_px / height_px) - (expected_width / expected_height)) <= 0.001
 
 
 def _safe_identifier(value: str) -> bool:
