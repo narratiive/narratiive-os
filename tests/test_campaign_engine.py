@@ -9,6 +9,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from runtime.campaign_engine import (
     AssetLifecycleStatus,
+    AssetReviewDecision,
+    AssetVersionReview,
     ChannelAssetSpecification,
     CampaignEngine,
     CampaignEngineApplicationService,
@@ -184,6 +186,21 @@ def produced_asset_version(
         producer="production-specialist",
         production_job_id=asset.production_job_id,
         source_manifest_checksum=manifest.manifest_artifact.checksum,
+    )
+
+
+def asset_review(
+    version: ProducedAssetVersion,
+    *,
+    decision: AssetReviewDecision = AssetReviewDecision.APPROVE,
+    reviewer: str = "matt",
+) -> AssetVersionReview:
+    return AssetVersionReview(
+        asset_version_id=version.asset_version_id,
+        file_checksum=version.file_checksum,
+        reviewer=reviewer,
+        decision=decision,
+        rationale="Reviewed the exact Drive file against the approved Production Pack.",
     )
 
 
@@ -738,6 +755,124 @@ class CampaignEngineTests(unittest.TestCase):
             )
 
             self.assertEqual(repository.load("safe-client", "safe-campaign"), produced)
+
+    def test_asset_suite_requires_matt_to_approve_every_exact_version(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, version)
+        in_review = self.engine.submit_asset_suite_for_review(
+            produced,
+            cycle_id="asset-review-1",
+        )
+
+        self.assertEqual(in_review.stage, CampaignEngineStage.ASSET_REVIEW)
+        self.assertTrue(in_review.requires_matt)
+        self.assertEqual(in_review.asset_review_cycles[-1].asset_version_ids, (version.asset_version_id,))
+        approved = self.engine.review_asset_version(in_review, asset_review(version))
+
+        self.assertEqual(approved.stage, CampaignEngineStage.ASSET_SUITE_APPROVED)
+        self.assertFalse(approved.publication_authorised)
+        self.assertFalse(approved.media_spend_authorised)
+        self.assertEqual(CampaignEngineState.from_dict(approved.to_dict()), approved)
+
+    def test_asset_review_rejects_tony_and_stale_file_checksum(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, version)
+        in_review = self.engine.submit_asset_suite_for_review(produced, cycle_id="asset-review-1")
+
+        with self.assertRaisesRegex(CampaignEngineError, "requires Matt"):
+            self.engine.review_asset_version(
+                in_review,
+                asset_review(version, reviewer="tony"),
+            )
+        with self.assertRaisesRegex(CampaignEngineError, "exact file checksum"):
+            self.engine.review_asset_version(
+                in_review,
+                replace(asset_review(version), file_checksum="stale-checksum"),
+            )
+
+    def test_changes_requested_return_to_production_and_next_cycle_selects_latest_version(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        first_version = produced_asset_version(started.asset_manifest)
+        produced = self.engine.register_asset_version(started, first_version)
+        first_review = self.engine.submit_asset_suite_for_review(
+            produced,
+            cycle_id="asset-review-1",
+        )
+        returned = self.engine.review_asset_version(
+            first_review,
+            asset_review(first_version, decision=AssetReviewDecision.CHANGES_REQUESTED),
+        )
+
+        self.assertEqual(returned.stage, CampaignEngineStage.ASSET_PRODUCTION)
+        second_version = produced_asset_version(started.asset_manifest, version_number=2)
+        revised = self.engine.register_asset_version(returned, second_version)
+        second_review = self.engine.submit_asset_suite_for_review(
+            revised,
+            cycle_id="asset-review-2",
+        )
+
+        self.assertEqual(len(second_review.asset_review_cycles), 2)
+        self.assertEqual(
+            second_review.asset_review_cycles[-1].asset_version_ids,
+            (second_version.asset_version_id,),
+        )
+        stale_cycle = replace(
+            second_review.asset_review_cycles[-1],
+            asset_version_ids=(first_version.asset_version_id,),
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "latest exact version"):
+            replace(
+                second_review,
+                asset_review_cycles=(*second_review.asset_review_cycles[:-1], stale_cycle),
+            )
+
+    def test_asset_review_transition_persists_with_stale_state_protection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            repository = FileCampaignEngineRepository(tmp, workspace_id="agency")
+            service = CampaignEngineApplicationService(repository)
+            ready = self._production_ready_state()
+            started = self.engine.start_asset_production(
+                ready,
+                planned_asset_manifest(ready.production_plan),
+            )
+            version = produced_asset_version(started.asset_manifest)
+            produced = self.engine.register_asset_version(started, version)
+            repository.save(produced, transition_id="asset-version-produced")
+            in_review = self.engine.submit_asset_suite_for_review(
+                produced,
+                cycle_id="asset-review-1",
+            )
+
+            service.persist_transition(
+                produced,
+                in_review,
+                transition_id="asset-review-opened",
+            )
+            approved = self.engine.review_asset_version(in_review, asset_review(version))
+            service.persist_transition(
+                in_review,
+                approved,
+                transition_id="asset-suite-approved",
+            )
+
+            self.assertEqual(
+                repository.load("safe-client", "safe-campaign").stage,
+                CampaignEngineStage.ASSET_SUITE_APPROVED,
+            )
 
     def test_campaign_bootstrap_requires_exact_blueprint_approval_and_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
