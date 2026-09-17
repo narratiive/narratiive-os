@@ -1,0 +1,155 @@
+# Tony Full Lifecycle Test Report
+
+Test client: **Northstar Test Co**
+
+Scope: isolated synthetic workspace `northstar-test-workspace-e2e` and client `northstar-test-co-e2e`
+
+Repository architecture source: `runtime/workflow_registry.py` and the existing workflow runtime, state machine, repositories, worker registry, quality validators and Tony runtime application service
+
+Production records modified: **none**
+
+## Executive result
+
+**Overall: FAIL — the native continuous lifecycle cannot currently reach final delivery.**
+
+All 11 registered gates pass contract/state-machine conformance when exercised with bounded isolated run IDs and deterministic synthetic workers. The unmodified native handoff chain fails after `research_to_growth_blueprint`: its next run ID repeatedly appends full workflow names and exceeds the filesystem filename limit while creating `growth_blueprint_deliverable_production`.
+
+This is not bypassed or marked as a pass. The bounded-ID conformance run exists only to exercise and evidence every remaining registered gate after preserving the native-chain failure.
+
+The repository also lacks production quality validators for the final five workflows and has no configured production worker for document generation or creative asset production by default. Those gates therefore pass structural test conformance but fail current default operational readiness.
+
+## Canonical gate architecture discovered
+
+1. `growth_diagnostic_to_blueprint_lite`
+2. `blueprint_lite_to_discovery_preparation`
+3. `discovery_evidence_to_growth_sprint_proposal`
+4. `growth_sprint_to_research_engine`
+5. `research_to_growth_blueprint`
+6. `growth_blueprint_deliverable_production`
+7. `growth_blueprint_to_campaign_world`
+8. `campaign_world_to_creative_bible`
+9. `creative_bible_to_asset_production`
+10. `asset_review_to_delivery_preparation`
+11. `delivery_to_follow_up_next_action`
+
+The chain was read from each workflow's existing `next_workflow_id`; no parallel workflow was invented.
+
+## Per-gate result
+
+| # | Gate | Contract/state test | Current default operational readiness | Elapsed | Resulting state | Worker / artefact |
+|---:|---|---|---|---:|---|---|
+| 1 | `growth_diagnostic_to_blueprint_lite` | PASS | PASS when Claude is configured | 3.574 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-3c5ca75cfc0e9bc0-78bd272963ee5819` |
+| 2 | `blueprint_lite_to_discovery_preparation` | PASS | PASS when Claude is configured | 4.674 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-4e6c24e78bca5785-eb2c1d85d517ca90` |
+| 3 | `discovery_evidence_to_growth_sprint_proposal` | PASS | PASS when Claude is configured | 5.101 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-c07129c3b50f6fb2-337af6082c7a632f` |
+| 4 | `growth_sprint_to_research_engine` | PASS | PASS for approved readable sources | 4.804 ms | `complete` / `not_required` | `northstar-test-fixture-worker`; `artifact-47460bebb1cc26ca-7a71ac6e4af35d8a` |
+| 5 | `research_to_growth_blueprint` | PASS | PASS when Claude is configured | 6.021 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-b618c71759b0450c-ba13080bc261e590` |
+| 6 | `growth_blueprint_deliverable_production` | PASS | **FAIL:** `document_generation` worker is planned/unavailable | 6.975 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-7bb9e3fcb74ad983-57bbad91f90268d8` |
+| 7 | `growth_blueprint_to_campaign_world` | PASS | **FAIL:** production quality validator unavailable | 7.928 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-03b07d324c779b30-0c12ec3683679c5a` |
+| 8 | `campaign_world_to_creative_bible` | PASS | **FAIL:** production quality validator unavailable | 7.412 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-9cda49fa37233c8d-a5ab82a6d39017fa` |
+| 9 | `creative_bible_to_asset_production` | PASS | **FAIL:** quality validator and creative-production worker unavailable | 7.521 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-af9a61c9d40c8917-a0e2ba1eb489ccbc` |
+| 10 | `asset_review_to_delivery_preparation` | PASS | **FAIL:** quality validator and `document_generation` worker unavailable | 7.817 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-754480eb3f5c52b6-7d1de1ac18cd717f` |
+| 11 | `delivery_to_follow_up_next_action` | PASS | **FAIL:** production quality validator unavailable | 7.916 ms | `awaiting_approval` / `pending` | `northstar-test-fixture-worker`; `artifact-2fe94c3f7f399ff8-3ad01f4c7573831f` |
+
+Elapsed times are from one local isolated deterministic run and are evidence of test execution, not provider-performance benchmarks.
+
+### Inputs, validation and continuation by gate
+
+| Gate | Required input state validated | Validation result | Explicit continuation |
+|---|---|---|---|
+| `growth_diagnostic_to_blueprint_lite` | `diagnostic_input_package` present | PASS — production Blueprint Lite quality gate | `/approve <run> because <rationale>; then /continue <run>` |
+| `blueprint_lite_to_discovery_preparation` | `blueprint_lite`, `diagnostic_evidence`, `company_context` present | PASS — production Discovery preparation quality gate | `/approve <run> because <rationale>; then /continue <run>` |
+| `discovery_evidence_to_growth_sprint_proposal` | `discovery_evidence`, `blueprint_lite`, `commercial_context` present | PASS — production Growth Sprint proposal quality gate | `/approve <run> because <rationale>; then /continue <run>` |
+| `growth_sprint_to_research_engine` | approved scope, research requirements, approved sources and client context present | PASS — production research-evidence quality gate | `/continue <run>` |
+| `research_to_growth_blueprint` | evidence pack, approved scope and client context present | PASS — production Growth Blueprint quality gate | `/approve <run> because <rationale>; then /continue <run>` |
+| `growth_blueprint_deliverable_production` | quality-accepted Blueprint, evidence lineage and canon bundle present | PASS — production deliverable quality gate | `/approve <run> because <rationale>; then /continue <run>` |
+| `growth_blueprint_to_campaign_world` | approved Growth Blueprint, evidence lineage and activation implications present | PASS — declared output contract plus no-external-action test validator; production validator unavailable | `/approve <run> because <rationale>; then /continue <run>` |
+| `campaign_world_to_creative_bible` | approved Campaign World, Growth Blueprint and production context present | PASS — declared output contract plus no-external-action test validator; production validator unavailable | `/approve <run> because <rationale>; then /continue <run>` |
+| `creative_bible_to_asset_production` | approved Creative Director's Bible, Asset Manifest and production constraints present | PASS — declared output contract plus no-external-action test validator; production validator unavailable | `/approve <run> because <rationale>; then /continue <run>` |
+| `asset_review_to_delivery_preparation` | reviewed assets, Asset Manifest and delivery requirements present | PASS — declared output contract plus no-external-action test validator; production validator unavailable | `/approve <run> because <rationale>; then /continue <run>` |
+| `delivery_to_follow_up_next_action` | verified delivery evidence, client context and measurement context present | PASS — declared output contract plus no-external-action test validator; production validator unavailable | `/approve <run> because <rationale>; terminal next-action state` |
+
+After the final synthetic approval, the terminal run is `complete` / `approved`. Before that decision it remains `awaiting_approval` / `pending`, as recorded in the primary table.
+
+## Gate evidence
+
+Every gate recorded the following evidence in its isolated run:
+
+- input snapshot and required input field list;
+- missing-field validation (empty for the passing gate run);
+- selected worker identity and attempt record;
+- immutable JSON artefact ID, checksum, location and parent artefact IDs;
+- quality-gate result and failed checks;
+- resulting workflow and approval state;
+- append-only workflow events;
+- elapsed execution time;
+- explicit approval/continuation command.
+
+The common successful audit sequence was:
+
+`workflow.created → stage.started → stage.attempt_recorded → stage.quality_recorded → workflow.outputs_promoted → stage.completed`
+
+Human-gated workflows then recorded `approval.requested`. Gate 4, the read-only Research Engine gate, completed without human approval. The other ten gates halted at `awaiting_approval` before continuation.
+
+Example continuation exposed at a human gate:
+
+`/approve northstar-test-lifecycle-gate-08 because Northstar Test Co gate reviewed; then /continue northstar-test-lifecycle-gate-08`
+
+The test invokes the runtime approval operation only with the synthetic exact-artefact checksum binding. It performs no delivery, client contact, publication or spend action.
+
+## Prerequisite and validation coverage
+
+The first six gates use the production validators currently composed by `build_tony_workflow_runtime`:
+
+- Blueprint Lite quality;
+- Discovery preparation quality;
+- Growth Sprint proposal quality;
+- research evidence quality;
+- Growth Blueprint quality;
+- Growth Blueprint deliverable quality.
+
+Gates 7–11 have named quality contracts in the registry but no production validators in the runtime composition. The conformance harness uses a clearly marked test-only validator that checks every declared output field and prohibits any external-action claim. This proves registry/state/audit behaviour only; it does not claim production creative quality or operational readiness.
+
+## Adversarial results
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Duplicate intake | PASS | Same run and inputs create one `workflow.created` event; conflicting replay is rejected as different input. |
+| Missing required data | PASS | Missing `diagnostic_input_package` produces `blocked` / `missing_required_inputs`; worker is not called. |
+| Worker failure | PASS | Two bounded timeout attempts are retained; state blocks with `worker_retry_policy_exhausted`. |
+| Malformed output | PASS | Non-object worker output blocks with `worker_output_rejected:MalformedWorkerOutput`; no external action occurs. |
+| Rejected approval | PASS | Rejection reopens the producing stage, increments revision, preserves the original artefact and writes a distinct revised artefact. |
+| Premature dispatch | PASS | Handoff before completed human approval is rejected; approval remains pending and no downstream run is dispatched. |
+| Service restart | PASS | Pending approval survives runtime reconstruction; recovery creates no duplicate execution or artefact. |
+| Native full-chain handoff | **FAIL** | Run ID growth produces `OSError: [Errno 63] File name too long` before the deliverable-production run can be persisted. |
+
+## Failure reasons and state inconsistencies
+
+1. **Unbounded downstream run IDs — critical.** `TonyWorkflowRuntime.handoff` constructs each next ID as `<entire-previous-run-id>-<next-workflow-id>`. The sixth handoff exceeds the filesystem component limit. Upstream runs and artefacts remain valid, but the downstream run and its creation event do not exist.
+2. **Duplicate approval-request events.** Human-gated runs contain two `approval.requested` events: one from stage completion and another from the explicit pause. The snapshot remains consistent, but audit consumers may count two requests for one gate.
+3. **Five declared quality contracts are not operational.** Campaign World, Creative Director's Bible, creative asset production, delivery preparation and follow-up have registry names but no production validator in runtime composition.
+4. **Provider gaps remain fail-closed.** Document generation and creative asset production are declared as planned/unavailable. This is correct safety behaviour, but prevents live completion.
+5. **Input payload expansion.** The handoff builder carries most upstream fields into every downstream run. It preserves evidence but creates very large snapshots and increases the chance of field-name collisions. Output fields not required as next inputs are filtered, but the payload remains broader than each specialist's declared input contract.
+
+## Orphaned artefacts
+
+- No orphaned artefacts were created by the isolated conformance run.
+- The native-chain failure occurs before the downstream run and artefact are created.
+- Rejected-approval artefacts are intentionally retained immutable history and are not orphans.
+- Failed worker attempts retain their attempt evidence as required; they are not represented as accepted outputs.
+
+## Recommended fixes
+
+1. Replace concatenated downstream run IDs with a bounded deterministic identity, for example a readable prefix plus a hash of source run, target workflow and correlation identity. Preserve source run ID in explicit lineage rather than the filename.
+2. Make approval-request creation idempotent for one run, stage, revision and exact artefact checksum.
+3. Implement and register production quality validators for Campaign World, Creative Director's Bible, creative asset production, delivery preparation and follow-up.
+4. Configure real document-generation and creative-production adapters only after capability, quality, exact-version approval, receipt and retry/reconciliation contracts pass acceptance.
+5. Narrow cross-workflow handoff payloads to declared inputs plus explicit `_lineage`, while preserving required evidence references and backward compatibility.
+6. Re-run this test without the bounded conformance IDs after fix 1. The overall result should remain FAIL until the native chain itself reaches the terminal approved next-action state.
+
+## Test location and command
+
+- Primary test: `tests/e2e/tony_full_lifecycle_test.py`
+- Discovery entry point: `tests/test_tony_full_lifecycle_e2e.py`
+- Focused command: `.venv/bin/python -m unittest tests.test_tony_full_lifecycle_e2e -v`
+
+The harness uses only temporary directories, synthetic `.invalid` email data and `northstar-test-*` identifiers. It does not read or modify production client records.
