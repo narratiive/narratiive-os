@@ -666,7 +666,19 @@ class MediaControlService:
         creative_mappings: Sequence[CreativePlatformMapping] = (),
     ) -> CanonicalMediaSnapshot:
         self.policy.authorize(MediaAuthority.READ, "get_performance")
-        prior = self._record_for_request(request_id)
+        if not request_id.strip():
+            raise MediaControlError("media ingestion request_id is required")
+        if not tony_request.strip():
+            raise MediaControlError("media ingestion tony_request is required")
+        request_fingerprint = self._ingest_request_fingerprint(
+            identity=identity,
+            provider_mapping=provider_mapping,
+            period_start=period_start,
+            period_end=period_end,
+            tony_request=tony_request,
+            creative_mappings=creative_mappings,
+        )
+        prior = self._record_for_request(request_id, request_fingerprint)
         if prior is not None:
             payload = prior.metadata.get("canonical_output")
             if not isinstance(payload, Mapping):
@@ -674,8 +686,38 @@ class MediaControlService:
             return CanonicalMediaSnapshot.from_dict(payload)
         adapter = self.adapters.get(provider_mapping.provider)
         if adapter is None:
-            self._audit_failure(identity, provider_mapping.provider, request_id, tony_request, "adapter not configured")
+            self._audit_failure(
+                identity, provider_mapping.provider, request_id, request_fingerprint,
+                tony_request, "adapter not configured",
+            )
             raise MediaConfigurationError(f"{provider_mapping.provider.value} adapter is not configured")
+        configured_account_id = str(
+            getattr(getattr(adapter, "configuration", None), "account_id", "")
+        ).strip()
+        if not configured_account_id:
+            self._audit_failure(
+                identity,
+                provider_mapping.provider,
+                request_id,
+                request_fingerprint,
+                tony_request,
+                "adapter account identity is unavailable",
+            )
+            raise MediaConfigurationError(
+                f"{provider_mapping.provider.value} adapter account identity is unavailable"
+            )
+        if provider_mapping.account_id != configured_account_id:
+            self._audit_failure(
+                identity,
+                provider_mapping.provider,
+                request_id,
+                request_fingerprint,
+                tony_request,
+                "provider account mapping does not match configured account",
+            )
+            raise MediaConfigurationError(
+                "provider account mapping does not match configured account"
+            )
         try:
             raw = adapter.get_performance(provider_mapping.campaign_id, period_start, period_end)
             snapshot = self.normaliser.normalise(
@@ -690,6 +732,7 @@ class MediaControlService:
                 identity,
                 provider_mapping.provider,
                 request_id,
+                request_fingerprint,
                 tony_request,
                 _audit_safe_error(exc),
             )
@@ -711,6 +754,7 @@ class MediaControlService:
                 "operation": "get_performance",
                 "authority": MediaAuthority.READ.value,
                 "request_id": request_id,
+                "request_fingerprint": request_fingerprint,
                 "result": "normalised",
                 "affected_object_ids": [provider_mapping.campaign_id],
                 "before_state": None,
@@ -839,19 +883,56 @@ class MediaControlService:
         result["pending_approvals"] = sum(1 for item in recommendations if item.human_approval_required)
         return result
 
-    def _record_for_request(self, request_id: str) -> ExecutionRecord | None:
+    def _record_for_request(self, request_id: str, request_fingerprint: str) -> ExecutionRecord | None:
         matches = [
             record
             for record in self.journal.read_all()
             if record.action == self.AUDIT_ACTION and record.metadata.get("request_id") == request_id
         ]
-        return matches[-1] if matches else None
+        if not matches:
+            return None
+        if any(
+            record.metadata.get("request_fingerprint") != request_fingerprint
+            for record in matches
+        ):
+            raise MediaControlError(
+                "media ingestion request_id is already bound to a different payload"
+            )
+        completed = [record for record in matches if record.status == "completed"]
+        return completed[-1] if completed else None
+
+    @staticmethod
+    def _ingest_request_fingerprint(
+        *,
+        identity: CampaignIdentity,
+        provider_mapping: ProviderObjectMapping,
+        period_start: str,
+        period_end: str,
+        tony_request: str,
+        creative_mappings: Sequence[CreativePlatformMapping],
+    ) -> str:
+        payload = {
+            "identity": asdict(identity),
+            "provider_mapping": {
+                **asdict(provider_mapping),
+                "provider": provider_mapping.provider.value,
+            },
+            "period_start": period_start,
+            "period_end": period_end,
+            "tony_request": tony_request,
+            "creative_mappings": [
+                {**asdict(item), "provider": item.provider.value}
+                for item in creative_mappings
+            ],
+        }
+        return _safe_hash(json.dumps(payload, sort_keys=True, separators=(",", ":")))
 
     def _audit_failure(
         self,
         identity: CampaignIdentity,
         provider: MediaProvider,
         request_id: str,
+        request_fingerprint: str,
         tony_request: str,
         error: str,
     ) -> None:
@@ -863,7 +944,6 @@ class MediaControlService:
             rationale="Provider read failed closed; no campaign state advanced.",
             actor="media-control-layer",
             status="failed",
-            record_id=f"media-{_safe_hash(request_id)}",
             metadata={
                 "timestamp": _utc_now(),
                 "tony_request": tony_request,
@@ -872,6 +952,7 @@ class MediaControlService:
                 "operation": "get_performance",
                 "authority": MediaAuthority.READ.value,
                 "request_id": request_id,
+                "request_fingerprint": request_fingerprint,
                 "result": "failed",
                 "affected_object_ids": [],
                 "before_state": None,

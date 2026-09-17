@@ -25,7 +25,7 @@ The canonical implementations found during discovery are:
 | Audit/provenance | `runtime/execution_journal.py` | Hash-chained append-only record for every provider interaction and denied write. |
 | Dispatcher and workers | `runtime/tony_dispatch_adapters.py`, `runtime/worker_registry.py` | Media capability can commission workers; adapters remain provider-specific. |
 | HTTP/public boundary | `runtime/public_gateway.py`, `openclaw/tony_http_bridge.py` | Authenticated command/action boundary; media does not open a second service. |
-| n8n | managed workflows documented under `docs/operations/` | Future scheduled reads should enter through an authenticated media-ingest command or job, not become a new source of truth. |
+| n8n | managed workflows documented under `docs/operations/` | Scheduled reads enter through authenticated `POST /media/sync`; n8n remains the action layer, not a source of truth. |
 | Notion | `runtime/notion_leads.py`, workflow projection adapters | Human-facing operational source for ownership, status and next action. Runtime execution evidence is projected explicitly; Notion changes are not inferred as execution. |
 | Drive | verified Drive business adapter and Campaign Engine Drive URIs | Asset/deliverable repository; media stores IDs and performance, not binary creative. |
 | Telegram | n8n trigger → authenticated Tony bridge | Interface only; never source of approval or state truth. |
@@ -83,7 +83,7 @@ Phase 1 implements schema and policy support only. It does not transition a real
 
 1. An approved Campaign Engine record supplies the canonical identity and approved creative IDs.
 2. A provider mapping resolves that identity to one explicit native account and campaign. Names are never keys.
-3. n8n or an operator may request a scheduled/on-demand read with a stable request ID.
+3. n8n or an operator requests a scheduled/on-demand read through authenticated `POST /media/sync` with a stable request ID.
 4. The policy engine authorises `READ` before provider dispatch.
 5. A provider adapter retrieves a native response. Missing adapter, credential, mapping, API response or malformed data fails closed.
 6. The normaliser emits provider-aware canonical metrics. Missing metrics become `available=false` and `value=null`, never zero.
@@ -114,6 +114,7 @@ Exact external steps and authoritative links are in `docs/MEDIA_EXTERNAL_SETUP.m
 - provider errors do not imply campaign health;
 - response schemas are validated before state advances;
 - request IDs make successful ingestion idempotent across service restart;
+- the requested provider account must exactly match the account configured on the adapter before any network call;
 - client/workspace/campaign identity is retained on every snapshot and audit record;
 - production client records are not used by the test harness.
 
@@ -143,8 +144,8 @@ This validator is present for design/testing only; no launch path consumes it in
 
 ## 8. Implementation phases
 
-1. **Phase 1 (this change):** canonical schema, creative mappings, adapter contract, fixture transports, normalisation, policy, audit/replay, Tony queries, diagnostics and Northstar certification.
-2. **Live read onboarding:** implement and certify one production read transport at a time after credentials exist; then add bounded n8n schedules for exceptions/daily/weekly reads.
+1. **Phase 1 (this change):** canonical schema, creative mappings, live-read transports, normalisation, policy, audit/replay, authenticated n8n ingestion, Tony queries, diagnostics and Northstar certification.
+2. **Live read onboarding:** certify one production read transport at a time after credentials exist; then enable bounded n8n schedules for exceptions/daily/weekly reads.
 3. **Media planning:** create an approved media-plan artefact from the Growth Blueprint/Campaign World and project its status to Notion.
 4. **Draft trafficking:** provider draft creation only, with no launch and exact native-ID receipts.
 5. **Human-approved activation:** separate approval state and pre-launch verification; no approval inference.
@@ -158,7 +159,7 @@ This validator is present for design/testing only; no launch path consumes it in
 - Provider attribution models are not harmonised. Canonical output preserves context but does not claim direct comparability.
 - Provider breakdown availability varies and must stay provider-specific.
 - Tony's natural-language interpretation is future work; deterministic `/media` commands are implemented.
-- n8n schedules are not installed until a live read-only provider smoke test passes.
+- the authenticated n8n ingestion contract is implemented, but schedules are not installed until a live read-only provider smoke test passes.
 - `MediaLifecycleStage` is a future lifecycle vocabulary, not an enabled live-buying state machine.
 
 ## 10. Required external setup from Matt

@@ -88,3 +88,35 @@ Engineering—not Matt—will then:
 - leave every write method disabled.
 
 The live read adapter is not production-accepted until its status is `HEALTHY`, account mapping is explicit and the audit journal contains a successful read. Missing credentials must appear as `NOT_CONFIGURED`, not as a healthy empty account.
+
+## n8n read-only ingestion contract
+
+After a provider passes its live smoke test, an n8n schedule may call `POST /media/sync` on the existing Tony bridge. The request must use the bridge bearer token and a stable, unique `request_id`; an exact-payload retry with the same ID returns the audited result without reading the provider again. Reusing an ID with another client, campaign, period or mapping fails closed.
+
+```json
+{
+  "request_id": "campaign-123-meta-2026-09-17T10:00:00Z",
+  "tony_request": "Scheduled read-only campaign performance sync",
+  "identity": {
+    "workspace_id": "workspace-id",
+    "client_id": "client-id",
+    "brand_id": "brand-id",
+    "market_ids": ["gb"],
+    "product_ids": ["product-id"],
+    "campaign_id": "campaign-123"
+  },
+  "provider_mapping": {
+    "provider": "meta",
+    "account_id": "configured-native-account-id",
+    "campaign_id": "native-campaign-id",
+    "ad_group_ids": [],
+    "ad_ids": [],
+    "creative_ids": []
+  },
+  "period_start": "2026-09-10T00:00:00Z",
+  "period_end": "2026-09-17T00:00:00Z",
+  "creative_mappings": []
+}
+```
+
+The account ID must exactly match the configured adapter account. The route supports reads only and always returns `external_action_taken=false`, `publication_authorised=false`, and `media_spend_authorised=false`. A schedule must not be enabled until the corresponding adapter is live-certified; provider errors remain visible for operational review and never trigger a write or an automatic retry storm.

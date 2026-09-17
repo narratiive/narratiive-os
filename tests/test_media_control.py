@@ -210,6 +210,26 @@ class MediaControlTests(unittest.TestCase):
                     )
                 self.assertEqual(service.diagnostics()["tiktok"]["health"], ConnectionHealth.OFFLINE.value)
 
+    def test_failed_request_can_retry_after_provider_recovers(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport_adapter = adapter(MediaProvider.META, MediaProviderError("temporary outage"))
+            service = MediaControlService(
+                {MediaProvider.META: transport_adapter},
+                ExecutionJournal(directory),
+            )
+            arguments = dict(
+                identity=identity(), provider_mapping=mapping(MediaProvider.META),
+                period_start="2026-09-10T00:00:00Z", period_end="2026-09-17T00:00:00Z",
+                request_id="northstar-retry-after-outage", tony_request="sync Northstar",
+            )
+            with self.assertRaises(MediaProviderError):
+                service.ingest(**arguments)
+            transport_adapter.transport.responses["get_performance"] = response(MediaProvider.META)
+            snapshot = service.ingest(**arguments)
+            self.assertEqual(snapshot.identity.client_id, "northstar-test-co")
+            self.assertEqual([record.status for record in service.journal.read_all()], ["failed", "completed"])
+            self.assertEqual(len(transport_adapter.transport.calls), 2)
+
     def test_duplicate_request_is_idempotent_and_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:
             transport_adapter = adapter(MediaProvider.META)
@@ -225,6 +245,32 @@ class MediaControlTests(unittest.TestCase):
             self.assertEqual(first.to_dict(), second.to_dict())
             self.assertEqual(len(transport_adapter.transport.calls), 1)
             self.assertEqual(len(restarted.journal.read_all()), 1)
+
+    def test_ingestion_rejects_cross_account_mapping_before_provider_read(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport_adapter = adapter(MediaProvider.META)
+            service = MediaControlService(
+                {MediaProvider.META: transport_adapter},
+                ExecutionJournal(directory),
+            )
+            wrong_account = ProviderObjectMapping(
+                provider=MediaProvider.META,
+                account_id="another-client-account",
+                campaign_id="test-meta-campaign",
+            )
+            with self.assertRaisesRegex(MediaConfigurationError, "does not match"):
+                service.ingest(
+                    identity=identity(),
+                    provider_mapping=wrong_account,
+                    period_start="2026-09-10T00:00:00Z",
+                    period_end="2026-09-17T00:00:00Z",
+                    request_id="northstar-cross-account",
+                    tony_request="sync Northstar",
+                )
+            self.assertEqual(transport_adapter.transport.calls, [])
+            record = service.journal.read_all()[-1]
+            self.assertEqual(record.status, "failed")
+            self.assertIn("does not match", record.metadata["error"])
 
     def test_creative_mapping_and_recommendations(self):
         creative = CreativePlatformMapping(
