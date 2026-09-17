@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import stat
 import subprocess
 import sys
 from pathlib import Path
@@ -18,6 +19,7 @@ CONTROL_PLANE_PLUGIN_PATH = REPOSITORY_ROOT / "openclaw" / "plugins" / "narratii
 CONTROL_PLANE_PLUGIN_ID = "narratiive-control-plane"
 LEGACY_TELEGRAM_INBOUND_LABEL = "com.narratiive.telegram-inbound"
 TONY_TELEGRAM_BINDING = {"agentId": "tony", "match": {"channel": "telegram"}}
+DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
 
 
 def deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
@@ -148,6 +150,123 @@ def _ensure_tony_telegram_binding(config: dict[str, Any]) -> None:
     config["bindings"] = preserved
 
 
+def _telegram_owner_id(value: str) -> str:
+    """Return a safe Telegram user id suitable for OpenClaw owner policy."""
+    candidate = str(value or "").strip()
+    if candidate.casefold().startswith("telegram:"):
+        candidate = candidate.split(":", 1)[1].strip()
+    if not candidate.isascii() or not candidate.isdigit() or int(candidate) <= 0:
+        raise ValueError("Telegram approval owner must be a positive numeric Telegram user id")
+    return candidate
+
+
+def _existing_telegram_owner_id(config: dict[str, Any]) -> str:
+    commands = config.get("commands")
+    if isinstance(commands, dict):
+        owners = commands.get("ownerAllowFrom")
+        if isinstance(owners, list):
+            for owner in owners:
+                candidate = str(owner or "").strip()
+                if candidate.casefold().startswith("telegram:"):
+                    return _telegram_owner_id(candidate)
+    channels = config.get("channels")
+    telegram = channels.get("telegram") if isinstance(channels, dict) else None
+    native = telegram.get("execApprovals") if isinstance(telegram, dict) else None
+    approvers = native.get("approvers") if isinstance(native, dict) else None
+    if isinstance(approvers, list):
+        for approver in approvers:
+            try:
+                return _telegram_owner_id(str(approver or ""))
+            except ValueError:
+                continue
+    return ""
+
+
+def _append_unique(values: Any, value: str, *, field: str) -> list[Any]:
+    if values is None:
+        result: list[Any] = []
+    elif isinstance(values, list):
+        result = list(values)
+    else:
+        raise ValueError(f"{field} must be a list")
+    if value not in result:
+        result.append(value)
+    return result
+
+
+def _ensure_telegram_approval_routing(config: dict[str, Any], owner_id: str) -> bool:
+    """Route Narratiive plugin approvals to Matt's authenticated Telegram identity.
+
+    Narratiive's consequential Gmail/calendar/etc. tool uses OpenClaw plugin
+    approvals, not host-exec approvals. Telegram still uses its native approval
+    client for the buttons and approver authorization, hence both configuration
+    families are required.
+    """
+    resolved_owner = _telegram_owner_id(owner_id) if owner_id else _existing_telegram_owner_id(config)
+    if not resolved_owner:
+        return False
+
+    commands = config.setdefault("commands", {})
+    if not isinstance(commands, dict):
+        raise ValueError("OpenClaw commands config must be an object")
+    commands["ownerAllowFrom"] = _append_unique(
+        commands.get("ownerAllowFrom"),
+        f"telegram:{resolved_owner}",
+        field="OpenClaw commands.ownerAllowFrom",
+    )
+
+    channels = config.setdefault("channels", {})
+    if not isinstance(channels, dict):
+        raise ValueError("OpenClaw channels config must be an object")
+    telegram = channels.setdefault("telegram", {})
+    if not isinstance(telegram, dict):
+        raise ValueError("OpenClaw channels.telegram config must be an object")
+    native = telegram.setdefault("execApprovals", {})
+    if not isinstance(native, dict):
+        raise ValueError("OpenClaw channels.telegram.execApprovals config must be an object")
+    native["enabled"] = True
+    native["target"] = "channel"
+    native["approvers"] = _append_unique(
+        native.get("approvers"),
+        resolved_owner,
+        field="OpenClaw channels.telegram.execApprovals.approvers",
+    )
+
+    approvals = config.setdefault("approvals", {})
+    if not isinstance(approvals, dict):
+        raise ValueError("OpenClaw approvals config must be an object")
+    plugin = approvals.setdefault("plugin", {})
+    if not isinstance(plugin, dict):
+        raise ValueError("OpenClaw approvals.plugin config must be an object")
+    plugin["enabled"] = True
+    existing_mode = str(plugin.get("mode") or "").strip().casefold()
+    plugin["mode"] = "both" if existing_mode == "targets" else (existing_mode or "session")
+    plugin["agentFilter"] = _append_unique(
+        plugin.get("agentFilter"), "tony", field="OpenClaw approvals.plugin.agentFilter"
+    )
+    plugin["sessionFilter"] = _append_unique(
+        plugin.get("sessionFilter"), "telegram", field="OpenClaw approvals.plugin.sessionFilter"
+    )
+    return True
+
+
+def _runtime_telegram_owner_id(path: Path) -> str:
+    resolved = path.expanduser().resolve()
+    mode = stat.S_IMODE(resolved.stat().st_mode)
+    if mode & 0o077:
+        raise PermissionError(f"runtime environment file must use mode 600: {resolved}")
+    for line_number, raw in enumerate(resolved.read_text(encoding="utf-8").splitlines(), start=1):
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        if "=" not in line:
+            raise ValueError(f"invalid runtime environment entry on line {line_number}")
+        key, value = line.split("=", 1)
+        if key.strip() == "TONY_TELEGRAM_CHAT_ID":
+            return _telegram_owner_id(value)
+    return ""
+
+
 def _native_telegram_enabled(config: dict[str, Any]) -> bool:
     channels = config.get("channels")
     if not isinstance(channels, dict):
@@ -208,7 +327,12 @@ def build_specialist_agents_file(agent: dict[str, Any]) -> str:
     )
 
 
-def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dict[str, Any], dict[Path, str]]:
+def build_install_plan(
+    home: Path,
+    existing_config: dict[str, Any],
+    *,
+    telegram_owner_id: str = "",
+) -> tuple[dict[str, Any], dict[Path, str]]:
     fleet = json.loads(FLEET_PATH.read_text(encoding="utf-8"))
     roster = json.loads(ROSTER_PATH.read_text(encoding="utf-8"))
 
@@ -221,6 +345,7 @@ def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dic
     merged_config["agents"] = _merge_agents(existing_agents, managed_agents)
     _enable_control_plane_plugin(merged_config)
     _ensure_tony_telegram_binding(merged_config)
+    _ensure_telegram_approval_routing(merged_config, telegram_owner_id)
 
     workspace_files: dict[Path, str] = {}
     for filename in TONY_WORKSPACE_FILES:
@@ -235,7 +360,13 @@ def build_install_plan(home: Path, existing_config: dict[str, Any]) -> tuple[dic
     return merged_config, workspace_files
 
 
-def install(*, home: Path, apply: bool) -> dict[str, Any]:
+def install(
+    *,
+    home: Path,
+    apply: bool,
+    telegram_owner_id: str = "",
+    require_approval_route: bool = False,
+) -> dict[str, Any]:
     config_path = home / ".openclaw" / "openclaw.json"
     if config_path.exists():
         existing = json.loads(config_path.read_text(encoding="utf-8"))
@@ -244,7 +375,17 @@ def install(*, home: Path, apply: bool) -> dict[str, Any]:
     else:
         existing = {}
 
-    merged_config, workspace_files = build_install_plan(home, existing)
+    merged_config, workspace_files = build_install_plan(
+        home,
+        existing,
+        telegram_owner_id=telegram_owner_id,
+    )
+    approval_route_configured = bool(_existing_telegram_owner_id(merged_config))
+    if require_approval_route and not approval_route_configured:
+        raise ValueError(
+            "Telegram approval routing was not installed: configure TONY_TELEGRAM_CHAT_ID "
+            "in the mode-600 runtime environment or pass --telegram-owner-id"
+        )
     result = {
         "config_path": str(config_path),
         "workspace_files": [str(path) for path in sorted(workspace_files)],
@@ -253,6 +394,7 @@ def install(*, home: Path, apply: bool) -> dict[str, Any]:
         "preserved_top_level_keys": sorted(set(existing) - set(json.loads(FLEET_PATH.read_text(encoding="utf-8")))),
         "tony_telegram_binding": dict(TONY_TELEGRAM_BINDING),
         "native_telegram_enabled": _native_telegram_enabled(merged_config),
+        "telegram_approval_route_configured": approval_route_configured,
     }
     if not apply:
         result.update(
@@ -287,9 +429,29 @@ def install(*, home: Path, apply: bool) -> dict[str, Any]:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Install Narratiive's bounded Tony OpenClaw fleet without replacing unrelated OpenClaw settings.")
     parser.add_argument("--home", type=Path, default=Path.home(), help="Home directory containing .openclaw")
+    parser.add_argument(
+        "--runtime-env-file",
+        type=Path,
+        default=DEFAULT_RUNTIME_ENV_PATH,
+        help="Mode-600 Narratiive runtime environment containing TONY_TELEGRAM_CHAT_ID",
+    )
+    parser.add_argument(
+        "--telegram-owner-id",
+        default="",
+        help="Positive Telegram user id for approval ownership; normally read from the runtime environment",
+    )
     parser.add_argument("--apply", action="store_true", help="Write the merged config and managed agent workspace instructions")
     args = parser.parse_args()
-    result = install(home=args.home.expanduser().resolve(), apply=args.apply)
+    owner_id = str(args.telegram_owner_id or os.environ.get("TONY_TELEGRAM_CHAT_ID", "")).strip()
+    runtime_env_file = args.runtime_env_file.expanduser().resolve()
+    if not owner_id and runtime_env_file.is_file():
+        owner_id = _runtime_telegram_owner_id(runtime_env_file)
+    result = install(
+        home=args.home.expanduser().resolve(),
+        apply=args.apply,
+        telegram_owner_id=owner_id,
+        require_approval_route=args.apply,
+    )
     print(json.dumps(result, indent=2, sort_keys=True))
     if not args.apply:
         print("Dry run only. Re-run with --apply after reviewing the plan.")
