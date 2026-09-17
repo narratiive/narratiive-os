@@ -18,6 +18,7 @@ from runtime.tony_internal_review_delivery import (
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
 from runtime.workflow_action_preview import WorkflowActionPreviewService
+from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 
 
@@ -139,7 +140,10 @@ class FileWorkflowCommandBackend:
         )
         if state.status.value == "complete" and runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id:
             outcome = runtime.handoff(state.run_id, lifecycle, additional_inputs)
-            return runtime.runs.load_run(outcome.next_run_id or f"{state.run_id}-{runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id}")
+            next_workflow_id = runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id
+            return runtime.runs.load_run(
+                outcome.next_run_id or downstream_run_id(state.run_id, next_workflow_id)
+            )
         if additional_inputs:
             raise ValueError("additional inputs can only be supplied to an approved cross-workflow handoff")
         runtime.advance(state.run_id, lifecycle)
