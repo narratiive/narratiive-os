@@ -286,7 +286,15 @@ def build_tony_worker_registry(
 
     planned = (
         ("document-generation-unavailable", ("document_generation", "deck_generation")),
-        ("creative-production-unavailable", ("creative_asset_production", "image_generation", "video_generation")),
+        (
+            "creative-production-unavailable",
+            (
+                "creative_asset_production",
+                "image_generation",
+                "video_generation",
+                "short_form_video_production",
+            ),
+        ),
         ("crm-operations-unavailable", ("crm_operations",)),
         ("email-operations-unavailable", ("email_preparation", "email_sending")),
         ("calendar-operations-unavailable", ("calendar_operations",)),
