@@ -181,8 +181,13 @@ that Notion changed without execution evidence.
    capability and selection policy. The planned route records the worker,
    provider, policy, reason and exact Production Pack checksum without invoking
    the provider or claiming that output exists; unavailable capabilities fail
-   closed. Provider execution, Drive ingestion and live probe execution remain
-   bounded follow-on work.
+   closed. Before a provider can be invoked, the engine now prepares a canonical
+   dispatch payload containing the exact workspace, client, campaign, Pack,
+   route, job, channel specification, planned asset and production parameters.
+   Matt must approve that payload's checksum; Tony and stale approvals are
+   rejected, and no preview can authorise execution, publication or spend.
+   Provider execution, Drive ingestion and live probe execution remain bounded
+   follow-on work.
 7. **Delivery and deployment preparation** — assemble the approved client asset
    suite. Add Meta, TikTok and Google adapters only after exact action-preview,
    approval, idempotency and reconciliation contracts are proven. No adapter
