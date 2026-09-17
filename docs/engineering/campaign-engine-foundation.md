@@ -162,10 +162,17 @@ that Notion changed without execution evidence.
    or spend. Generated files can now be registered only as append-only versions
    in Drive, with checksums and exact Asset Manifest/job lineage. Version numbers
    cannot be overwritten or skipped, every generated version requires human
-   review, and generation cannot imply approval, delivery or publication.
+   review, and generation cannot imply approval, delivery or publication. A
+   complete suite now enters an explicit review cycle containing the latest exact
+   version of every planned asset. Matt's review is checksum-bound per file;
+   Tony cannot substitute for that approval. Changes requested return the
+   campaign to asset production without erasing the prior review cycle, while
+   unanimous approval advances to an approved asset suite that still carries no
+   delivery, publication or media-spend authority.
 6. **Production orchestration** — route jobs by declared capability, ingest
-   generated files into Drive, register versions, validate technical
-   specifications and stop at human asset approval.
+   generated files into Drive, register versions and validate technical
+   specifications. The exact-version human asset-approval stop is implemented;
+   provider routing and technical-file validation remain bounded follow-on work.
 7. **Delivery and deployment preparation** — assemble the approved client asset
    suite. Add Meta, TikTok and Google adapters only after exact action-preview,
    approval, idempotency and reconciliation contracts are proven. No adapter

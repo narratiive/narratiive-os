@@ -31,6 +31,8 @@ class CampaignEngineStage(str, Enum):
     PRODUCTION_PLAN_APPROVAL_REQUIRED = "production_plan_approval_required"
     PRODUCTION_READY = "production_ready"
     ASSET_PRODUCTION = "asset_production"
+    ASSET_REVIEW = "asset_review"
+    ASSET_SUITE_APPROVED = "asset_suite_approved"
 
 
 class QualityVerdict(str, Enum):
@@ -65,6 +67,11 @@ class AssetLifecycleStatus(str, Enum):
     DELIVERED = "delivered"
     SUPERSEDED = "superseded"
     BLOCKED = "blocked"
+
+
+class AssetReviewDecision(str, Enum):
+    APPROVE = "approve"
+    CHANGES_REQUESTED = "changes_requested"
 
 
 @dataclass(frozen=True, slots=True)
@@ -438,6 +445,46 @@ class ProducedAssetVersion:
 
 
 @dataclass(frozen=True, slots=True)
+class AssetVersionReview:
+    asset_version_id: str
+    file_checksum: str
+    reviewer: str
+    decision: AssetReviewDecision
+    rationale: str
+
+    def __post_init__(self) -> None:
+        required = (
+            self.asset_version_id,
+            self.file_checksum,
+            self.reviewer,
+            self.rationale,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("asset review fields must not be empty")
+
+
+@dataclass(frozen=True, slots=True)
+class AssetReviewCycle:
+    cycle_id: str
+    source_manifest_checksum: str
+    asset_version_ids: tuple[str, ...]
+    reviews: tuple[AssetVersionReview, ...] = ()
+
+    def __post_init__(self) -> None:
+        if not self.cycle_id.strip() or not self.source_manifest_checksum.strip():
+            raise CampaignEngineError("asset review cycle requires an ID and Asset Manifest checksum")
+        if not self.asset_version_ids:
+            raise CampaignEngineError("asset review cycle requires asset versions")
+        if len(self.asset_version_ids) != len(set(self.asset_version_ids)):
+            raise CampaignEngineError("asset review cycle version IDs must be unique")
+        reviewed_ids = [review.asset_version_id for review in self.reviews]
+        if len(reviewed_ids) != len(set(reviewed_ids)):
+            raise CampaignEngineError("an asset version can be reviewed only once per cycle")
+        if not set(reviewed_ids).issubset(self.asset_version_ids):
+            raise CampaignEngineError("asset review references a version outside its review cycle")
+
+
+@dataclass(frozen=True, slots=True)
 class CampaignEngineState:
     identity: CampaignIdentity
     approved_blueprint: VersionedArtifact
@@ -457,6 +504,7 @@ class CampaignEngineState:
     production_plan_approval: HumanApproval | None = None
     asset_manifest: PlannedAssetManifest | None = None
     asset_versions: tuple[ProducedAssetVersion, ...] = ()
+    asset_review_cycles: tuple[AssetReviewCycle, ...] = ()
     publication_authorised: bool = False
     media_spend_authorised: bool = False
 
@@ -482,6 +530,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }
         if self.stage in world_stages and len(self.campaign_world_candidates) < 2:
             raise CampaignEngineError("campaign state requires multiple Campaign World candidates")
@@ -498,6 +548,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }
         if self.stage in bible_stages:
             if self.selected_campaign_world is None or self.campaign_world_approval is None:
@@ -510,6 +562,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         } and self.creative_bible is None:
             raise CampaignEngineError("Creative Bible review stages require a Creative Director's Bible")
         if self.creative_bible is not None:
@@ -535,6 +589,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }:
             if not (
                 self.creative_bible_quality_review
@@ -548,6 +604,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }:
             if self.creative_bible is None or self.creative_bible_approval is None:
                 raise CampaignEngineError("production planning requires an approved Creative Director's Bible")
@@ -556,6 +614,8 @@ class CampaignEngineState:
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }:
             if self.production_plan is None or self.creative_bible is None:
                 raise CampaignEngineError("production plan approval requires a Production Plan")
@@ -574,6 +634,8 @@ class CampaignEngineState:
         if self.stage in {
             CampaignEngineStage.PRODUCTION_READY,
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
         }:
             if self.production_plan is None or self.production_plan_approval is None:
                 raise CampaignEngineError("production readiness requires an approved Production Pack")
@@ -582,7 +644,11 @@ class CampaignEngineState:
                 self.production_plan.production_pack,
                 self.production_plan_approval,
             )
-        if self.stage is CampaignEngineStage.ASSET_PRODUCTION:
+        if self.stage in {
+            CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
+        }:
             if self.asset_manifest is None or self.production_plan is None:
                 raise CampaignEngineError("asset production requires a planned Asset Manifest")
             manifest_source = (
@@ -611,8 +677,59 @@ class CampaignEngineState:
                     raise CampaignEngineError("asset version job does not match its planned asset")
                 if version.source_manifest_checksum != self.asset_manifest.manifest_artifact.checksum:
                     raise CampaignEngineError("asset version lineage must match the Asset Manifest")
+            cycle_ids: set[str] = set()
+            versions_by_id = {version.asset_version_id: version for version in self.asset_versions}
+            for cycle in self.asset_review_cycles:
+                if cycle.cycle_id in cycle_ids:
+                    raise CampaignEngineError("asset review cycle IDs must be unique")
+                cycle_ids.add(cycle.cycle_id)
+                if cycle.source_manifest_checksum != self.asset_manifest.manifest_artifact.checksum:
+                    raise CampaignEngineError("asset review cycle lineage must match the Asset Manifest")
+                reviewed_versions = {review.asset_version_id: review for review in cycle.reviews}
+                for version_id in cycle.asset_version_ids:
+                    if version_id not in versions_by_id:
+                        raise CampaignEngineError("asset review cycle references an unknown asset version")
+                for review in cycle.reviews:
+                    version = versions_by_id[review.asset_version_id]
+                    if review.file_checksum != version.file_checksum:
+                        raise CampaignEngineError("asset review does not match the exact file checksum")
+                    if review.reviewer.strip().casefold() != "matt":
+                        raise CampaignEngineError("asset version approval requires Matt")
+            if self.stage in {
+                CampaignEngineStage.ASSET_REVIEW,
+                CampaignEngineStage.ASSET_SUITE_APPROVED,
+            }:
+                if not self.asset_review_cycles:
+                    raise CampaignEngineError("asset review stage requires a review cycle")
+                active_cycle = self.asset_review_cycles[-1]
+                selected_versions = [versions_by_id[item] for item in active_cycle.asset_version_ids]
+                if len(selected_versions) != len(planned_assets):
+                    raise CampaignEngineError("asset review requires one version for every planned asset")
+                if {item.asset_id for item in selected_versions} != set(planned_assets):
+                    raise CampaignEngineError("asset review does not cover every planned asset")
+                latest_version_ids = {
+                    max(
+                        (
+                            version
+                            for version in self.asset_versions
+                            if version.asset_id == asset_id
+                        ),
+                        key=lambda version: version.version_number,
+                    ).asset_version_id
+                    for asset_id in planned_assets
+                }
+                if set(active_cycle.asset_version_ids) != latest_version_ids:
+                    raise CampaignEngineError("asset review must bind the latest exact version of every asset")
+                if self.stage is CampaignEngineStage.ASSET_SUITE_APPROVED:
+                    if len(reviewed_versions) != len(active_cycle.asset_version_ids) or any(
+                        review.decision is not AssetReviewDecision.APPROVE
+                        for review in active_cycle.reviews
+                    ):
+                        raise CampaignEngineError("approved asset suite requires Matt's approval of every exact version")
         elif self.asset_versions:
             raise CampaignEngineError("asset versions require the asset-production stage")
+        elif self.asset_review_cycles:
+            raise CampaignEngineError("asset reviews require the asset-production stage")
 
     @property
     def requires_matt(self) -> bool:
@@ -620,6 +737,7 @@ class CampaignEngineState:
             CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
             CampaignEngineStage.PRODUCTION_PLAN_APPROVAL_REQUIRED,
+            CampaignEngineStage.ASSET_REVIEW,
         }
 
     @property
@@ -645,6 +763,10 @@ class CampaignEngineState:
             ),
             CampaignEngineStage.ASSET_PRODUCTION: (
                 "route approved jobs and register generated asset versions for human review"
+            ),
+            CampaignEngineStage.ASSET_REVIEW: "Matt reviews each exact asset version",
+            CampaignEngineStage.ASSET_SUITE_APPROVED: (
+                "prepare the approved asset suite for a separate delivery or deployment gate"
             ),
         }
         return actions[self.stage]
@@ -706,6 +828,10 @@ class CampaignEngineState:
                 asset_versions=tuple(
                     _produced_asset_version_from_dict(item)
                     for item in value.get("asset_versions", [])
+                ),
+                asset_review_cycles=tuple(
+                    _asset_review_cycle_from_dict(item)
+                    for item in value.get("asset_review_cycles", [])
                 ),
                 publication_authorised=bool(value.get("publication_authorised", False)),
                 media_spend_authorised=bool(value.get("media_spend_authorised", False)),
@@ -846,7 +972,14 @@ class FileCampaignEngineRepository:
         },
         CampaignEngineStage.ASSET_PRODUCTION: {
             CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_REVIEW,
         },
+        CampaignEngineStage.ASSET_REVIEW: {
+            CampaignEngineStage.ASSET_REVIEW,
+            CampaignEngineStage.ASSET_PRODUCTION,
+            CampaignEngineStage.ASSET_SUITE_APPROVED,
+        },
+        CampaignEngineStage.ASSET_SUITE_APPROVED: set(),
     }
 
     def __init__(self, root: str | Path, *, workspace_id: str) -> None:
@@ -1367,6 +1500,75 @@ class CampaignEngine:
             )
         return replace(state, asset_versions=(*state.asset_versions, version))
 
+    def submit_asset_suite_for_review(
+        self,
+        state: CampaignEngineState,
+        *,
+        cycle_id: str,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if state.asset_manifest is None:
+            raise CampaignEngineError("asset review requires an Asset Manifest")
+        if not cycle_id.strip():
+            raise CampaignEngineError("asset review cycle ID must not be empty")
+        if any(cycle.cycle_id == cycle_id for cycle in state.asset_review_cycles):
+            raise CampaignEngineError("asset review cycle ID already exists")
+        selected_ids: list[str] = []
+        for planned in state.asset_manifest.assets:
+            versions = [
+                version
+                for version in state.asset_versions
+                if version.asset_id == planned.asset_id
+            ]
+            if not versions:
+                raise CampaignEngineError(
+                    "asset review requires a generated version for every planned asset"
+                )
+            latest = max(versions, key=lambda version: version.version_number)
+            selected_ids.append(latest.asset_version_id)
+        cycle = AssetReviewCycle(
+            cycle_id=cycle_id,
+            source_manifest_checksum=state.asset_manifest.manifest_artifact.checksum,
+            asset_version_ids=tuple(selected_ids),
+        )
+        return replace(
+            state,
+            stage=CampaignEngineStage.ASSET_REVIEW,
+            asset_review_cycles=(*state.asset_review_cycles, cycle),
+        )
+
+    def review_asset_version(
+        self,
+        state: CampaignEngineState,
+        review: AssetVersionReview,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_REVIEW)
+        if review.reviewer.strip().casefold() != "matt":
+            raise CampaignEngineError("asset version approval requires Matt")
+        active_cycle = state.asset_review_cycles[-1]
+        if review.asset_version_id not in active_cycle.asset_version_ids:
+            raise CampaignEngineError("asset version is not part of the active review cycle")
+        if any(item.asset_version_id == review.asset_version_id for item in active_cycle.reviews):
+            raise CampaignEngineError("asset version has already been reviewed in this cycle")
+        version = next(
+            item for item in state.asset_versions if item.asset_version_id == review.asset_version_id
+        )
+        if review.file_checksum != version.file_checksum:
+            raise CampaignEngineError("asset review does not match the exact file checksum")
+        updated_cycle = replace(active_cycle, reviews=(*active_cycle.reviews, review))
+        cycles = (*state.asset_review_cycles[:-1], updated_cycle)
+        if len(updated_cycle.reviews) < len(updated_cycle.asset_version_ids):
+            return replace(state, asset_review_cycles=cycles)
+        stage = (
+            CampaignEngineStage.ASSET_SUITE_APPROVED
+            if all(
+                item.decision is AssetReviewDecision.APPROVE
+                for item in updated_cycle.reviews
+            )
+            else CampaignEngineStage.ASSET_PRODUCTION
+        )
+        return replace(state, stage=stage, asset_review_cycles=cycles)
+
     @staticmethod
     def _require_stage(state: CampaignEngineState, expected: CampaignEngineStage) -> None:
         if state.stage is not expected:
@@ -1496,6 +1698,26 @@ def _produced_asset_version_from_dict(value: Any) -> ProducedAssetVersion:
             **value,
             "status": AssetLifecycleStatus(value.get("status", "generated")),
         }
+    )
+
+
+def _asset_review_cycle_from_dict(value: Any) -> AssetReviewCycle:
+    if not isinstance(value, dict):
+        raise CampaignEngineStoreError("asset review cycle must be an object")
+    return AssetReviewCycle(
+        cycle_id=value["cycle_id"],
+        source_manifest_checksum=value["source_manifest_checksum"],
+        asset_version_ids=tuple(value.get("asset_version_ids", ())),
+        reviews=tuple(
+            AssetVersionReview(
+                asset_version_id=review["asset_version_id"],
+                file_checksum=review["file_checksum"],
+                reviewer=review["reviewer"],
+                decision=AssetReviewDecision(review["decision"]),
+                rationale=review["rationale"],
+            )
+            for review in value.get("reviews", ())
+        ),
     )
 
 
