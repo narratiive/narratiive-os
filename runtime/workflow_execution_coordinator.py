@@ -23,6 +23,7 @@ from runtime.worker_registry import (
     ProhibitedWorkerSideEffect,
 )
 from runtime.workflow_registry import WorkflowRegistry
+from runtime.workflow_run_identity import downstream_run_id
 
 
 QualityValidator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
@@ -436,7 +437,7 @@ class WorkflowExecutionCoordinator:
                 f"Hand off {state.workflow_id} to {next_definition.workflow_id}",
             )
             return self._outcome(state, AutonomyAction.APPROVAL.value)
-        next_run_id = f"{state.run_id}-{next_definition.workflow_id}"
+        next_run_id = downstream_run_id(state.run_id, next_definition.workflow_id)
         latest = state.stages[-1].output_artifacts[-1]
         output = json.loads(Path(latest.location).read_text(encoding="utf-8"))
         self.enqueue(
