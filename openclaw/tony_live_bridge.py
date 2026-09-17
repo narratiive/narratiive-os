@@ -24,7 +24,11 @@ from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
 from runtime.tony_blueprint_client_feedback import TonyBlueprintClientFeedbackCommandService
 from runtime.tony_blueprint_delivery_notion_sync import TonyBlueprintDeliveryNotionSyncCommandService
-from runtime.tony_blueprint_lite_inbound import FileBlueprintLitePreparationStore, TonyInboundBlueprintLiteService
+from runtime.tony_blueprint_lite_inbound import (
+    BlueprintLiteWebsiteResearch,
+    FileBlueprintLitePreparationStore,
+    TonyInboundBlueprintLiteService,
+)
 from runtime.tony_blueprint_revision_cycle import TonyBlueprintRevisionCycleCommandService
 from runtime.tony_blueprint_revision_persistence import TonyBlueprintRevisionPersistenceCommandService
 from runtime.tony_capability_commands import TonyCapabilityCommandService
@@ -401,6 +405,7 @@ def build_app() -> LeadAwareTonyApplication:
         ),
         dispatchers=live_dispatchers,
         workflow_runtime_root=workflow_runtime_root,
+        researcher=BlueprintLiteWebsiteResearch(workflow_runtime_root / "blueprint-lite-research"),
     )
     dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))))
 

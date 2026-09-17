@@ -4,6 +4,7 @@ import json
 import os
 import tempfile
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from email.utils import parseaddr
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -11,6 +12,7 @@ from typing import Any, Callable, Mapping
 
 GmailRead = Callable[[dict[str, Any]], dict[str, Any]]
 MessageSender = Callable[[str], None]
+LeadCandidateIngestor = Callable[[Mapping[str, Any]], bool]
 
 
 @dataclass(frozen=True, slots=True)
@@ -18,6 +20,9 @@ class InboxWatchResult:
     status: str
     checked: int
     alerted: int
+    candidates: int = 0
+    ingested: int = 0
+    ingest_failed: int = 0
     message_ids: tuple[str, ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
@@ -25,6 +30,9 @@ class InboxWatchResult:
             "status": self.status,
             "checked": self.checked,
             "alerted": self.alerted,
+            "candidates": self.candidates,
+            "ingested": self.ingested,
+            "ingest_failed": self.ingest_failed,
             "message_ids": list(self.message_ids),
         }
 
@@ -44,11 +52,13 @@ class GmailInboxWatchService:
         state_path: str | Path,
         send_message: MessageSender,
         *,
+        ingest_lead_candidate: LeadCandidateIngestor | None = None,
         owned_addresses: tuple[str, ...] = ("hello@narratiive.com", "tony@narratiive.com"),
     ) -> None:
         self.gmail = gmail
         self.state_path = Path(state_path)
         self.send_message = send_message
+        self.ingest_lead_candidate = ingest_lead_candidate
         self.owned_addresses = {value.casefold() for value in owned_addresses}
 
     def run(self) -> InboxWatchResult:
@@ -74,18 +84,70 @@ class GmailInboxWatchService:
         seen = self._load_seen()
         unseen = [item for item in items if self._message_id(item) not in seen]
         actionable = [item for item in unseen if self._is_person_to_person(item)]
+        candidates = [item for item in actionable if self._is_lead_candidate(item)]
+
+        ingested_ids: set[str] = set()
+        ingest_failed = 0
+        if self.ingest_lead_candidate is not None:
+            for item in candidates:
+                try:
+                    if self.ingest_lead_candidate(item):
+                        ingested_ids.add(self._message_id(item))
+                    else:
+                        ingest_failed += 1
+                except Exception:
+                    ingest_failed += 1
 
         if actionable:
             self.send_message(self._render(actionable))
 
-        current_ids = [self._message_id(item) for item in items if self._message_id(item)]
+        candidate_ids = {self._message_id(item) for item in candidates}
+        current_ids = [
+            self._message_id(item)
+            for item in items
+            if self._message_id(item)
+            and (
+                self._message_id(item) not in candidate_ids
+                or self.ingest_lead_candidate is None
+                or self._message_id(item) in ingested_ids
+            )
+        ]
         self._save_seen([*current_ids, *seen])
         return InboxWatchResult(
             "attention_sent" if actionable else "no_new_actionable_mail",
             len(items),
             len(actionable),
+            len(candidates),
+            len(ingested_ids),
+            ingest_failed,
             tuple(self._message_id(item) for item in actionable),
         )
+
+    @staticmethod
+    def _is_lead_candidate(item: Mapping[str, Any]) -> bool:
+        text = " ".join(
+            (
+                str(item.get("subject") or ""),
+                str(item.get("snippet") or ""),
+            )
+        ).casefold()
+        signals = (
+            "introduction",
+            "intro ",
+            "enquiry",
+            "inquiry",
+            "new conversation",
+            "recommended you",
+            "suggested i contact",
+            "looking for",
+            "work together",
+            "campaign",
+            "proposal",
+            "help with",
+            "arrange a conversation",
+            "book a call",
+        )
+        return any(signal in text for signal in signals)
 
     @staticmethod
     def _verified(evidence: Any) -> bool:
@@ -152,7 +214,15 @@ class GmailInboxWatchService:
         )
         try:
             with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                json.dump({"seen_message_ids": deduplicated}, handle, indent=2, sort_keys=True)
+                json.dump(
+                    {
+                        "last_successful_check_at": datetime.now(timezone.utc).isoformat(),
+                        "seen_message_ids": deduplicated,
+                    },
+                    handle,
+                    indent=2,
+                    sort_keys=True,
+                )
                 handle.write("\n")
                 handle.flush()
                 os.fsync(handle.fileno())

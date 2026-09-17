@@ -140,6 +140,46 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(len(store.get("lead-1")["versions"]), 1)
 
+    def test_verified_website_research_is_persisted_and_handed_to_claude(self) -> None:
+        calls: list[dict] = []
+
+        def claude(dispatch: dict) -> dict:
+            calls.append(dispatch)
+            return self._good_evidence()
+
+        def researcher(_lead, _payload):
+            return {
+                "status": "complete",
+                "pack_id": "pack-1",
+                "source_backed_evidence": [
+                    {
+                        "evidence_id": "ev-1",
+                        "uri": "https://example.invalid/about",
+                        "excerpt": "Example Co describes its proposition.",
+                        "content_hash": "abc123",
+                    }
+                ],
+                "research_gaps": [],
+                "external_action_taken": False,
+            }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": claude},
+                researcher=researcher,
+            )
+            service.enqueue(self._lead(), self._payload())
+            result = service.process("lead-1")
+
+            self.assertEqual(result["state"], "awaiting_review")
+            research = store.get("lead-1")["research_evidence"]
+            self.assertEqual(research["pack_id"], "pack-1")
+            handed_off = calls[0]["target"]["verified_research_evidence"]
+            self.assertEqual(handed_off["source_backed_evidence"][0]["evidence_id"], "ev-1")
+            self.assertFalse(handed_off["external_action_taken"])
+
     def test_live_inbound_persists_the_same_completed_work_in_generic_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
