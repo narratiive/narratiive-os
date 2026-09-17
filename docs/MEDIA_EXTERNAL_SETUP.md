@@ -24,6 +24,7 @@ This checklist requests only account-owner actions that cannot be completed in t
    - `META_ACCOUNT_ID`
    - `META_TIMEZONE` (for example `Europe/London`)
    - `META_CURRENCY` (for example `GBP`)
+   - `META_GRAPH_API_VERSION` (an explicitly reviewed supported version, for example `v24.0`; do not silently float versions)
 
 8. [ ] Authorise a read-only smoke test: account list, campaign list, one campaign, creatives, delivery/review status and a seven-day insight query.
 
@@ -66,6 +67,7 @@ Google's official documentation records that developer tokens were sunset on 9 S
    - `GOOGLE_ADS_MANAGER_ACCOUNT_ID` (only for indirect manager access)
    - `GOOGLE_ADS_TIMEZONE`
    - `GOOGLE_ADS_CURRENCY`
+   - `GOOGLE_ADS_API_VERSION` (an explicitly reviewed supported version, for example `v25`)
    - optional legacy `GOOGLE_ADS_DEVELOPER_TOKEN`
 
 8. [ ] Authorise a read-only smoke test: accessible customers, campaign/ad-group/ad/assets, policy status, delivery status and a seven-day Google Ads Query Language report.

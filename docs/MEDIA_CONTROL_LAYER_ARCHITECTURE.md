@@ -98,9 +98,9 @@ Cross-provider totals are produced only when currencies match. Attribution conte
 
 Credentials are validated at adapter construction and are never serialised to canonical state or audit events.
 
-- Meta: Meta app with Marketing API, authorised Business Portfolio/ad account, a server-side user or system-user access token, and read permission (`ads_read`; any broader permission requires separate justification). Required local values: `META_ACCESS_TOKEN`, `META_ACCOUNT_ID`, `META_TIMEZONE`, `META_CURRENCY`.
+- Meta: Meta app with Marketing API, authorised Business Portfolio/ad account, a server-side user or system-user access token, and read permission (`ads_read`; any broader permission requires separate justification). Required local values: `META_ACCESS_TOKEN`, `META_ACCOUNT_ID`, `META_TIMEZONE`, `META_CURRENCY`, and an explicit reviewed `META_GRAPH_API_VERSION`.
 - TikTok: approved TikTok API for Business app, app/secret used in the external OAuth exchange, advertiser authorisation, resulting server-side access token and explicit advertiser ID. Required runtime values: `TIKTOK_ACCESS_TOKEN`, `TIKTOK_ACCOUNT_ID`, `TIKTOK_TIMEZONE`, `TIKTOK_CURRENCY`.
-- Google Ads: Google Cloud project/API access, OAuth client ID/secret, refresh token for a user with access, target customer ID, and manager/login customer ID when access is indirect. Required values: `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_ACCOUNT_ID`, optional `GOOGLE_ADS_MANAGER_ACCOUNT_ID`, `GOOGLE_ADS_TIMEZONE`, `GOOGLE_ADS_CURRENCY`. Google sunset developer tokens on 9 September 2026; `GOOGLE_ADS_DEVELOPER_TOKEN` may remain for backwards compatibility but is not a new Phase 1 prerequisite.
+- Google Ads: Google Cloud project/API access, OAuth client ID/secret, refresh token for a user with access, target customer ID, and manager/login customer ID when access is indirect. Required values: `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_ACCOUNT_ID`, optional `GOOGLE_ADS_MANAGER_ACCOUNT_ID`, `GOOGLE_ADS_TIMEZONE`, `GOOGLE_ADS_CURRENCY`, and an explicit reviewed `GOOGLE_ADS_API_VERSION`. Google sunset developer tokens on 9 September 2026; `GOOGLE_ADS_DEVELOPER_TOKEN` may remain for backwards compatibility but is not a new Phase 1 prerequisite.
 
 Exact external steps and authoritative links are in `docs/MEDIA_EXTERNAL_SETUP.md`.
 
@@ -154,7 +154,7 @@ This validator is present for design/testing only; no launch path consumes it in
 ## 9. Known blockers and limitations
 
 - No production Meta, TikTok or Google credentials were available to this repository run, so real account reads are **not certified**.
-- The adapters currently accept an injected provider transport. Production HTTP/client-library transports are deliberately deferred until each provider account and credential flow can be exercised safely.
+- Fixed-host read-only HTTP transports now exist for Meta Marketing API, TikTok API for Business and Google Ads SearchStream/OAuth. Their request construction and native-to-canonical translation are fixture-tested, but each remains `DEGRADED` until its first successful audited live read.
 - Provider attribution models are not harmonised. Canonical output preserves context but does not claim direct comparability.
 - Provider breakdown availability varies and must stay provider-specific.
 - Tony's natural-language interpretation is future work; deterministic `/media` commands are implemented.

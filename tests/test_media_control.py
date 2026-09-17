@@ -348,6 +348,16 @@ class MediaControlTests(unittest.TestCase):
             health = tony.execute("/health", ())
             self.assertIn("media_integrations", health.data)
 
+    def test_configured_but_unverified_integration_is_degraded_not_healthy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = MediaControlService(
+                {MediaProvider.META: adapter(MediaProvider.META)},
+                ExecutionJournal(directory),
+            )
+            diagnostics = service.diagnostics()["meta"]
+            self.assertEqual(diagnostics["health"], ConnectionHealth.DEGRADED.value)
+            self.assertEqual(diagnostics["credential_health"], "configured_unverified")
+
 
 if __name__ == "__main__":
     unittest.main()

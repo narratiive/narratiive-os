@@ -21,6 +21,7 @@ from runtime.execution_journal import ExecutionJournal
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
 from runtime.media_control import MediaControlService
+from runtime.media_provider_transports import build_configured_media_adapters
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
@@ -443,7 +444,7 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
     media_control = MediaControlService(
-        {},
+        build_configured_media_adapters(os.environ),
         ExecutionJournal(
             Path(
                 os.getenv(

@@ -810,6 +810,8 @@ class MediaControlService:
             failed = [record for record in provider_records if record.status == "failed"]
             if provider not in self.adapters:
                 health = ConnectionHealth.NOT_CONFIGURED
+            elif not provider_records:
+                health = ConnectionHealth.DEGRADED
             elif failed and (not completed or failed[-1].sequence > completed[-1].sequence):
                 health = ConnectionHealth.OFFLINE
             elif failed:
@@ -821,7 +823,13 @@ class MediaControlService:
                 "health": health.value,
                 "last_successful_sync": completed[-1].occurred_at if completed else None,
                 "last_failed_sync": failed[-1].occurred_at if failed else None,
-                "credential_health": "configured_not_exposed" if provider in self.adapters else "not_configured",
+                "credential_health": (
+                    "configured_verified_by_successful_read"
+                    if completed
+                    else "configured_unverified"
+                    if provider in self.adapters
+                    else "not_configured"
+                ),
                 "mapped_campaigns": len({item.provider_mapping.campaign_id for item in snapshots}),
                 "unmapped_campaigns": 0,
                 "data_freshness": max((item.ingested_at for item in snapshots), default=None),
