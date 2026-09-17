@@ -119,6 +119,13 @@ class MediaSyncBridgeTests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "unauthorized")
         self.assertEqual(self.transport.calls, [])
 
+    def test_sync_fails_closed_when_bridge_token_is_not_configured(self) -> None:
+        self.base.bridge_token = ""
+        status, body = self.call(self.payload(), token="")
+        self.assertTrue(status.startswith("503"))
+        self.assertEqual(body["error"]["code"], "media_sync_auth_unavailable")
+        self.assertEqual(self.transport.calls, [])
+
     def test_sync_normalises_and_returns_only_non_executing_actions(self) -> None:
         status, body = self.call(self.payload())
         self.assertTrue(status.startswith("200"))

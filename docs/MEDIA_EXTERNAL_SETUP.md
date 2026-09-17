@@ -91,7 +91,7 @@ The live read adapter is not production-accepted until its status is `HEALTHY`, 
 
 ## n8n read-only ingestion contract
 
-After a provider passes its live smoke test, an n8n schedule may call `POST /media/sync` on the existing Tony bridge. The request must use the bridge bearer token and a stable, unique `request_id`; an exact-payload retry with the same ID returns the audited result without reading the provider again. Reusing an ID with another client, campaign, period or mapping fails closed.
+After a provider passes its live smoke test, an n8n schedule may call `POST /media/sync` on the existing Tony bridge. A configured bridge bearer token is mandatory; the route remains unavailable when that token is absent. The request must use that token and a stable, unique `request_id`; an exact-payload retry with the same ID returns the audited result without reading the provider again. Reusing an ID with another client, campaign, period or mapping fails closed.
 
 ```json
 {

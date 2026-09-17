@@ -302,6 +302,18 @@ class LeadAwareTonyApplication:
 
     def _media_sync(self, environ, start_response):
         """Authenticated, read-only performance ingestion boundary for n8n."""
+        if not str(self.base.bridge_token or "").strip():
+            return self._respond(
+                start_response,
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "media_sync_auth_unavailable",
+                        "message": "Media sync requires a configured bridge token",
+                    },
+                },
+            )
         denied = self._authorize(environ, start_response)
         if denied is not None:
             return denied
