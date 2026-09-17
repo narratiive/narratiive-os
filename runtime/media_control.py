@@ -670,6 +670,7 @@ class MediaControlService:
             raise MediaControlError("media ingestion request_id is required")
         if not tony_request.strip():
             raise MediaControlError("media ingestion tony_request is required")
+        self._validate_requested_period(period_start, period_end)
         request_fingerprint = self._ingest_request_fingerprint(
             identity=identity,
             provider_mapping=provider_mapping,
@@ -926,6 +927,25 @@ class MediaControlService:
             ],
         }
         return _safe_hash(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+
+    @staticmethod
+    def _validate_requested_period(period_start: str, period_end: str) -> None:
+        parsed: list[datetime] = []
+        for field_name, value in (("period_start", period_start), ("period_end", period_end)):
+            raw = str(value).strip()
+            try:
+                timestamp = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise MediaControlError(
+                    f"media ingestion {field_name} must be an ISO-8601 timestamp"
+                ) from exc
+            if timestamp.tzinfo is None:
+                raise MediaControlError(
+                    f"media ingestion {field_name} must include a timezone"
+                )
+            parsed.append(timestamp)
+        if parsed[1] < parsed[0]:
+            raise MediaControlError("media ingestion period_end precedes period_start")
 
     def _audit_failure(
         self,

@@ -17,6 +17,7 @@ from runtime.media_control import (
     MalformedProviderResponse,
     MediaAuthority,
     MediaConfigurationError,
+    MediaControlError,
     MediaControlService,
     MediaMutationDisabled,
     MediaPolicyEngine,
@@ -167,7 +168,7 @@ class MediaControlTests(unittest.TestCase):
             with self.assertRaises(MalformedProviderResponse):
                 service.ingest(
                     identity=identity(), provider_mapping=mapping(MediaProvider.META),
-                    period_start="a", period_end="b", request_id="northstar-malformed",
+                    period_start="2026-09-10T00:00:00Z", period_end="2026-09-17T00:00:00Z", request_id="northstar-malformed",
                     tony_request="test malformed",
                 )
             records = service.journal.read_all()
@@ -191,7 +192,7 @@ class MediaControlTests(unittest.TestCase):
                 with self.assertRaises(MalformedProviderResponse):
                     service.ingest(
                         identity=identity(), provider_mapping=mapping(MediaProvider.META),
-                        period_start="a", period_end="b", request_id=f"northstar-invalid-context-{index}",
+                        period_start="2026-09-10T00:00:00Z", period_end="2026-09-17T00:00:00Z", request_id=f"northstar-invalid-context-{index}",
                         tony_request="validate provider context",
                     )
 
@@ -205,7 +206,7 @@ class MediaControlTests(unittest.TestCase):
                 with self.assertRaises(MediaProviderError):
                     service.ingest(
                         identity=identity(), provider_mapping=mapping(MediaProvider.TIKTOK),
-                        period_start="a", period_end="b", request_id=f"northstar-{str(error).replace(' ', '-')}",
+                        period_start="2026-09-10T00:00:00Z", period_end="2026-09-17T00:00:00Z", request_id=f"northstar-{str(error).replace(' ', '-')}",
                         tony_request="provider health check",
                     )
                 self.assertEqual(service.diagnostics()["tiktok"]["health"], ConnectionHealth.OFFLINE.value)
@@ -229,6 +230,29 @@ class MediaControlTests(unittest.TestCase):
             self.assertEqual(snapshot.identity.client_id, "northstar-test-co")
             self.assertEqual([record.status for record in service.journal.read_all()], ["failed", "completed"])
             self.assertEqual(len(transport_adapter.transport.calls), 2)
+
+    def test_invalid_requested_period_is_rejected_before_provider_read(self):
+        invalid_periods = (
+            ("not-a-date", "2026-09-17T00:00:00Z"),
+            ("2026-09-10T00:00:00", "2026-09-17T00:00:00Z"),
+            ("2026-09-18T00:00:00Z", "2026-09-17T00:00:00Z"),
+        )
+        for index, (period_start, period_end) in enumerate(invalid_periods):
+            with tempfile.TemporaryDirectory() as directory:
+                transport_adapter = adapter(MediaProvider.META)
+                service = MediaControlService(
+                    {MediaProvider.META: transport_adapter},
+                    ExecutionJournal(directory),
+                )
+                with self.assertRaises(MediaControlError):
+                    service.ingest(
+                        identity=identity(), provider_mapping=mapping(MediaProvider.META),
+                        period_start=period_start, period_end=period_end,
+                        request_id=f"northstar-invalid-request-period-{index}",
+                        tony_request="sync Northstar",
+                    )
+                self.assertEqual(transport_adapter.transport.calls, [])
+                self.assertEqual(service.journal.read_all(), [])
 
     def test_duplicate_request_is_idempotent_and_survives_restart(self):
         with tempfile.TemporaryDirectory() as directory:

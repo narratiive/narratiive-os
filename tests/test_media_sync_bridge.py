@@ -159,6 +159,14 @@ class MediaSyncBridgeTests(unittest.TestCase):
         self.assertEqual(body["error"]["code"], "invalid_media_sync")
         self.assertEqual(self.transport.calls, [])
 
+    def test_invalid_period_fails_before_provider_read(self) -> None:
+        payload = self.payload()
+        payload["period_start"] = "not-a-date"
+        status, body = self.call(payload)
+        self.assertTrue(status.startswith("400"))
+        self.assertEqual(body["error"]["code"], "invalid_media_sync")
+        self.assertEqual(self.transport.calls, [])
+
     def test_cross_account_request_is_rejected_and_audited(self) -> None:
         payload = self.payload()
         payload["provider_mapping"]["account_id"] = "another-client-account"
