@@ -25,6 +25,7 @@ from runtime.campaign_engine import (
     CampaignWorldCandidate,
     HumanApproval,
     ProductionJob,
+    ProductionJobRoute,
     ProductionMethod,
     ProductionPlan,
     ProducedAssetVersion,
@@ -36,6 +37,14 @@ from runtime.campaign_engine import (
     TonyTasteReview,
     VersionedArtifact,
     FileCampaignEngineRepository,
+)
+from runtime.campaign_production_router import CampaignProductionRouter
+from runtime.worker_registry import (
+    CapabilityWorkerRegistry,
+    NoAvailableWorker,
+    WorkerAvailability,
+    WorkerMetadata,
+    WorkerRegistration,
 )
 
 
@@ -187,6 +196,23 @@ def produced_asset_version(
         producer="production-specialist",
         production_job_id=asset.production_job_id,
         source_manifest_checksum=manifest.manifest_artifact.checksum,
+    )
+
+
+def routed_production(engine: CampaignEngine, current: CampaignEngineState) -> CampaignEngineState:
+    job = current.production_plan.jobs[0]
+    return engine.register_production_route(
+        current,
+        ProductionJobRoute(
+            route_id=f"route-{job.job_id}",
+            job_id=job.job_id,
+            required_capability=job.required_capability,
+            worker_id="creative-worker",
+            provider="test-provider",
+            policy_id="test-policy",
+            selection_reason="only_eligible_worker",
+            source_production_pack_checksum=current.production_plan.production_pack.checksum,
+        ),
     )
 
 
@@ -710,12 +736,90 @@ class CampaignEngineTests(unittest.TestCase):
 
             self.assertEqual(repository.load("safe-client", "safe-campaign"), started)
 
+    def test_production_router_selects_capability_without_invoking_provider(self) -> None:
+        calls = []
+        registry = CapabilityWorkerRegistry(
+            (
+                WorkerRegistration(
+                    WorkerMetadata(
+                        worker_id="video-worker",
+                        provider="creative-provider",
+                        capabilities=("short_form_video_production",),
+                        availability=WorkerAvailability.AVAILABLE,
+                        side_effect_permissions=("preparation",),
+                        selection_priority=10,
+                    ),
+                    lambda contract: calls.append(contract) or {"generated": True},
+                ),
+            )
+        )
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+
+        routed = CampaignProductionRouter(registry).plan_route(
+            started,
+            job_id=started.production_plan.jobs[0].job_id,
+            route_id="route-video-1",
+        )
+
+        self.assertEqual(calls, [])
+        self.assertEqual(routed.production_routes[0].worker_id, "video-worker")
+        self.assertEqual(routed.production_routes[0].provider, "creative-provider")
+        self.assertEqual(routed.production_routes[0].side_effect_classification, "preparation")
+        self.assertFalse(routed.production_routes[0].external_action_taken)
+        self.assertEqual(CampaignEngineState.from_dict(routed.to_dict()), routed)
+
+    def test_production_router_fails_closed_when_capability_is_unavailable(self) -> None:
+        registry = CapabilityWorkerRegistry(
+            (
+                WorkerRegistration(
+                    WorkerMetadata(
+                        worker_id="video-worker-unconfigured",
+                        provider="unconfigured",
+                        capabilities=("short_form_video_production",),
+                        availability=WorkerAvailability.PLANNED,
+                        side_effect_permissions=(),
+                    )
+                ),
+            )
+        )
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+
+        with self.assertRaisesRegex(NoAvailableWorker, "video-worker-unconfigured"):
+            CampaignProductionRouter(registry).plan_route(
+                started,
+                job_id=started.production_plan.jobs[0].job_id,
+                route_id="route-video-1",
+            )
+        self.assertEqual(started.production_routes, ())
+
+    def test_asset_version_requires_capability_route_for_its_job(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+
+        with self.assertRaisesRegex(CampaignEngineError, "planned production route"):
+            self.engine.register_asset_version(
+                started,
+                produced_asset_version(started.asset_manifest),
+            )
+
     def test_generated_asset_versions_are_append_only_drive_records(self) -> None:
         ready = self._production_ready_state()
         started = self.engine.start_asset_production(
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         first = self.engine.register_asset_version(
             started,
             produced_asset_version(started.asset_manifest),
@@ -738,6 +842,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         first_version = produced_asset_version(started.asset_manifest)
         current = self.engine.register_asset_version(started, first_version)
 
@@ -766,6 +871,7 @@ class CampaignEngineTests(unittest.TestCase):
                 ready,
                 planned_asset_manifest(ready.production_plan),
             )
+            started = routed_production(self.engine, started)
             repository.save(started, transition_id="asset-production-started")
             produced = self.engine.register_asset_version(
                 started,
@@ -786,6 +892,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
         validated = self.engine.validate_asset_version(
@@ -826,6 +933,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
 
@@ -854,6 +962,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
 
@@ -870,6 +979,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
         produced = self.engine.validate_asset_version(
@@ -898,6 +1008,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, version)
         produced = self.engine.validate_asset_version(
@@ -924,6 +1035,7 @@ class CampaignEngineTests(unittest.TestCase):
             ready,
             planned_asset_manifest(ready.production_plan),
         )
+        started = routed_production(self.engine, started)
         first_version = produced_asset_version(started.asset_manifest)
         produced = self.engine.register_asset_version(started, first_version)
         produced = self.engine.validate_asset_version(
@@ -977,6 +1089,7 @@ class CampaignEngineTests(unittest.TestCase):
                 ready,
                 planned_asset_manifest(ready.production_plan),
             )
+            started = routed_production(self.engine, started)
             version = produced_asset_version(started.asset_manifest)
             produced = self.engine.register_asset_version(started, version)
             produced = self.engine.validate_asset_version(

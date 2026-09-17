@@ -176,8 +176,13 @@ that Notion changed without execution evidence.
    specification. File existence/readability, type, dimensions, aspect ratio,
    duration, checksum and Production Pack lineage are critical checks; a missing
    or failed latest validation blocks the human review gate. The exact-version
-   human asset-approval stop is implemented. Provider routing and live probe
-   execution remain bounded follow-on work.
+   human asset-approval stop is implemented. Each Production Pack job can now be
+   deterministically matched to one available worker through its declared
+   capability and selection policy. The planned route records the worker,
+   provider, policy, reason and exact Production Pack checksum without invoking
+   the provider or claiming that output exists; unavailable capabilities fail
+   closed. Provider execution, Drive ingestion and live probe execution remain
+   bounded follow-on work.
 7. **Delivery and deployment preparation** — assemble the approved client asset
    suite. Add Meta, TikTok and Google adapters only after exact action-preview,
    approval, idempotency and reconciliation contracts are proven. No adapter

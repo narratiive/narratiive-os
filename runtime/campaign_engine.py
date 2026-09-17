@@ -56,6 +56,10 @@ class ProductionMethod(str, Enum):
     COMPOSITE = "composite"
 
 
+class ProductionRouteStatus(str, Enum):
+    PLANNED = "planned"
+
+
 class AssetLifecycleStatus(str, Enum):
     PLANNED = "planned"
     QUEUED = "queued"
@@ -301,6 +305,43 @@ class ProductionPlan:
                 raise CampaignEngineError("production job references an unknown channel specification")
             if job.source_bible_checksum != self.source_bible_checksum:
                 raise CampaignEngineError("production job lineage must match the approved Bible")
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionJobRoute:
+    route_id: str
+    job_id: str
+    required_capability: str
+    worker_id: str
+    provider: str
+    policy_id: str
+    selection_reason: str
+    source_production_pack_checksum: str
+    side_effect_classification: str = "preparation"
+    status: ProductionRouteStatus = ProductionRouteStatus.PLANNED
+    external_action_taken: bool = False
+
+    def __post_init__(self) -> None:
+        required = (
+            self.route_id,
+            self.job_id,
+            self.required_capability,
+            self.worker_id,
+            self.provider,
+            self.policy_id,
+            self.selection_reason,
+            self.source_production_pack_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("production job route fields must not be empty")
+        if self.provider.strip().casefold() == "unconfigured":
+            raise CampaignEngineError("production route requires an available configured provider")
+        if self.side_effect_classification != "preparation":
+            raise CampaignEngineError("production routing may authorise preparation only")
+        if self.status is not ProductionRouteStatus.PLANNED:
+            raise CampaignEngineError("new production routes must begin as planned")
+        if self.external_action_taken:
+            raise CampaignEngineError("production routing cannot claim an external action")
 
 
 @dataclass(frozen=True, slots=True)
@@ -575,6 +616,7 @@ class CampaignEngineState:
     production_plan: ProductionPlan | None = None
     production_plan_approval: HumanApproval | None = None
     asset_manifest: PlannedAssetManifest | None = None
+    production_routes: tuple[ProductionJobRoute, ...] = ()
     asset_versions: tuple[ProducedAssetVersion, ...] = ()
     asset_validations: tuple[AssetTechnicalValidation, ...] = ()
     asset_review_cycles: tuple[AssetReviewCycle, ...] = ()
@@ -733,6 +775,23 @@ class CampaignEngineState:
             if manifest_source != (pack.artifact_id, pack.version, pack.checksum):
                 raise CampaignEngineError("Asset Manifest lineage must match the approved Production Pack")
             planned_assets = {asset.asset_id: asset for asset in self.asset_manifest.assets}
+            jobs_by_id = {job.job_id: job for job in self.production_plan.jobs}
+            route_ids: set[str] = set()
+            routed_jobs: set[str] = set()
+            for route in self.production_routes:
+                if route.route_id in route_ids:
+                    raise CampaignEngineError("production route IDs must be unique")
+                route_ids.add(route.route_id)
+                if route.job_id in routed_jobs:
+                    raise CampaignEngineError("Production Pack jobs may have only one planned route")
+                routed_jobs.add(route.job_id)
+                job = jobs_by_id.get(route.job_id)
+                if job is None:
+                    raise CampaignEngineError("production route references an unknown job")
+                if route.required_capability != job.required_capability:
+                    raise CampaignEngineError("production route capability does not match its job")
+                if route.source_production_pack_checksum != self.production_plan.production_pack.checksum:
+                    raise CampaignEngineError("production route lineage must match the Production Pack")
             version_ids: set[str] = set()
             version_keys: set[tuple[str, int]] = set()
             for version in self.asset_versions:
@@ -748,6 +807,8 @@ class CampaignEngineState:
                     raise CampaignEngineError("asset version references an unknown planned asset")
                 if version.production_job_id != planned.production_job_id:
                     raise CampaignEngineError("asset version job does not match its planned asset")
+                if version.production_job_id not in routed_jobs:
+                    raise CampaignEngineError("asset version requires a planned production route")
                 if version.source_manifest_checksum != self.asset_manifest.manifest_artifact.checksum:
                     raise CampaignEngineError("asset version lineage must match the Asset Manifest")
             cycle_ids: set[str] = set()
@@ -849,6 +910,8 @@ class CampaignEngineState:
                         for review in active_cycle.reviews
                     ):
                         raise CampaignEngineError("approved asset suite requires Matt's approval of every exact version")
+        elif self.production_routes:
+            raise CampaignEngineError("production routes require the asset-production stage")
         elif self.asset_versions:
             raise CampaignEngineError("asset versions require the asset-production stage")
         elif self.asset_validations:
@@ -950,6 +1013,10 @@ class CampaignEngineState:
                 production_plan=_production_plan_from_dict(value.get("production_plan")),
                 production_plan_approval=_approval_from_dict(value.get("production_plan_approval")),
                 asset_manifest=_planned_asset_manifest_from_dict(value.get("asset_manifest")),
+                production_routes=tuple(
+                    _production_job_route_from_dict(item)
+                    for item in value.get("production_routes", [])
+                ),
                 asset_versions=tuple(
                     _produced_asset_version_from_dict(item)
                     for item in value.get("asset_versions", [])
@@ -1594,10 +1661,35 @@ class CampaignEngine:
             state,
             stage=CampaignEngineStage.ASSET_PRODUCTION,
             asset_manifest=asset_manifest,
+            production_routes=(),
             asset_versions=(),
             asset_validations=(),
             asset_review_cycles=(),
         )
+
+    def register_production_route(
+        self,
+        state: CampaignEngineState,
+        route: ProductionJobRoute,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if state.production_plan is None:
+            raise CampaignEngineError("production routing requires a Production Plan")
+        if any(item.route_id == route.route_id for item in state.production_routes):
+            raise CampaignEngineError("production route ID already exists")
+        if any(item.job_id == route.job_id for item in state.production_routes):
+            raise CampaignEngineError("Production Pack job already has a planned route")
+        job = next(
+            (item for item in state.production_plan.jobs if item.job_id == route.job_id),
+            None,
+        )
+        if job is None:
+            raise CampaignEngineError("production route references an unknown job")
+        if route.required_capability != job.required_capability:
+            raise CampaignEngineError("production route capability does not match its job")
+        if route.source_production_pack_checksum != state.production_plan.production_pack.checksum:
+            raise CampaignEngineError("production route lineage must match the Production Pack")
+        return replace(state, production_routes=(*state.production_routes, route))
 
     def register_asset_version(
         self,
@@ -1951,6 +2043,17 @@ def _planned_asset_manifest_from_dict(value: Any) -> PlannedAssetManifest | None
         publication_authorised=bool(value.get("publication_authorised", False)),
         delivery_authorised=bool(value.get("delivery_authorised", False)),
         media_spend_authorised=bool(value.get("media_spend_authorised", False)),
+    )
+
+
+def _production_job_route_from_dict(value: Any) -> ProductionJobRoute:
+    if not isinstance(value, dict):
+        raise CampaignEngineStoreError("production job route must be an object")
+    return ProductionJobRoute(
+        **{
+            **value,
+            "status": ProductionRouteStatus(value.get("status", "planned")),
+        }
     )
 
 
