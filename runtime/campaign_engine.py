@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass, replace
 from enum import Enum
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any, Iterable, Mapping
 
 
 class CampaignEngineError(ValueError):
@@ -345,6 +345,70 @@ class ProductionJobRoute:
 
 
 @dataclass(frozen=True, slots=True)
+class ProductionDispatchPreview:
+    dispatch_id: str
+    route_id: str
+    job_id: str
+    worker_id: str
+    provider: str
+    required_capability: str
+    source_production_pack_checksum: str
+    payload_json: str
+    payload_checksum: str
+    execution_authorised: bool = False
+    publication_authorised: bool = False
+    media_spend_authorised: bool = False
+
+    def __post_init__(self) -> None:
+        required = (
+            self.dispatch_id,
+            self.route_id,
+            self.job_id,
+            self.worker_id,
+            self.provider,
+            self.required_capability,
+            self.source_production_pack_checksum,
+            self.payload_json,
+            self.payload_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError("production dispatch preview fields must not be empty")
+        try:
+            payload = json.loads(self.payload_json)
+        except json.JSONDecodeError as exc:
+            raise CampaignEngineError("production dispatch payload must be valid JSON") from exc
+        if not isinstance(payload, dict) or not payload:
+            raise CampaignEngineError("production dispatch payload must be a non-empty object")
+        canonical = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+        if self.payload_json != canonical or self.payload_checksum != _canonical_hash(payload):
+            raise CampaignEngineError("production dispatch payload checksum or canonical form is invalid")
+        if self.execution_authorised or self.publication_authorised or self.media_spend_authorised:
+            raise CampaignEngineError(
+                "production dispatch preview cannot authorise execution, publication or media spend"
+            )
+
+
+@dataclass(frozen=True, slots=True)
+class ProductionDispatchApproval:
+    approver: str
+    rationale: str
+    dispatch_id: str
+    payload_checksum: str
+
+    def __post_init__(self) -> None:
+        required = (
+            self.approver,
+            self.rationale,
+            self.dispatch_id,
+            self.payload_checksum,
+        )
+        if any(not value.strip() for value in required):
+            raise CampaignEngineError(
+                "production dispatch approval must bind an approver and exact payload"
+            )
+
+
+@dataclass(frozen=True, slots=True)
 class PlannedAssetRecord:
     asset_id: str
     asset_key: str
@@ -617,6 +681,8 @@ class CampaignEngineState:
     production_plan_approval: HumanApproval | None = None
     asset_manifest: PlannedAssetManifest | None = None
     production_routes: tuple[ProductionJobRoute, ...] = ()
+    production_dispatch_previews: tuple[ProductionDispatchPreview, ...] = ()
+    production_dispatch_approvals: tuple[ProductionDispatchApproval, ...] = ()
     asset_versions: tuple[ProducedAssetVersion, ...] = ()
     asset_validations: tuple[AssetTechnicalValidation, ...] = ()
     asset_review_cycles: tuple[AssetReviewCycle, ...] = ()
@@ -792,6 +858,86 @@ class CampaignEngineState:
                     raise CampaignEngineError("production route capability does not match its job")
                 if route.source_production_pack_checksum != self.production_plan.production_pack.checksum:
                     raise CampaignEngineError("production route lineage must match the Production Pack")
+            routes_by_id = {route.route_id: route for route in self.production_routes}
+            dispatch_ids: set[str] = set()
+            dispatched_routes: set[str] = set()
+            for preview in self.production_dispatch_previews:
+                if preview.dispatch_id in dispatch_ids:
+                    raise CampaignEngineError("production dispatch IDs must be unique")
+                dispatch_ids.add(preview.dispatch_id)
+                if preview.route_id in dispatched_routes:
+                    raise CampaignEngineError("production routes may have only one dispatch preview")
+                dispatched_routes.add(preview.route_id)
+                route = routes_by_id.get(preview.route_id)
+                if route is None:
+                    raise CampaignEngineError("production dispatch references an unknown route")
+                if (
+                    preview.job_id != route.job_id
+                    or preview.worker_id != route.worker_id
+                    or preview.provider != route.provider
+                    or preview.required_capability != route.required_capability
+                ):
+                    raise CampaignEngineError("production dispatch does not match its planned route")
+                if preview.source_production_pack_checksum != self.production_plan.production_pack.checksum:
+                    raise CampaignEngineError("production dispatch lineage must match the Production Pack")
+                payload = json.loads(preview.payload_json)
+                planned = next(
+                    asset
+                    for asset in self.asset_manifest.assets
+                    if asset.production_job_id == preview.job_id
+                )
+                job = jobs_by_id[preview.job_id]
+                required_sections = (
+                    payload.get("production_pack"),
+                    payload.get("route"),
+                    payload.get("job"),
+                    payload.get("channel_specification"),
+                    payload.get("planned_asset"),
+                    payload.get("production_parameters"),
+                )
+                if any(not isinstance(section, dict) for section in required_sections):
+                    raise CampaignEngineError(
+                        "production dispatch payload does not match campaign execution lineage"
+                    )
+                if (
+                    payload.get("workspace_id") != self.identity.workspace_id
+                    or payload.get("client_id") != self.identity.client_id
+                    or payload.get("campaign_id") != self.identity.campaign_id
+                    or payload.get("production_pack", {}).get("checksum")
+                    != self.production_plan.production_pack.checksum
+                    or payload.get("route", {}).get("route_id") != route.route_id
+                    or payload.get("route", {}).get("worker_id") != route.worker_id
+                    or payload.get("route", {}).get("provider") != route.provider
+                    or payload.get("route", {}).get("required_capability")
+                    != route.required_capability
+                    or payload.get("job", {}).get("job_id") != job.job_id
+                    or payload.get("channel_specification", {}).get("specification_id")
+                    != job.specification_id
+                    or payload.get("planned_asset", {}).get("asset_id") != planned.asset_id
+                    or not isinstance(payload.get("production_parameters"), dict)
+                    or not payload["production_parameters"]
+                ):
+                    raise CampaignEngineError(
+                        "production dispatch payload does not match campaign execution lineage"
+                    )
+            approved_dispatches: set[str] = set()
+            approved_job_ids: set[str] = set()
+            previews_by_id = {
+                preview.dispatch_id: preview
+                for preview in self.production_dispatch_previews
+            }
+            for approval in self.production_dispatch_approvals:
+                if approval.dispatch_id in approved_dispatches:
+                    raise CampaignEngineError("production dispatch may be approved only once")
+                approved_dispatches.add(approval.dispatch_id)
+                preview = previews_by_id.get(approval.dispatch_id)
+                if preview is None:
+                    raise CampaignEngineError("production dispatch approval references an unknown preview")
+                if approval.payload_checksum != preview.payload_checksum:
+                    raise CampaignEngineError("production dispatch approval does not match the exact payload")
+                if approval.approver.strip().casefold() != "matt":
+                    raise CampaignEngineError("production dispatch approval requires Matt")
+                approved_job_ids.add(preview.job_id)
             version_ids: set[str] = set()
             version_keys: set[tuple[str, int]] = set()
             for version in self.asset_versions:
@@ -809,6 +955,8 @@ class CampaignEngineState:
                     raise CampaignEngineError("asset version job does not match its planned asset")
                 if version.production_job_id not in routed_jobs:
                     raise CampaignEngineError("asset version requires a planned production route")
+                if version.production_job_id not in approved_job_ids:
+                    raise CampaignEngineError("asset version requires an approved exact production dispatch")
                 if version.source_manifest_checksum != self.asset_manifest.manifest_artifact.checksum:
                     raise CampaignEngineError("asset version lineage must match the Asset Manifest")
             cycle_ids: set[str] = set()
@@ -912,6 +1060,8 @@ class CampaignEngineState:
                         raise CampaignEngineError("approved asset suite requires Matt's approval of every exact version")
         elif self.production_routes:
             raise CampaignEngineError("production routes require the asset-production stage")
+        elif self.production_dispatch_previews or self.production_dispatch_approvals:
+            raise CampaignEngineError("production dispatches require the asset-production stage")
         elif self.asset_versions:
             raise CampaignEngineError("asset versions require the asset-production stage")
         elif self.asset_validations:
@@ -921,6 +1071,15 @@ class CampaignEngineState:
 
     @property
     def requires_matt(self) -> bool:
+        if self.stage is CampaignEngineStage.ASSET_PRODUCTION:
+            approved_dispatches = {
+                approval.dispatch_id for approval in self.production_dispatch_approvals
+            }
+            if any(
+                preview.dispatch_id not in approved_dispatches
+                for preview in self.production_dispatch_previews
+            ):
+                return True
         return self.stage in {
             CampaignEngineStage.CAMPAIGN_WORLD_SELECTION_REQUIRED,
             CampaignEngineStage.CREATIVE_BIBLE_APPROVAL_REQUIRED,
@@ -930,6 +1089,35 @@ class CampaignEngineState:
 
     @property
     def next_action(self) -> str:
+        if self.stage is CampaignEngineStage.ASSET_PRODUCTION:
+            routed_job_ids = {route.job_id for route in self.production_routes}
+            if self.production_plan and any(
+                job.job_id not in routed_job_ids for job in self.production_plan.jobs
+            ):
+                return "route approved Production Pack jobs by declared capability"
+            previewed_route_ids = {
+                preview.route_id for preview in self.production_dispatch_previews
+            }
+            if any(
+                route.route_id not in previewed_route_ids
+                for route in self.production_routes
+            ):
+                return "prepare the exact production dispatch payload"
+            approved_dispatches = {
+                approval.dispatch_id for approval in self.production_dispatch_approvals
+            }
+            if any(
+                preview.dispatch_id not in approved_dispatches
+                for preview in self.production_dispatch_previews
+            ):
+                return "Matt approves the exact production dispatch payload"
+            produced_job_ids = {
+                version.production_job_id for version in self.asset_versions
+            }
+            if self.production_plan and any(
+                job.job_id not in produced_job_ids for job in self.production_plan.jobs
+            ):
+                return "execute approved production dispatches and ingest outputs into Drive"
         actions = {
             CampaignEngineStage.STRATEGY_APPROVED: "commission multiple Campaign World candidates",
             CampaignEngineStage.CAMPAIGN_WORLDS_IN_DEVELOPMENT: "complete Campaign World candidates",
@@ -1016,6 +1204,14 @@ class CampaignEngineState:
                 production_routes=tuple(
                     _production_job_route_from_dict(item)
                     for item in value.get("production_routes", [])
+                ),
+                production_dispatch_previews=tuple(
+                    _production_dispatch_preview_from_dict(item)
+                    for item in value.get("production_dispatch_previews", [])
+                ),
+                production_dispatch_approvals=tuple(
+                    ProductionDispatchApproval(**item)
+                    for item in value.get("production_dispatch_approvals", [])
                 ),
                 asset_versions=tuple(
                     _produced_asset_version_from_dict(item)
@@ -1662,6 +1858,8 @@ class CampaignEngine:
             stage=CampaignEngineStage.ASSET_PRODUCTION,
             asset_manifest=asset_manifest,
             production_routes=(),
+            production_dispatch_previews=(),
+            production_dispatch_approvals=(),
             asset_versions=(),
             asset_validations=(),
             asset_review_cycles=(),
@@ -1690,6 +1888,119 @@ class CampaignEngine:
         if route.source_production_pack_checksum != state.production_plan.production_pack.checksum:
             raise CampaignEngineError("production route lineage must match the Production Pack")
         return replace(state, production_routes=(*state.production_routes, route))
+
+    def prepare_production_dispatch(
+        self,
+        state: CampaignEngineState,
+        *,
+        route_id: str,
+        dispatch_id: str,
+        production_parameters: Mapping[str, Any],
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if state.production_plan is None or state.asset_manifest is None:
+            raise CampaignEngineError("production dispatch requires production state")
+        if not dispatch_id.strip() or not production_parameters:
+            raise CampaignEngineError(
+                "production dispatch requires an ID and explicit production parameters"
+            )
+        if any(
+            item.dispatch_id == dispatch_id
+            for item in state.production_dispatch_previews
+        ):
+            raise CampaignEngineError("production dispatch ID already exists")
+        if any(item.route_id == route_id for item in state.production_dispatch_previews):
+            raise CampaignEngineError("production route already has a dispatch preview")
+        route = next(
+            (item for item in state.production_routes if item.route_id == route_id),
+            None,
+        )
+        if route is None:
+            raise CampaignEngineError("production dispatch references an unknown route")
+        job = next(
+            item for item in state.production_plan.jobs if item.job_id == route.job_id
+        )
+        specification = next(
+            item
+            for item in state.production_plan.channel_specifications
+            if item.specification_id == job.specification_id
+        )
+        asset = next(
+            item
+            for item in state.asset_manifest.assets
+            if item.production_job_id == job.job_id
+        )
+        payload = {
+            "workspace_id": state.identity.workspace_id,
+            "client_id": state.identity.client_id,
+            "campaign_id": state.identity.campaign_id,
+            "production_pack": {
+                "artifact_id": state.production_plan.production_pack.artifact_id,
+                "version": state.production_plan.production_pack.version,
+                "checksum": state.production_plan.production_pack.checksum,
+            },
+            "route": {
+                "route_id": route.route_id,
+                "worker_id": route.worker_id,
+                "provider": route.provider,
+                "required_capability": route.required_capability,
+            },
+            "job": _to_primitive(job),
+            "channel_specification": _to_primitive(specification),
+            "planned_asset": _to_primitive(asset),
+            "production_parameters": _to_primitive(dict(production_parameters)),
+        }
+        try:
+            payload_json = json.dumps(payload, separators=(",", ":"), sort_keys=True)
+        except (TypeError, ValueError) as exc:
+            raise CampaignEngineError(
+                "production dispatch parameters must be JSON-compatible"
+            ) from exc
+        preview = ProductionDispatchPreview(
+            dispatch_id=dispatch_id,
+            route_id=route.route_id,
+            job_id=job.job_id,
+            worker_id=route.worker_id,
+            provider=route.provider,
+            required_capability=route.required_capability,
+            source_production_pack_checksum=state.production_plan.production_pack.checksum,
+            payload_json=payload_json,
+            payload_checksum=_canonical_hash(payload),
+        )
+        return replace(
+            state,
+            production_dispatch_previews=(*state.production_dispatch_previews, preview),
+        )
+
+    def approve_production_dispatch(
+        self,
+        state: CampaignEngineState,
+        approval: ProductionDispatchApproval,
+    ) -> CampaignEngineState:
+        self._require_stage(state, CampaignEngineStage.ASSET_PRODUCTION)
+        if approval.approver.strip().casefold() != "matt":
+            raise CampaignEngineError("production dispatch approval requires Matt")
+        if any(
+            item.dispatch_id == approval.dispatch_id
+            for item in state.production_dispatch_approvals
+        ):
+            raise CampaignEngineError("production dispatch has already been approved")
+        preview = next(
+            (
+                item
+                for item in state.production_dispatch_previews
+                if item.dispatch_id == approval.dispatch_id
+            ),
+            None,
+        )
+        if preview is None:
+            raise CampaignEngineError("production dispatch approval references an unknown preview")
+        if approval.payload_checksum != preview.payload_checksum:
+            raise CampaignEngineError("production dispatch approval does not match the exact payload")
+        return replace(
+            state,
+            production_dispatch_approvals=(*state.production_dispatch_approvals, approval),
+        )
 
     def register_asset_version(
         self,
@@ -2055,6 +2366,12 @@ def _production_job_route_from_dict(value: Any) -> ProductionJobRoute:
             "status": ProductionRouteStatus(value.get("status", "planned")),
         }
     )
+
+
+def _production_dispatch_preview_from_dict(value: Any) -> ProductionDispatchPreview:
+    if not isinstance(value, dict):
+        raise CampaignEngineStoreError("production dispatch preview must be an object")
+    return ProductionDispatchPreview(**value)
 
 
 def _produced_asset_version_from_dict(value: Any) -> ProducedAssetVersion:

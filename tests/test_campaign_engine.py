@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+import hashlib
 import json
 import tempfile
 from dataclasses import replace
@@ -26,6 +27,7 @@ from runtime.campaign_engine import (
     HumanApproval,
     ProductionJob,
     ProductionJobRoute,
+    ProductionDispatchApproval,
     ProductionMethod,
     ProductionPlan,
     ProducedAssetVersion,
@@ -201,7 +203,7 @@ def produced_asset_version(
 
 def routed_production(engine: CampaignEngine, current: CampaignEngineState) -> CampaignEngineState:
     job = current.production_plan.jobs[0]
-    return engine.register_production_route(
+    routed = engine.register_production_route(
         current,
         ProductionJobRoute(
             route_id=f"route-{job.job_id}",
@@ -212,6 +214,25 @@ def routed_production(engine: CampaignEngine, current: CampaignEngineState) -> C
             policy_id="test-policy",
             selection_reason="only_eligible_worker",
             source_production_pack_checksum=current.production_plan.production_pack.checksum,
+        ),
+    )
+    previewed = engine.prepare_production_dispatch(
+        routed,
+        route_id=f"route-{job.job_id}",
+        dispatch_id=f"dispatch-{job.job_id}",
+        production_parameters={
+            "prompt": "Create the approved short-form asset exactly as specified.",
+            "variants": job.expected_variants,
+        },
+    )
+    preview = previewed.production_dispatch_previews[-1]
+    return engine.approve_production_dispatch(
+        previewed,
+        ProductionDispatchApproval(
+            approver="matt",
+            rationale="Approved this exact provider payload for production.",
+            dispatch_id=preview.dispatch_id,
+            payload_checksum=preview.payload_checksum,
         ),
     )
 
@@ -770,6 +791,7 @@ class CampaignEngineTests(unittest.TestCase):
         self.assertEqual(routed.production_routes[0].provider, "creative-provider")
         self.assertEqual(routed.production_routes[0].side_effect_classification, "preparation")
         self.assertFalse(routed.production_routes[0].external_action_taken)
+        self.assertEqual(routed.next_action, "prepare the exact production dispatch payload")
         self.assertEqual(CampaignEngineState.from_dict(routed.to_dict()), routed)
 
     def test_production_router_fails_closed_when_capability_is_unavailable(self) -> None:
@@ -799,6 +821,110 @@ class CampaignEngineTests(unittest.TestCase):
                 route_id="route-video-1",
             )
         self.assertEqual(started.production_routes, ())
+
+    def test_production_dispatch_requires_matt_to_approve_exact_payload(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        job = started.production_plan.jobs[0]
+        routed = self.engine.register_production_route(
+            started,
+            ProductionJobRoute(
+                route_id="route-video-1",
+                job_id=job.job_id,
+                required_capability=job.required_capability,
+                worker_id="video-worker",
+                provider="creative-provider",
+                policy_id="default",
+                selection_reason="only_eligible_worker",
+                source_production_pack_checksum=started.production_plan.production_pack.checksum,
+            ),
+        )
+        previewed = self.engine.prepare_production_dispatch(
+            routed,
+            route_id="route-video-1",
+            dispatch_id="dispatch-video-1",
+            production_parameters={"prompt": "Approved creative instructions", "variants": 3},
+        )
+        preview = previewed.production_dispatch_previews[0]
+
+        self.assertTrue(previewed.requires_matt)
+        self.assertEqual(
+            previewed.next_action,
+            "Matt approves the exact production dispatch payload",
+        )
+        self.assertFalse(preview.execution_authorised)
+        self.assertFalse(preview.publication_authorised)
+        tampered_payload = json.loads(preview.payload_json)
+        tampered_payload["client_id"] = "different-client"
+        tampered_json = json.dumps(tampered_payload, separators=(",", ":"), sort_keys=True)
+        tampered_preview = replace(
+            preview,
+            payload_json=tampered_json,
+            payload_checksum=hashlib.sha256(tampered_json.encode("utf-8")).hexdigest(),
+        )
+        with self.assertRaisesRegex(CampaignEngineError, "execution lineage"):
+            replace(previewed, production_dispatch_previews=(tampered_preview,))
+        with self.assertRaisesRegex(CampaignEngineError, "requires Matt"):
+            self.engine.approve_production_dispatch(
+                previewed,
+                ProductionDispatchApproval(
+                    approver="tony",
+                    rationale="Attempted autonomous approval.",
+                    dispatch_id=preview.dispatch_id,
+                    payload_checksum=preview.payload_checksum,
+                ),
+            )
+        with self.assertRaisesRegex(CampaignEngineError, "exact payload"):
+            self.engine.approve_production_dispatch(
+                previewed,
+                ProductionDispatchApproval(
+                    approver="matt",
+                    rationale="Stale approval.",
+                    dispatch_id=preview.dispatch_id,
+                    payload_checksum="stale-checksum",
+                ),
+            )
+        approved = self.engine.approve_production_dispatch(
+            previewed,
+            ProductionDispatchApproval(
+                approver="matt",
+                rationale="Approved this exact production request.",
+                dispatch_id=preview.dispatch_id,
+                payload_checksum=preview.payload_checksum,
+            ),
+        )
+        self.assertFalse(approved.requires_matt)
+        self.assertEqual(CampaignEngineState.from_dict(approved.to_dict()), approved)
+
+    def test_asset_version_requires_approved_exact_dispatch_after_routing(self) -> None:
+        ready = self._production_ready_state()
+        started = self.engine.start_asset_production(
+            ready,
+            planned_asset_manifest(ready.production_plan),
+        )
+        job = started.production_plan.jobs[0]
+        routed = self.engine.register_production_route(
+            started,
+            ProductionJobRoute(
+                route_id="route-video-1",
+                job_id=job.job_id,
+                required_capability=job.required_capability,
+                worker_id="video-worker",
+                provider="creative-provider",
+                policy_id="default",
+                selection_reason="only_eligible_worker",
+                source_production_pack_checksum=started.production_plan.production_pack.checksum,
+            ),
+        )
+
+        with self.assertRaisesRegex(CampaignEngineError, "approved exact production dispatch"):
+            self.engine.register_asset_version(
+                routed,
+                produced_asset_version(routed.asset_manifest),
+            )
 
     def test_asset_version_requires_capability_route_for_its_job(self) -> None:
         ready = self._production_ready_state()
