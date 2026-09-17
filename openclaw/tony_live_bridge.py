@@ -287,6 +287,19 @@ class LeadAwareTonyApplication:
         try:
             request = self._read_json(environ)
             payload = request.get("lead") if isinstance(request.get("lead"), dict) else request
+            diagnostic = request.get("diagnostic") if isinstance(request.get("diagnostic"), dict) else {}
+            source_submission_id = str(
+                diagnostic.get("lead_id")
+                or diagnostic.get("leadId")
+                or diagnostic.get("id")
+                or ""
+            ).strip()
+            if source_submission_id:
+                # Notion creates a fresh page id for every POST. The originating
+                # form submission id is the durable business identity and keeps
+                # retries from becoming separate Tony leads and preparation jobs.
+                payload = dict(payload)
+                payload["lead_id"] = source_submission_id
             lead = InboundLead.from_mapping(payload)
             self.lead_store.upsert(lead)
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:

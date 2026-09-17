@@ -685,9 +685,12 @@ def _normalise_diagnostic_input_contract(payload: dict[str, Any]) -> dict[str, A
         category_scores["demand_gen"] = category_scores["demandGen"]
         normalised["category_scores"] = category_scores
 
-    result = dict(payload)
-    result["diagnostic"] = normalised
-    return result
+    # The Notion page returned by the intake workflow contains transport-only
+    # ids and timestamps that change on every retry. Blueprint preparation is
+    # driven by the submitted diagnostic, so exclude that volatile envelope
+    # from the fingerprint and persisted input contract. This makes an exact
+    # submission replay a true replay rather than a second model job.
+    return {"diagnostic": normalised}
 
 
 def _diagnostic_input_coverage(payload: Mapping[str, Any]) -> dict[str, Any]:
