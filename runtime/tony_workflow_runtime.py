@@ -33,6 +33,7 @@ from runtime.workflow_quality import (
     validate_operational_inputs,
 )
 from runtime.workflow_handoffs import build_next_workflow_inputs
+from runtime.workflow_run_identity import downstream_run_id
 
 
 @dataclass(slots=True)
@@ -169,7 +170,7 @@ class TonyWorkflowRuntime:
         missing = [field for field in next_stage.input_contract.required_fields if field not in inputs or inputs[field] in (None, "", [], {})]
         if missing:
             raise ValueError(f"next workflow requires additional inputs: {','.join(missing)}")
-        next_run_id = f"{state.run_id}-{definition.next_workflow_id}"
+        next_run_id = downstream_run_id(state.run_id, definition.next_workflow_id)
         self.enqueue(
             definition.next_workflow_id,
             next_run_id,
@@ -249,7 +250,7 @@ class TonyWorkflowRuntime:
         if missing:
             raise ValueError(f"commissioned workflow requires additional inputs: {','.join(missing)}")
 
-        next_run_id = f"{source.run_id}-{target_id}"
+        next_run_id = downstream_run_id(source.run_id, target_id)
         replay = self.runs.repository.exists(next_run_id)
         if replay:
             existing = self.runs.load_run(next_run_id)
