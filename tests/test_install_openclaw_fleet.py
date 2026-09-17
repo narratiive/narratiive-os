@@ -30,7 +30,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 },
                 "plugins": {"allow": ["existing-safe-plugin"], "load": {"paths": ["/tmp/existing-plugin"]}},
             }
-            merged, workspace_files = build_install_plan(home, existing)
+            merged, workspace_files = build_install_plan(home, existing, telegram_owner_id="123456789")
 
             self.assertEqual(merged["models"], existing["models"])
             self.assertEqual(merged["channels"], existing["channels"])
@@ -48,6 +48,20 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), merged["plugins"]["load"]["paths"])
             self.assertTrue(merged["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn({"agentId": "tony", "match": {"channel": "telegram"}}, merged["bindings"])
+            self.assertIn("telegram:123456789", merged["commands"]["ownerAllowFrom"])
+            self.assertEqual(
+                merged["channels"]["telegram"]["execApprovals"],
+                {"enabled": True, "target": "channel", "approvers": ["123456789"]},
+            )
+            self.assertEqual(
+                merged["approvals"]["plugin"],
+                {
+                    "enabled": True,
+                    "mode": "session",
+                    "agentFilter": ["tony"],
+                    "sessionFilter": ["telegram"],
+                },
+            )
             for filename in ("AGENTS.md", "IDENTITY.md", "USER.md", "SOUL.md"):
                 self.assertIn(home / ".openclaw" / "workspace-tony" / filename, workspace_files)
             self.assertIn(home / ".openclaw" / "workspace-research" / "AGENTS.md", workspace_files)
@@ -118,6 +132,60 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 },
             )
 
+    def test_install_plan_preserves_existing_approval_targets_and_adds_session_routing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            existing = {
+                "commands": {"ownerAllowFrom": ["slack:U123"]},
+                "channels": {
+                    "telegram": {
+                        "enabled": True,
+                        "execApprovals": {"target": "dm", "approvers": ["987654321"]},
+                    }
+                },
+                "approvals": {
+                    "plugin": {
+                        "enabled": False,
+                        "mode": "targets",
+                        "targets": [{"channel": "slack", "to": "U123"}],
+                    }
+                },
+            }
+
+            merged, _ = build_install_plan(Path(tmp), existing, telegram_owner_id="123456789")
+
+            self.assertEqual(
+                merged["commands"]["ownerAllowFrom"],
+                ["slack:U123", "telegram:123456789"],
+            )
+            self.assertEqual(
+                merged["channels"]["telegram"]["execApprovals"]["approvers"],
+                ["987654321", "123456789"],
+            )
+            self.assertEqual(merged["channels"]["telegram"]["execApprovals"]["target"], "channel")
+            self.assertTrue(merged["approvals"]["plugin"]["enabled"])
+            self.assertEqual(merged["approvals"]["plugin"]["mode"], "both")
+            self.assertEqual(
+                merged["approvals"]["plugin"]["targets"],
+                [{"channel": "slack", "to": "U123"}],
+            )
+
+    def test_existing_telegram_owner_repairs_approval_route_without_cli_value(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            existing = {"commands": {"ownerAllowFrom": ["telegram:123456789"]}}
+
+            merged, _ = build_install_plan(Path(tmp), existing)
+
+            self.assertEqual(
+                merged["channels"]["telegram"]["execApprovals"]["approvers"],
+                ["123456789"],
+            )
+            self.assertTrue(merged["approvals"]["plugin"]["enabled"])
+
+    def test_rejects_group_chat_id_as_telegram_approval_owner(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with self.assertRaisesRegex(ValueError, "positive numeric Telegram user id"):
+                build_install_plan(Path(tmp), {}, telegram_owner_id="-100123456789")
+
     def test_dry_run_does_not_mutate_home(self):
         with tempfile.TemporaryDirectory() as tmp:
             home = Path(tmp)
@@ -126,6 +194,15 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertFalse(result["apply"])
             self.assertEqual(result["control_plane_plugin_path"], str(CONTROL_PLANE_PLUGIN_PATH))
             self.assertFalse(result["legacy_telegram_inbound_retired"])
+
+    def test_required_approval_route_fails_before_writing_config(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+
+            with self.assertRaisesRegex(ValueError, "Telegram approval routing was not installed"):
+                install(home=home, apply=True, require_approval_route=True)
+
+            self.assertFalse((home / ".openclaw").exists())
 
     def test_apply_backs_up_existing_config_and_writes_tony_and_specialists(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -139,12 +216,17 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             }
             config_path.write_text(json.dumps(original), encoding="utf-8")
 
-            result = install(home=home, apply=True)
+            result = install(home=home, apply=True, telegram_owner_id="123456789")
             written = json.loads(config_path.read_text(encoding="utf-8"))
 
             self.assertTrue(result["apply"])
+            self.assertTrue(result["telegram_approval_route_configured"])
             self.assertEqual(written["models"], original["models"])
-            self.assertEqual(written["channels"], original["channels"])
+            self.assertTrue(written["channels"]["telegram"]["enabled"])
+            self.assertEqual(
+                written["channels"]["telegram"]["execApprovals"],
+                {"enabled": True, "target": "channel", "approvers": ["123456789"]},
+            )
             self.assertEqual(written["tools"]["sessions"]["visibility"], "all")
             self.assertTrue(written["plugins"]["entries"][CONTROL_PLANE_PLUGIN_ID]["enabled"])
             self.assertIn(str(CONTROL_PLANE_PLUGIN_PATH), written["plugins"]["load"]["paths"])
