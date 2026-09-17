@@ -10,11 +10,9 @@ Production records modified: **none**
 
 ## Executive result
 
-**Overall: FAIL — the native continuous lifecycle cannot currently reach final delivery.**
+**Overall: PASS — the native continuous lifecycle reaches the terminal delivery/next-action gate.**
 
-All 11 registered gates pass contract/state-machine conformance when exercised with bounded isolated run IDs and deterministic synthetic workers. The unmodified native handoff chain fails after `research_to_growth_blueprint`: its next run ID repeatedly appends full workflow names and exceeds the filesystem filename limit while creating `growth_blueprint_deliverable_production`.
-
-This is not bypassed or marked as a pass. The bounded-ID conformance run exists only to exercise and evidence every remaining registered gate after preserving the native-chain failure.
+All 11 registered gates pass contract/state-machine conformance with isolated run IDs and deterministic synthetic workers. The native handoff chain now uses bounded deterministic downstream identities and reaches `delivery_to_follow_up_next_action` without a filesystem filename-limit failure.
 
 The repository also lacks production quality validators for the final five workflows and has no configured production worker for document generation or creative asset production by default. Those gates therefore pass structural test conformance but fail current default operational readiness.
 
@@ -120,31 +118,29 @@ Gates 7–11 have named quality contracts in the registry but no production vali
 | Rejected approval | PASS | Rejection reopens the producing stage, increments revision, preserves the original artefact and writes a distinct revised artefact. |
 | Premature dispatch | PASS | Handoff before completed human approval is rejected; approval remains pending and no downstream run is dispatched. |
 | Service restart | PASS | Pending approval survives runtime reconstruction; recovery creates no duplicate execution or artefact. |
-| Native full-chain handoff | **FAIL** | Run ID growth produces `OSError: [Errno 63] File name too long` before the deliverable-production run can be persisted. |
+| Native full-chain handoff | PASS | Bounded deterministic run IDs preserve readable target context and source lineage through all 11 gates. |
 
 ## Failure reasons and state inconsistencies
 
-1. **Unbounded downstream run IDs — critical.** `TonyWorkflowRuntime.handoff` constructs each next ID as `<entire-previous-run-id>-<next-workflow-id>`. The sixth handoff exceeds the filesystem component limit. Upstream runs and artefacts remain valid, but the downstream run and its creation event do not exist.
-2. **Duplicate approval-request events.** Human-gated runs contain two `approval.requested` events: one from stage completion and another from the explicit pause. The snapshot remains consistent, but audit consumers may count two requests for one gate.
-3. **Five declared quality contracts are not operational.** Campaign World, Creative Director's Bible, creative asset production, delivery preparation and follow-up have registry names but no production validator in runtime composition.
-4. **Provider gaps remain fail-closed.** Document generation and creative asset production are declared as planned/unavailable. This is correct safety behaviour, but prevents live completion.
-5. **Input payload expansion.** The handoff builder carries most upstream fields into every downstream run. It preserves evidence but creates very large snapshots and increases the chance of field-name collisions. Output fields not required as next inputs are filtered, but the payload remains broader than each specialist's declared input contract.
+1. **Duplicate approval-request events.** Human-gated runs contain two `approval.requested` events: one from stage completion and another from the explicit pause. The snapshot remains consistent, but audit consumers may count two requests for one gate.
+2. **Five declared quality contracts are not operational.** Campaign World, Creative Director's Bible, creative asset production, delivery preparation and follow-up have registry names but no production validator in runtime composition.
+3. **Provider gaps remain fail-closed.** Document generation and creative asset production are declared as planned/unavailable. This is correct safety behaviour, but prevents live completion.
+4. **Input payload expansion.** The handoff builder carries most upstream fields into every downstream run. It preserves evidence but creates very large snapshots and increases the chance of field-name collisions. Output fields not required as next inputs are filtered, but the payload remains broader than each specialist's declared input contract.
 
 ## Orphaned artefacts
 
 - No orphaned artefacts were created by the isolated conformance run.
-- The native-chain failure occurs before the downstream run and artefact are created.
+- The native chain completes without leaving a partial downstream run or orphaned artefact.
 - Rejected-approval artefacts are intentionally retained immutable history and are not orphans.
 - Failed worker attempts retain their attempt evidence as required; they are not represented as accepted outputs.
 
 ## Recommended fixes
 
-1. Replace concatenated downstream run IDs with a bounded deterministic identity, for example a readable prefix plus a hash of source run, target workflow and correlation identity. Preserve source run ID in explicit lineage rather than the filename.
+1. Keep bounded downstream-run identity regression coverage in the full lifecycle suite.
 2. Make approval-request creation idempotent for one run, stage, revision and exact artefact checksum.
 3. Implement and register production quality validators for Campaign World, Creative Director's Bible, creative asset production, delivery preparation and follow-up.
 4. Configure real document-generation and creative-production adapters only after capability, quality, exact-version approval, receipt and retry/reconciliation contracts pass acceptance.
 5. Narrow cross-workflow handoff payloads to declared inputs plus explicit `_lineage`, while preserving required evidence references and backward compatibility.
-6. Re-run this test without the bounded conformance IDs after fix 1. The overall result should remain FAIL until the native chain itself reaches the terminal approved next-action state.
 
 ## Test location and command
 

@@ -549,12 +549,12 @@ class TonyFullLifecycleTest(unittest.TestCase):
         self.assertTrue(all(item.resulting_state["approval_status"] == "pending" for item in gated))
         self.assertTrue(all(item.continuation_command.startswith("/approve ") for item in gated))
 
-    def test_native_continuous_chain_records_filename_limit_failure(self) -> None:
+    def test_native_continuous_chain_uses_bounded_run_ids_to_reach_terminal_gate(self) -> None:
         with tempfile.TemporaryDirectory(prefix="northstar-test-native-chain-") as directory:
-            _runtime, reached, failure = execute_native_lifecycle_until_failure(Path(directory))
-        self.assertIsInstance(failure, OSError)
-        self.assertIn("File name too long", str(failure))
-        self.assertEqual(reached[-1], "research_to_growth_blueprint")
+            runtime, reached, failure = execute_native_lifecycle_until_failure(Path(directory))
+        expected = [item.workflow_id for item in _ordered_definitions(runtime)]
+        self.assertIsNone(failure)
+        self.assertEqual(reached, expected)
 
     def test_duplicate_intake_is_idempotent_and_conflicting_replay_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="northstar-test-duplicate-") as directory:
