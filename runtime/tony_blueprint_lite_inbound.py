@@ -6,9 +6,11 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
+from urllib.parse import urlparse
 
 from runtime.external_action_truth import no_asserted_external_action
 from runtime.inbound_leads import InboundLead
+from runtime.research_engine import EvidenceSource, EvidenceSourcePolicy, ResearchEngine, ResearchJob
 from runtime.models import ArtifactRef, StageStatus
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.state_machine import WorkflowEngine
@@ -24,6 +26,7 @@ from runtime.tony_tool_routing import TonyExecutiveToolRouter
 
 
 DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
+BlueprintLiteResearcher = Callable[[InboundLead, Mapping[str, Any]], dict[str, Any]]
 
 _BLUEPRINT_LITE_SOURCES = {"growth diagnostic", "tally", "website"}
 _REQUIRED_LINEAGE_KEYS = ("fact", "interpretation", "hypothesis")
@@ -36,6 +39,78 @@ _FALSE_EXECUTION_MARKERS = (
     "meeting booked",
     "updated notion",
 )
+
+
+class BlueprintLiteWebsiteResearch:
+    """Collect bounded, source-backed website evidence before strategic drafting."""
+
+    def __init__(self, root: str | Path) -> None:
+        self.engine = ResearchEngine(Path(root))
+
+    def __call__(self, lead: InboundLead, payload: Mapping[str, Any]) -> dict[str, Any]:
+        diagnostic = payload.get("diagnostic")
+        website = str(diagnostic.get("website") or "").strip() if isinstance(diagnostic, Mapping) else ""
+        if not website:
+            return {
+                "status": "blocked",
+                "source_backed_evidence": [],
+                "research_gaps": ["The submitted diagnostic does not include a company website."],
+                "external_action_taken": False,
+            }
+        parsed = urlparse(website)
+        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+            return {
+                "status": "blocked",
+                "source_backed_evidence": [],
+                "research_gaps": ["The submitted company website is not a valid public HTTP(S) URL."],
+                "external_action_taken": False,
+            }
+        source = EvidenceSource(
+            source_id=f"submitted-website:{parsed.hostname}",
+            workspace_id=lead.lead_id,
+            source_type="web",
+            uri=website,
+            title=f"Submitted website for {lead.company or lead.contact}",
+            policy=EvidenceSourcePolicy(
+                approved=True,
+                allowed_domains=(parsed.hostname,),
+                allowed_schemes=(parsed.scheme,),
+                max_bytes=250_000,
+                timeout_seconds=15,
+            ),
+            metadata={"approval_basis": "prospect_submitted_company_website"},
+        )
+        run = self.engine.run(
+            ResearchJob(
+                job_id=f"{lead.lead_id}-blueprint-lite-website",
+                workspace_id=lead.lead_id,
+                query=f"Collect verifiable outside-in evidence for the Blueprint Lite for {lead.company or lead.contact}.",
+                sources=(source,),
+                lineage=(lead.lead_id,),
+            )
+        )
+        pack = run.evidence_pack.as_dict()
+        evidence = [
+            {
+                "evidence_id": record.get("evidence_id"),
+                "source_id": record.get("source_id"),
+                "title": record.get("title"),
+                "uri": record.get("uri"),
+                "excerpt": record.get("excerpt"),
+                "content_hash": record.get("content_hash"),
+                "retrieved_at": record.get("retrieved_at"),
+                "provenance": record.get("provenance"),
+            }
+            for record in pack.get("records", [])
+            if isinstance(record, Mapping)
+        ]
+        return {
+            "status": pack.get("status"),
+            "pack_id": pack.get("pack_id"),
+            "source_backed_evidence": evidence,
+            "research_gaps": list(run.blockers),
+            "external_action_taken": False,
+        }
 
 BLUEPRINT_LITE_WORKFLOW = GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE
 
@@ -91,12 +166,14 @@ class TonyInboundBlueprintLiteService:
         router: TonyExecutiveToolRouter | None = None,
         worker_registry: CapabilityWorkerRegistry | None = None,
         workflow_runtime_root: Path | None = None,
+        researcher: BlueprintLiteResearcher | None = None,
     ) -> None:
         self.store = store
         self.dispatchers = dict(dispatchers or {})
         self.worker_registry = worker_registry or build_tony_worker_registry(self.dispatchers)
         self.router = router or TonyExecutiveToolRouter()
         self.workflow_runtime_root = workflow_runtime_root
+        self.researcher = researcher
         self._active: set[str] = set()
         self._active_lock = threading.Lock()
 
@@ -265,6 +342,21 @@ class TonyInboundBlueprintLiteService:
             self.store.put(lead_id, state)
             return self._public_state(state)
 
+        research = state.get("research_evidence")
+        if not isinstance(research, dict) and self.researcher is not None:
+            try:
+                research = self.researcher(lead, payload)
+            except Exception as exc:
+                research = {
+                    "status": "blocked",
+                    "source_backed_evidence": [],
+                    "research_gaps": [f"Website evidence retrieval failed: {str(exc)[:300]}"],
+                    "external_action_taken": False,
+                }
+            state["research_evidence"] = research
+            state["updated_at"] = _now()
+            self.store.put(lead_id, state)
+
         handoff = self.router.route(
             {
                 "area": "commercial",
@@ -278,6 +370,11 @@ class TonyInboundBlueprintLiteService:
                     "source": lead.source,
                     "diagnostic_input_package": payload,
                     "diagnostic_input_coverage_assessment": _diagnostic_input_coverage(payload),
+                    "verified_research_evidence": research or {
+                        "status": "unavailable",
+                        "source_backed_evidence": [],
+                        "research_gaps": ["No Blueprint Lite research adapter is configured."],
+                    },
                     "product": "Blueprint Lite",
                 },
             }
@@ -542,6 +639,7 @@ class TonyInboundBlueprintLiteService:
             f"Prepare the canonical Blueprint Lite for {subject} from the completed Growth Diagnostic input package supplied in target context. "
             "This is reversible internal preparation only. Do not send anything. "
             "Use only the supplied diagnostic evidence and genuinely verified public sources. Preserve source lineage and clearly separate facts, "
+            "Use the exact verified_research_evidence supplied in target context; never invent, replace or imply a source that is not present there. "
             "interpretations and hypotheses. Explicitly report whether the supplied diagnostic package contains enough information to represent the "
             "diagnostic faithfully; do not silently fill missing diagnostic inputs. Identify one company-specific growth tension, one consequential "
             "but provisional opportunity, and 3–4 meaningful questions to answer next. Produce only the internal human-review-ready Blueprint Lite "

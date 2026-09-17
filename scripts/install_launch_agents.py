@@ -79,7 +79,7 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
             (str(python_path), str(launcher), str(env_file), str(python_path), str(gmail_inbox_watch)),
             False,
             start_interval=900,
-            run_at_load=False,
+            run_at_load=True,
         ),
         AgentSpec(
             "com.narratiive.proactive-morning",

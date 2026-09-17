@@ -3,7 +3,9 @@ from __future__ import annotations
 import json
 import os
 import sys
+from email.utils import parseaddr
 from pathlib import Path
+from urllib import request
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
@@ -12,6 +14,36 @@ if str(REPOSITORY_ROOT) not in sys.path:
 from openclaw.telegram_outbound import TelegramConfig, TelegramDeliveryError, TelegramSender  # noqa: E402
 from runtime.tony_dispatch_adapters import build_http_dispatchers  # noqa: E402
 from runtime.tony_gmail_inbox_watch import GmailInboxWatchService  # noqa: E402
+
+
+def ingest_email_candidate(item: dict[str, object], webhook_url: str) -> bool:
+    message_id = str(item.get("message_id") or "").strip()
+    sender_name, sender_email = parseaddr(str(item.get("from") or ""))
+    if not message_id or not sender_email:
+        return False
+    payload = {
+        "lead_id": f"gmail:{message_id}",
+        "inbound_message_id": message_id,
+        "source": "Email",
+        "name": sender_name or sender_email,
+        "email": sender_email,
+        "challenge": str(item.get("snippet") or "")[:1000],
+        "raw_answers": {
+            "email_subject": str(item.get("subject") or "")[:500],
+            "gmail_thread_id": str(item.get("thread_id") or ""),
+            "person_to_person": True,
+        },
+        "submitted_at": str(item.get("date") or ""),
+    }
+    call = request.Request(
+        webhook_url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with request.urlopen(call, timeout=30) as response:
+        result = json.loads(response.read().decode("utf-8"))
+    return isinstance(result, dict) and result.get("ok") is True
 
 
 def main() -> int:
@@ -36,6 +68,10 @@ def main() -> int:
         gmail,
         state_path,
         lambda text: telegram.send(telegram.config.default_chat_id, text),
+        ingest_lead_candidate=lambda item: ingest_email_candidate(
+            item,
+            os.getenv("NARRATIIVE_INBOUND_WEBHOOK_URL", "http://127.0.0.1:5678/webhook/diagnostic-lead"),
+        ),
     )
     try:
         result = service.run()
