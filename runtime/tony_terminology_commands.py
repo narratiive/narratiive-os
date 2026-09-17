@@ -5,6 +5,7 @@ from typing import Any, Iterable
 from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_conversational_intent import TonyConversationalIntentCommandService
+from runtime.tony_media_commands import TonyMediaCommandService
 
 
 class TonyTerminologyCommandService:
@@ -12,12 +13,17 @@ class TonyTerminologyCommandService:
 
     VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
-    def __init__(self, command_service, policy: TerminologyPolicy | None = None) -> None:
+    def __init__(self, command_service, policy: TerminologyPolicy | None = None, media_control=None) -> None:
         # Preserve `command_service` as the canonical composition link because the
         # runtime and regression suite inspect that chain directly. Conversation
         # routing is an input boundary, not a new business-state layer.
         self.command_service = command_service
         self.conversation_router = TonyConversationalIntentCommandService(command_service)
+        self.media_commands = (
+            TonyMediaCommandService(command_service, media_control)
+            if media_control is not None
+            else None
+        )
         self.policy = policy or TerminologyPolicy.from_path()
 
     @property
@@ -34,7 +40,10 @@ class TonyTerminologyCommandService:
         if name in self.VOCABULARY_COMMANDS:
             return self._vocabulary()
 
-        response = self.conversation_router.execute(command, objects)
+        if self.media_commands is not None and self.media_commands.supports(command):
+            response = self.media_commands.execute(command, objects)
+        else:
+            response = self.conversation_router.execute(command, objects)
         violations = self.policy.scan_many(self._strings(response.message, response.data))
         if not violations:
             return response

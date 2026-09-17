@@ -17,8 +17,10 @@ from openclaw.tony_http_bridge import (
 )
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
+from runtime.execution_journal import ExecutionJournal
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
+from runtime.media_control import MediaControlService
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
@@ -440,7 +442,21 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_service = TonyBlueprintRevisionCycleCommandService(blueprint_client_feedback_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_CYCLE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision.json"))))
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
-    app.command_service = TonyTerminologyCommandService(execution_status_service)
+    media_control = MediaControlService(
+        {},
+        ExecutionJournal(
+            Path(
+                os.getenv(
+                    "TONY_MEDIA_CONTROL_STATE_ROOT",
+                    str(REPOSITORY_ROOT / ".runtime" / "media-control"),
+                )
+            )
+        ),
+    )
+    app.command_service = TonyTerminologyCommandService(
+        execution_status_service,
+        media_control=media_control,
+    )
     composition = getattr(app, "runtime_composition", None)
     workflow_backend = (
         composition.workflow_backend

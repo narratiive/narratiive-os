@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://narratiive.local/schemas/media-control-layer.schema.json",
+  "title": "Narratiive Media Control Layer",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "identity",
+    "provider",
+    "provider_mapping",
+    "period_start",
+    "period_end",
+    "currency",
+    "timezone_name",
+    "campaign_status",
+    "review_status",
+    "tracking_status",
+    "metrics"
+  ],
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["workspace_id", "client_id", "brand_id", "market_ids", "product_ids", "campaign_id"],
+      "properties": {
+        "workspace_id": {"type": "string", "minLength": 1},
+        "client_id": {"type": "string", "minLength": 1},
+        "brand_id": {"type": "string", "minLength": 1},
+        "market_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "product_ids": {"type": "array", "minItems": 1, "uniqueItems": true, "items": {"type": "string", "minLength": 1}},
+        "campaign_id": {"type": "string", "minLength": 1}
+      }
+    },
+    "provider": {"enum": ["meta", "tiktok", "google"]},
+    "provider_mapping": {
+      "type": "object",
+      "required": ["provider", "account_id", "campaign_id"],
+      "properties": {
+        "provider": {"enum": ["meta", "tiktok", "google"]},
+        "account_id": {"type": "string", "minLength": 1},
+        "campaign_id": {"type": "string", "minLength": 1},
+        "ad_group_ids": {"type": "array", "items": {"type": "string"}},
+        "ad_ids": {"type": "array", "items": {"type": "string"}},
+        "creative_ids": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "period_start": {"type": "string", "format": "date-time"},
+    "period_end": {"type": "string", "format": "date-time"},
+    "currency": {"type": "string", "pattern": "^[A-Z]{3}$"},
+    "timezone_name": {"type": "string", "minLength": 1},
+    "campaign_status": {"type": "string", "minLength": 1},
+    "review_status": {"type": "string", "minLength": 1},
+    "tracking_status": {"type": "string", "minLength": 1},
+    "authorised_budget": {"type": ["string", "null"]},
+    "metrics": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "value", "provider", "definition", "period_start", "period_end", "available", "unavailable_reason"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1},
+          "value": {"type": ["string", "null"]},
+          "provider": {"enum": ["meta", "tiktok", "google"]},
+          "definition": {"type": "string", "minLength": 1},
+          "period_start": {"type": "string"},
+          "period_end": {"type": "string"},
+          "currency": {"type": ["string", "null"]},
+          "attribution_context": {"type": "string"},
+          "available": {"type": "boolean"},
+          "unavailable_reason": {"type": "string"}
+        }
+      }
+    },
+    "creative_mappings": {"type": "array"},
+    "breakdowns": {"type": "object"},
+    "ingested_at": {"type": "string"}
+  }
+}

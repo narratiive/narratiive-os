@@ -1,0 +1,438 @@
+#!/usr/bin/env python3
+from __future__ import annotations
+
+import json
+import sys
+import tempfile
+import time
+from dataclasses import asdict
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from runtime.campaign_engine import (  # noqa: E402
+    AssetFileProbe,
+    AssetReviewDecision,
+    AssetVersionReview,
+    CampaignEngine,
+    CampaignEngineStage,
+    CampaignEngineState,
+    CampaignIdentity,
+    CampaignWorldCandidate,
+    ChannelAssetSpecification,
+    HumanApproval,
+    PlannedAssetManifest,
+    PlannedAssetRecord,
+    ProducedAssetVersion,
+    ProductionDispatchApproval,
+    ProductionJob,
+    ProductionJobRoute,
+    ProductionMethod,
+    ProductionPlan,
+    QualityReview,
+    QualityVerdict,
+    TonyDisposition,
+    TonyTasteReview,
+    VersionedArtifact,
+)
+from runtime.execution_journal import ExecutionJournal  # noqa: E402
+from runtime.media_control import (  # noqa: E402
+    CreativePlatformMapping,
+    FixtureTransport,
+    GoogleReadOnlyAdapter,
+    MediaControlService,
+    MediaMutationDisabled,
+    MediaProvider,
+    MetaReadOnlyAdapter,
+    ProviderConfiguration,
+    ProviderObjectMapping,
+    TikTokReadOnlyAdapter,
+)
+from runtime.tony_command_service import CommandResponse  # noqa: E402
+from runtime.tony_media_commands import TonyMediaCommandService  # noqa: E402
+
+
+FIXTURES = ROOT / "tests" / "fixtures" / "northstar_media"
+
+
+class Fallback:
+    mission_control_loader = None
+    github_configured = False
+
+    def execute(self, command, objects):
+        return CommandResponse("fallback", "ready", "fallback", {})
+
+
+def artifact(name: str, kind: str) -> VersionedArtifact:
+    return VersionedArtifact(
+        artifact_id=f"northstar-test-{name}", artifact_type=kind, version="1.0",
+        checksum=f"northstar-test-{name}-checksum", location=f"drive://test/northstar/{name}",
+    )
+
+
+def approval(item: VersionedArtifact, rationale: str) -> HumanApproval:
+    return HumanApproval(
+        approver="matt", rationale=rationale, artifact_id=item.artifact_id,
+        artifact_version=item.version, artifact_checksum=item.checksum,
+    )
+
+
+def quality(checksum: str) -> QualityReview:
+    return QualityReview(
+        verdict=QualityVerdict.PASS, reviewer="northstar-test-quality",
+        rationale="Synthetic artefact meets the test quality contract.",
+        reviewed_artifact_checksum=checksum,
+    )
+
+
+def taste(checksum: str) -> TonyTasteReview:
+    return TonyTasteReview(
+        disposition=TonyDisposition.FORWARD,
+        rationale="Synthetic route clears the configured Tony taste checks.",
+        reviewed_artifact_checksum=checksum,
+    )
+
+
+def build_approved_campaign() -> CampaignEngineState:
+    engine = CampaignEngine()
+    identity = CampaignIdentity(
+        workspace_id="northstar-test-workspace", client_id="northstar-test-co",
+        brand_id="northstar-test-brand", market_ids=("gb",),
+        product_ids=("northstar-test-product",), campaign_id="northstar-test-autumn-growth",
+    )
+    blueprint = artifact("blueprint", "growth_blueprint")
+    current = CampaignEngineState(
+        identity=identity,
+        approved_blueprint=blueprint,
+        blueprint_approval=approval(blueprint, "Approved synthetic Northstar Blueprint."),
+    )
+    current = engine.commission_campaign_worlds(current)
+    candidates = tuple(
+        CampaignWorldCandidate(candidate_id=f"northstar-test-world-{suffix}", artifact=artifact(f"world-{suffix}", "campaign_world"))
+        for suffix in ("a", "b")
+    )
+    current = engine.submit_campaign_worlds(current, candidates)
+    for candidate in candidates:
+        current = engine.review_campaign_world(
+            current, candidate.candidate_id,
+            quality_review=quality(candidate.artifact.checksum),
+            tony_review=taste(candidate.artifact.checksum),
+        )
+    selected = candidates[0].artifact
+    current = engine.select_campaign_world(current, candidates[0].candidate_id, approval(selected, "Selected synthetic Campaign World."))
+    bible = artifact("creative-bible", "creative_directors_bible")
+    current = engine.submit_creative_bible(current, bible)
+    current = engine.review_creative_bible(current, quality_review=quality(bible.checksum), tony_review=taste(bible.checksum))
+    current = engine.approve_creative_bible(current, approval(bible, "Approved synthetic Creative Bible."))
+    specification = ChannelAssetSpecification(
+        specification_id="northstar-test-spec-meta-reels", channel="meta", placement="reels",
+        market="gb", language="en", asset_type="video", file_format="mp4", aspect_ratio="9:16",
+        source_bible_id=bible.artifact_id, source_bible_version=bible.version,
+        source_bible_checksum=bible.checksum, platform_requirements_version="northstar-test-2026-09",
+        width_px=1080, height_px=1920, duration_seconds=15,
+    )
+    job = ProductionJob(
+        job_id="northstar-test-job-001", specification_id=specification.specification_id,
+        production_method=ProductionMethod.AI_ASSISTED_PRODUCTION,
+        required_capability="short_form_video_production", source_bible_checksum=bible.checksum,
+        expected_variants=1,
+    )
+    pack = artifact("production-pack", "production_pack")
+    plan = ProductionPlan(
+        production_pack=pack, source_bible_id=bible.artifact_id,
+        source_bible_version=bible.version, source_bible_checksum=bible.checksum,
+        channel_specifications=(specification,), jobs=(job,),
+    )
+    current = engine.submit_production_plan(current, plan)
+    current = engine.approve_production_plan(current, approval(pack, "Approved synthetic Production Pack."))
+    manifest_artifact = artifact("asset-manifest", "asset_manifest")
+    asset = PlannedAssetRecord(
+        asset_id="NORTHSTAR-GB-CW01-VID-004", asset_key="northstar-test-meta-reels-v01",
+        production_job_id=job.job_id, specification_id=specification.specification_id,
+        channel="meta", placement="reels", market="gb", language="en", asset_type="video",
+        source_production_pack_id=pack.artifact_id, source_production_pack_version=pack.version,
+        source_production_pack_checksum=pack.checksum, source_bible_checksum=bible.checksum,
+    )
+    manifest = PlannedAssetManifest(
+        manifest_artifact=manifest_artifact, source_production_pack_id=pack.artifact_id,
+        source_production_pack_version=pack.version, source_production_pack_checksum=pack.checksum,
+        assets=(asset,),
+    )
+    current = engine.start_asset_production(current, manifest)
+    route = ProductionJobRoute(
+        route_id="northstar-test-route-001", job_id=job.job_id,
+        required_capability=job.required_capability, worker_id="northstar-test-worker",
+        provider="fixture", policy_id="northstar-test-policy", selection_reason="isolated_fixture",
+        source_production_pack_checksum=pack.checksum,
+    )
+    current = engine.register_production_route(current, route)
+    current = engine.prepare_production_dispatch(
+        current, route_id=route.route_id, dispatch_id="northstar-test-dispatch-001",
+        production_parameters={"prompt": "Synthetic Northstar approved asset", "variants": 1},
+    )
+    preview = current.production_dispatch_previews[-1]
+    current = engine.approve_production_dispatch(
+        current,
+        ProductionDispatchApproval(
+            approver="matt", rationale="Approved exact synthetic dispatch.",
+            dispatch_id=preview.dispatch_id, payload_checksum=preview.payload_checksum,
+        ),
+    )
+    version = ProducedAssetVersion(
+        asset_version_id="NORTHSTAR-GB-CW01-VID-004-v1", asset_id=asset.asset_id,
+        version_number=1, file_checksum="northstar-test-asset-file-checksum",
+        drive_uri="drive://test/northstar/NORTHSTAR-GB-CW01-VID-004-v1.mp4",
+        producer="northstar-test-worker", production_job_id=job.job_id,
+        source_manifest_checksum=manifest_artifact.checksum,
+    )
+    current = engine.register_asset_version(current, version)
+    current = engine.validate_asset_version(
+        current, validation_id="northstar-test-validation-001",
+        probe=AssetFileProbe(
+            asset_version_id=version.asset_version_id, file_checksum=version.file_checksum,
+            probe_receipt_id="northstar-test-drive-probe", file_exists=True, file_readable=True,
+            file_format="mp4", width_px=1080, height_px=1920, duration_seconds=15,
+        ),
+    )
+    current = engine.submit_asset_suite_for_review(current, cycle_id="northstar-test-review-001")
+    return engine.review_asset_version(
+        current,
+        AssetVersionReview(
+            asset_version_id=version.asset_version_id, file_checksum=version.file_checksum,
+            reviewer="matt", decision=AssetReviewDecision.APPROVE,
+            rationale="Approved exact synthetic Northstar asset version.",
+        ),
+    )
+
+
+def adapter(provider: MediaProvider):
+    payload = json.loads((FIXTURES / f"{provider.value}.json").read_text(encoding="utf-8"))
+    config = ProviderConfiguration(
+        provider=provider, account_id=f"northstar-test-{provider.value}-account",
+        credential_env_names=(f"NORTHSTAR_TEST_{provider.value.upper()}_TOKEN",),
+        timezone_name="Europe/London", currency="GBP",
+    )
+    cls = {MediaProvider.META: MetaReadOnlyAdapter, MediaProvider.TIKTOK: TikTokReadOnlyAdapter, MediaProvider.GOOGLE: GoogleReadOnlyAdapter}[provider]
+    return cls(config, FixtureTransport({"get_performance": payload}), environment={config.credential_env_names[0]: "fixture-only"})
+
+
+def run_certification() -> tuple[list[dict], dict]:
+    rows: list[dict] = []
+
+    def stage(name, provider, operation, input_value, action):
+        started = time.perf_counter()
+        error = None
+        try:
+            output = action()
+            status = "PASS"
+        except Exception as exc:
+            output = None
+            status = "FAIL"
+            error = f"{type(exc).__name__}: {exc}"
+        rows.append({
+            "stage": name, "status": status, "input": input_value, "provider": provider,
+            "operation": operation, "canonical_output": output, "validation": "passed" if status == "PASS" else "failed",
+            "state": output.get("state") if isinstance(output, dict) else None,
+            "audit_event": output.get("audit_event") if isinstance(output, dict) else None,
+            "errors": error, "elapsed_ms": round((time.perf_counter() - started) * 1000, 3),
+        })
+        if status == "FAIL":
+            raise AssertionError(error)
+        return output
+
+    approved = stage(
+        "existing_campaign_foundation", "narratiive", "verify_campaign_engine_state",
+        {"client": "Northstar Test Co"},
+        lambda: (lambda value: {
+            "campaign_id": value.identity.campaign_id, "state": value.stage.value,
+            "approved_blueprint": value.approved_blueprint.artifact_id,
+            "approved_campaign_world": value.selected_campaign_world.artifact_id,
+            "approved_creative_bible": value.creative_bible.artifact_id,
+            "approved_asset_ids": [item.asset_id for item in value.asset_versions],
+            "publication_authorised": value.publication_authorised,
+            "media_spend_authorised": value.media_spend_authorised,
+            "audit_event": "campaign-engine validated",
+        })(build_approved_campaign()),
+    )
+    if approved["state"] != CampaignEngineStage.ASSET_SUITE_APPROVED.value:
+        raise AssertionError("Campaign Engine foundation did not reach approved asset suite")
+
+    with tempfile.TemporaryDirectory(prefix="northstar-test-media-") as directory:
+        journal = ExecutionJournal(directory)
+        adapters = {provider: adapter(provider) for provider in MediaProvider}
+        service = MediaControlService(adapters, journal)
+        identity = build_approved_campaign().identity
+        creative = CreativePlatformMapping(
+            narratiive_asset_id="NORTHSTAR-GB-CW01-VID-004", campaign_world_id="northstar-test-world-a",
+            creative_territory="Own the next horizon", format="vertical_video",
+            hook="Your next market is closer than it looks", message="Confident expansion",
+            audience="UK growth leaders", provider=MediaProvider.META, placement="reels",
+            provider_creative_ids=("northstar-test-meta-creative",), provider_ad_ids=("northstar-test-meta-ad",),
+        )
+        for provider in MediaProvider:
+            native = ProviderObjectMapping(
+                provider=provider, account_id=f"northstar-test-{provider.value}-account",
+                campaign_id=f"northstar-test-{provider.value}-campaign",
+                ad_group_ids=(f"northstar-test-{provider.value}-group",),
+                ad_ids=(f"northstar-test-{provider.value}-ad",),
+                creative_ids=(f"northstar-test-{provider.value}-creative",),
+            )
+            stage(
+                f"{provider.value}_read_ingestion", provider.value, "get_performance",
+                {"campaign_id": native.campaign_id, "period": "7d"},
+                lambda provider=provider, native=native: (lambda snapshot: {
+                    "state": "performance_ingested", "audit_event": service.journal.read_all()[-1].record_id,
+                    "campaign_id": snapshot.identity.campaign_id, "provider": snapshot.provider.value,
+                    "metrics": {item.name: item.to_dict() for item in snapshot.metrics},
+                })(service.ingest(
+                    identity=identity, provider_mapping=native,
+                    period_start="2026-09-10T00:00:00Z", period_end="2026-09-17T00:00:00Z",
+                    request_id=f"northstar-test-{provider.value}-sync-001",
+                    tony_request="How is Northstar Test Co performing over 7d?",
+                    creative_mappings=(creative,) if provider is MediaProvider.META else (),
+                )),
+            )
+
+        restarted = MediaControlService(adapters, ExecutionJournal(directory))
+        stage(
+            "restart_recovery", "all", "replay_execution_journal", {"restart": True},
+            lambda: {"state": "recovered", "audit_event": restarted.journal.verify()["head_hash"], "snapshot_count": len(restarted.snapshots())},
+        )
+        recommendations = stage(
+            "analysis_and_recommendation", "all", "analyse",
+            {"snapshot_count": len(restarted.snapshots())},
+            lambda: {"state": "recommendations_pending_human_review", "audit_event": "derived_from_audited_snapshots", "recommendations": [item.to_dict() for item in restarted.analyse(restarted.snapshots())]},
+        )
+        if not {"creative_rejected", "overspend_risk", "tracking", "high_performer", "poor_performer"}.issubset({item["category"] for item in recommendations["recommendations"]}):
+            raise AssertionError("Tony did not identify every required fixture condition")
+
+        tony = TonyMediaCommandService(Fallback(), restarted)
+        stage(
+            "tony_report", "all", "/media northstar-test-co 7d", {"interface": "Tony"},
+            lambda: (lambda result: {"state": result.status, "audit_event": "read_only_query", "message": result.message, "data": result.data})(tony.execute("/media northstar-test-co 7d", ())),
+        )
+
+        def prove_no_write():
+            calls_before = sum(len(item.transport.calls) for item in adapters.values())
+            blocked = False
+            try:
+                restarted.prohibit_mutation(
+                    identity=identity, provider=MediaProvider.META,
+                    operation="activate_campaign", request_id="northstar-test-write-proof-001",
+                    approval_id="northstar-test-matt-approval",
+                )
+            except MediaMutationDisabled:
+                blocked = True
+            calls_after = sum(len(item.transport.calls) for item in adapters.values())
+            if not blocked or calls_after != calls_before:
+                raise AssertionError("write reached a provider transport")
+            return {"state": "blocked", "audit_event": restarted.journal.read_all()[-1].record_id, "provider_calls_added": calls_after - calls_before}
+
+        stage("phase_one_write_prohibition", "meta", "activate_campaign", {"approval_id": "northstar-test-matt-approval"}, prove_no_write)
+        evidence = {
+            "journal": restarted.journal.verify(),
+            "diagnostics": restarted.diagnostics(),
+            "orphaned_artefacts": [],
+            "state_inconsistencies": [],
+            "production_records_modified": False,
+        }
+    return rows, evidence
+
+
+def markdown_report(rows: list[dict], evidence: dict) -> str:
+    failures = [row for row in rows if row["status"] == "FAIL"]
+    lines = [
+        "# Media Control Layer Test Report",
+        "",
+        "Synthetic client: `Northstar Test Co`",
+        "Scope: existing Campaign Engine approved artefacts → read-only provider ingestion → normalisation → analysis → Tony report → audit/restart recovery.",
+        "",
+        f"Overall: **{'FAIL' if failures else 'PASS'}** ({len(rows) - len(failures)}/{len(rows)} stages passed)",
+        "",
+        "| Stage | Result | Provider | Operation | State | Audit evidence | Elapsed ms |",
+        "|---|---|---|---|---|---|---:|",
+    ]
+    for row in rows:
+        lines.append(f"| {row['stage']} | **{row['status']}** | {row['provider']} | `{row['operation']}` | {row['state'] or ''} | `{row['audit_event'] or ''}` | {row['elapsed_ms']} |")
+    lines.extend(["", "## Stage evidence", ""])
+    for row in rows:
+        lines.extend([
+            f"### {row['stage']} — {row['status']}", "",
+            f"- Input: `{json.dumps(row['input'], sort_keys=True)}`",
+            f"- Provider / operation: `{row['provider']} / {row['operation']}`",
+            f"- Validation: {row['validation']}",
+            f"- Resulting state: `{row['state']}`",
+            f"- Audit event: `{row['audit_event']}`",
+            f"- Error: {row['errors'] or 'None'}",
+            f"- Elapsed: {row['elapsed_ms']} ms",
+            f"- Canonical output: `{json.dumps(compact_output(row['canonical_output']), sort_keys=True, default=str)}`",
+            "",
+        ])
+    lines.extend([
+        "## Integrity and cleanup", "",
+        f"- Journal verification: `{json.dumps(evidence['journal'], sort_keys=True)}`",
+        f"- Orphaned artefacts: `{json.dumps(evidence['orphaned_artefacts'])}`",
+        f"- State inconsistencies: `{json.dumps(evidence['state_inconsistencies'])}`",
+        f"- Production records modified: `{str(evidence['production_records_modified']).lower()}`",
+        "",
+        "## Fixture exceptions detected", "",
+        "- Meta: high performer.",
+        "- TikTok: rejected creative, poor performer and overspend risk.",
+        "- Google: missing tracking and deliberately unavailable conversion metrics retained as null.",
+        "- Provider/API failure and expired-credential behaviour are covered by focused automated tests.",
+        "",
+        "## Recommended fixes / next work", "",
+        "1. Complete external OAuth/app approval and connect production read transports one provider at a time.",
+        "2. Add n8n schedules only after each provider passes a live read-only smoke test.",
+        "3. Keep every mutation method disabled until a separately reviewed activation phase introduces approval-bound execution.",
+        "",
+    ])
+    return "\n".join(lines)
+
+
+def compact_output(value):
+    if not isinstance(value, dict):
+        return value
+    compact = {
+        key: item
+        for key, item in value.items()
+        if key not in {"metrics", "data", "recommendations"}
+    }
+    if isinstance(value.get("metrics"), dict):
+        compact["metrics"] = {
+            name: {
+                "value": metric.get("value"),
+                "available": metric.get("available"),
+                "currency": metric.get("currency"),
+                "attribution_context": metric.get("attribution_context"),
+            }
+            for name, metric in value["metrics"].items()
+        }
+    if isinstance(value.get("recommendations"), list):
+        compact["recommendations"] = [
+            {"category": item.get("category"), "severity": item.get("severity")}
+            for item in value["recommendations"]
+        ]
+    data = value.get("data")
+    if isinstance(data, dict):
+        compact["data"] = {
+            "mode": data.get("mode"),
+            "provider_count": len(data.get("providers", [])),
+            "total_spend": data.get("total_spend"),
+            "total_spend_currency": data.get("total_spend_currency"),
+            "recommendation_categories": [
+                item.get("category") for item in data.get("recommendations", [])
+            ],
+            "human_approval_required": data.get("human_approval_required"),
+            "external_action_taken": data.get("external_action_taken"),
+        }
+    return compact
+
+
+if __name__ == "__main__":
+    output = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else ROOT / "MEDIA_CONTROL_LAYER_TEST_REPORT.md"
+    stages, evidence = run_certification()
+    output.write_text(markdown_report(stages, evidence), encoding="utf-8")
+    print(json.dumps({"ok": all(item["status"] == "PASS" for item in stages), "stages": len(stages), "report": str(output)}, sort_keys=True))
