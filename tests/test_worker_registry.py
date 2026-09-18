@@ -97,6 +97,18 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
         self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("external_read",))
 
+    def test_configured_document_worker_replaces_planned_placeholder(self) -> None:
+        adapter = lambda contract: {"editable_pptx": "safe.pptx"}
+        registry = build_tony_worker_registry({}, document_adapter=adapter)
+
+        resolution = registry.resolve("document_generation")
+        declared = {item.metadata.worker_id for item in registry.all()}
+
+        self.assertEqual(resolution.worker_id, "narratiive-growth-blueprint-renderer")
+        self.assertEqual(resolution.registration.metadata.provider, "narratiive-local-artifact-tool")
+        self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("preparation",))
+        self.assertNotIn("document-generation-unavailable", declared)
+
     def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
         calls = []
         registry = build_tony_worker_registry(

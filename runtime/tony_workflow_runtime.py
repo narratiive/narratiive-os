@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
+from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
@@ -166,6 +167,21 @@ class TonyWorkflowRuntime:
         inputs = build_next_workflow_inputs(state, value, additional_inputs)
         next_definition = self.coordinator.registry.resolve(definition.next_workflow_id)
         next_stage = next_definition.stages[0]
+        if definition.next_workflow_id == "growth_blueprint_deliverable_production":
+            source_artifact = artifacts[-1]
+            if not source_artifact.checksum:
+                raise ValueError("approved Blueprint artefact is missing its immutable checksum")
+            inputs["quality_accepted_growth_blueprint"] = dict(value)
+            inputs["blueprint_identity"] = {
+                "artifact_id": source_artifact.artifact_id,
+                "version": 1,
+                "checksum": source_artifact.checksum,
+            }
+            inputs["blueprint_canon"] = {
+                "artifact_id": source_artifact.artifact_id,
+                "checksum": source_artifact.checksum,
+                "status": "quality_accepted_and_human_approved",
+            }
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
                 inputs.pop(field, None)
@@ -324,6 +340,7 @@ def build_tony_workflow_runtime(
         client_id=client_id,
     )
     configured_dispatchers = dict(dispatchers) if dispatchers is not None else build_http_dispatchers(environ)
+    document_adapter = build_growth_blueprint_deliverable_worker(scoped_root, environ)
     validators: dict[str, QualityValidator] = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
@@ -344,6 +361,7 @@ def build_tony_workflow_runtime(
                 scoped_root,
                 fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
             ),
+            document_adapter=document_adapter,
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

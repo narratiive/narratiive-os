@@ -50,6 +50,26 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("Growth Blueprint preparation requires a substantive evidence pack")
         if not _meaningful(inputs.get("approved_growth_sprint_scope")):
             raise ValueError("Growth Blueprint preparation requires approved Growth Sprint scope")
+    elif workflow_id == "growth_blueprint_deliverable_production":
+        if not isinstance(inputs.get("quality_accepted_growth_blueprint"), Mapping):
+            raise ValueError("Growth Blueprint delivery requires a structured quality-accepted Blueprint")
+        identity = inputs.get("blueprint_identity")
+        if not isinstance(identity, Mapping) or not all(
+            _meaningful(identity.get(field)) for field in ("artifact_id", "version", "checksum")
+        ):
+            raise ValueError("Growth Blueprint delivery requires exact immutable Blueprint identity")
+        context = inputs.get("client_context")
+        if not isinstance(context, Mapping) or not _meaningful(
+            context.get("brand_name")
+            or context.get("company_name")
+            or context.get("company")
+            or context.get("name")
+        ):
+            raise ValueError("Growth Blueprint delivery requires named client context")
+        if not _lineage(inputs.get("evidence_lineage"), minimum=5):
+            raise ValueError("Growth Blueprint delivery requires complete evidence lineage")
+        if not isinstance(inputs.get("blueprint_canon"), Mapping):
+            raise ValueError("Growth Blueprint delivery requires the canonical Blueprint reference")
     elif workflow_id == "growth_blueprint_to_campaign_world":
         if not isinstance(inputs.get("approved_growth_blueprint"), Mapping):
             raise ValueError("Campaign World preparation requires a structured approved Growth Blueprint")

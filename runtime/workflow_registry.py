@@ -229,7 +229,13 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
     _step(
         "produce_growth_blueprint_deliverable",
         capability="document_generation",
-        inputs=("quality_accepted_growth_blueprint", "evidence_lineage", "blueprint_canon"),
+        inputs=(
+            "quality_accepted_growth_blueprint",
+            "blueprint_identity",
+            "client_context",
+            "evidence_lineage",
+            "blueprint_canon",
+        ),
         outputs=(
             "presentation_specification",
             "editable_pptx",

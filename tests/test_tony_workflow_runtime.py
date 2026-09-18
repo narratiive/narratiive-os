@@ -9,6 +9,7 @@ from tests.test_workflow_quality import (
     campaign_world_output,
     creative_bible_output,
     discovery_output,
+    growth_blueprint_output,
     proposal_output,
 )
 
@@ -306,6 +307,52 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             parent_ids = proposal_state["stages"][0]["output_artifacts"][0]["metadata"]["parent_artifact_ids"]
             self.assertTrue(parent_ids)
             self.assertFalse(proposal_state["external_action_taken"])
+
+    def test_approved_blueprint_handoff_binds_exact_artefact_identity_before_rendering(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Claude": lambda contract: growth_blueprint_output()},
+                environ={},
+            )
+            runtime.enqueue(
+                "research_to_growth_blueprint",
+                "safe-growth-blueprint-run",
+                {
+                    "evidence_pack": {"records": [{"source_id": "safe-source"}]},
+                    "approved_growth_sprint_scope": ["SAFE bounded workstream"],
+                    "client_context": {"name": "Northstar Test Co"},
+                },
+                entity_id="safe-client",
+                correlation_id="safe-correlation",
+            )
+            runtime.advance("safe-growth-blueprint-run", _lifecycle("safe-client"))
+            runtime.approve(
+                "safe-growth-blueprint-run",
+                approver="authorised-human",
+                rationale="SAFE synthetic Blueprint approval",
+            )
+
+            outcome = runtime.handoff("safe-growth-blueprint-run", _lifecycle("safe-client"))
+            downstream = runtime.runs.load_run(outcome.run_id)
+            source = runtime.runs.load_run("safe-growth-blueprint-run")
+            source_ref = source.stages[0].output_artifacts[-1]
+
+            self.assertEqual(outcome.workflow_id, "growth_blueprint_deliverable_production")
+            self.assertEqual(outcome.status, "blocked")
+            self.assertEqual(downstream.input_payload["blueprint_identity"]["artifact_id"], source_ref.artifact_id)
+            self.assertEqual(downstream.input_payload["blueprint_identity"]["checksum"], source_ref.checksum)
+            self.assertEqual(
+                downstream.input_payload["quality_accepted_growth_blueprint"]["recommendation"],
+                "advance",
+            )
+            self.assertEqual(
+                downstream.input_payload["blueprint_canon"]["status"],
+                "quality_accepted_and_human_approved",
+            )
+            self.assertFalse(downstream.external_action_taken)
 
 
 if __name__ == "__main__":
