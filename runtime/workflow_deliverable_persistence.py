@@ -138,7 +138,10 @@ class WorkflowDeliverablePersistenceService:
             "client_notification": "not_authorised",
             "publication": "not_authorised",
         }
-        runtime.runs.record_external_action(state.run_id, idempotency_key=expected, receipt=receipt)
+        updated = runtime.runs.record_external_action(state.run_id, idempotency_key=expected, receipt=receipt)
+        projection = getattr(runtime, "business_projection", None)
+        if projection is not None:
+            projection.prepare(updated)
         return self._result(preview, receipt, duplicate=all(item["duplicate_suppressed"] for item in file_receipts))
 
     def _artifact_output(self, state: WorkflowState) -> tuple[ArtifactRef, Mapping[str, Any]]:

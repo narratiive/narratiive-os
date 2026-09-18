@@ -885,7 +885,20 @@ class NotionWorkflowProjectionDispatcher:
         status = {"active": "Active", "blocked": "Waiting", "awaiting_approval": "Waiting", "complete": "Complete", "failed": "Waiting"}.get(_text(payload.get("workflow_status")), "Waiting")
         approval = {"pending": "Needs Review", "approved": "Approved", "rejected": "Rejected"}.get(_text(payload.get("approval_status")))
         pipeline = {"blueprint_lite": "Blueprint Lite", "discovery": "Discovery Call", "proposal": "Proposal", "delivery": "Growth Sprint"}.get(_text(payload.get("lifecycle_stage")))
-        summary = f"Tony workflow {_text(payload.get('workflow_id'))} is { _text(payload.get('workflow_status'))}. {marker}"
+        deliverable_state = _text(payload.get("deliverable_state"))
+        drive_files = payload.get("drive_files") if isinstance(payload.get("drive_files"), list) else []
+        drive_summary = "; ".join(
+            f"{_text(item.get('filename'))}: {_text(item.get('file_url'))}"
+            for item in drive_files[:4]
+            if isinstance(item, Mapping) and _text(item.get("filename")) and _text(item.get("file_url"))
+        )
+        summary_parts = [
+            f"Tony workflow {_text(payload.get('workflow_id'))} is {_text(payload.get('workflow_status'))}.",
+            f"Deliverable state: {deliverable_state}." if deliverable_state and deliverable_state != "not_applicable" else "",
+            f"Internal Drive files: {drive_summary}." if drive_summary else "",
+            marker,
+        ]
+        summary = " ".join(part for part in summary_parts if part)
         properties: dict[str, Any] = {
             "Status": {"status": {"name": status}},
             "AI Summary": {"rich_text": [{"type": "text", "text": {"content": summary[:1900]}}]},
