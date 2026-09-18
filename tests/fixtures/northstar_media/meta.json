@@ -1,0 +1,13 @@
+{
+  "period_start": "2026-09-10T00:00:00Z",
+  "period_end": "2026-09-17T00:00:00Z",
+  "currency": "GBP",
+  "timezone": "Europe/London",
+  "campaign_status": "active",
+  "review_status": "approved",
+  "tracking_status": "healthy",
+  "authorised_budget": "5000",
+  "attribution_context": "Meta 7-day click / 1-day view; provider attributed",
+  "metrics": {"spend": "3500", "impressions": "440000", "reach": "250000", "frequency": "1.76", "clicks": "9100", "ctr": "2.07", "cpc": "0.38", "cpm": "7.95", "video_views": "180000", "video_completions": "52000", "conversions": "140", "conversion_value": "15400", "cpa": "25", "roas": "4.4"},
+  "breakdowns": {"placement": {"instagram_reels": {"spend": "1700"}}}
+}

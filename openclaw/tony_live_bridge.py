@@ -17,8 +17,20 @@ from openclaw.tony_http_bridge import (
 )
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
+from runtime.execution_journal import ExecutionJournal
+from runtime.campaign_engine import CampaignIdentity
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
+from runtime.media_control import (
+    CreativePlatformMapping,
+    MediaConfigurationError,
+    MediaControlError,
+    MediaControlService,
+    MediaProvider,
+    MediaProviderError,
+    ProviderObjectMapping,
+)
+from runtime.media_provider_transports import build_configured_media_adapters
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
@@ -83,6 +95,7 @@ class LeadAwareTonyApplication:
         authorised_principal_id: str = "",
         attention_service: LeadAttentionService | None = None,
         conversation_ingress: TonyConversationIngress | None = None,
+        media_control: MediaControlService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -92,6 +105,7 @@ class LeadAwareTonyApplication:
         self.authorised_principal_id = authorised_principal_id.strip()
         self.attention_service = attention_service
         self.conversation_ingress = conversation_ingress
+        self.media_control = media_control
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -107,6 +121,8 @@ class LeadAwareTonyApplication:
             return self._workflow_control(environ, start_response)
         if method == "POST" and path == "/attention/control":
             return self._attention_control(environ, start_response)
+        if method == "POST" and path == "/media/sync":
+            return self._media_sync(environ, start_response)
         return self.base(environ, start_response)
 
     @staticmethod
@@ -284,6 +300,144 @@ class LeadAwareTonyApplication:
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_attention_control", "message": str(exc)}})
 
+    def _media_sync(self, environ, start_response):
+        """Authenticated, read-only performance ingestion boundary for n8n."""
+        if not str(self.base.bridge_token or "").strip():
+            return self._respond(
+                start_response,
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {
+                    "ok": False,
+                    "error": {
+                        "code": "media_sync_auth_unavailable",
+                        "message": "Media sync requires a configured bridge token",
+                    },
+                },
+            )
+        denied = self._authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.media_control is None:
+            return self._respond(
+                start_response,
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"ok": False, "error": {"code": "media_control_unavailable", "message": "Media control is not configured"}},
+            )
+        try:
+            request = self._read_json(environ)
+            identity_value = request.get("identity")
+            mapping_value = request.get("provider_mapping")
+            if not isinstance(identity_value, dict):
+                raise ValueError("identity must be an object")
+            if not isinstance(mapping_value, dict):
+                raise ValueError("provider_mapping must be an object")
+            identity = CampaignIdentity(
+                workspace_id=str(identity_value.get("workspace_id") or "").strip(),
+                client_id=str(identity_value.get("client_id") or "").strip(),
+                brand_id=str(identity_value.get("brand_id") or "").strip(),
+                market_ids=self._string_tuple(identity_value.get("market_ids"), "identity.market_ids"),
+                product_ids=self._string_tuple(identity_value.get("product_ids"), "identity.product_ids"),
+                campaign_id=str(identity_value.get("campaign_id") or "").strip(),
+            )
+            provider = MediaProvider(str(mapping_value.get("provider") or "").strip().casefold())
+            provider_mapping = ProviderObjectMapping(
+                provider=provider,
+                account_id=str(mapping_value.get("account_id") or "").strip(),
+                campaign_id=str(mapping_value.get("campaign_id") or "").strip(),
+                ad_group_ids=self._optional_string_tuple(mapping_value.get("ad_group_ids"), "provider_mapping.ad_group_ids"),
+                ad_ids=self._optional_string_tuple(mapping_value.get("ad_ids"), "provider_mapping.ad_ids"),
+                creative_ids=self._optional_string_tuple(mapping_value.get("creative_ids"), "provider_mapping.creative_ids"),
+            )
+            creative_values = request.get("creative_mappings", [])
+            if not isinstance(creative_values, list):
+                raise ValueError("creative_mappings must be an array")
+            creative_mappings = tuple(
+                self._creative_mapping(value, provider, index)
+                for index, value in enumerate(creative_values)
+            )
+            snapshot = self.media_control.ingest(
+                identity=identity,
+                provider_mapping=provider_mapping,
+                period_start=self._required_string(request, "period_start"),
+                period_end=self._required_string(request, "period_end"),
+                request_id=self._required_string(request, "request_id"),
+                tony_request=self._required_string(request, "tony_request"),
+                creative_mappings=creative_mappings,
+            )
+            recommendations = self.media_control.analyse((snapshot,))
+            return self._respond(
+                start_response,
+                HTTPStatus.OK,
+                {
+                    "ok": True,
+                    "status": "performance_ingested",
+                    "snapshot": snapshot.to_dict(),
+                    "recommendations": [item.to_dict() for item in recommendations],
+                    "external_action_taken": False,
+                    "publication_authorised": False,
+                    "media_spend_authorised": False,
+                },
+            )
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, MediaControlError) as exc:
+            unavailable = isinstance(exc, (MediaConfigurationError, MediaProviderError))
+            status = HTTPStatus.SERVICE_UNAVAILABLE if unavailable else HTTPStatus.BAD_REQUEST
+            code = "media_sync_unavailable" if unavailable else "invalid_media_sync"
+            return self._respond(start_response, status, {"ok": False, "error": {"code": code, "message": str(exc)}})
+        except Exception:
+            return self._respond(
+                start_response,
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": {"code": "media_sync_failed", "message": "Media performance ingestion failed closed"}},
+            )
+
+    @staticmethod
+    def _required_string(value: dict[str, Any], field: str) -> str:
+        result = str(value.get(field) or "").strip()
+        if not result:
+            raise ValueError(f"{field} is required")
+        return result
+
+    @staticmethod
+    def _string_tuple(value: Any, field: str) -> tuple[str, ...]:
+        if not isinstance(value, list) or not value:
+            raise ValueError(f"{field} must be a non-empty array")
+        result = tuple(str(item).strip() for item in value)
+        if any(not item for item in result):
+            raise ValueError(f"{field} must contain non-empty strings")
+        return result
+
+    @staticmethod
+    def _optional_string_tuple(value: Any, field: str) -> tuple[str, ...]:
+        if value is None:
+            return ()
+        if not isinstance(value, list):
+            raise ValueError(f"{field} must be an array")
+        result = tuple(str(item).strip() for item in value)
+        if any(not item for item in result):
+            raise ValueError(f"{field} must contain non-empty strings")
+        return result
+
+    @classmethod
+    def _creative_mapping(cls, value: Any, provider: MediaProvider, index: int) -> CreativePlatformMapping:
+        if not isinstance(value, dict):
+            raise ValueError(f"creative_mappings[{index}] must be an object")
+        creative_provider = MediaProvider(str(value.get("provider") or "").strip().casefold())
+        if creative_provider is not provider:
+            raise ValueError(f"creative_mappings[{index}].provider must match provider_mapping.provider")
+        return CreativePlatformMapping(
+            narratiive_asset_id=cls._required_string(value, "narratiive_asset_id"),
+            campaign_world_id=cls._required_string(value, "campaign_world_id"),
+            creative_territory=cls._required_string(value, "creative_territory"),
+            format=cls._required_string(value, "format"),
+            hook=str(value.get("hook") or "").strip(),
+            message=str(value.get("message") or "").strip(),
+            audience=str(value.get("audience") or "").strip(),
+            provider=creative_provider,
+            placement=str(value.get("placement") or "").strip(),
+            provider_creative_ids=cls._optional_string_tuple(value.get("provider_creative_ids"), f"creative_mappings[{index}].provider_creative_ids"),
+            provider_ad_ids=cls._optional_string_tuple(value.get("provider_ad_ids"), f"creative_mappings[{index}].provider_ad_ids"),
+        )
+
     def _ingest(self, environ, start_response):
         denied = self._authorize(environ, start_response)
         if denied is not None:
@@ -440,7 +594,21 @@ def build_app() -> LeadAwareTonyApplication:
     blueprint_revision_service = TonyBlueprintRevisionCycleCommandService(blueprint_client_feedback_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_CYCLE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision.json"))))
     blueprint_revision_persistence_service = TonyBlueprintRevisionPersistenceCommandService(blueprint_revision_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-revision-persistence.json"))))
     execution_status_service = TonyVerifiedExecutionStatusCommandService(blueprint_revision_persistence_service)
-    app.command_service = TonyTerminologyCommandService(execution_status_service)
+    media_control = MediaControlService(
+        build_configured_media_adapters(os.environ),
+        ExecutionJournal(
+            Path(
+                os.getenv(
+                    "TONY_MEDIA_CONTROL_STATE_ROOT",
+                    str(REPOSITORY_ROOT / ".runtime" / "media-control"),
+                )
+            )
+        ),
+    )
+    app.command_service = TonyTerminologyCommandService(
+        execution_status_service,
+        media_control=media_control,
+    )
     composition = getattr(app, "runtime_composition", None)
     workflow_backend = (
         composition.workflow_backend
@@ -473,6 +641,7 @@ def build_app() -> LeadAwareTonyApplication:
         ),
         attention_service=attention_service,
         conversation_ingress=conversation_ingress,
+        media_control=media_control,
     )
 
 

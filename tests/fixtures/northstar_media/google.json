@@ -1,0 +1,13 @@
+{
+  "period_start": "2026-09-10T00:00:00Z",
+  "period_end": "2026-09-17T00:00:00Z",
+  "currency": "GBP",
+  "timezone": "Europe/London",
+  "campaign_status": "active",
+  "review_status": "approved",
+  "tracking_status": "missing",
+  "authorised_budget": "3400",
+  "attribution_context": "Google Ads data-driven attribution; provider attributed",
+  "metrics": {"spend": "2100", "impressions": "190000", "clicks": "5200", "ctr": "2.74", "cpc": "0.40", "cpm": "11.05", "conversions": null, "conversion_value": null, "cpa": null, "roas": null},
+  "breakdowns": {"network": {"youtube": {"spend": "900"}}}
+}

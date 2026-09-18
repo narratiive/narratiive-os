@@ -1,0 +1,13 @@
+{
+  "period_start": "2026-09-10T00:00:00Z",
+  "period_end": "2026-09-17T00:00:00Z",
+  "currency": "GBP",
+  "timezone": "Europe/London",
+  "campaign_status": "active",
+  "review_status": "rejected",
+  "tracking_status": "healthy",
+  "authorised_budget": "4000",
+  "attribution_context": "TikTok 7-day click / 1-day view; provider attributed",
+  "metrics": {"spend": "3900", "impressions": "600000", "reach": "410000", "frequency": "1.46", "clicks": "8700", "ctr": "1.45", "cpc": "0.45", "cpm": "6.5", "video_views": "350000", "video_completions": "80000", "conversions": "75", "conversion_value": "2925", "cpa": "52", "roas": "0.75"},
+  "breakdowns": {"device": {"mobile": {"spend": "3900"}}}
+}
