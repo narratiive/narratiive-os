@@ -154,7 +154,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
 
     def test_operations_is_read_only_while_other_specialists_may_prepare_reversible_workspace_artifacts(self):
         self.assertEqual(self.agents["operations"]["sandbox"]["workspaceAccess"], "ro")
-        self.assertEqual(self.agents["operations"]["tools"]["allow"], ["read"])
+        self.assertEqual(set(self.agents["operations"]["tools"]["allow"]), {"read", "web_fetch"})
+        self.assertTrue({"write", "edit", "apply_patch"}.issubset(self.agents["operations"]["tools"]["deny"]))
         for agent_id in ("research", "strategy", "creative-director", "production"):
             with self.subTest(agent_id=agent_id):
                 self.assertEqual(self.agents[agent_id]["sandbox"]["workspaceAccess"], "rw")
