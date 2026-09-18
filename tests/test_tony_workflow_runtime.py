@@ -5,7 +5,12 @@ import unittest
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
-from tests.test_workflow_quality import discovery_output, proposal_output
+from tests.test_workflow_quality import (
+    campaign_world_output,
+    creative_bible_output,
+    discovery_output,
+    proposal_output,
+)
 
 
 def _lifecycle(client_id: str) -> ClientLifecycleRecord:
@@ -149,6 +154,65 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
 
             state = runtime.status("safe-proposal-run")
             self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(state["approval_status"], "pending")
+            self.assertFalse(state["external_action_taken"])
+
+    def test_campaign_world_uses_real_validator_and_requires_human_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Claude": lambda contract: campaign_world_output()},
+                environ={},
+            )
+            lineage = campaign_world_output()["evidence_lineage"]
+            runtime.enqueue(
+                "growth_blueprint_to_campaign_world",
+                "safe-campaign-world-run",
+                {
+                    "approved_growth_blueprint": {"status": "approved", "source": "synthetic"},
+                    "evidence_lineage": lineage,
+                    "activation_implications": {"priority": "Synthetic internal test"},
+                },
+                entity_id="safe-campaign",
+                correlation_id="safe-correlation",
+            )
+            outcome = runtime.advance("safe-campaign-world-run", _lifecycle("safe-client"))
+            state = runtime.status("safe-campaign-world-run")
+
+            self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertEqual(outcome.action, "await_human_approval")
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(state["approval_status"], "pending")
+            self.assertFalse(state["external_action_taken"])
+
+    def test_creative_bible_uses_real_validator_and_requires_human_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Claude": lambda contract: creative_bible_output()},
+                environ={},
+            )
+            runtime.enqueue(
+                "campaign_world_to_creative_bible",
+                "safe-creative-bible-run",
+                {
+                    "approved_campaign_world": {"status": "approved", "source": "synthetic"},
+                    "growth_blueprint": {"status": "approved", "source": "synthetic"},
+                    "production_context": {"market": "Synthetic UK test market"},
+                },
+                entity_id="safe-campaign",
+                correlation_id="safe-correlation",
+            )
+            outcome = runtime.advance("safe-creative-bible-run", _lifecycle("safe-client"))
+            state = runtime.status("safe-creative-bible-run")
+
+            self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertEqual(outcome.action, "await_human_approval")
             self.assertTrue(state["stages"][0]["quality_result"]["passed"])
             self.assertEqual(state["approval_status"], "pending")
             self.assertFalse(state["external_action_taken"])

@@ -25,6 +25,8 @@ from runtime.workflow_execution_coordinator import (
 from runtime.workflow_business_projection import WorkflowBusinessProjectionService
 from runtime.workflow_registry import build_narratiive_workflow_registry
 from runtime.workflow_quality import (
+    campaign_world_quality_gate,
+    creative_bible_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_blueprint_deliverable_quality_gate,
@@ -329,6 +331,8 @@ def build_tony_workflow_runtime(
         "research_evidence_quality_gate": research_evidence_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
+        "campaign_world_quality_gate": campaign_world_quality_gate,
+        "creative_bible_quality_gate": creative_bible_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
     coordinator = WorkflowExecutionCoordinator(

@@ -50,6 +50,20 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("Growth Blueprint preparation requires a substantive evidence pack")
         if not _meaningful(inputs.get("approved_growth_sprint_scope")):
             raise ValueError("Growth Blueprint preparation requires approved Growth Sprint scope")
+    elif workflow_id == "growth_blueprint_to_campaign_world":
+        if not isinstance(inputs.get("approved_growth_blueprint"), Mapping):
+            raise ValueError("Campaign World preparation requires a structured approved Growth Blueprint")
+        if not _lineage(inputs.get("evidence_lineage"), minimum=3):
+            raise ValueError("Campaign World preparation requires complete evidence lineage")
+        if not _meaningful(inputs.get("activation_implications")):
+            raise ValueError("Campaign World preparation requires activation implications")
+    elif workflow_id == "campaign_world_to_creative_bible":
+        if not isinstance(inputs.get("approved_campaign_world"), Mapping):
+            raise ValueError("Creative Director's Bible preparation requires a structured approved Campaign World")
+        if not isinstance(inputs.get("growth_blueprint"), Mapping):
+            raise ValueError("Creative Director's Bible preparation requires the structured Growth Blueprint")
+        if not isinstance(inputs.get("production_context"), Mapping):
+            raise ValueError("Creative Director's Bible preparation requires structured production context")
 
 
 def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -142,6 +156,164 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     return _result(checks)
 
 
+def campaign_world_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate a Campaign World against the canonical v1 creative contract."""
+    world = output.get("campaign_world")
+    checks = {
+        "campaign_world_is_structured": isinstance(world, Mapping),
+        "client_information_is_complete": _mapping_fields(
+            _mapping_value(world, "client_information"),
+            ("client_name", "industry", "category", "growth_blueprint_link", "date_created", "campaign_world_version"),
+        ),
+        "strategic_foundation_is_complete": _mapping_fields(
+            _mapping_value(world, "strategic_foundation"),
+            ("core_problem", "growth_opportunity", "strategic_positioning", "audience_summary", "core_narrative"),
+        ),
+        "creative_north_star_is_actionable": _mapping_fields(
+            _mapping_value(world, "creative_north_star"),
+            ("north_star_statement", "strategic_role", "emotional_job", "behavioural_change_required"),
+        ),
+        "visual_world_is_specific": _mapping_fields(
+            _mapping_value(world, "visual_world"),
+            (
+                "photography_style", "lighting_style", "colour_direction", "composition_style",
+                "environment_style", "human_casting_style", "product_treatment",
+                "typography_direction", "motion_direction", "brand_references",
+            ),
+        ),
+        "tone_of_voice_is_specific": _mapping_fields(
+            _mapping_value(world, "tone_of_voice"),
+            (
+                "voice_description", "personality_traits", "words_to_use", "words_to_avoid",
+                "cta_style", "headline_style", "caption_style", "email_style",
+            ),
+        ),
+        "three_campaign_territories_are_complete": _records_with_fields(
+            _mapping_value(world, "campaign_territories"),
+            (
+                "territory_name", "strategic_role", "audience_job", "key_message",
+                "visual_direction", "copy_direction", "emotional_outcome",
+                "example_activations", "channel_recommendations",
+            ),
+            minimum=3,
+        ),
+        "twelve_still_assets_are_production_ready": _records_with_fields(
+            _mapping_value(world, "still_image_generation_pack"),
+            (
+                "asset_name", "strategic_purpose", "channel", "creative_description",
+                "sora_prompt", "recommended_dimensions", "notes",
+            ),
+            minimum=12,
+        ),
+        "six_motion_assets_are_production_ready": _records_with_fields(
+            _mapping_value(world, "motion_generation_pack"),
+            (
+                "asset_name", "strategic_purpose", "channel", "duration",
+                "creative_description", "shot_structure", "sora_prompt", "call_to_action", "notes",
+            ),
+            minimum=6,
+        ),
+        "social_mockups_cover_canonical_platforms": _records_cover_values(
+            _mapping_value(world, "social_mockups"),
+            field="platform",
+            required=("linkedin", "instagram", "tiktok", "facebook", "youtube shorts", "x"),
+            fields=("creative_concept", "example_headline", "example_copy", "suggested_visual", "suggested_cta"),
+        ),
+        "channel_translation_covers_canonical_channels": _records_cover_values(
+            _mapping_value(world, "channel_translation_framework"),
+            field="channel",
+            required=("website", "email", "linkedin", "instagram", "tiktok", "meta", "youtube", "search"),
+            fields=("objective", "audience_behaviour", "content_role", "creative_adaptation", "recommended_asset_types", "measurement_focus"),
+        ),
+        "production_roadmap_is_phased": _mapping_fields(
+            _mapping_value(world, "production_roadmap"),
+            ("priority_assets", "phase_1", "phase_2", "phase_3", "phase_4"),
+        ),
+        "strategic_handoff_is_present": _meaningful(output.get("strategic_handoff")),
+        "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
+        "uncertainty_is_preserved": _contains_uncertainty(output),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def creative_bible_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Validate the Creative Director's Bible v2 without inferring approval."""
+    bible = output.get("creative_directors_bible")
+    checks = {
+        "message_system_is_present": _meaningful(output.get("message_system")),
+        "tone_is_present": _meaningful(output.get("tone")),
+        "distinctive_assets_are_explicit": _meaningful_list(output.get("distinctive_assets"), minimum=3),
+        "creative_principles_are_explicit": _meaningful_list(output.get("creative_principles"), minimum=3),
+        "formats_are_explicit": _meaningful_list(output.get("formats"), minimum=3),
+        "production_constraints_are_explicit": isinstance(output.get("production_constraints"), list),
+        "creative_bible_is_structured": isinstance(bible, Mapping),
+        "creative_north_star_is_complete": _mapping_fields(
+            _mapping_value(bible, "creative_north_star"),
+            ("campaign_name", "brand", "version", "date", "one_sentence_vision", "creative_ambition", "emotional_outcome", "human_truth", "narrative_tension"),
+        ),
+        "world_building_is_complete": _mapping_fields(
+            _mapping_value(bible, "world_building"),
+            ("environment", "time", "weather", "geography", "architectural_language", "surface_language"),
+        ),
+        "visual_dna_is_complete": _visual_dna(_mapping_value(bible, "visual_dna")),
+        "human_casting_is_complete": _mapping_fields(
+            _mapping_value(bible, "human_casting"),
+            ("demographics", "personality", "diversity", "expressions", "behaviour"),
+        ),
+        "wardrobe_is_complete": _mapping_fields(
+            _mapping_value(bible, "wardrobe"),
+            ("wardrobe_direction", "texture", "colour_palette", "accessories", "footwear", "avoid"),
+        ),
+        "product_language_is_complete": _mapping_fields(
+            _mapping_value(bible, "product_language"),
+            ("product_role", "product_behaviour", "product_context", "product_rules"),
+        ),
+        "camera_language_is_complete": _mapping_fields(
+            _mapping_value(bible, "camera_language"),
+            ("lens_choices", "camera_height", "movement", "framing", "pacing", "transitions", "camera_personality"),
+        ),
+        "motion_language_is_complete": _mapping_fields(
+            _mapping_value(bible, "motion_language"),
+            ("movement_principles", "motion_pacing", "use_of_stillness", "use_of_speed", "restrictions"),
+        ),
+        "sound_world_is_complete": _mapping_fields(
+            _mapping_value(bible, "sound_world"),
+            ("music", "ambient_sound", "voiceover", "silence", "rhythm", "natural_audio", "sonic_texture"),
+        ),
+        "editorial_principles_are_complete": _mapping_fields(
+            _mapping_value(bible, "editorial_principles"), ("principles", "always", "never")
+        ),
+        "campaign_asset_matrix_is_complete": _asset_matrix(_mapping_value(bible, "campaign_asset_matrix")),
+        "three_storyboards_are_complete": _storyboards(_mapping_value(bible, "storyboards")),
+        "twenty_image_prompts_are_complete": _records_with_fields(
+            _mapping_value(bible, "image_generation_pack"),
+            ("prompt_name", "purpose", "aspect_ratio", "subject", "environment", "lighting", "camera", "lens", "mood", "composition", "colour_palette", "prompt", "negative_prompt"),
+            minimum=20,
+        ),
+        "ten_video_prompts_are_complete": _records_with_fields(
+            _mapping_value(bible, "video_generation_pack"),
+            ("prompt_name", "intended_tool", "duration", "scene_description", "camera_movement", "environment", "wardrobe", "performance_direction", "lighting", "lens", "audio", "editing_rhythm", "output_quality", "prompt", "negative_prompt"),
+            minimum=10,
+        ),
+        "consistency_rules_are_complete": _mapping_fields(
+            _mapping_value(bible, "consistency_rules"),
+            ("universe_rules", "recurring_visual_cues", "recurring_behaviours", "recurring_sonic_cues", "brand_memory_devices"),
+        ),
+        "creative_quality_checklist_is_usable": _creative_quality_checklist(
+            _mapping_value(bible, "creative_quality_checklist")
+        ),
+        "creative_taste_is_attribute_based": _creative_taste(
+            _mapping_value(bible, "creative_references_and_creative_taste")
+        ),
+        "production_handoff_summary_is_present": _meaningful(
+            _mapping_value(bible, "production_handoff_summary")
+        ),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
 def _result(checks: Mapping[str, bool]) -> dict[str, Any]:
     failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
     return {"passed": not failed, "failed_checks": failed, "checks": dict(checks)}
@@ -167,6 +339,93 @@ def _bounded_text(value: Any, minimum_words: int, maximum_words: int) -> bool:
 
 def _meaningful_list(value: Any, *, minimum: int) -> bool:
     return isinstance(value, list) and len(value) >= minimum and all(_meaningful(item) for item in value)
+
+
+def _mapping_value(value: Any, key: str) -> Any:
+    return value.get(key) if isinstance(value, Mapping) else None
+
+
+def _mapping_fields(value: Any, fields: tuple[str, ...]) -> bool:
+    return isinstance(value, Mapping) and all(_meaningful(value.get(field)) for field in fields)
+
+
+def _records_with_fields(value: Any, fields: tuple[str, ...], *, minimum: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= minimum
+        and all(isinstance(item, Mapping) and all(_meaningful(item.get(field)) for field in fields) for item in value)
+    )
+
+
+def _records_cover_values(
+    value: Any,
+    *,
+    field: str,
+    required: tuple[str, ...],
+    fields: tuple[str, ...],
+) -> bool:
+    if not _records_with_fields(value, (field, *fields), minimum=len(required)):
+        return False
+    observed = {str(item.get(field) or "").strip().casefold() for item in value}
+    return set(required).issubset(observed)
+
+
+def _visual_dna(value: Any) -> bool:
+    if not _mapping_fields(
+        value,
+        ("photography_style", "colour_palette", "lighting", "contrast", "depth", "composition"),
+    ):
+        return False
+    palette = value.get("colour_palette")
+    return _mapping_fields(palette, ("primary_colours", "accent_colours", "colours_to_avoid"))
+
+
+def _asset_matrix(value: Any) -> bool:
+    required = {
+        "hero_film", "launch_film", "thirty_second_advert", "fifteen_second_advert",
+        "six_second_cutdown", "website_hero", "homepage_photography", "linkedin_campaign",
+        "instagram_campaign", "tiktok_campaign", "youtube_campaign", "display_campaign",
+        "outdoor", "email", "presentation", "podcast_artwork", "press_photography",
+        "case_study_imagery",
+    }
+    if not isinstance(value, list) or len(value) < len(required):
+        return False
+    if not _records_with_fields(
+        value,
+        ("asset_type", "role", "audience", "message", "visual_direction", "format_notes", "production_notes"),
+        minimum=len(required),
+    ):
+        return False
+    return required.issubset({str(item.get("asset_type") or "").strip().casefold() for item in value})
+
+
+def _storyboards(value: Any) -> bool:
+    if not _records_with_fields(value, ("asset_name", "objective", "audience", "narrative", "scenes", "ending", "cta"), minimum=3):
+        return False
+    return all(
+        _records_with_fields(
+            item.get("scenes"),
+            ("scene_number", "scene_description", "camera_notes", "lighting", "performance_direction", "transition"),
+            minimum=1,
+        )
+        for item in value
+    )
+
+
+def _creative_quality_checklist(value: Any) -> bool:
+    if isinstance(value, Mapping):
+        value = value.get("questions")
+    return _meaningful_list(value, minimum=8)
+
+
+def _creative_taste(value: Any) -> bool:
+    if not _mapping_fields(
+        value,
+        ("editorial_inspiration", "photography_characteristics", "film_characteristics", "design_characteristics", "creative_principles", "atmosphere_vocabulary", "creative_reference_rule"),
+    ):
+        return False
+    principles = value.get("creative_principles")
+    return _mapping_fields(principles, ("always_include", "always_avoid"))
 
 
 def _valid_source(value: Any) -> bool:
