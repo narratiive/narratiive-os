@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from runtime.models import StageRecord, WorkflowState, WorkflowStatus
+from runtime.models import ArtifactRef, StageRecord, WorkflowState, WorkflowStatus
 from runtime.workflow_business_projection import WorkflowBusinessProjectionService
 
 
@@ -107,6 +107,45 @@ class WorkflowBusinessProjectionTests(unittest.TestCase):
 
             self.assertEqual(blocked["projection_status"], "notion_dispatcher_unavailable")
             self.assertEqual(completed["projection_status"], "verified")
+
+    def test_blueprint_projection_distinguishes_internal_drive_persistence_from_delivery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            stage = StageRecord(
+                "produce_growth_blueprint_deliverable",
+                "",
+                output_artifacts=[ArtifactRef("artifact-blueprint", "workflow_step_output", "/safe/blueprint.json")],
+            )
+            current = WorkflowState(
+                workflow_id="growth_blueprint_deliverable_production",
+                run_id="safe-blueprint-deliverable",
+                stages=[stage],
+                status=WorkflowStatus.COMPLETE,
+                approval_required=True,
+                approval_status="approved",
+                workspace_id="agency",
+                client_id="northstar-test-co",
+                entity_id="notion-page-1",
+            )
+            before = WorkflowBusinessProjectionService(Path(tmp) / "before").prepare(current)
+            current.external_action_taken = True
+            current.external_action_receipts.append({
+                "idempotency_key": "safe-drive-action",
+                "receipt": {
+                    "kind": "persist_reviewed_growth_blueprint_files",
+                    "files": [{
+                        "filename": "Northstar-Growth-Blueprint.pdf",
+                        "file_id": "drive-file-1",
+                        "file_url": "https://drive.invalid/drive-file-1",
+                        "checksum": "a" * 64,
+                    }],
+                },
+            })
+            after = WorkflowBusinessProjectionService(Path(tmp) / "after").prepare(current)
+
+            self.assertEqual(before["deliverable_state"], "rendered_approved_not_persisted")
+            self.assertEqual(after["deliverable_state"], "persisted_internal_drive_not_delivered")
+            self.assertEqual(after["drive_files"][0]["file_id"], "drive-file-1")
+            self.assertEqual(after["lifecycle_stage"], "delivery")
 
 
 if __name__ == "__main__":

@@ -122,6 +122,7 @@ class WorkflowBusinessProjectionService:
 
     def _projection(self, state: WorkflowState) -> dict[str, Any]:
         latest = next((stage for stage in reversed(state.stages) if stage.output_artifacts), None)
+        deliverable_state, drive_files = _deliverable_persistence(state)
         payload = {
             "workflow_run_id": state.run_id,
             "workflow_id": state.workflow_id,
@@ -134,6 +135,8 @@ class WorkflowBusinessProjectionService:
             "latest_artifact_id": latest.output_artifacts[-1].artifact_id if latest else None,
             "runtime_updated_at": state.updated_at,
             "external_action_taken": state.external_action_taken,
+            "deliverable_state": deliverable_state,
+            "drive_files": drive_files,
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return {**payload, "projection_key": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}
@@ -189,9 +192,43 @@ def _lifecycle_stage(workflow_id: str) -> str:
         return "discovery"
     if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
         return "proposal"
-    if workflow_id in {"growth_sprint_to_research_engine", "research_to_growth_blueprint"}:
+    if workflow_id in {
+        "growth_sprint_to_research_engine",
+        "research_to_growth_blueprint",
+        "growth_blueprint_deliverable_production",
+    }:
         return "delivery"
+    if workflow_id in {"growth_blueprint_to_campaign_world", "campaign_world_to_creative_bible"}:
+        return "campaign"
     return "unchanged"
+
+
+def _deliverable_persistence(state: WorkflowState) -> tuple[str, list[dict[str, str]]]:
+    if state.workflow_id != "growth_blueprint_deliverable_production":
+        return "not_applicable", []
+    receipts = [
+        item.get("receipt")
+        for item in state.external_action_receipts
+        if isinstance(item.get("receipt"), Mapping)
+        and item["receipt"].get("kind") == "persist_reviewed_growth_blueprint_files"
+    ]
+    if not receipts:
+        return (
+            "rendered_approved_not_persisted"
+            if state.approval_status == "approved"
+            else "rendered_awaiting_approval"
+        ), []
+    files = []
+    for item in receipts[-1].get("files", []):
+        if not isinstance(item, Mapping):
+            continue
+        files.append({
+            "filename": str(item.get("filename") or "")[:240],
+            "file_id": str(item.get("file_id") or "")[:240],
+            "file_url": str(item.get("file_url") or "")[:1000],
+            "checksum": str(item.get("checksum") or "")[:64],
+        })
+    return "persisted_internal_drive_not_delivered", files
 
 
 def _now() -> str:

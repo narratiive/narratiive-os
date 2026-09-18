@@ -541,6 +541,11 @@ class NativeBusinessAdapterTests(unittest.TestCase):
                     "approval_status": "pending",
                     "lifecycle_stage": "discovery",
                     "proposed_next_action": "Review SAFE internal preparation.",
+                    "deliverable_state": "persisted_internal_drive_not_delivered",
+                    "drive_files": [{
+                        "filename": "Northstar-Growth-Blueprint.pdf",
+                        "file_url": "https://drive.invalid/file-1",
+                    }],
                 },
                 lead_id="page-1",
             )
@@ -548,6 +553,9 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         body = json.loads(router.requests[1].data)
         self.assertEqual(set(body["properties"]), {"Status", "AI Summary", "Recommended Next Action", "Approval Status", "Pipeline Stage"})
         self.assertEqual(body["properties"]["Approval Status"]["select"]["name"], "Needs Review")
+        summary = body["properties"]["AI Summary"]["rich_text"][0]["text"]["content"]
+        self.assertIn("persisted_internal_drive_not_delivered", summary)
+        self.assertIn("https://drive.invalid/file-1", summary)
         self.assertEqual(result["projection_key"], "safe-key")
 
     def test_fireflies_returns_provenanced_transcript_without_mutation(self):
