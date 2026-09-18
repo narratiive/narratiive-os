@@ -99,6 +99,13 @@ adapter. It remains unavailable until an approved sharing policy defines the
 recipient, permission role, notification behaviour and revocation/reconciliation
 rules. The adapter must not substitute public-link sharing.
 
+Approved Growth Blueprint PPTX/PDF persistence is supported as an internal
+repository write only. The binary file must be beneath the configured
+`TONY_WORKFLOW_RUNTIME_ROOT`; its extension, MIME type, size and SHA-256 checksum
+must match the exact approval-bound payload. The adapter records a stable
+idempotency key and source checksum in Drive metadata. Upload does not share the
+file, notify a client, publish advertising or authorise any downstream spend.
+
 ## Independent validation
 
 Load the canonical runtime environment without printing it, then run:

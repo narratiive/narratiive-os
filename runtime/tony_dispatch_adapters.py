@@ -87,7 +87,14 @@ def build_http_dispatchers(
                     timezone_name=str(env.get("TONY_GOOGLE_CALENDAR_TIMEZONE", "Europe/London")).strip() or "Europe/London",
                 )
             else:
-                handlers[worker] = factory(google_oauth)
+                if worker == "Google Drive":
+                    upload_root = str(env.get("TONY_WORKFLOW_RUNTIME_ROOT") or "").strip()
+                    handlers[worker] = factory(
+                        google_oauth,
+                        allowed_upload_root=Path(upload_root).expanduser() if upload_root else None,
+                    )
+                else:
+                    handlers[worker] = factory(google_oauth)
 
     if "Notion" not in handlers and str(env.get("TONY_DISPATCH_NOTION_MODE", "")).strip().casefold() == "notion_api":
         token = next(

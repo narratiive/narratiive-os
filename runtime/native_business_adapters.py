@@ -8,6 +8,7 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from email.message import EmailMessage
+from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib import parse, request
 from urllib.error import HTTPError, URLError
@@ -536,6 +537,21 @@ class GoogleCalendarDispatcher(GoogleAdapter):
 
 class GoogleDriveDispatcher(GoogleAdapter):
     api_base = "https://www.googleapis.com/drive/v3"
+    _BINARY_TYPES = {
+        ".pdf": "application/pdf",
+        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    }
+    _MAX_BINARY_UPLOAD_BYTES = 100 * 1024 * 1024
+
+    def __init__(
+        self,
+        oauth: GoogleOAuthConfig,
+        *,
+        opener: OpenUrl = request.urlopen,
+        allowed_upload_root: Path | None = None,
+    ) -> None:
+        super().__init__(oauth, opener=opener)
+        self.allowed_upload_root = Path(allowed_upload_root).resolve() if allowed_upload_root else None
 
     def probe(self) -> dict[str, Any]:
         self.client.call(f"{self.api_base}/files?pageSize=1&fields=files(id)", headers=self._headers())
@@ -596,6 +612,8 @@ class GoogleDriveDispatcher(GoogleAdapter):
             return self._create_workspace(contract, payload, target)
         if kind in {"reviewed_growth_blueprint_artifact", "growth_blueprint_revision"}:
             return self._create_text_file(contract, payload, target)
+        if kind == "reviewed_growth_blueprint_file":
+            return self._create_binary_file(contract, payload, target)
         raise BusinessAdapterError("drive_write_kind_not_supported")
 
     def _key(self, contract: Mapping[str, Any], payload: Mapping[str, Any]) -> str:
@@ -693,6 +711,99 @@ class GoogleDriveDispatcher(GoogleAdapter):
             raise BusinessAdapterError("drive_file_unverified")
         url = _text(created.get("webViewLink")) or f"https://drive.google.com/open?id={file_id}"
         return {"verified": True, "created": True, "mutation_count": 1, "file_id": file_id, "file_url": url, "url": url}
+
+    def _create_binary_file(
+        self,
+        contract: Mapping[str, Any],
+        payload: Mapping[str, Any],
+        target: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        if self.allowed_upload_root is None:
+            raise BusinessAdapterError("drive_binary_upload_root_not_configured")
+        parent = _text(payload.get("parent_folder_id") or target.get("drive_folder_id"))
+        filename = _text(payload.get("filename"))
+        local_path = Path(_text(payload.get("local_path"))).expanduser().resolve()
+        expected_checksum = _text(payload.get("checksum")).casefold()
+        if not parent or not filename or not expected_checksum:
+            raise BusinessAdapterError("drive_binary_file_requires_parent_name_and_checksum")
+        if Path(filename).name != filename or local_path.suffix.casefold() not in self._BINARY_TYPES:
+            raise BusinessAdapterError("drive_binary_file_type_not_supported")
+        mime_type = self._BINARY_TYPES[local_path.suffix.casefold()]
+        if _text(payload.get("mime_type")) != mime_type:
+            raise BusinessAdapterError("drive_binary_file_mime_type_mismatch")
+        try:
+            local_path.relative_to(self.allowed_upload_root)
+        except ValueError as exc:
+            raise BusinessAdapterError("drive_binary_file_outside_allowed_root") from exc
+        try:
+            size = local_path.stat().st_size
+        except OSError as exc:
+            raise BusinessAdapterError("drive_binary_file_unreadable") from exc
+        if size <= 0 or size > self._MAX_BINARY_UPLOAD_BYTES:
+            raise BusinessAdapterError("drive_binary_file_size_invalid")
+        try:
+            content = local_path.read_bytes()
+        except OSError as exc:
+            raise BusinessAdapterError("drive_binary_file_unreadable") from exc
+        actual_checksum = hashlib.sha256(content).hexdigest()
+        if actual_checksum != expected_checksum:
+            raise BusinessAdapterError("drive_binary_file_checksum_mismatch")
+        key = self._key(contract, payload)
+        existing = self._find_existing(key)
+        if existing:
+            url = _text(existing.get("webViewLink"))
+            return {
+                "verified": True,
+                "created": True,
+                "mutation_count": 0,
+                "duplicate_suppressed": True,
+                "file_id": _text(existing.get("id")),
+                "file_url": url,
+                "url": url,
+                "checksum": actual_checksum,
+                "mime_type": mime_type,
+                "size_bytes": size,
+            }
+        metadata = {
+            "name": filename,
+            "parents": [parent],
+            "mimeType": mime_type,
+            "appProperties": {
+                "narratiiveIdempotencyKey": key,
+                "narratiiveChecksum": actual_checksum,
+            },
+        }
+        boundary = f"narratiive-{hashlib.sha256((key + actual_checksum).encode()).hexdigest()[:24]}"
+        if boundary.encode("ascii") in content:
+            raise BusinessAdapterError("drive_binary_file_boundary_collision")
+        data = (
+            f"--{boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n".encode("utf-8")
+            + json.dumps(metadata).encode("utf-8")
+            + f"\r\n--{boundary}\r\nContent-Type: {mime_type}\r\n\r\n".encode("utf-8")
+            + content
+            + f"\r\n--{boundary}--\r\n".encode("utf-8")
+        )
+        created = self.client.call_bytes(
+            "https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink",
+            data=data,
+            headers={**self._headers(), "Content-Type": f"multipart/related; boundary={boundary}"},
+        )
+        file_id = _text(created.get("id"))
+        if not file_id:
+            raise BusinessAdapterError("drive_binary_file_unverified")
+        url = _text(created.get("webViewLink")) or f"https://drive.google.com/open?id={file_id}"
+        return {
+            "verified": True,
+            "created": True,
+            "mutation_count": 1,
+            "duplicate_suppressed": False,
+            "file_id": file_id,
+            "file_url": url,
+            "url": url,
+            "checksum": actual_checksum,
+            "mime_type": mime_type,
+            "size_bytes": size,
+        }
 
 
 class NotionWorkflowProjectionDispatcher:
