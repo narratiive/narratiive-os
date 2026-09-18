@@ -80,6 +80,11 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
     elif workflow_id == "campaign_world_to_creative_bible":
         if not isinstance(inputs.get("approved_campaign_world"), Mapping):
             raise ValueError("Creative Director's Bible preparation requires a structured approved Campaign World")
+        selection = inputs.get("campaign_world_selection")
+        if not isinstance(selection, Mapping) or not all(
+            _meaningful(selection.get(field)) for field in ("approver", "rationale", "candidate_id", "candidate_checksum")
+        ):
+            raise ValueError("Creative Director's Bible preparation requires Matt's exact Campaign World selection")
         if not isinstance(inputs.get("growth_blueprint"), Mapping):
             raise ValueError("Creative Director's Bible preparation requires the structured Growth Blueprint")
         if not isinstance(inputs.get("production_context"), Mapping):
@@ -252,6 +257,57 @@ def campaign_world_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
         "strategic_handoff_is_present": _meaningful(output.get("strategic_handoff")),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
         "uncertainty_is_preserved": _contains_uncertainty(output),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def campaign_world_candidates_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Require multiple independently valid Campaign World routes."""
+    candidates = output.get("campaign_world_candidates")
+    candidate_ids = [
+        str(item.get("candidate_id") or "").strip()
+        for item in candidates or []
+        if isinstance(item, Mapping)
+    ] if isinstance(candidates, list) else []
+    candidate_results = [
+        campaign_world_quality_gate(item)
+        for item in candidates or []
+        if isinstance(item, Mapping)
+    ] if isinstance(candidates, list) else []
+    checks = {
+        "exactly_three_campaign_world_candidates": isinstance(candidates, list) and len(candidates) == 3,
+        "candidate_ids_are_unique_and_complete": bool(candidate_ids) and len(candidate_ids) == len(candidates or []) and len(candidate_ids) == len(set(candidate_ids)),
+        "every_candidate_passes_campaign_world_contract": bool(candidate_results) and all(result.get("passed") is True for result in candidate_results),
+        "candidate_routes_are_named": isinstance(candidates, list) and all(
+            isinstance(item, Mapping) and _substantive_text(item.get("route_name"), minimum_words=2)
+            for item in candidates
+        ),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    result = _result(checks)
+    result["candidate_results"] = candidate_results
+    return result
+
+
+def campaign_world_triage_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    reviews = output.get("campaign_world_reviews")
+    brief = output.get("selection_brief")
+    ready = brief.get("ready_candidate_ids") if isinstance(brief, Mapping) else None
+    checks = {
+        "candidate_reviews_are_complete": isinstance(reviews, list) and len(reviews) >= 3 and all(
+            isinstance(item, Mapping)
+            and all(_meaningful(item.get(field)) for field in ("candidate_id", "candidate_checksum", "quality_verdict", "tony_disposition", "tony_rationale"))
+            and isinstance(item.get("taste_checks"), Mapping)
+            for item in reviews
+        ),
+        "at_least_two_candidates_are_ready_for_matt": isinstance(ready, list) and len(ready) >= 2,
+        "selection_is_explicitly_human_only": isinstance(brief, Mapping)
+        and brief.get("selection_required") is True
+        and str(brief.get("human_selector") or "").casefold() == "matt"
+        and brief.get("auto_selection_authorised") is False,
+        "publication_and_spend_remain_unauthorised": output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
         "no_false_external_execution_claim": _no_false_action(output),
     }
     return _result(checks)

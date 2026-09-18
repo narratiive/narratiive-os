@@ -250,18 +250,31 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
     approval_required=True,
 )
 
-GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD = _workflow(
-    "growth_blueprint_to_campaign_world",
-    _step(
-        "generate_campaign_world",
-        capability="strategic_reasoning",
-        inputs=("approved_growth_blueprint", "evidence_lineage", "activation_implications"),
-        outputs=("campaign_world", "strategic_handoff", "evidence_lineage"),
-        quality="campaign_world_quality_gate",
-        approval_required=True,
+GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD = WorkflowDefinition(
+    workflow_id="growth_blueprint_to_campaign_world",
+    stages=(
+        _step(
+            "generate_campaign_world",
+            capability="strategic_reasoning",
+            inputs=("approved_growth_blueprint", "evidence_lineage", "activation_implications"),
+            outputs=("campaign_world_candidates",),
+            quality="campaign_world_candidates_quality_gate",
+            approval_required=False,
+        ),
+        _step(
+            "triage_campaign_world_candidates",
+            capability="creative_quality_triage",
+            inputs=("campaign_world_candidates",),
+            outputs=("campaign_world_reviews", "selection_brief"),
+            quality="campaign_world_triage_quality_gate",
+            approval_required=True,
+        ),
     ),
     next_workflow_id="campaign_world_to_creative_bible",
     approval_required=True,
+    entity_type="client",
+    failure_policy="block_and_escalate",
+    autonomous_handoff=False,
 )
 
 CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = _workflow(
@@ -269,7 +282,7 @@ CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = _workflow(
     _step(
         "prepare_creative_bible",
         capability="copy_drafting",
-        inputs=("approved_campaign_world", "growth_blueprint", "production_context"),
+        inputs=("approved_campaign_world", "campaign_world_selection", "growth_blueprint", "production_context"),
         outputs=(
             "message_system",
             "tone",

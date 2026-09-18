@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
+import re
 from uuid import uuid4
 
 from .definitions import WorkflowDefinition
@@ -473,6 +474,43 @@ class WorkflowRunService:
         state.external_action_taken = True
         state.touch()
         self._commit(state, "external_action.recorded", record)
+        return state
+
+    def record_campaign_world_selection(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        candidate_id: str,
+        candidate_checksum: str,
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        if state.workflow_id != "growth_blueprint_to_campaign_world":
+            raise ValueError("Campaign World selection belongs to the Campaign World workflow")
+        if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
+            raise ValueError("Campaign World selection requires an approved completed review gate")
+        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+            raise ValueError("Campaign World selection requires Matt's authenticated identity")
+        decision = {
+            "decision": "campaign_world_selection",
+            "approver": approver.strip(),
+            "rationale": rationale.strip(),
+            "candidate_id": candidate_id.strip(),
+            "candidate_checksum": candidate_checksum.strip(),
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if any(not decision[key] for key in ("approver", "rationale", "candidate_id", "candidate_checksum")):
+            raise ValueError("Campaign World selection requires exact candidate approval evidence")
+        existing = [item for item in state.approval_history if item.get("decision") == "campaign_world_selection"]
+        if existing:
+            prior = existing[-1]
+            if prior.get("candidate_id") == decision["candidate_id"] and prior.get("candidate_checksum") == decision["candidate_checksum"]:
+                return state
+            raise ValueError("a different Campaign World has already been selected")
+        state.approval_history.append(decision)
+        state.touch()
+        self._commit(state, "campaign_world.selected", decision)
         return state
 
     def record_handoff(

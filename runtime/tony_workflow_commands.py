@@ -48,6 +48,16 @@ class WorkflowCommandBackend(Protocol):
         approver: str,
         rationale: str,
     ) -> Mapping[str, Any]: ...
+    def campaign_world_selection_brief(self, state: WorkflowState) -> Mapping[str, Any]: ...
+    def select_campaign_world(
+        self,
+        state: WorkflowState,
+        *,
+        candidate_id: str,
+        candidate_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
@@ -297,6 +307,28 @@ class FileWorkflowCommandBackend:
             rationale=rationale,
         )
 
+    def campaign_world_selection_brief(self, state: WorkflowState) -> Mapping[str, Any]:
+        return self._runtime(state).campaign_world_selection_brief(state.run_id)
+
+    def select_campaign_world(
+        self,
+        state: WorkflowState,
+        *,
+        candidate_id: str,
+        candidate_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState:
+        runtime = self._runtime(state)
+        runtime.select_campaign_world(
+            state.run_id,
+            candidate_id=candidate_id,
+            candidate_checksum=candidate_checksum,
+            approver=approver,
+            rationale=rationale,
+        )
+        return runtime.runs.load_run(state.run_id)
+
     def projection(self, state: WorkflowState) -> Mapping[str, Any]:
         runtime = self._runtime(state)
         if runtime.business_projection is None:
@@ -429,6 +461,7 @@ class TonyWorkflowCommandService:
         "commission",
         "artefact-detail", "artifact-detail", "action-preview", "execute-action",
         "drive-preview", "persist-drive",
+        "worlds", "select-world",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -560,6 +593,37 @@ class TonyWorkflowCommandService:
                     "healthy",
                     "Verified the approved Blueprint files in the internal Drive repository. Nothing was shared, published or sent to the client.",
                     result,
+                )
+            if name == "worlds":
+                brief = dict(self.backend.campaign_world_selection_brief(state))
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    f"{len(brief.get('ready_candidate_ids') or [])} Campaign World candidates clear Tony's bar; Matt must select one exact checksum.",
+                    brief,
+                )
+            if name == "select-world":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Campaign World selection requires Matt's authenticated identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /select-world <run> because <reason>.")
+                supplied = dict(inputs or {})
+                candidate_id = str(supplied.get("candidate_id") or "").strip()
+                candidate_checksum = str(supplied.get("candidate_checksum") or "").strip()
+                if not candidate_id or not candidate_checksum:
+                    return self._error(name, "candidate_binding_required", "Read /worlds first and supply the exact candidate ID and checksum.")
+                changed = self.backend.select_campaign_world(
+                    state,
+                    candidate_id=candidate_id,
+                    candidate_checksum=candidate_checksum,
+                    approver=principal_id,
+                    rationale=rationale,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    f"Recorded Matt's exact Campaign World selection {candidate_id}. No asset was produced, published or funded.",
+                    self._summary(changed),
                 )
             if name == "proposed":
                 return self._proposed(state)
