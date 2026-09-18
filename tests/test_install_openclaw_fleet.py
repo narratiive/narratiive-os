@@ -44,10 +44,16 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             )
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 self.assertEqual(agents[agent_id]["tools"]["profile"], "coding")
-            self.assertEqual(agents["production"]["tools"]["allow"], ["read", "write", "edit", "apply_patch"])
+            self.assertEqual(
+                agents["production"]["tools"]["allow"],
+                ["read", "write", "edit", "apply_patch", "web_fetch"],
+            )
             self.assertIn("exec", agents["production"]["tools"]["deny"])
-            self.assertEqual(agents["operations"]["tools"]["allow"], ["read"])
+            self.assertEqual(agents["operations"]["tools"]["allow"], ["read", "web_fetch"])
             self.assertEqual(agents["operations"]["sandbox"]["workspaceAccess"], "ro")
+            for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
+                self.assertIn("web_fetch", agents[agent_id]["tools"]["allow"])
+                self.assertIn("web_fetch", agents[agent_id]["tools"]["sandbox"]["tools"]["alsoAllow"])
             self.assertEqual(agents["personal"]["workspace"], "~/.openclaw/workspace-personal")
             self.assertEqual(set(merged["plugins"]["allow"]), {"existing-safe-plugin", CONTROL_PLANE_PLUGIN_ID})
             self.assertIn("/tmp/existing-plugin", merged["plugins"]["load"]["paths"])

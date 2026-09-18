@@ -73,7 +73,8 @@
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
           "profile": "coding",
-          "allow": ["read", "write", "edit", "apply_patch"],
+          "allow": ["read", "write", "edit", "apply_patch", "web_fetch"],
+          "sandbox": {"tools": {"alsoAllow": ["web_fetch"]}},
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
@@ -84,7 +85,8 @@
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
           "profile": "coding",
-          "allow": ["read", "write", "edit", "apply_patch", "browser"],
+          "allow": ["read", "write", "edit", "apply_patch", "browser", "web_fetch"],
+          "sandbox": {"tools": {"alsoAllow": ["web_fetch"]}},
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
@@ -95,7 +97,8 @@
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
           "profile": "coding",
-          "allow": ["read", "write", "edit", "apply_patch"],
+          "allow": ["read", "write", "edit", "apply_patch", "web_fetch"],
+          "sandbox": {"tools": {"alsoAllow": ["web_fetch"]}},
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       },
@@ -106,7 +109,8 @@
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
         "tools": {
           "profile": "coding",
-          "allow": ["read"],
+          "allow": ["read", "web_fetch"],
+          "sandbox": {"tools": {"alsoAllow": ["web_fetch"]}},
           "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
       }
