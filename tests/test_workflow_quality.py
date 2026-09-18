@@ -3,7 +3,9 @@ from __future__ import annotations
 import unittest
 
 from runtime.workflow_quality import (
+    campaign_world_candidates_quality_gate,
     campaign_world_quality_gate,
+    campaign_world_triage_quality_gate,
     creative_bible_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
@@ -42,7 +44,13 @@ def campaign_world_output() -> dict:
             "creative_north_star": _record(("north_star_statement", "strategic_role", "emotional_job", "behavioural_change_required")),
             "visual_world": _record(("photography_style", "lighting_style", "colour_direction", "composition_style", "environment_style", "human_casting_style", "product_treatment", "typography_direction", "motion_direction", "brand_references")),
             "tone_of_voice": _record(("voice_description", "personality_traits", "words_to_use", "words_to_avoid", "cta_style", "headline_style", "caption_style", "email_style")),
-            "campaign_territories": [_record(territories, f"Synthetic territory {index}") for index in range(3)],
+            "campaign_territories": [
+                {
+                    **_record(territories, f"Synthetic territory {index}"),
+                    "example_activations": [f"Synthetic activation {index}A", f"Synthetic activation {index}B"],
+                }
+                for index in range(3)
+            ],
             "still_image_generation_pack": [_record(still, f"Synthetic still {index}") for index in range(12)],
             "motion_generation_pack": [_record(motion, f"Synthetic motion {index}") for index in range(6)],
             "social_mockups": [
@@ -63,6 +71,20 @@ def campaign_world_output() -> dict:
         ],
         "external_action_taken": False,
     }
+
+
+def campaign_world_candidates_output() -> dict:
+    candidates = []
+    for index, route in enumerate(("Radical intimacy", "Category rebellion", "Useful wonder"), start=1):
+        item = campaign_world_output()
+        item["candidate_id"] = f"northstar-world-{index}"
+        item["route_name"] = route
+        item["campaign_world"]["creative_north_star"]["north_star_statement"] = f"{route} makes the strategic choice unmistakable"
+        for territory_index, territory in enumerate(item["campaign_world"]["campaign_territories"], start=1):
+            territory["territory_name"] = f"{route} territory {territory_index}"
+            territory["visual_direction"] = f"{route} visual language {territory_index} with specific material contrast"
+        candidates.append(item)
+    return {"campaign_world_candidates": candidates, "external_action_taken": False}
 
 
 def creative_bible_output() -> dict:
@@ -339,6 +361,33 @@ class WorkflowQualityTests(unittest.TestCase):
         result = campaign_world_quality_gate(output)
         self.assertFalse(result["passed"])
         self.assertIn("no false external execution claim", result["failed_checks"])
+
+    def test_campaign_world_candidate_and_triage_gates_require_real_human_choice(self) -> None:
+        generated = campaign_world_candidates_output()
+        self.assertTrue(campaign_world_candidates_quality_gate(generated)["passed"])
+        reviews = [{
+            "candidate_id": item["candidate_id"],
+            "candidate_checksum": f"checksum-{index}",
+            "quality_verdict": "pass",
+            "tony_disposition": "forward",
+            "tony_rationale": "This route is strategically coherent, distinctive and executable.",
+            "taste_checks": {"specific": True},
+        } for index, item in enumerate(generated["campaign_world_candidates"], start=1)]
+        triage = {
+            "campaign_world_reviews": reviews,
+            "selection_brief": {
+                "selection_required": True,
+                "human_selector": "matt",
+                "auto_selection_authorised": False,
+                "ready_candidate_ids": [item["candidate_id"] for item in generated["campaign_world_candidates"]],
+            },
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+            "external_action_taken": False,
+        }
+        self.assertTrue(campaign_world_triage_quality_gate(triage)["passed"])
+        triage["selection_brief"]["auto_selection_authorised"] = True
+        self.assertFalse(campaign_world_triage_quality_gate(triage)["passed"])
 
     def test_creative_bible_gate_enforces_canonical_production_contract(self) -> None:
         output = creative_bible_output()

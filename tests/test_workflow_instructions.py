@@ -65,13 +65,14 @@ class WorkflowInstructionTests(unittest.TestCase):
         instruction = workflow_instruction(
             "growth_blueprint_to_campaign_world",
             "generate_campaign_world",
-            ("campaign_world", "strategic_handoff", "evidence_lineage"),
+            ("campaign_world_candidates",),
         )
 
         self.assertIn("Campaign World Schema v1", instruction)
+        self.assertIn("exactly three materially different", instruction)
         self.assertIn("at least three complete campaign territories", instruction)
         self.assertIn("all eight canonical channel translations", instruction)
-        self.assertIn("Matt selection", instruction)
+        self.assertIn("Matt alone", instruction)
 
     def test_creative_bible_contract_matches_validator(self) -> None:
         instruction = workflow_instruction(

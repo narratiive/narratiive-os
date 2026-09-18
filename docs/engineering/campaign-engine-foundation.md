@@ -51,11 +51,14 @@ No advertising API is required for the foundation.
 
 1. No first-class runtime identity currently binds Client, Brand, Market,
    Product and Campaign before downstream creative work begins.
-2. The registered Growth Blueprint to Campaign World handoff produces one
-   Campaign World; it does not model several candidate worlds and a bound human
-   selection.
-3. Tony's taste judgement is not represented separately from independent
-   quality review and Matt's approval.
+2. The canonical Campaign Engine models several Campaign World candidates, and
+   the registered Growth Blueprint workflow now generates exactly three,
+   quality-checks each, records Tony's bounded taste disposition and requires
+   Matt to select one exact candidate checksum. Live-provider acceptance and
+   Matt's taste-calibration examples remain outstanding.
+3. Tony's taste judgement is now represented separately from independent
+   structural quality review and Matt's selection; it is deliberately a bounded
+   triage rubric rather than autonomous strategy or approval.
 4. Campaign World and Creative Director's Bible lifecycle state is not yet
    exposed as one durable multi-client campaign portfolio.
 5. Channel specifications and Production Pack jobs are specified but are not
@@ -143,9 +146,13 @@ that Notion changed without execution evidence.
    readiness are visible while automatic selection remains forbidden. Exact
    approval operations and explicit Notion projections remain the next
    control-surface work.
-3. **Campaign World generation** — reconcile the existing Campaign World agent
-   and template with multiple candidate generation, a quality rubric and Tony's
-   bounded taste review. Prove the flow from one approved Growth Blueprint.
+3. **Campaign World generation** — the registered workflow now requests exactly
+   three materially distinct candidates from one approved Growth Blueprint,
+   validates every candidate, routes them through Tony's deterministic taste
+   triage, pauses for human approval, and records Matt's exact ID/checksum
+   selection before Creative Bible handoff. The selection cannot produce,
+   publish, deliver or fund an asset. Live Claude acceptance and iterative taste
+   calibration against Matt's decisions remain follow-on work.
 4. **Creative Director's Bible** — reconcile the v2 draft specification with
    the stable template, persist one approved Bible, and prove version-bound
    review and revision. The runtime now binds every submitted Bible version to

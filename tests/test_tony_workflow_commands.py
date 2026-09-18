@@ -9,7 +9,12 @@ from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
-from tests.test_workflow_quality import discovery_output, growth_blueprint_output, proposal_output
+from tests.test_workflow_quality import (
+    campaign_world_candidates_output,
+    discovery_output,
+    growth_blueprint_output,
+    proposal_output,
+)
 
 
 class FallbackCommands:
@@ -131,6 +136,77 @@ class TonyWorkflowCommandTests(unittest.TestCase):
 
         proposed = self.service.execute("/proposed safe-executive-run", [])
         self.assertIn("No current proposed next action", proposed.message)
+
+    def test_campaign_world_selection_is_bound_to_matt_and_exact_candidate_checksum(self) -> None:
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-world-client",
+            dispatchers={"Claude": lambda _contract: campaign_world_candidates_output()},
+            environ={},
+        )
+        runtime.enqueue(
+            "growth_blueprint_to_campaign_world",
+            "safe-world-run",
+            {
+                "approved_growth_blueprint": {"status": "approved", "source": "synthetic"},
+                "evidence_lineage": campaign_world_candidates_output()["campaign_world_candidates"][0]["evidence_lineage"],
+                "activation_implications": {"priority": "Synthetic internal test"},
+            },
+            entity_id="safe-campaign",
+            correlation_id="safe-world-correlation",
+        )
+        runtime.advance("safe-world-run", lifecycle("safe-world-client"))
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(
+                self.root,
+                dispatchers={"Claude": lambda _contract: campaign_world_candidates_output()},
+                environ={},
+            ),
+        )
+        token = service.execute("/workflow safe-world-run", []).data["approval_token"]
+        service.execute(
+            "/approve safe-world-run because Tony candidate review is ready for selection",
+            [],
+            principal_id="telegram:matt",
+            inputs={"approval_token": token},
+        )
+        brief = service.execute("/worlds safe-world-run", [])
+        candidate = brief.data["candidates"][0]
+
+        denied = service.execute(
+            "/select-world safe-world-run because this is the strongest route",
+            [],
+            inputs={
+                "candidate_id": candidate["candidate_id"],
+                "candidate_checksum": candidate["candidate_checksum"],
+            },
+        )
+        stale = service.execute(
+            "/select-world safe-world-run because this is the strongest route",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "candidate_id": candidate["candidate_id"],
+                "candidate_checksum": "0" * 64,
+            },
+        )
+        selected = service.execute(
+            "/select-world safe-world-run because this is the strongest route",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "candidate_id": candidate["candidate_id"],
+                "candidate_checksum": candidate["candidate_checksum"],
+            },
+        )
+
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(stale.status, "error")
+        self.assertIn("stale", stale.message)
+        self.assertEqual(selected.status, "healthy")
+        self.assertFalse(selected.data["external_action_taken"])
 
     def test_legacy_approved_snapshot_does_not_present_approved_action_as_current(self) -> None:
         token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]

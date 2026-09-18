@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
+from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
@@ -27,6 +28,8 @@ from runtime.workflow_business_projection import WorkflowBusinessProjectionServi
 from runtime.workflow_registry import build_narratiive_workflow_registry
 from runtime.workflow_quality import (
     campaign_world_quality_gate,
+    campaign_world_candidates_quality_gate,
+    campaign_world_triage_quality_gate,
     creative_bible_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
@@ -140,6 +143,68 @@ class TonyWorkflowRuntime:
     def status(self, run_id: str) -> dict[str, Any]:
         return workflow_to_dict(self.runs.load_run(run_id))
 
+    def campaign_world_selection_brief(self, run_id: str) -> dict[str, Any]:
+        state = self.runs.load_run(run_id)
+        if state.workflow_id != "growth_blueprint_to_campaign_world":
+            raise ValueError("run is not a Campaign World selection gate")
+        candidates = state.input_payload.get("campaign_world_candidates")
+        brief = state.input_payload.get("selection_brief")
+        if not isinstance(candidates, list) or not isinstance(brief, Mapping):
+            raise ValueError("Campaign World selection evidence is incomplete")
+        ready = {str(item) for item in brief.get("ready_candidate_ids") or []}
+        return {
+            **dict(brief),
+            "candidates": [
+                {
+                    "candidate_id": str(item.get("candidate_id") or ""),
+                    "route_name": str(item.get("route_name") or ""),
+                    "candidate_checksum": _workflow_value_checksum(item),
+                    "ready_for_matt": str(item.get("candidate_id") or "") in ready,
+                    "creative_north_star": dict(item.get("campaign_world", {}).get("creative_north_star", {}))
+                    if isinstance(item, Mapping) and isinstance(item.get("campaign_world"), Mapping)
+                    else {},
+                }
+                for item in candidates
+                if isinstance(item, Mapping)
+            ],
+            "selection_recorded": any(
+                item.get("decision") == "campaign_world_selection" for item in state.approval_history
+            ),
+        }
+
+    def select_campaign_world(
+        self,
+        run_id: str,
+        *,
+        candidate_id: str,
+        candidate_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        state = self.runs.load_run(run_id)
+        brief = self.campaign_world_selection_brief(run_id)
+        candidates = state.input_payload.get("campaign_world_candidates")
+        selected = next(
+            (item for item in candidates if isinstance(item, Mapping) and item.get("candidate_id") == candidate_id.strip()),
+            None,
+        ) if isinstance(candidates, list) else None
+        if not isinstance(selected, Mapping):
+            raise ValueError("unknown Campaign World candidate")
+        if candidate_id.strip() not in set(brief.get("ready_candidate_ids") or []):
+            raise ValueError("Matt may select only a candidate forwarded by Tony")
+        expected = _workflow_value_checksum(selected)
+        if not candidate_checksum.strip() or expected != candidate_checksum.strip():
+            raise ValueError("Campaign World selection checksum is stale or incorrect")
+        changed = self.runs.record_campaign_world_selection(
+            run_id,
+            approver=approver,
+            rationale=rationale,
+            candidate_id=candidate_id,
+            candidate_checksum=expected,
+        )
+        self._project(changed)
+        return workflow_to_dict(changed)
+
     def handoff(
         self,
         run_id: str,
@@ -182,6 +247,28 @@ class TonyWorkflowRuntime:
                 "checksum": source_artifact.checksum,
                 "status": "quality_accepted_and_human_approved",
             }
+        if state.workflow_id == "growth_blueprint_to_campaign_world":
+            selection = next(
+                (
+                    item for item in reversed(state.approval_history)
+                    if item.get("decision") == "campaign_world_selection"
+                ),
+                None,
+            )
+            if not isinstance(selection, Mapping):
+                raise ValueError("Campaign World handoff requires Matt's exact candidate selection")
+            candidates = state.input_payload.get("campaign_world_candidates")
+            selected = next(
+                (
+                    item for item in candidates
+                    if isinstance(item, Mapping) and item.get("candidate_id") == selection.get("candidate_id")
+                ),
+                None,
+            ) if isinstance(candidates, list) else None
+            if not isinstance(selected, Mapping) or _workflow_value_checksum(selected) != selection.get("candidate_checksum"):
+                raise ValueError("recorded Campaign World selection no longer matches candidate evidence")
+            inputs["approved_campaign_world"] = dict(selected["campaign_world"])
+            inputs["campaign_world_selection"] = dict(selection)
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
                 inputs.pop(field, None)
@@ -349,6 +436,8 @@ def build_tony_workflow_runtime(
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,
+        "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
+        "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
@@ -362,6 +451,7 @@ def build_tony_workflow_runtime(
                 fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
             ),
             document_adapter=document_adapter,
+            campaign_world_triage_adapter=CampaignWorldTriageWorker(),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
@@ -372,3 +462,9 @@ def build_tony_workflow_runtime(
         dispatcher=configured_dispatchers.get("Notion"),
     )
     return TonyWorkflowRuntime(coordinator=coordinator, runs=runs, business_projection=projection)
+
+
+def _workflow_value_checksum(value: Any) -> str:
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()

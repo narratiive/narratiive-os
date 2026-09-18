@@ -109,6 +109,17 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("preparation",))
         self.assertNotIn("document-generation-unavailable", declared)
 
+    def test_tony_campaign_world_triage_is_a_distinct_local_capability(self) -> None:
+        adapter = lambda contract: {"selection_brief": {"selection_required": True}}
+        registry = build_tony_worker_registry({}, campaign_world_triage_adapter=adapter)
+
+        resolution = registry.resolve("creative_quality_triage")
+        declared = {item.metadata.worker_id for item in registry.all()}
+
+        self.assertEqual(resolution.worker_id, "tony-campaign-world-triage")
+        self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
+        self.assertNotIn("campaign-world-triage-unavailable", declared)
+
     def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
         calls = []
         registry = build_tony_worker_registry(

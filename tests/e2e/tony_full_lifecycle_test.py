@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
+from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.inbound_leads import InboundLead
 from runtime.inbound_lifecycle import project_inbound_lead
 from runtime.models import WorkflowStatus
@@ -26,6 +27,8 @@ from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, Wo
 from runtime.deliverable_production import _checksum
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
+    campaign_world_candidates_quality_gate,
+    campaign_world_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_blueprint_quality_gate,
@@ -34,7 +37,7 @@ from runtime.workflow_quality import (
 )
 from runtime.workflow_registry import WorkflowDefinition, build_narratiive_workflow_registry
 from tests.test_tony_workflow_runtime import _blueprint_output
-from tests.test_workflow_quality import discovery_output, growth_blueprint_output, proposal_output
+from tests.test_workflow_quality import campaign_world_candidates_output, discovery_output, growth_blueprint_output, proposal_output
 
 
 CLIENT_NAME = "Northstar Test Co"
@@ -137,12 +140,7 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
     if workflow_id == "growth_blueprint_deliverable_production":
         return _deliverable_output()
     if workflow_id == "growth_blueprint_to_campaign_world":
-        return {
-            "campaign_world": {"name": "Northstar Test World", "version": 1},
-            "strategic_handoff": {"source": "approved synthetic Growth Blueprint"},
-            "evidence_lineage": ["northstar-test-evidence-1"],
-            "external_action_taken": False,
-        }
+        return campaign_world_candidates_output()
     if workflow_id == "campaign_world_to_creative_bible":
         return {
             "message_system": {"promise": "Synthetic promise for test use only"},
@@ -237,6 +235,17 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             ),
             fixture_worker,
         ),
+        WorkerRegistration(
+            WorkerMetadata(
+                worker_id="northstar-test-tony-triage",
+                provider="isolated-deterministic-fixture",
+                capabilities=("creative_quality_triage",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            CampaignWorldTriageWorker(),
+        ),
     ))
     validators = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
@@ -245,10 +254,12 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "research_evidence_quality_gate": research_evidence_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
+        "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
+        "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
     }
     for definition in registry.all():
-        quality_contract = definition.stages[0].quality_contract
-        validators.setdefault(quality_contract, _strict_fixture_validator(definition))
+        for stage in definition.stages:
+            validators.setdefault(stage.quality_contract, _strict_fixture_validator(definition))
     coordinator = WorkflowExecutionCoordinator(
         registry=registry,
         workers=workers,
@@ -300,7 +311,13 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             "approved_growth_blueprint": dict(prior_output),
         },
         "campaign_world_to_creative_bible": {
-            "approved_campaign_world": prior_output.get("campaign_world"),
+            "approved_campaign_world": campaign_world_candidates_output()["campaign_world_candidates"][0]["campaign_world"],
+            "campaign_world_selection": {
+                "approver": "matt-authorised-synthetic-e2e",
+                "rationale": "Synthetic exact candidate selection.",
+                "candidate_id": "northstar-world-1",
+                "candidate_checksum": "synthetic-bound-in-runtime-chain",
+            },
             "growth_blueprint": {"source": "northstar-test-approved-blueprint"},
             "production_context": {"channels": ["Meta", "TikTok", "Google"], "test_only": True},
         },
@@ -426,6 +443,16 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
                 rationale=f"Approve isolated {CLIENT_NAME} gate for lifecycle testing only.",
                 approval_binding={"test_fixture": CLIENT_ID, "artifact_checksum": state.stages[0].output_artifacts[-1].checksum},
             )
+        if definition.workflow_id == "growth_blueprint_to_campaign_world":
+            brief = runtime.campaign_world_selection_brief(run_id)
+            selected = brief["candidates"][0]
+            runtime.select_campaign_world(
+                run_id,
+                candidate_id=selected["candidate_id"],
+                candidate_checksum=selected["candidate_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Select exact isolated Campaign World candidate.",
+            )
         if not definition.next_workflow_id:
             break
         prior_state = runtime.runs.load_run(run_id)
@@ -493,6 +520,16 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
                 approver="matt-authorised-synthetic-e2e",
                 rationale="Approve isolated native-chain test gate.",
             )
+        if definition.workflow_id == "growth_blueprint_to_campaign_world":
+            brief = runtime.campaign_world_selection_brief(run_id)
+            selected = brief["candidates"][0]
+            runtime.select_campaign_world(
+                run_id,
+                candidate_id=selected["candidate_id"],
+                candidate_checksum=selected["candidate_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Select exact isolated Campaign World candidate.",
+            )
         if not definition.next_workflow_id:
             return runtime, reached, None
         output = _latest_output(runtime, run_id)
@@ -540,7 +577,7 @@ class TonyFullLifecycleTest(unittest.TestCase):
             self.assertEqual([item.gate for item in records], expected)
             self.assertEqual(len(records), 11)
             self.assertTrue(all(item.status == "PASS" for item in records), [asdict(item) for item in records])
-            self.assertTrue(all(item.dispatched_worker == "northstar-test-fixture-worker" for item in records))
+            self.assertTrue(all(item.dispatched_worker in {"northstar-test-fixture-worker", "northstar-test-tony-triage"} for item in records))
             self.assertTrue(all(item.output_artefact for item in records))
             self.assertTrue(all("stage.completed" in item.audit_events for item in records))
             self.assertTrue(all(item.resulting_state["external_action_taken"] is False for item in records))

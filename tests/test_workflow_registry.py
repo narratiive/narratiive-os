@@ -103,6 +103,16 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertIn("editable_pptx", stage.output_contract.required_fields)
         self.assertIn("review_pdf", stage.output_contract.required_fields)
 
+    def test_campaign_world_generation_and_tony_triage_are_separate_steps(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve("growth_blueprint_to_campaign_world")
+        self.assertEqual(len(definition.stages), 2)
+        generation, triage = definition.stages
+        self.assertEqual(generation.output_contract.required_fields, ("campaign_world_candidates",))
+        self.assertFalse(generation.approval_policy.required)
+        self.assertEqual(triage.capability, "creative_quality_triage")
+        self.assertIn("selection_brief", triage.output_contract.required_fields)
+        self.assertTrue(triage.approval_policy.required)
+
     def test_unknown_duplicate_and_unsafe_workflows_fail_closed(self) -> None:
         registry = WorkflowRegistry()
         with self.assertRaises(WorkflowNotFound):

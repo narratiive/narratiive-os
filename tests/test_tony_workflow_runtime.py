@@ -7,6 +7,7 @@ from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_workflow_quality import (
     campaign_world_output,
+    campaign_world_candidates_output,
     creative_bible_output,
     discovery_output,
     growth_blueprint_output,
@@ -165,7 +166,7 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 tmp,
                 workspace_id="agency",
                 client_id="safe-client",
-                dispatchers={"Claude": lambda contract: campaign_world_output()},
+                dispatchers={"Claude": lambda contract: campaign_world_candidates_output()},
                 environ={},
             )
             lineage = campaign_world_output()["evidence_lineage"]
@@ -186,8 +187,45 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             self.assertEqual(outcome.status, "awaiting_approval")
             self.assertEqual(outcome.action, "await_human_approval")
             self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertTrue(state["stages"][1]["quality_result"]["passed"])
+            self.assertEqual(state["stages"][1]["agent_ref"], "capability:creative_quality_triage")
             self.assertEqual(state["approval_status"], "pending")
             self.assertFalse(state["external_action_taken"])
+
+            runtime.approve(
+                "safe-campaign-world-run",
+                approver="telegram:matt",
+                rationale="Approve the exact candidate review set.",
+            )
+            brief = runtime.campaign_world_selection_brief("safe-campaign-world-run")
+            self.assertEqual(len(brief["ready_candidate_ids"]), 3)
+            selected = brief["candidates"][0]
+            with self.assertRaisesRegex(ValueError, "Matt"):
+                runtime.select_campaign_world(
+                    "safe-campaign-world-run",
+                    candidate_id=selected["candidate_id"],
+                    candidate_checksum=selected["candidate_checksum"],
+                    approver="tony",
+                    rationale="Tony must never substitute for Matt.",
+                )
+            with self.assertRaisesRegex(ValueError, "stale"):
+                runtime.select_campaign_world(
+                    "safe-campaign-world-run",
+                    candidate_id=selected["candidate_id"],
+                    candidate_checksum="0" * 64,
+                    approver="telegram:matt",
+                    rationale="Stale selection test.",
+                )
+            runtime.select_campaign_world(
+                "safe-campaign-world-run",
+                candidate_id=selected["candidate_id"],
+                candidate_checksum=selected["candidate_checksum"],
+                approver="telegram:matt",
+                rationale="Select this exact route for Creative Bible development.",
+            )
+            selected_state = runtime.runs.load_run("safe-campaign-world-run")
+            self.assertEqual(selected_state.approval_history[-1]["decision"], "campaign_world_selection")
+            self.assertFalse(selected_state.external_action_taken)
 
     def test_creative_bible_uses_real_validator_and_requires_human_approval(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -203,6 +241,12 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 "safe-creative-bible-run",
                 {
                     "approved_campaign_world": {"status": "approved", "source": "synthetic"},
+                    "campaign_world_selection": {
+                        "approver": "telegram:matt",
+                        "rationale": "Synthetic exact Campaign World selection.",
+                        "candidate_id": "safe-candidate-1",
+                        "candidate_checksum": "safe-candidate-checksum",
+                    },
                     "growth_blueprint": {"status": "approved", "source": "synthetic"},
                     "production_context": {"market": "Synthetic UK test market"},
                 },
