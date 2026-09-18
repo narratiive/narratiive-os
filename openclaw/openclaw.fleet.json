@@ -59,6 +59,7 @@
         "workspace": "~/.openclaw/workspace-research",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
+          "profile": "coding",
           "allow": ["read", "write", "edit", "apply_patch", "browser", "web_search", "web_fetch"],
           "sandbox": {"tools": {"alsoAllow": ["web_search", "web_fetch"]}},
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
@@ -71,6 +72,7 @@
         "workspace": "~/.openclaw/workspace-strategy",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
+          "profile": "coding",
           "allow": ["read", "write", "edit", "apply_patch"],
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
@@ -81,6 +83,7 @@
         "workspace": "~/.openclaw/workspace-creative-director",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
+          "profile": "coding",
           "allow": ["read", "write", "edit", "apply_patch", "browser"],
           "deny": ["exec", "process", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
@@ -91,6 +94,7 @@
         "workspace": "~/.openclaw/workspace-production",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "rw"},
         "tools": {
+          "profile": "coding",
           "allow": ["read", "write", "edit", "apply_patch"],
           "deny": ["exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
@@ -101,6 +105,7 @@
         "workspace": "~/.openclaw/workspace-operations",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
         "tools": {
+          "profile": "coding",
           "allow": ["read"],
           "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
         }
