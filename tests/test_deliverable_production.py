@@ -120,6 +120,37 @@ class DeliverableProductionTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "unsafe output path"):
                 _safe_rendered_path(output, "../escaped.pptx", suffix=".pptx")
 
+    def test_record_store_loads_exact_scope_and_rejects_unsafe_identity(self) -> None:
+        source = artifact()
+        spec = build_growth_blueprint_presentation_spec(
+            source,
+            specification_id="spec-northstar-load",
+            source_blueprint_id="blueprint-northstar",
+            source_blueprint_version=1,
+            workspace_id="safe-northstar",
+            client_id="northstar-test-co",
+            title="Narratiive Growth Blueprint — Northstar Test Co",
+            brand_name="Northstar Test Co",
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            store = FileDeliverableStore(Path(temporary) / "records")
+            record = DeliverableProductionService(FakePresentationRenderer(), store).produce(
+                source,
+                specification=spec,
+                deliverable_id="northstar-load-v1",
+                output_dir=Path(temporary) / "outputs",
+                created_at="2026-09-18T00:00:00Z",
+            )
+            self.assertEqual(store.load("safe-northstar", "northstar-test-co", "northstar-load-v1"), record)
+            with self.assertRaisesRegex(ValueError, "safe identifiers"):
+                store.load("../escaped", "northstar-test-co", "northstar-load-v1")
+
+            unsafe = record.__class__(
+                **{**record.to_dict(), "workspace_id": "../escaped", "visual_qa": record.visual_qa}
+            )
+            with self.assertRaisesRegex(ValueError, "safe identifiers"):
+                store.save(unsafe)
+
 
 if __name__ == "__main__":
     unittest.main()

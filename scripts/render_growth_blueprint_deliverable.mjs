@@ -47,7 +47,8 @@ function render(slide, s, index) {
   footer(slide, s); slide.speakerNotes.textFrame.setText(`${(s.source_notes || []).join("\\n")}\\nEvidence refs (internal only): ${(s.evidence_refs || []).join(", ") || "none supplied"}`);
 }
 for (let i = 0; i < spec.slides.length; i += 1) { const s = spec.slides[i]; const slide = presentation.slides.add(); render(slide, s, i + 1); }
-const candidatePath = path.join(outputDir, ".candidate.pptx"); await (await PresentationFile.exportPptx(presentation)).save(candidatePath);
+const buildDir = path.join(outputDir, ".build"); await fs.mkdir(buildDir, { recursive: true });
+const candidatePath = path.join(buildDir, "candidate.pptx"); await (await PresentationFile.exportPptx(presentation)).save(candidatePath);
 const finalPath = path.join(outputDir, `${outputBase}.pptx`);
 const workspaceDir = path.dirname(outputDir); const reportPath = path.join(workspaceDir, `${path.basename(outputDir)}.validation.json`);
 const result = await finalizePresentation({ workspaceDir, candidatePath, finalPath, pythonExecutable: runtimePython, integrityValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_package_integrity.py"), layoutValidatorPath: path.join(skillDir, "container_tools/inspect_presentation_layout_geometry.py"), layoutArgs: ["--expected-slide-size-emu", "12192000,6858000", "--validate-heading-fit"], requiredNativeTableOwnerSlides: [], fontPolicy: { basis: "design", families: [family] }, verifyArtifactToolImport: true, receiptPath: reportPath });

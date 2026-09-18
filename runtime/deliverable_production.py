@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import subprocess
 import tempfile
 from dataclasses import dataclass
@@ -26,6 +27,10 @@ def _checksum(value: Any) -> str:
     return hashlib.sha256(_stable_json(value).encode("utf-8")).hexdigest()
 
 
+def _safe_identifier(value: str) -> bool:
+    return bool(re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", value))
+
+
 def _text(value: Any, limit: int = 480) -> str:
     text = " ".join(str(value or "").split())
     return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
@@ -33,7 +38,6 @@ def _text(value: Any, limit: int = 480) -> str:
 
 def _client_copy(value: Any, limit: int = 210) -> str:
     """Remove implementation identifiers from visible presentation copy."""
-    import re
     text = re.sub(r"\(?\s*(?:ev_[A-Za-z0-9_-]+|artifact-[A-Za-z0-9_-]+|workflow[_-][A-Za-z0-9_-]+)(?:\s*,\s*(?:ev_|artifact-|workflow[_-])[A-Za-z0-9_-]+)*\s*\)?", "", str(value or ""))
     text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
     text = " ".join(text.split()).strip(" ,;:")
@@ -375,6 +379,32 @@ class DeliverableProductionRecord:
             "template_source": self.template_source,
         }
 
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "DeliverableProductionRecord":
+        visual_qa = value.get("visual_qa")
+        if not isinstance(visual_qa, Mapping) or not isinstance(visual_qa.get("checks"), Mapping):
+            raise ValueError("deliverable record contains invalid visual QA evidence")
+        return cls(
+            deliverable_id=str(value.get("deliverable_id") or ""),
+            workspace_id=str(value.get("workspace_id") or ""),
+            client_id=str(value.get("client_id") or ""),
+            source_blueprint_id=str(value.get("source_blueprint_id") or ""),
+            source_blueprint_version=int(value.get("source_blueprint_version")),
+            specification_checksum=str(value.get("specification_checksum") or ""),
+            pptx_path=str(value.get("pptx_path") or ""),
+            pdf_path=str(value.get("pdf_path") or ""),
+            status=str(value.get("status") or ""),
+            approval_status=str(value.get("approval_status") or ""),
+            external_action_taken=value.get("external_action_taken") is True,
+            visual_qa=VisualQAResult(
+                status=str(visual_qa.get("status") or ""),
+                checks={str(key): item is True for key, item in visual_qa["checks"].items()},
+                findings=tuple(str(item) for item in visual_qa.get("findings", [])),
+            ),
+            created_at=str(value.get("created_at") or ""),
+            template_source=str(value.get("template_source") or ""),
+        )
+
 
 class PresentationRenderer(Protocol):
     def render(self, specification: PresentationSpecification, output_dir: Path) -> tuple[Path, Path, VisualQAResult]: ...
@@ -385,6 +415,11 @@ class FileDeliverableStore:
         self.root = Path(root)
 
     def save(self, record: DeliverableProductionRecord) -> Path:
+        if not all(
+            _safe_identifier(item)
+            for item in (record.workspace_id, record.client_id, record.deliverable_id)
+        ):
+            raise ValueError("deliverable record identity must use safe identifiers")
         directory = self.root / record.workspace_id / record.client_id
         directory.mkdir(parents=True, exist_ok=True)
         target = directory / f"{record.deliverable_id}.json"
@@ -402,6 +437,27 @@ class FileDeliverableStore:
             if os.path.exists(temporary):
                 os.unlink(temporary)
         return target
+
+    def load(self, workspace_id: str, client_id: str, deliverable_id: str) -> DeliverableProductionRecord | None:
+        if not all(_safe_identifier(item) for item in (workspace_id, client_id, deliverable_id)):
+            raise ValueError("deliverable record identity must use safe identifiers")
+        target = self.root / workspace_id / client_id / f"{deliverable_id}.json"
+        if not target.exists():
+            return None
+        try:
+            payload = json.loads(target.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ValueError("deliverable record is unreadable") from exc
+        if not isinstance(payload, Mapping):
+            raise ValueError("deliverable record must be an object")
+        record = DeliverableProductionRecord.from_dict(payload)
+        if (record.workspace_id, record.client_id, record.deliverable_id) != (
+            workspace_id,
+            client_id,
+            deliverable_id,
+        ):
+            raise ValueError("deliverable record identity does not match its storage scope")
+        return record
 
 
 class DeliverableProductionService:

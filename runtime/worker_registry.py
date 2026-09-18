@@ -194,6 +194,7 @@ def build_tony_worker_registry(
     dispatchers: Mapping[str, WorkerAdapter],
     environ: Mapping[str, str] | None = None,
     research_adapter: WorkerAdapter | None = None,
+    document_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
@@ -260,6 +261,24 @@ def build_tony_worker_registry(
             )
         )
 
+    if document_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-growth-blueprint-renderer",
+                    provider="narratiive-local-artifact-tool",
+                    capabilities=("document_generation", "deck_generation"),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=300,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                document_adapter,
+            )
+        )
+
     fireflies = dispatchers.get("Fireflies")
     if fireflies is not None:
         registrations.append(
@@ -285,7 +304,6 @@ def build_tony_worker_registry(
         )
 
     planned = (
-        ("document-generation-unavailable", ("document_generation", "deck_generation")),
         (
             "creative-production-unavailable",
             (
@@ -299,6 +317,8 @@ def build_tony_worker_registry(
         ("email-operations-unavailable", ("email_preparation", "email_sending")),
         ("calendar-operations-unavailable", ("calendar_operations",)),
     )
+    if document_adapter is None:
+        planned = (("document-generation-unavailable", ("document_generation", "deck_generation")), *planned)
     if research_adapter is None:
         planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
     if fireflies is None:

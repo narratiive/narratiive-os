@@ -98,6 +98,8 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertEqual(stage.capability, "document_generation")
         self.assertEqual(stage.side_effect_classification, "preparation")
         self.assertTrue(stage.approval_policy.required)
+        self.assertIn("blueprint_identity", stage.input_contract.required_fields)
+        self.assertIn("client_context", stage.input_contract.required_fields)
         self.assertIn("editable_pptx", stage.output_contract.required_fields)
         self.assertIn("review_pdf", stage.output_contract.required_fields)
 

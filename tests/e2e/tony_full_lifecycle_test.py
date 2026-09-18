@@ -23,6 +23,7 @@ from runtime.worker_registry import (
     WorkerRegistration,
 )
 from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, WorkflowExecutionCoordinator
+from runtime.deliverable_production import _checksum
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     discovery_preparation_quality_gate,
@@ -287,6 +288,12 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
         "research_to_growth_blueprint": {},
         "growth_blueprint_deliverable_production": {
             "quality_accepted_growth_blueprint": dict(prior_output),
+            "blueprint_identity": {
+                "artifact_id": "artifact-northstar-test-approved-blueprint",
+                "version": 1,
+                "checksum": _checksum(prior_output),
+            },
+            "client_context": common_context,
             "blueprint_canon": {"bundle": "synthetic-test-only", "checksum": "northstar-test-canon"},
         },
         "growth_blueprint_to_campaign_world": {
