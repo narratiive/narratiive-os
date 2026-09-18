@@ -3,12 +3,127 @@ from __future__ import annotations
 import unittest
 
 from runtime.workflow_quality import (
+    campaign_world_quality_gate,
+    creative_bible_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
     validate_operational_inputs,
 )
+
+
+def _record(fields: tuple[str, ...], label: str = "Synthetic Northstar Test Co direction") -> dict:
+    return {field: f"{label}: {field}" for field in fields}
+
+
+def campaign_world_output() -> dict:
+    territories = (
+        "territory_name", "strategic_role", "audience_job", "key_message", "visual_direction",
+        "copy_direction", "emotional_outcome", "example_activations", "channel_recommendations",
+    )
+    still = (
+        "asset_name", "strategic_purpose", "channel", "creative_description", "sora_prompt",
+        "recommended_dimensions", "notes",
+    )
+    motion = (
+        "asset_name", "strategic_purpose", "channel", "duration", "creative_description",
+        "shot_structure", "sora_prompt", "call_to_action", "notes",
+    )
+    social = ("creative_concept", "example_headline", "example_copy", "suggested_visual", "suggested_cta")
+    channel = (
+        "objective", "audience_behaviour", "content_role", "creative_adaptation",
+        "recommended_asset_types", "measurement_focus",
+    )
+    return {
+        "campaign_world": {
+            "client_information": _record(("client_name", "industry", "category", "growth_blueprint_link", "date_created", "campaign_world_version")),
+            "strategic_foundation": _record(("core_problem", "growth_opportunity", "strategic_positioning", "audience_summary", "core_narrative")),
+            "creative_north_star": _record(("north_star_statement", "strategic_role", "emotional_job", "behavioural_change_required")),
+            "visual_world": _record(("photography_style", "lighting_style", "colour_direction", "composition_style", "environment_style", "human_casting_style", "product_treatment", "typography_direction", "motion_direction", "brand_references")),
+            "tone_of_voice": _record(("voice_description", "personality_traits", "words_to_use", "words_to_avoid", "cta_style", "headline_style", "caption_style", "email_style")),
+            "campaign_territories": [_record(territories, f"Synthetic territory {index}") for index in range(3)],
+            "still_image_generation_pack": [_record(still, f"Synthetic still {index}") for index in range(12)],
+            "motion_generation_pack": [_record(motion, f"Synthetic motion {index}") for index in range(6)],
+            "social_mockups": [
+                {"platform": platform, **_record(social)}
+                for platform in ("LinkedIn", "Instagram", "TikTok", "Facebook", "YouTube Shorts", "X")
+            ],
+            "channel_translation_framework": [
+                {"channel": name, **_record(channel)}
+                for name in ("Website", "Email", "LinkedIn", "Instagram", "TikTok", "Meta", "YouTube", "Search")
+            ],
+            "production_roadmap": _record(("priority_assets", "phase_1", "phase_2", "phase_3", "phase_4")),
+        },
+        "strategic_handoff": "Synthetic handoff; audience proof remains uncertain and requires validation.",
+        "evidence_lineage": [
+            {"claim": "Synthetic fact", "classification": "fact", "source_refs": ["blueprint:1"]},
+            {"claim": "Synthetic interpretation", "classification": "interpretation", "source_refs": ["blueprint:1"]},
+            {"claim": "Synthetic hypothesis", "classification": "hypothesis", "source_refs": ["blueprint:1"]},
+        ],
+        "external_action_taken": False,
+    }
+
+
+def creative_bible_output() -> dict:
+    asset_types = (
+        "hero_film", "launch_film", "thirty_second_advert", "fifteen_second_advert",
+        "six_second_cutdown", "website_hero", "homepage_photography", "linkedin_campaign",
+        "instagram_campaign", "tiktok_campaign", "youtube_campaign", "display_campaign",
+        "outdoor", "email", "presentation", "podcast_artwork", "press_photography", "case_study_imagery",
+    )
+    image_fields = (
+        "prompt_name", "purpose", "aspect_ratio", "subject", "environment", "lighting", "camera",
+        "lens", "mood", "composition", "colour_palette", "prompt", "negative_prompt",
+    )
+    video_fields = (
+        "prompt_name", "intended_tool", "duration", "scene_description", "camera_movement",
+        "environment", "wardrobe", "performance_direction", "lighting", "lens", "audio",
+        "editing_rhythm", "output_quality", "prompt", "negative_prompt",
+    )
+    scene = _record(("scene_number", "scene_description", "camera_notes", "lighting", "performance_direction", "transition"))
+    bible = {
+        "creative_north_star": _record(("campaign_name", "brand", "version", "date", "one_sentence_vision", "creative_ambition", "emotional_outcome", "human_truth", "narrative_tension")),
+        "world_building": _record(("environment", "time", "weather", "geography", "architectural_language", "surface_language")),
+        "visual_dna": {
+            **_record(("photography_style", "lighting", "contrast", "depth", "composition")),
+            "colour_palette": _record(("primary_colours", "accent_colours", "colours_to_avoid")),
+        },
+        "human_casting": _record(("demographics", "personality", "diversity", "expressions", "behaviour")),
+        "wardrobe": _record(("wardrobe_direction", "texture", "colour_palette", "accessories", "footwear", "avoid")),
+        "product_language": _record(("product_role", "product_behaviour", "product_context", "product_rules")),
+        "camera_language": _record(("lens_choices", "camera_height", "movement", "framing", "pacing", "transitions", "camera_personality")),
+        "motion_language": _record(("movement_principles", "motion_pacing", "use_of_stillness", "use_of_speed", "restrictions")),
+        "sound_world": _record(("music", "ambient_sound", "voiceover", "silence", "rhythm", "natural_audio", "sonic_texture")),
+        "editorial_principles": _record(("principles", "always", "never")),
+        "campaign_asset_matrix": [
+            {"asset_type": asset_type, **_record(("role", "audience", "message", "visual_direction", "format_notes", "production_notes"))}
+            for asset_type in asset_types
+        ],
+        "storyboards": [
+            {**_record(("asset_name", "objective", "audience", "narrative", "ending", "cta"), f"Synthetic storyboard {index}"), "scenes": [scene]}
+            for index in range(3)
+        ],
+        "image_generation_pack": [_record(image_fields, f"Synthetic image prompt {index}") for index in range(20)],
+        "video_generation_pack": [_record(video_fields, f"Synthetic video prompt {index}") for index in range(10)],
+        "consistency_rules": _record(("universe_rules", "recurring_visual_cues", "recurring_behaviours", "recurring_sonic_cues", "brand_memory_devices")),
+        "creative_quality_checklist": {"questions": [f"Synthetic quality question {index}?" for index in range(8)]},
+        "creative_references_and_creative_taste": {
+            **_record(("editorial_inspiration", "photography_characteristics", "film_characteristics", "design_characteristics", "atmosphere_vocabulary", "creative_reference_rule")),
+            "creative_principles": _record(("always_include", "always_avoid")),
+        },
+        "production_handoff_summary": "Internal handoff only; approval remains pending.",
+    }
+    return {
+        "message_system": _record(("promise", "proof", "call_to_action")),
+        "tone": _record(("voice", "range", "guardrails")),
+        "distinctive_assets": ["Synthetic signal", "Synthetic colour", "Synthetic behaviour"],
+        "creative_principles": ["Human truth", "Specific detail", "Coherent world"],
+        "formats": ["Still", "Motion", "Social"],
+        "production_constraints": ["Human approval before production or publication"],
+        "creative_directors_bible": bible,
+        "external_action_taken": False,
+    }
 
 
 def discovery_output() -> dict:
@@ -204,6 +319,46 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
         output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
         self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_campaign_world_gate_enforces_canonical_world_and_channel_coverage(self) -> None:
+        output = campaign_world_output()
+        self.assertTrue(campaign_world_quality_gate(output)["passed"])
+
+        output["campaign_world"]["campaign_territories"] = output["campaign_world"]["campaign_territories"][:2]
+        output["campaign_world"]["channel_translation_framework"] = [
+            item for item in output["campaign_world"]["channel_translation_framework"] if item["channel"] != "Meta"
+        ]
+        result = campaign_world_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("three campaign territories are complete", result["failed_checks"])
+        self.assertIn("channel translation covers canonical channels", result["failed_checks"])
+
+    def test_campaign_world_gate_rejects_false_publication_claim(self) -> None:
+        output = campaign_world_output()
+        output["status_note"] = "Published to the client"
+        result = campaign_world_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("no false external execution claim", result["failed_checks"])
+
+    def test_creative_bible_gate_enforces_canonical_production_contract(self) -> None:
+        output = creative_bible_output()
+        self.assertTrue(creative_bible_quality_gate(output)["passed"])
+
+        output["creative_directors_bible"]["image_generation_pack"] = output["creative_directors_bible"]["image_generation_pack"][:19]
+        output["creative_directors_bible"]["storyboards"][0]["scenes"] = []
+        result = creative_bible_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("twenty image prompts are complete", result["failed_checks"])
+        self.assertIn("three storyboards are complete", result["failed_checks"])
+
+    def test_creative_bible_gate_rejects_missing_taste_and_false_execution(self) -> None:
+        output = creative_bible_output()
+        output["creative_directors_bible"]["creative_references_and_creative_taste"] = {}
+        output["release_note"] = "Publication completed"
+        result = creative_bible_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("creative taste is attribute based", result["failed_checks"])
+        self.assertIn("no false external execution claim", result["failed_checks"])
 
 
 if __name__ == "__main__":

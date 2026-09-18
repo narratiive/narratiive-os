@@ -61,6 +61,30 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("evidence_and_uncertainty must be a list of at least three", instruction)
         self.assertIn('recommendation must be the exact JSON string "advance"', instruction)
 
+    def test_campaign_world_contract_matches_validator(self) -> None:
+        instruction = workflow_instruction(
+            "growth_blueprint_to_campaign_world",
+            "generate_campaign_world",
+            ("campaign_world", "strategic_handoff", "evidence_lineage"),
+        )
+
+        self.assertIn("Campaign World Schema v1", instruction)
+        self.assertIn("at least three complete campaign territories", instruction)
+        self.assertIn("all eight canonical channel translations", instruction)
+        self.assertIn("Matt selection", instruction)
+
+    def test_creative_bible_contract_matches_validator(self) -> None:
+        instruction = workflow_instruction(
+            "campaign_world_to_creative_bible",
+            "prepare_creative_bible",
+            ("creative_directors_bible",),
+        )
+
+        self.assertIn("Creative Director's Bible v2", instruction)
+        self.assertIn("twenty complete image prompts", instruction)
+        self.assertIn("ten complete video prompts", instruction)
+        self.assertIn("Matt approval", instruction)
+
 
 if __name__ == "__main__":
     unittest.main()
