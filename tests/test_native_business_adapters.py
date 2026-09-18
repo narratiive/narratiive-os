@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import base64
+import hashlib
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 from urllib.error import HTTPError
 from datetime import datetime, timezone
@@ -421,6 +424,61 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["file_id"], "file-1")
         self.assertIn("uploadType=multipart", router.requests[1].full_url)
         self.assertIn("multipart/related", router.requests[1].get_header("Content-type"))
+
+    def test_drive_reviewed_binary_upload_requires_exact_root_type_and_checksum(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            deck = root / "Northstar Growth Blueprint.pptx"
+            content = b"PK\x03\x04 SAFE synthetic PPTX package"
+            deck.write_bytes(content)
+            router = Router([{"files": []}, {"id": "file-pptx", "webViewLink": "https://drive.google.invalid/file-pptx"}])
+            adapter = GoogleDriveDispatcher(
+                GoogleOAuthConfig(access_token="synthetic"),
+                opener=router,
+                allowed_upload_root=root,
+            )
+            result = adapter(
+                approved_contract(
+                    {
+                        "kind": "reviewed_growth_blueprint_file",
+                        "parent_folder_id": "folder-1",
+                        "filename": deck.name,
+                        "local_path": str(deck),
+                        "checksum": hashlib.sha256(content).hexdigest(),
+                        "mime_type": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    }
+                )
+            )
+            self.assertEqual(result["file_id"], "file-pptx")
+            self.assertEqual(result["checksum"], hashlib.sha256(content).hexdigest())
+            self.assertIn(content, router.requests[1].data)
+
+    def test_drive_binary_upload_rejects_unapproved_path_and_checksum(self):
+        with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as outside:
+            root = Path(temporary)
+            file = Path(outside) / "unsafe.pdf"
+            file.write_bytes(b"%PDF-1.7 safe test")
+            adapter = GoogleDriveDispatcher(
+                GoogleOAuthConfig(access_token="synthetic"),
+                opener=Router([{"files": []}]),
+                allowed_upload_root=root,
+            )
+            payload = {
+                "kind": "reviewed_growth_blueprint_file",
+                "parent_folder_id": "folder-1",
+                "filename": file.name,
+                "local_path": str(file),
+                "checksum": hashlib.sha256(file.read_bytes()).hexdigest(),
+                "mime_type": "application/pdf",
+            }
+            with self.assertRaisesRegex(BusinessAdapterError, "outside_allowed_root"):
+                adapter(approved_contract(payload))
+
+            inside = root / "safe.pdf"
+            inside.write_bytes(file.read_bytes())
+            payload.update({"filename": inside.name, "local_path": str(inside), "checksum": "0" * 64})
+            with self.assertRaisesRegex(BusinessAdapterError, "checksum_mismatch"):
+                adapter(approved_contract(payload))
 
     def test_notion_projection_requires_approval_and_suppresses_matching_marker(self):
         adapter = NotionWorkflowProjectionDispatcher("synthetic", "source-1", opener=Router([]))
