@@ -40,6 +40,17 @@ def _client_copy(value: Any, limit: int = 210) -> str:
     return _text(text, limit)
 
 
+def _safe_rendered_path(output_dir: Path, value: Any, *, suffix: str) -> Path:
+    root = output_dir.resolve()
+    candidate = Path(str(value or ""))
+    if not candidate.is_absolute():
+        candidate = root / candidate
+    candidate = candidate.resolve()
+    if candidate.parent != root or candidate.suffix.casefold() != suffix:
+        raise RuntimeError("presentation renderer returned an unsafe output path")
+    return candidate
+
+
 @dataclass(frozen=True, slots=True)
 class PresentationSlideSpec:
     slide_no: int
@@ -122,6 +133,7 @@ def _human_source_note(section: str) -> str:
 def build_directed_growth_blueprint_presentation_spec(
     artifact: Mapping[str, Any], *, specification_id: str, source_blueprint_id: str,
     source_blueprint_version: int, workspace_id: str, client_id: str, title: str,
+    brand_name: str,
 ) -> PresentationSpecification:
     """Create a director-led, variable-length story from the approved strategy.
 
@@ -143,38 +155,41 @@ def build_directed_growth_blueprint_presentation_spec(
         return _client_copy(value, min(limit, 150)) or "The approved source does not support a stronger conclusion here."
     def refs(key: str) -> tuple[str, ...]:
         return tuple(str(v) for v in sections[key].get("evidence_refs") or () if str(v).strip())
+    brand = _client_copy(brand_name, 100)
+    if not brand:
+        raise ValueError("brand_name is required for presentation production")
     # The sequence follows an argument: case for change -> diagnosis -> choice -> activation.
     plan = [
-        ("The Narratiive Growth Blueprint", "Rave Coffee", "Strategic clarity for scalable growth.", "thesis", "growth_opportunity"),
+        ("The Narratiive Growth Blueprint", brand, "Strategic clarity for scalable growth.", "thesis", "growth_opportunity"),
         ("The executive thesis", text("growth_opportunity"), "The answer is a choice about clarity, memory and momentum.", "thesis", "growth_opportunity"),
-        ("The commercial question", "Where could Rave's next meaningful growth come from?", "Move from marketing activity to being easier to choose.", "question", "evidence_and_uncertainty"),
+        ("The commercial question", f"Where could {brand}'s next meaningful growth come from?", "Move from marketing activity to being easier to choose.", "question", "evidence_and_uncertainty"),
         ("Market reality", text("market_category_diagnosis"), "New category conditions change what growth must earn.", "market_forces", "market_category_diagnosis"),
         ("Category growth dynamics", text("market_category_diagnosis", "implication"), "Name the battlefield: demand, distinction, distribution or trust.", "comparison", "market_category_diagnosis"),
         ("Competitive landscape", text("source_of_difference"), "The category's default behaviour is visible in how brands compete.", "competitive_landscape", "source_of_difference"),
-        ("The Sea of Sameness", "The category's language and visual codes are converging.", "If every brand says quality, craft and freshness, Rave needs a more memorable reason to be chosen.", "sea_of_sameness", "source_of_difference"),
+        ("The Sea of Sameness", "The category's language and visual codes are converging.", f"When familiar category promises become interchangeable, {brand} needs a more memorable reason to be chosen.", "sea_of_sameness", "source_of_difference"),
         ("The market gap", text("growth_opportunity"), "The opportunity is a new interpretation of the category, not simply another audience.", "opportunity", "growth_opportunity"),
         ("Growth constraint diagnosis", text("growth_barriers"), "Weak growth is not automatically a channel problem.", "diagnosis", "growth_barriers"),
-        ("The provocation", "Rave cannot scale a trust-dependent proposition while its proof remains unresolved.", "Resolve the contradiction before buying more attention.", "provocation", "growth_barriers"),
+        ("The provocation", f"{brand} cannot scale a trust-dependent proposition while its proof remains unresolved.", "Resolve the contradiction before buying more attention.", "provocation", "growth_barriers"),
         ("Audience reality", text("audience"), "The future growth audience may not look like today's customer.", "audience", "audience"),
         ("Audience segments / demand pools", text("audience", "implication"), "Segment by growth opportunity, not persona fiction.", "demand_pools", "audience"),
         ("Customer evidence board", text("audience"), "Observed signals are directional; interpretation remains bounded.", "evidence_board", "audience"),
         ("Audience tensions / decision context", text("audience", "implication"), "Confidence is built or lost at specific moments.", "journey", "audience"),
-        ("Category entry points", text("positioning"), "The planning question is when Rave should be remembered.", "entry_points", "positioning"),
-        ("Current brand diagnosis", text("source_of_difference"), "Earn trust by being candid about what the brand currently means.", "comparison", "source_of_difference"),
+        ("Category entry points", text("positioning"), f"The planning question is when {brand} should be remembered.", "entry_points", "positioning"),
+        ("Current brand diagnosis", text("source_of_difference"), f"Earn trust by being candid about what {brand} currently means.", "comparison", "source_of_difference"),
         ("The positioning problem", text("positioning"), "The gap is between what the business says and what the market hears.", "diagnosis", "positioning"),
         ("Strategic positioning", text("positioning", "implication"), "Make the strategic anchor brutally simple and testable.", "positioning", "positioning"),
         ("Positioning map", text("positioning"), "Use axes that expose strategic tension, not generic premium/value.", "positioning_map", "positioning"),
         ("Narrative platform", text("narrative"), "Tension, shift and resolution join insight to activation.", "narrative", "narrative"),
         ("Core message architecture", text("narrative", "implication"), "Messaging is a decision system, not a slogan bank.", "message_architecture", "narrative"),
         ("Messaging territories", text("narrative"), "Each territory has a job: trust, desire, risk reduction or action.", "comparison", "narrative"),
-        ("Distinctive assets", "Distinctiveness should compound as recognisable verbal, visual and tonal codes.", "Build a small set of codes that make Rave recognisable before the logo appears.", "evidence_board", "source_of_difference"),
+        ("Distinctive assets", "Distinctiveness should compound as recognisable verbal, visual and tonal codes.", f"Build a small set of codes that make {brand} recognisable before the logo appears.", "evidence_board", "source_of_difference"),
         ("Attention strategy", text("activation_implications"), "The question is what people will notice, remember and connect.", "flywheel", "activation_implications"),
         ("Channel roles", text("activation_implications", "implication"), "Every channel earns one strategic role.", "channel_roles", "activation_implications"),
         ("Content / campaign system", text("narrative", "implication"), "Narrative becomes themes, campaigns, assets, distribution and learning.", "campaign_system", "narrative"),
-        ("Creative territories / lookbook", "Translate the strategic position into a world of warm, witty, everyday coffee.", "Use real kitchens, deadpan type, sensory detail and reassuring proof as creative routes to test.", "creative_territories", "activation_implications"),
+        ("Creative territories / lookbook", text("activation_implications"), "Translate only the approved activation implications into distinctive creative routes for testing.", "creative_territories", "activation_implications"),
         ("90-day activation plan", text("key_strategic_choices", "implication"), "Prove the strategy before scaling it.", "roadmap", "key_strategic_choices"),
         ("Measurement framework", "Measurement must capture movement in attention, confidence, choice and repeat.", "Set baselines and guardrails across attention, search, conversion, repeat and learning.", "measurement", "evidence_and_uncertainty"),
-        ("Strategic principle / closing mandate", "Make Rave easier to notice, trust, remember and choose.", "The strategy is to make the proposition easier to trust, understand and choose before scaling activity.", "closing", "key_strategic_choices"),
+        ("Strategic principle / closing mandate", f"Make {brand} easier to notice, trust, remember and choose.", "The strategy is to make the proposition easier to trust, understand and choose before scaling activity.", "closing", "key_strategic_choices"),
     ]
     slides = tuple(PresentationSlideSpec(
         slide_no=i, title=heading, takeaway=takeaway, body=body,
@@ -185,9 +200,9 @@ def build_directed_growth_blueprint_presentation_spec(
         specification_id=specification_id, source_blueprint_id=source_blueprint_id,
         source_blueprint_version=source_blueprint_version, workspace_id=workspace_id,
         client_id=client_id, title=title, status="ready_for_production",
-        template_source="Narratiive editorial benchmark grammar: dark ink, warm ivory, amber accent, serif hero typography, variable editorial pacing; benchmark PDF NOS-BLUEPRINT-RAVE-v1.pdf",
+        template_source="Narratiive editorial grammar: dark ink, warm ivory, amber accent, serif hero typography and variable editorial pacing.",
         slides=slides, source_checksum=_checksum(artifact),
-        notes=("SAFE INTERNAL STRATEGIC PILOT — NOT COMMISSIONED — NO CONTACT", "Presentation Director plan; raw lineage is retained in notes and source records."),
+        notes=("INTERNAL REVIEW DRAFT — HUMAN APPROVAL REQUIRED", "Presentation Director plan; raw lineage is retained in notes and source records."),
     )
 
 
@@ -205,6 +220,7 @@ def build_growth_blueprint_presentation_spec(
     workspace_id: str,
     client_id: str,
     title: str,
+    brand_name: str,
 ) -> PresentationSpecification:
     """Map the canonical structured output to the fixed master Blueprint story.
 
@@ -212,6 +228,9 @@ def build_growth_blueprint_presentation_spec(
     revise strategic conclusions, numbers, evidence or recommendations.
     """
 
+    brand = _client_copy(brand_name, 100)
+    if not brand:
+        raise ValueError("brand_name is required for presentation production")
     sections = {
         key: _section(artifact, key)
         for key in (
@@ -234,12 +253,12 @@ def build_growth_blueprint_presentation_spec(
 
     plan = [
         ("Growth thesis", "The strategic answer is a bounded, testable opportunity rather than a forecast.", diag("growth_opportunity"), "thesis", "statement"),
-        ("Executive thesis", "Rave's next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
-        ("The commercial question", "Where could Rave's next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
-        ("Market reality", "Category context creates pressure, but does not diagnose Rave by itself.", diag("market_category_diagnosis"), "market", "comparison"),
+        ("Executive thesis", f"{brand}'s next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
+        ("The commercial question", f"Where could {brand}'s next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
+        ("Market reality", f"Category context creates pressure, but does not diagnose {brand} by itself.", diag("market_category_diagnosis"), "market", "comparison"),
         ("Category growth dynamics", "Premiumisation and category polarisation make the middle harder to defend.", uncertainty("market_category_diagnosis"), "market", "framework"),
-        ("Competitive landscape", "Competitors own different trust and value cues; Rave's combination remains a hypothesis.", diag("source_of_difference"), "competition", "comparison"),
-        ("The sea of sameness", "Accessible specialty needs a reason to be remembered, not another generic quality claim.", implication("source_of_difference"), "competition", "comparison"),
+        ("Competitive landscape", f"Competitors own different trust and value cues; {brand}'s combination remains a hypothesis.", diag("source_of_difference"), "competition", "comparison"),
+        ("The sea of sameness", f"{brand} needs a reason to be remembered, not another generic category claim.", implication("source_of_difference"), "competition", "comparison"),
         ("The market gap", "The opportunity is a specific, reversible bet grounded in the evidence available.", diag("growth_opportunity"), "opportunity", "matrix"),
         ("Growth constraint diagnosis", "Trust and conversion are constrained by unresolved proof and proposition questions.", diag("growth_barriers"), "constraint", "framework"),
         ("The provocation", "A public trust contradiction can undermine a trust-dependent growth story.", implication("growth_barriers"), "constraint", "statement"),
@@ -248,10 +267,10 @@ def build_growth_blueprint_presentation_spec(
         ("Customer evidence board", "The available customer signal is directional, small and self-selected.", diag("audience"), "audience", "evidence"),
         ("Audience tensions / decision context", "The useful tension is between breadth of appeal and clarity of choice.", implication("audience"), "audience", "framework"),
         ("Category entry points", "Different entry points may require different proof and proposition jobs.", diag("positioning"), "positioning", "framework"),
-        ("Current brand diagnosis", "Rave's accessible, irreverent proposition is observable; its effectiveness is not proven.", diag("source_of_difference"), "positioning", "comparison"),
+        ("Current brand diagnosis", f"{brand}'s current proposition is observable; its effectiveness is not proven.", diag("source_of_difference"), "positioning", "comparison"),
         ("Positioning problem", "The positioning hypothesis depends on resolving a credibility contradiction first.", diag("positioning"), "positioning", "tension"),
-        ("Strategic positioning", "Specialty-grade coffee made unpretentious and accessible is a testable hypothesis.", diag("positioning"), "positioning", "statement"),
-        ("Positioning map", "Rave should test ownable territory against real customer perception, not marketing copy alone.", uncertainty("positioning"), "positioning", "matrix"),
+        ("Strategic positioning", "The approved positioning is a testable strategic hypothesis, not a proven market fact.", diag("positioning"), "positioning", "statement"),
+        ("Positioning map", f"{brand} should test ownable territory against real customer perception, not marketing copy alone.", uncertainty("positioning"), "positioning", "matrix"),
         ("Narrative platform", "A clearer progression could turn breadth of range into a guided reason to return.", diag("narrative"), "narrative", "framework"),
         ("Core message architecture", "One front door can make two subscription jobs easier to understand.", implication("narrative"), "narrative", "framework"),
         ("Messaging territories / distinctive assets", "Distinctiveness must be earned through proof, not asserted through tone.", uncertainty("narrative"), "narrative", "comparison"),
@@ -289,7 +308,7 @@ def build_growth_blueprint_presentation_spec(
         template_source="Narratiive Blueprint canon v1 visual framework library and visual intelligence system; native PPTX template not present in repository",
         slides=slides,
         source_checksum=source_checksum,
-        notes=("SAFE INTERNAL STRATEGIC PILOT — NOT COMMISSIONED — NO CONTACT",),
+        notes=("INTERNAL REVIEW DRAFT — HUMAN APPROVAL REQUIRED",),
     )
 
 
@@ -453,8 +472,12 @@ class LocalArtifactToolPresentationRenderer:
         environment = dict(os.environ)
         environment.update({"RUNTIME_NODE_MODULES": str(self.node_modules), "SKILL_DIR": str(self.skill_dir), "RUNTIME_PYTHON": str(self.python)})
         subprocess.run([str(self.node), str(self.render_script), str(spec_path), str(output_dir)], check=True, env=environment, capture_output=True, text=True)
-        pptx = output_dir / "Rave-Growth-Blueprint-SAFE-Pilot.pptx"
-        pdf = output_dir / "Rave-Growth-Blueprint-SAFE-Pilot.pdf"
+        receipt_path = output_dir / "render-receipt.json"
+        if not receipt_path.is_file():
+            raise RuntimeError("presentation renderer did not return a render receipt")
+        receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+        pptx = _safe_rendered_path(output_dir, receipt.get("pptx"), suffix=".pptx")
+        pdf = _safe_rendered_path(output_dir, receipt.get("pdf"), suffix=".pdf")
         subprocess.run([str(self.python), str(self.pdf_script), str(output_dir / ".rendered-slides"), str(pdf)], check=True, capture_output=True, text=True)
         validation = output_dir.parent / f"{output_dir.name}.validation.json"
         checks = {
