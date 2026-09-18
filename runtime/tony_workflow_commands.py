@@ -18,6 +18,7 @@ from runtime.tony_internal_review_delivery import (
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
 from runtime.workflow_action_preview import WorkflowActionPreviewService
+from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersistenceService
 from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 
@@ -36,6 +37,16 @@ class WorkflowCommandBackend(Protocol):
     ) -> Mapping[str, Any]: ...
     def execute_action(
         self, state: WorkflowState, *, action_digest: str, approver: str, rationale: str
+    ) -> Mapping[str, Any]: ...
+    def drive_persistence_preview(self, state: WorkflowState, *, drive_folder_id: str) -> Mapping[str, Any]: ...
+    def execute_drive_persistence(
+        self,
+        state: WorkflowState,
+        *,
+        drive_folder_id: str,
+        action_digest: str,
+        approver: str,
+        rationale: str,
     ) -> Mapping[str, Any]: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
@@ -253,6 +264,39 @@ class FileWorkflowCommandBackend:
             rationale=rationale,
         )
 
+    def drive_persistence_preview(
+        self,
+        state: WorkflowState,
+        *,
+        drive_folder_id: str,
+    ) -> Mapping[str, Any]:
+        return WorkflowDeliverablePersistenceService(
+            self.root,
+            self.dispatchers.get("Google Drive") if self.dispatchers else None,
+        ).preview(state, drive_folder_id=drive_folder_id)
+
+    def execute_drive_persistence(
+        self,
+        state: WorkflowState,
+        *,
+        drive_folder_id: str,
+        action_digest: str,
+        approver: str,
+        rationale: str,
+    ) -> Mapping[str, Any]:
+        runtime = self._runtime(state)
+        return WorkflowDeliverablePersistenceService(
+            self.root,
+            self.dispatchers.get("Google Drive") if self.dispatchers else None,
+        ).execute(
+            runtime,
+            state,
+            drive_folder_id=drive_folder_id,
+            action_digest=action_digest,
+            approver=approver,
+            rationale=rationale,
+        )
+
     def projection(self, state: WorkflowState) -> Mapping[str, Any]:
         runtime = self._runtime(state)
         if runtime.business_projection is None:
@@ -384,6 +428,7 @@ class TonyWorkflowCommandService:
         "deliver-review",
         "commission",
         "artefact-detail", "artifact-detail", "action-preview", "execute-action",
+        "drive-preview", "persist-drive",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -477,6 +522,43 @@ class TonyWorkflowCommandService:
                     name,
                     "healthy",
                     f"Verified simulated delivery to {result['delivery_override']} with Gmail message {result['message_id']}.",
+                    result,
+                )
+            if name == "drive-preview":
+                drive_folder_id = str((inputs or {}).get("drive_folder_id") or "").strip()
+                if not drive_folder_id:
+                    return self._error(name, "drive_folder_id_required", "Supply the verified Drive folder identifier.")
+                preview = dict(self.backend.drive_persistence_preview(state, drive_folder_id=drive_folder_id))
+                filenames = ", ".join(str(item.get("filename") or "") for item in preview["files"])
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    f"Prepared an exact internal Drive persistence preview for {filenames}. Nothing has been uploaded or shared.",
+                    preview,
+                )
+            if name == "persist-drive":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "This Drive write requires Matt's authenticated approval.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /persist-drive <run> because <reason>.")
+                supplied = dict(inputs or {})
+                action_digest = str(supplied.get("action_digest") or "").strip()
+                drive_folder_id = str(supplied.get("drive_folder_id") or "").strip()
+                if not action_digest or not drive_folder_id:
+                    return self._error(name, "drive_approval_binding_required", "Read the Drive preview first and supply its exact action digest and folder identifier.")
+                result = dict(
+                    self.backend.execute_drive_persistence(
+                        state,
+                        drive_folder_id=drive_folder_id,
+                        action_digest=action_digest,
+                        approver=principal_id,
+                        rationale=rationale,
+                    )
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "Verified the approved Blueprint files in the internal Drive repository. Nothing was shared, published or sent to the client.",
                     result,
                 )
             if name == "proposed":

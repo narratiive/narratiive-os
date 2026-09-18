@@ -21,13 +21,23 @@ class ConfigureDocumentWorkerTests(unittest.TestCase):
             modules.mkdir()
             skill.mkdir()
             env = root / "config" / "runtime.env"
+            workflow_root = root / "workflow-runtime"
 
             for _ in range(2):
-                install(env, node=node, node_modules=modules, skill_dir=skill, python=python)
+                install(
+                    env,
+                    node=node,
+                    node_modules=modules,
+                    skill_dir=skill,
+                    python=python,
+                    workflow_root=workflow_root,
+                )
 
             contents = env.read_text(encoding="utf-8")
             self.assertEqual(contents.count("NARRATIIVE_DOCUMENT_WORKER_MODE="), 1)
             self.assertIn("NARRATIIVE_DOCUMENT_WORKER_MODE=local_artifact_tool", contents)
+            self.assertIn(f"TONY_WORKFLOW_RUNTIME_ROOT={workflow_root.resolve()}", contents)
+            self.assertTrue(workflow_root.is_dir())
             self.assertEqual(stat.S_IMODE(env.stat().st_mode), 0o600)
 
     def test_install_rejects_missing_runtime_paths(self) -> None:
@@ -40,6 +50,7 @@ class ConfigureDocumentWorkerTests(unittest.TestCase):
                     node_modules=root,
                     skill_dir=root,
                     python=root / "missing-python",
+                    workflow_root=root / "workflow-runtime",
                 )
 
 

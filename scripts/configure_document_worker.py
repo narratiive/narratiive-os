@@ -19,6 +19,7 @@ def install(
     node_modules: Path,
     skill_dir: Path,
     python: Path,
+    workflow_root: Path,
 ) -> None:
     resolved = {
         "NARRATIIVE_PRESENTATION_NODE": node.expanduser().resolve(),
@@ -26,6 +27,10 @@ def install(
         "NARRATIIVE_PRESENTATION_SKILL_DIR": skill_dir.expanduser().resolve(),
         "NARRATIIVE_PRESENTATION_PYTHON": python.expanduser().resolve(),
     }
+    resolved_workflow_root = workflow_root.expanduser().resolve()
+    resolved_workflow_root.mkdir(parents=True, exist_ok=True)
+    if not resolved_workflow_root.is_dir():
+        raise ValueError("TONY_WORKFLOW_RUNTIME_ROOT must point to an existing directory")
     for name in ("NARRATIIVE_PRESENTATION_NODE", "NARRATIIVE_PRESENTATION_PYTHON"):
         if not resolved[name].is_file():
             raise ValueError(f"{name} must point to an existing file")
@@ -44,6 +49,7 @@ def install(
         existing = ""
     values = {
         "NARRATIIVE_DOCUMENT_WORKER_MODE": "local_artifact_tool",
+        "TONY_WORKFLOW_RUNTIME_ROOT": str(resolved_workflow_root),
         **{name: str(path) for name, path in resolved.items()},
     }
     lines = existing.splitlines()
@@ -79,6 +85,7 @@ def main() -> int:
     parser.add_argument("--node-modules", type=Path, required=True)
     parser.add_argument("--skill-dir", type=Path, required=True)
     parser.add_argument("--python", type=Path, required=True)
+    parser.add_argument("--workflow-root", type=Path, required=True)
     args = parser.parse_args()
     install(
         args.env_file,
@@ -86,6 +93,7 @@ def main() -> int:
         node_modules=args.node_modules,
         skill_dir=args.skill_dir,
         python=args.python,
+        workflow_root=args.workflow_root,
     )
     print(f"Document worker configuration installed in {args.env_file.expanduser()} (mode 600).")
     return 0

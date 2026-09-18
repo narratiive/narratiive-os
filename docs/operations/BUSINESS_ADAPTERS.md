@@ -106,6 +106,12 @@ must match the exact approval-bound payload. The adapter records a stable
 idempotency key and source checksum in Drive metadata. Upload does not share the
 file, notify a client, publish advertising or authorise any downstream spend.
 
+Tony exposes this as a two-step control after the deliverable itself is approved:
+`/drive-preview <run>` resolves the exact verified Drive folder, files and
+checksums without writing; `/persist-drive <run> because <reason>` requires the
+preview digest plus Matt's authenticated identity before upload. Replays use the
+same provider idempotency keys and do not create duplicate files.
+
 ## Independent validation
 
 Load the canonical runtime environment without printing it, then run:
