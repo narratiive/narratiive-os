@@ -6,6 +6,7 @@ import unittest
 from runtime.campaign_engine import (
     CampaignEngine,
     CampaignEngineApplicationService,
+    CampaignEngineError,
     FileCampaignEngineRepository,
     ProductionDispatchApproval,
     ProductionJobRoute,
@@ -191,7 +192,7 @@ class CampaignProductionExecutorTests(unittest.TestCase):
         calls = []
         executor = self.executor(lambda contract: calls.append(contract) or production_result(current))
 
-        with self.assertRaisesRegex(Exception, "exact-payload approval"):
+        with self.assertRaisesRegex(CampaignEngineError, "exact-payload approval"):
             executor.execute(
                 current,
                 dispatch_id="dispatch-video-1",
