@@ -67,10 +67,14 @@ No advertising API is required for the foundation.
    Pack jobs and a planned Asset Manifest from the exact approved Bible. Live
    creative-tool adapters remain unconfigured, so provider execution correctly
    blocks after its separate human approval gate.
-6. Asset Manifest rules are canonical documentation rather than the complete
-   executable asset-version and review service.
-7. Deployment, performance ingestion and learning/iteration are not yet live
-   campaign adapters.
+6. Asset versions, review approval, delivery packaging and receipt-backed
+   client delivery now have executable contracts. Live Drive ingestion/probing
+   and a configured client-delivery provider remain outstanding.
+7. Meta, TikTok and Google performance ingestion is read-only and normalized.
+   Normalized snapshots and Tony's bounded recommendations can now be converted
+   into immutable Performance Evidence, Campaign Insight and pending Creative
+   Iteration records. Notion projection and live multi-client scheduling of
+   that learning cycle remain outstanding; platform mutation remains disabled.
 
 ## Data model and state machine
 
@@ -243,8 +247,12 @@ that Notion changed without execution evidence.
    `orchestrate_monitor_and_quality_check`; strategy authority remains human and
    neither publication nor spend can be authorised. The existing Media Control
    Layer already supplies read-only cross-platform snapshots and deterministic
-   recommendations. Persisting those recommendations as versioned Campaign
-   Engine Insight/iteration records remains follow-on work.
+   recommendations. The Campaign Learning service now binds those snapshots to
+   approved Narratiive asset-version IDs and persists immutable Performance,
+   Insight and pending Creative Iteration records. Unapproved mappings,
+   cross-campaign evidence and non-advisory recommendations fail closed. Each
+   learning cycle explicitly requires Notion projection; verified projection
+   and scheduled multi-client execution remain follow-on work.
 
 Each slice must extend the live acceptance run from its last verified checkpoint
 and must prove restart, retry, isolation, lineage and approval behaviour before

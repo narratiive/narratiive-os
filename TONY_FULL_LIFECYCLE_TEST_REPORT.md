@@ -140,7 +140,7 @@ All 11 gates use production validators currently composed by `build_tony_workflo
 
 1. Keep bounded downstream-run identity regression coverage in the full lifecycle suite.
 2. Make approval-request creation idempotent for one run, stage, revision and exact artefact checksum.
-3. Persist Media Control recommendations as versioned Campaign Engine Insight and creative-iteration proposal records.
+3. Project immutable Campaign Learning cycles into Notion and schedule them per active client/campaign after the agreed observation window.
 4. Configure real creative-production and client-delivery adapters only after credentials, Drive writes, exact-version receipts and retry/reconciliation contracts pass live acceptance.
 5. Narrow cross-workflow handoff payloads to declared inputs plus explicit `_lineage`, while preserving required evidence references and backward compatibility.
 
