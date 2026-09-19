@@ -8,6 +8,24 @@ compatible.
 Configuration is opt-in. A mode without its credential is reported as
 unconfigured and no dispatcher is registered.
 
+Creative production and client asset delivery use the same explicit HTTP
+provider boundary as the other live workers:
+
+```text
+TONY_DISPATCH_CREATIVE_PRODUCTION_URL
+TONY_DISPATCH_CREATIVE_PRODUCTION_TOKEN
+TONY_DISPATCH_CLIENT_DELIVERY_URL
+TONY_DISPATCH_CLIENT_DELIVERY_TOKEN
+```
+
+Tokens are optional only for a provider endpoint that is independently secured
+and intentionally accepts the runtime host. Merely setting an endpoint makes
+the worker selectable; it does not bypass the exact Production Pack, Asset
+Manifest, asset-suite or client-delivery approval gates. Provider output must
+still include the complete checksum-bound versions and verified receipts
+required by the workflow adapters. No delivery provider may imply publication
+or media-spend authority.
+
 ## Runtime configuration
 
 Google uses one OAuth grant shared by the three Google adapters:

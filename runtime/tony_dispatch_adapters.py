@@ -22,6 +22,8 @@ from runtime.tony_claude_api_dispatcher import build_claude_api_dispatcher
 
 SUPPORTED_DISPATCH_WORKERS = (
     "Claude",
+    "Creative Production",
+    "Client Delivery",
     "Fireflies",
     "Gmail",
     "Google Calendar",

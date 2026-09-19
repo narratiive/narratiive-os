@@ -95,6 +95,8 @@ class NativeBusinessAdapterTests(unittest.TestCase):
     def test_readiness_reports_native_modes_without_rendering_credentials(self):
         env = {
             "TONY_DISPATCH_CLAUDE_URL": "http://claude.invalid",
+            "TONY_DISPATCH_CREATIVE_PRODUCTION_URL": "http://creative.invalid",
+            "TONY_DISPATCH_CLIENT_DELIVERY_URL": "http://delivery.invalid",
             "TONY_DISPATCH_GMAIL_MODE": "google_api",
             "TONY_DISPATCH_GOOGLE_CALENDAR_MODE": "google_api",
             "TONY_DISPATCH_GOOGLE_DRIVE_MODE": "google_api",

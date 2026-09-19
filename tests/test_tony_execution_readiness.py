@@ -15,7 +15,16 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertFalse(report.ready)
         self.assertEqual(
             report.missing_workers,
-            ("Claude", "Gmail", "Google Calendar", "Google Drive", "Notion", "Fireflies"),
+            (
+                "Claude",
+                "Creative Production",
+                "Client Delivery",
+                "Gmail",
+                "Google Calendar",
+                "Google Drive",
+                "Notion",
+                "Fireflies",
+            ),
         )
         rendered = render_execution_readiness(report)
         self.assertIn("TONY_DISPATCH_GMAIL_URL", rendered)
@@ -23,11 +32,15 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertIn("TONY_DISPATCH_GOOGLE_DRIVE_URL", rendered)
         self.assertIn("TONY_DISPATCH_NOTION_URL", rendered)
         self.assertIn("TONY_DISPATCH_FIREFLIES_URL", rendered)
+        self.assertIn("TONY_DISPATCH_CREATIVE_PRODUCTION_URL", rendered)
+        self.assertIn("TONY_DISPATCH_CLIENT_DELIVERY_URL", rendered)
         self.assertNotIn("secret", rendered.casefold())
 
     def test_http_dispatchers_are_ready_without_requiring_optional_tokens(self):
         env = {
             "TONY_DISPATCH_CLAUDE_URL": "http://127.0.0.1:9001/claude",
+            "TONY_DISPATCH_CREATIVE_PRODUCTION_URL": "http://127.0.0.1:9007/creative",
+            "TONY_DISPATCH_CLIENT_DELIVERY_URL": "http://127.0.0.1:9008/delivery",
             "TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9002/gmail",
             "TONY_DISPATCH_GOOGLE_CALENDAR_URL": "http://127.0.0.1:9003/calendar",
             "TONY_DISPATCH_GOOGLE_DRIVE_URL": "http://127.0.0.1:9004/drive",
@@ -52,6 +65,8 @@ class TonyExecutionReadinessTests(unittest.TestCase):
                 "TONY_DISPATCH_CLAUDE_MODE": "anthropic_api",
                 "TONY_DISPATCH_CLAUDE_MODEL": "claude-model",
                 "ANTHROPIC_API_KEY": "not-rendered",
+                "TONY_DISPATCH_CREATIVE_PRODUCTION_URL": "http://creative",
+                "TONY_DISPATCH_CLIENT_DELIVERY_URL": "http://delivery",
                 "TONY_DISPATCH_GMAIL_URL": "http://gmail",
                 "TONY_DISPATCH_GOOGLE_CALENDAR_URL": "http://calendar",
                 "TONY_DISPATCH_GOOGLE_DRIVE_URL": "http://drive",
@@ -82,6 +97,16 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertIn("project_workflow_state", integrations["Notion"].approval_gated_operations)
         self.assertIn("read_repository_work", integrations["GitHub"].autonomous_operations)
         self.assertIn("read_workflow_metadata", integrations["n8n"].autonomous_operations)
+        self.assertIn(
+            "produce_exact_approved_asset_manifest",
+            integrations["Creative Production"].approval_gated_operations,
+        )
+        self.assertIn(
+            "deliver_exact_approved_asset_package",
+            integrations["Client Delivery"].approval_gated_operations,
+        )
+        self.assertFalse(integrations["Creative Production"].configured)
+        self.assertFalse(integrations["Client Delivery"].configured)
         self.assertFalse(integrations["GitHub"].configured)
         self.assertNotIn("send_reviewed_email", integrations["Gmail"].autonomous_operations)
 
