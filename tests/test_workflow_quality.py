@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import unittest
 
 from runtime.workflow_quality import (
@@ -7,6 +9,7 @@ from runtime.workflow_quality import (
     campaign_world_quality_gate,
     campaign_world_triage_quality_gate,
     creative_bible_quality_gate,
+    creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
@@ -408,6 +411,50 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertIn("creative taste is attribute based", result["failed_checks"])
         self.assertIn("no false external execution claim", result["failed_checks"])
+
+    def test_creative_bible_triage_gate_requires_tony_forward_and_matt_control(self) -> None:
+        output = {
+            "creative_bible_review": {
+                "reviewed_bible_checksum": "safe-checksum",
+                "tony_disposition": "forward",
+                "tony_rationale": "Ready for exact human review.",
+                "taste_checks": {"coherent": True, "producible": True},
+                "taste_is_advisory": True,
+                "approval_granted": False,
+            },
+            "creative_bible_approval_brief": {
+                "requires_matt": True,
+                "creative_bible_checksum": "safe-checksum",
+                "auto_approval_authorised": False,
+            },
+            "production_authorised": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+            "external_action_taken": False,
+        }
+        self.assertTrue(creative_bible_triage_quality_gate(output)["passed"])
+        output["creative_bible_approval_brief"]["auto_approval_authorised"] = True
+        self.assertFalse(creative_bible_triage_quality_gate(output)["passed"])
+
+    def test_asset_production_requires_exact_matt_approved_creative_bible(self) -> None:
+        bible = creative_bible_output()["creative_directors_bible"]
+        checksum = hashlib.sha256(
+            json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
+        inputs = {
+            "approved_creative_bible": bible,
+            "creative_bible_approval": {
+                "decision": "creative_bible_approval",
+                "approver": "telegram:matt",
+                "creative_bible_checksum": checksum,
+            },
+            "asset_manifest": {"manifest_id": "safe-manifest"},
+            "production_constraints": ["No publication without approval"],
+        }
+        validate_operational_inputs("creative_bible_to_asset_production", inputs)
+        inputs["creative_bible_approval"]["creative_bible_checksum"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "exact Creative Bible checksum"):
+            validate_operational_inputs("creative_bible_to_asset_production", inputs)
 
 
 if __name__ == "__main__":

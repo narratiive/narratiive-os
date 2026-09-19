@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
+from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
 from runtime.inbound_leads import InboundLead
 from runtime.inbound_lifecycle import project_inbound_lead
 from runtime.models import WorkflowStatus
@@ -29,6 +30,8 @@ from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
+    creative_bible_quality_gate,
+    creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_blueprint_quality_gate,
@@ -37,7 +40,13 @@ from runtime.workflow_quality import (
 )
 from runtime.workflow_registry import WorkflowDefinition, build_narratiive_workflow_registry
 from tests.test_tony_workflow_runtime import _blueprint_output
-from tests.test_workflow_quality import campaign_world_candidates_output, discovery_output, growth_blueprint_output, proposal_output
+from tests.test_workflow_quality import (
+    campaign_world_candidates_output,
+    creative_bible_output,
+    discovery_output,
+    growth_blueprint_output,
+    proposal_output,
+)
 
 
 CLIENT_NAME = "Northstar Test Co"
@@ -142,16 +151,7 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
     if workflow_id == "growth_blueprint_to_campaign_world":
         return campaign_world_candidates_output()
     if workflow_id == "campaign_world_to_creative_bible":
-        return {
-            "message_system": {"promise": "Synthetic promise for test use only"},
-            "tone": ["clear", "ambitious", "evidence-led"],
-            "distinctive_assets": ["northstar-test-symbol"],
-            "creative_principles": ["Make the strategic choice visible"],
-            "formats": ["9:16 video", "1:1 still"],
-            "production_constraints": ["No publication", "Human approval required"],
-            "creative_directors_bible": {"name": "Northstar Test Creative Director's Bible", "version": 1},
-            "external_action_taken": False,
-        }
+        return creative_bible_output()
     if workflow_id == "creative_bible_to_asset_production":
         return {
             "production_tasks": [{"task_id": "northstar-test-asset-job-1", "status": "prepared"}],
@@ -246,6 +246,17 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             ),
             CampaignWorldTriageWorker(),
         ),
+        WorkerRegistration(
+            WorkerMetadata(
+                worker_id="northstar-test-creative-bible-triage",
+                provider="isolated-deterministic-fixture",
+                capabilities=("creative_bible_quality_triage",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            CreativeBibleTriageWorker(),
+        ),
     ))
     validators = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
@@ -256,6 +267,8 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
+        "creative_bible_quality_gate": creative_bible_quality_gate,
+        "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
     }
     for definition in registry.all():
         for stage in definition.stages:
@@ -322,7 +335,6 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             "production_context": {"channels": ["Meta", "TikTok", "Google"], "test_only": True},
         },
         "creative_bible_to_asset_production": {
-            "approved_creative_bible": prior_output.get("creative_directors_bible"),
             "asset_manifest": {"manifest_id": "northstar-test-manifest-1", "status": "planned"},
         },
         "asset_review_to_delivery_preparation": {
@@ -359,11 +371,14 @@ def _record_gate(runtime: TonyWorkflowRuntime, run_id: str, elapsed_ms: float) -
     attempt = stage.attempts[-1] if stage.attempts else {}
     artefact = stage.output_artifacts[-1] if stage.output_artifacts else None
     human_gate = state.status is WorkflowStatus.AWAITING_APPROVAL
-    command = (
-        f"/approve {run_id} because Northstar Test Co gate reviewed; then /continue {run_id}"
-        if human_gate
-        else (f"/continue {run_id}" if definition.next_workflow_id else "No continuation: terminal next-action state")
-    )
+    if human_gate and state.workflow_id == "growth_blueprint_to_campaign_world":
+        command = f"/approve {run_id} because candidate review accepted; /worlds {run_id}; /select-world {run_id} because <reason>; /continue {run_id}"
+    elif human_gate and state.workflow_id == "campaign_world_to_creative_bible":
+        command = f"/bible {run_id}; /approve-bible {run_id} because <reason>; /continue {run_id}"
+    elif human_gate:
+        command = f"/approve {run_id} because Northstar Test Co gate reviewed; then /continue {run_id}"
+    else:
+        command = f"/continue {run_id}" if definition.next_workflow_id else "No continuation: terminal next-action state"
     passed = not missing and stage.quality_result is not None and stage.quality_result.get("passed") is True
     return GateEvidence(
         gate=state.workflow_id,
@@ -453,6 +468,14 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
                 approver="matt-authorised-synthetic-e2e",
                 rationale="Select exact isolated Campaign World candidate.",
             )
+        if definition.workflow_id == "campaign_world_to_creative_bible":
+            brief = runtime.creative_bible_approval_brief(run_id)
+            runtime.approve_creative_bible(
+                run_id,
+                creative_bible_checksum=brief["creative_bible_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Approve exact isolated Creative Bible version.",
+            )
         if not definition.next_workflow_id:
             break
         prior_state = runtime.runs.load_run(run_id)
@@ -463,6 +486,13 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
             prior_output,
             _additional_inputs(next_definition.workflow_id, prior_output),
         )
+        if definition.workflow_id == "campaign_world_to_creative_bible":
+            approval = next(
+                item for item in reversed(prior_state.approval_history)
+                if item.get("decision") == "creative_bible_approval"
+            )
+            next_inputs["approved_creative_bible"] = dict(prior_state.input_payload["creative_directors_bible"])
+            next_inputs["creative_bible_approval"] = dict(approval)
         next_stage = next_definition.stages[0]
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
@@ -530,6 +560,14 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
                 approver="matt-authorised-synthetic-e2e",
                 rationale="Select exact isolated Campaign World candidate.",
             )
+        if definition.workflow_id == "campaign_world_to_creative_bible":
+            brief = runtime.creative_bible_approval_brief(run_id)
+            runtime.approve_creative_bible(
+                run_id,
+                creative_bible_checksum=brief["creative_bible_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Approve exact isolated Creative Bible version.",
+            )
         if not definition.next_workflow_id:
             return runtime, reached, None
         output = _latest_output(runtime, run_id)
@@ -591,7 +629,8 @@ class TonyFullLifecycleTest(unittest.TestCase):
         gated = [item for item in records if item.resulting_state["status"] == "awaiting_approval"]
         self.assertEqual(len(gated), 10)
         self.assertTrue(all(item.resulting_state["approval_status"] == "pending" for item in gated))
-        self.assertTrue(all(item.continuation_command.startswith("/approve ") for item in gated))
+        self.assertTrue(all(item.continuation_command.startswith("/") for item in gated))
+        self.assertTrue(all(f"/continue {item.input_state['run_id']}" in item.continuation_command for item in gated))
 
     def test_native_continuous_chain_completes_with_bounded_run_ids(self) -> None:
         with tempfile.TemporaryDirectory(prefix="northstar-test-native-chain-") as directory:

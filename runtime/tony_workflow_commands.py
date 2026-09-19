@@ -15,6 +15,7 @@ from runtime.tony_internal_review_delivery import (
     INTERNAL_REVIEW_ADDRESS,
     InternalReviewDeliveryService,
     approval_binding_evidence,
+    workflow_approval_token,
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
 from runtime.workflow_action_preview import WorkflowActionPreviewService
@@ -55,6 +56,16 @@ class WorkflowCommandBackend(Protocol):
         *,
         candidate_id: str,
         candidate_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState: ...
+    def creative_bible_approval_brief(self, state: WorkflowState) -> Mapping[str, Any]: ...
+    def approve_creative_bible(
+        self,
+        state: WorkflowState,
+        *,
+        creative_bible_checksum: str,
+        approval_token: str,
         approver: str,
         rationale: str,
     ) -> WorkflowState: ...
@@ -329,6 +340,38 @@ class FileWorkflowCommandBackend:
         )
         return runtime.runs.load_run(state.run_id)
 
+    def creative_bible_approval_brief(self, state: WorkflowState) -> Mapping[str, Any]:
+        return self._runtime(state).creative_bible_approval_brief(state.run_id)
+
+    def approve_creative_bible(
+        self,
+        state: WorkflowState,
+        *,
+        creative_bible_checksum: str,
+        approval_token: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState:
+        runtime = self._runtime(state)
+        brief = runtime.creative_bible_approval_brief(state.run_id)
+        if creative_bible_checksum.strip() != str(brief.get("creative_bible_checksum") or ""):
+            raise ValueError("Creative Bible approval checksum is stale or incorrect")
+        if state.status.value == "awaiting_approval":
+            binding = approval_binding_evidence(state, approval_token)
+            runtime.approve(
+                state.run_id,
+                approver=approver,
+                rationale=rationale,
+                approval_binding=binding,
+            )
+        runtime.approve_creative_bible(
+            state.run_id,
+            creative_bible_checksum=creative_bible_checksum,
+            approver=approver,
+            rationale=rationale,
+        )
+        return runtime.runs.load_run(state.run_id)
+
     def projection(self, state: WorkflowState) -> Mapping[str, Any]:
         runtime = self._runtime(state)
         if runtime.business_projection is None:
@@ -461,7 +504,7 @@ class TonyWorkflowCommandService:
         "commission",
         "artefact-detail", "artifact-detail", "action-preview", "execute-action",
         "drive-preview", "persist-drive",
-        "worlds", "select-world",
+        "worlds", "select-world", "bible", "approve-bible",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -623,6 +666,38 @@ class TonyWorkflowCommandService:
                     name,
                     "healthy",
                     f"Recorded Matt's exact Campaign World selection {candidate_id}. No asset was produced, published or funded.",
+                    self._summary(changed),
+                )
+            if name == "bible":
+                brief = dict(self.backend.creative_bible_approval_brief(state))
+                brief["approval_token"] = workflow_approval_token(state)
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "Tony has forwarded this exact Creative Bible version for Matt's approval. No production, publication or spend is authorised.",
+                    brief,
+                )
+            if name == "approve-bible":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Creative Bible approval requires Matt's authenticated identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /approve-bible <run> because <reason>.")
+                supplied = dict(inputs or {})
+                creative_bible_checksum = str(supplied.get("creative_bible_checksum") or "").strip()
+                approval_token = str(supplied.get("approval_token") or "").strip()
+                if not creative_bible_checksum or (state.status.value == "awaiting_approval" and not approval_token):
+                    return self._error(name, "bible_approval_binding_required", "Read /bible first and supply its exact Bible checksum and approval token.")
+                changed = self.backend.approve_creative_bible(
+                    state,
+                    creative_bible_checksum=creative_bible_checksum,
+                    approval_token=approval_token,
+                    approver=principal_id,
+                    rationale=rationale,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "Recorded Matt's exact Creative Bible approval. Production remains a separate planned and approved action.",
                     self._summary(changed),
                 )
             if name == "proposed":

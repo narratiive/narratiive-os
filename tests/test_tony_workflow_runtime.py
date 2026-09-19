@@ -259,8 +259,41 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             self.assertEqual(outcome.status, "awaiting_approval")
             self.assertEqual(outcome.action, "await_human_approval")
             self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertTrue(state["stages"][1]["quality_result"]["passed"])
+            self.assertEqual(state["stages"][1]["agent_ref"], "capability:creative_bible_quality_triage")
             self.assertEqual(state["approval_status"], "pending")
             self.assertFalse(state["external_action_taken"])
+
+            runtime.approve(
+                "safe-creative-bible-run",
+                approver="telegram:matt",
+                rationale="Approve Tony's exact review gate.",
+            )
+            brief = runtime.creative_bible_approval_brief("safe-creative-bible-run")
+            self.assertEqual(brief["tony_disposition"], "forward")
+            with self.assertRaisesRegex(ValueError, "Matt"):
+                runtime.approve_creative_bible(
+                    "safe-creative-bible-run",
+                    creative_bible_checksum=brief["creative_bible_checksum"],
+                    approver="tony",
+                    rationale="Tony must not approve the Bible.",
+                )
+            with self.assertRaisesRegex(ValueError, "stale"):
+                runtime.approve_creative_bible(
+                    "safe-creative-bible-run",
+                    creative_bible_checksum="0" * 64,
+                    approver="telegram:matt",
+                    rationale="Stale approval test.",
+                )
+            runtime.approve_creative_bible(
+                "safe-creative-bible-run",
+                creative_bible_checksum=brief["creative_bible_checksum"],
+                approver="telegram:matt",
+                rationale="Approve this exact Bible for production planning.",
+            )
+            approved = runtime.runs.load_run("safe-creative-bible-run")
+            self.assertEqual(approved.approval_history[-1]["decision"], "creative_bible_approval")
+            self.assertFalse(approved.external_action_taken)
 
     def test_workspace_client_scopes_are_durably_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

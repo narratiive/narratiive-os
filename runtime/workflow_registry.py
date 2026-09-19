@@ -277,26 +277,43 @@ GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD = WorkflowDefinition(
     autonomous_handoff=False,
 )
 
-CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = _workflow(
-    "campaign_world_to_creative_bible",
-    _step(
-        "prepare_creative_bible",
-        capability="copy_drafting",
-        inputs=("approved_campaign_world", "campaign_world_selection", "growth_blueprint", "production_context"),
-        outputs=(
-            "message_system",
-            "tone",
-            "distinctive_assets",
-            "creative_principles",
-            "formats",
-            "production_constraints",
-            "creative_directors_bible",
+CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = WorkflowDefinition(
+    workflow_id="campaign_world_to_creative_bible",
+    stages=(
+        _step(
+            "prepare_creative_bible",
+            capability="copy_drafting",
+            inputs=("approved_campaign_world", "campaign_world_selection", "growth_blueprint", "production_context"),
+            outputs=(
+                "message_system",
+                "tone",
+                "distinctive_assets",
+                "creative_principles",
+                "formats",
+                "production_constraints",
+                "creative_directors_bible",
+            ),
+            quality="creative_bible_quality_gate",
+            approval_required=False,
         ),
-        quality="creative_bible_quality_gate",
-        approval_required=True,
+        _step(
+            "triage_creative_bible",
+            capability="creative_bible_quality_triage",
+            inputs=(
+                "creative_directors_bible",
+                "distinctive_assets",
+                "production_constraints",
+            ),
+            outputs=("creative_bible_review", "creative_bible_approval_brief"),
+            quality="creative_bible_triage_quality_gate",
+            approval_required=True,
+        ),
     ),
     next_workflow_id="creative_bible_to_asset_production",
     approval_required=True,
+    entity_type="client",
+    failure_policy="block_and_escalate",
+    autonomous_handoff=False,
 )
 
 CREATIVE_BIBLE_TO_ASSET_PRODUCTION = _workflow(
@@ -304,7 +321,7 @@ CREATIVE_BIBLE_TO_ASSET_PRODUCTION = _workflow(
     _step(
         "orchestrate_creative_assets",
         capability="creative_asset_production",
-        inputs=("approved_creative_bible", "asset_manifest", "production_constraints"),
+        inputs=("approved_creative_bible", "creative_bible_approval", "asset_manifest", "production_constraints"),
         outputs=("production_tasks", "asset_versions", "asset_manifest", "production_gaps"),
         quality="creative_asset_production_quality_gate",
         approval_required=True,

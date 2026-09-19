@@ -120,6 +120,17 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
         self.assertNotIn("campaign-world-triage-unavailable", declared)
 
+    def test_tony_creative_bible_triage_is_a_distinct_local_capability(self) -> None:
+        adapter = lambda contract: {"creative_bible_review": {"tony_disposition": "forward"}}
+        registry = build_tony_worker_registry({}, creative_bible_triage_adapter=adapter)
+
+        resolution = registry.resolve("creative_bible_quality_triage")
+        declared = {item.metadata.worker_id for item in registry.all()}
+
+        self.assertEqual(resolution.worker_id, "tony-creative-bible-triage")
+        self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
+        self.assertNotIn("creative-bible-triage-unavailable", declared)
+
     def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
         calls = []
         registry = build_tony_worker_registry(
