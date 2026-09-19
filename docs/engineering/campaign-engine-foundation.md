@@ -81,8 +81,8 @@ No advertising API is required for the foundation.
    blocked until the exact asset suite was human-approved and the terminal
    delivery follow-up gate was completed and approved. Notion projection is
    checksum-bound and requires Matt's authenticated approval. Connecting the
-   monitor endpoint to the agreed hourly n8n schedule remains deployment work;
-   platform mutation remains disabled.
+   monitor endpoint is installed as a read-only hourly n8n schedule; platform
+   mutation remains disabled.
 
 ## Data model and state machine
 
@@ -267,8 +267,9 @@ that Notion changed without execution evidence.
    asset lineage, rejects pre-fulfilment learning, persists the cycle and
    prepares the Notion projection. Its repeat-safe multi-client monitor reports
    each campaign as review-ready or blocked without external writes. The
-   remaining operational step is to call that monitor from the agreed hourly
-   n8n schedule and prove it against live provider snapshots.
+   the agreed hourly n8n schedule calls that monitor through the authenticated
+   workflow-control boundary. Live provider snapshots remain a separate bounded
+   acceptance step and are not enabled by the learning monitor.
 
 Each slice must extend the live acceptance run from its last verified checkpoint
 and must prove restart, retry, isolation, lineage and approval behaviour before

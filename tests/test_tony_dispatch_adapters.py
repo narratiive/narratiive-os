@@ -35,10 +35,15 @@ class TonyDispatchAdapterTests(unittest.TestCase):
             {
                 "TONY_DISPATCH_GMAIL_URL": "http://127.0.0.1:9001/gmail",
                 "TONY_DISPATCH_GITHUB_URL": "http://127.0.0.1:9002/github",
+                "TONY_DISPATCH_CREATIVE_PRODUCTION_URL": "http://127.0.0.1:9003/creative",
+                "TONY_DISPATCH_CLIENT_DELIVERY_URL": "http://127.0.0.1:9004/delivery",
             }
         )
 
-        self.assertEqual(set(dispatchers), {"Gmail", "GitHub"})
+        self.assertEqual(
+            set(dispatchers),
+            {"Gmail", "GitHub", "Creative Production", "Client Delivery"},
+        )
 
     def test_handler_posts_contract_and_returns_nested_evidence(self):
         dispatchers = build_http_dispatchers(

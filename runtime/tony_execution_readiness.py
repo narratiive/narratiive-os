@@ -57,6 +57,8 @@ class ControlledIntegration:
 # These are the live surfaces required by the end-to-end commercial and delivery flow.
 REQUIRED_LIVE_WORKERS = (
     "Claude",
+    "Creative Production",
+    "Client Delivery",
     "Gmail",
     "Google Calendar",
     "Google Drive",
@@ -95,6 +97,14 @@ def build_controlled_integration_report(environ: Mapping[str, str]) -> tuple[Con
         "Google Drive": (
             ("read_file_metadata",),
             ("create_internal_workspace", "persist_reviewed_artifact"),
+        ),
+        "Creative Production": (
+            (),
+            ("produce_exact_approved_asset_manifest",),
+        ),
+        "Client Delivery": (
+            (),
+            ("deliver_exact_approved_asset_package",),
         ),
         "Fireflies": (
             ("read_verified_transcript",),
