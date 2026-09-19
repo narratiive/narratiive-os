@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.campaign_learning_coordinator import CampaignLearningCoordinator
 from runtime.models import WorkflowState
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.tony_command_service import CommandResponse
@@ -22,6 +23,7 @@ from runtime.workflow_action_preview import WorkflowActionPreviewService
 from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersistenceService
 from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
+from runtime.workflow_portfolio import project_client_portfolio
 
 
 class WorkflowCommandBackend(Protocol):
@@ -547,11 +549,18 @@ class TonyWorkflowCommandService:
         "artefact-detail", "artifact-detail", "action-preview", "execute-action",
         "drive-preview", "persist-drive",
         "worlds", "select-world", "bible", "approve-bible", "assets", "approve-assets",
+        "campaigns", "clients", "learning", "learning-queue", "sync-learning",
     }
 
-    def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
+    def __init__(
+        self,
+        command_service,
+        backend: WorkflowCommandBackend,
+        campaign_learning: CampaignLearningCoordinator | None = None,
+    ) -> None:
         self.command_service = command_service
         self.backend = backend
+        self.campaign_learning = campaign_learning
 
     def supports(self, command: str) -> bool:
         name = command.strip().split(" ", 1)[0].lower().lstrip("/")
@@ -584,6 +593,50 @@ class TonyWorkflowCommandService:
                 recovered = self.backend.recover()
                 return CommandResponse("recover", "healthy", f"Recovery checked; {recovered} interrupted run(s) recovered.", {"recovered": recovered})
             states = self.backend.list_states()
+            if name in {"campaigns", "clients"}:
+                return self._portfolio(states)
+            if name in {"learning", "learning-queue", "sync-learning"}:
+                reference, rationale = self._arguments(parts[1:])
+                if self.campaign_learning is None:
+                    return self._error(name, "campaign_learning_unavailable", "Campaign learning is not configured.")
+                if name == "learning-queue":
+                    result = self.campaign_learning.monitor(states)
+                    return CommandResponse(
+                        name,
+                        "attention_required" if result["blocked_count"] else "healthy",
+                        f"Campaign learning monitor found {result['ready_count']} review-ready and "
+                        f"{result['blocked_count']} blocked campaign(s). No external action was taken.",
+                        result,
+                    )
+                if name == "learning":
+                    result = self.campaign_learning.prepare(states, reference)
+                    return CommandResponse(
+                        name,
+                        "attention_required",
+                        f"Prepared {len(result['insights'])} evidence-backed insight(s) and "
+                        f"{len(result['iteration_proposals'])} bounded iteration proposal(s). "
+                        "Nothing was published, funded or changed in media platforms.",
+                        result,
+                    )
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Learning projection requires Matt's authenticated identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /sync-learning <campaign> because <reason>.")
+                cycle_checksum = str((inputs or {}).get("cycle_checksum") or "").strip()
+                result = self.campaign_learning.sync(
+                    states,
+                    reference,
+                    cycle_checksum=cycle_checksum,
+                    approver=principal_id,
+                    rationale=rationale,
+                )
+                status = str(result.get("projection_status") or "unknown")
+                return CommandResponse(
+                    name,
+                    "healthy" if status in {"verified", "duplicate_suppressed"} else "blocked",
+                    f"Campaign learning Notion projection is {status.replace('_', ' ')}. No media mutation occurred.",
+                    result,
+                )
             if name in {"work", "approvals", "blockers"} and len(parts) == 1:
                 return self._queue(name, states)
             reference, rationale = self._arguments(parts[1:])
@@ -944,6 +997,33 @@ class TonyWorkflowCommandService:
         lines = [f"{len(selected)} {label}(s)."]
         lines.extend(f"• {_state_name(state)} — {state.workflow_id}: {state.status.value.replace('_', ' ')}" for state in selected[:10])
         return CommandResponse(name, "blocked" if name == "blockers" and selected else "healthy", "\n".join(lines), {"runs": [self._summary(state) for state in selected]})
+
+    def _portfolio(self, states: tuple[WorkflowState, ...]) -> CommandResponse:
+        clients = project_client_portfolio(states)
+        blocked = sum(item["journey_status"] == "blocked" for item in clients)
+        approvals = sum(item["human_approval_required"] for item in clients)
+        fulfilled = sum(item["journey_status"] == "fulfilled" for item in clients)
+        lines = [
+            f"{len(clients)} client journey(s): {blocked} blocked, {approvals} awaiting human approval, {fulfilled} fulfilled."
+        ]
+        lines.extend(
+            f"• {item['company']} — Gate {item['current_gate']}/{item['total_gates']}, "
+            f"{item['current_phase']}: {item['journey_status'].replace('_', ' ')}. Next: {item['next_action']}"
+            for item in clients[:10]
+        )
+        return CommandResponse(
+            "campaigns",
+            "attention_required" if blocked or approvals else "healthy",
+            "\n".join(lines),
+            {
+                "clients": list(clients),
+                "client_count": len(clients),
+                "blocked_count": blocked,
+                "approval_count": approvals,
+                "fulfilled_count": fulfilled,
+                "external_action_taken": False,
+            },
+        )
 
     def _status(self, state: WorkflowState) -> CommandResponse:
         summary = self._summary(state)

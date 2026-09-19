@@ -61,8 +61,11 @@ No advertising API is required for the foundation.
 3. Tony's taste judgement is now represented separately from independent
    structural quality review and Matt's selection; it is deliberately a bounded
    triage rubric rather than autonomous strategy or approval.
-4. Campaign World and Creative Director's Bible lifecycle state is not yet
-   exposed as one durable multi-client campaign portfolio.
+4. Campaign World and Creative Director's Bible lifecycle state is now exposed
+   through a read-only multi-client journey projection. `/campaigns` (or
+   `/clients`) shows one current canonical position per client, its furthest
+   verified gate, blockers, pending approvals and next safe action while every
+   underlying workflow run remains authoritative and independently auditable.
 5. The registered workflow now generates channel specifications, Production
    Pack jobs and a planned Asset Manifest from the exact approved Bible. Live
    creative-tool adapters remain unconfigured, so provider execution correctly
@@ -73,8 +76,13 @@ No advertising API is required for the foundation.
 7. Meta, TikTok and Google performance ingestion is read-only and normalized.
    Normalized snapshots and Tony's bounded recommendations can now be converted
    into immutable Performance Evidence, Campaign Insight and pending Creative
-   Iteration records. Notion projection and live multi-client scheduling of
-   that learning cycle remain outstanding; platform mutation remains disabled.
+   Iteration records. The live Tony bridge now exposes a repeat-safe
+   `/learning-queue` monitor and per-campaign `/learning` preview. Learning is
+   blocked until the exact asset suite was human-approved and the terminal
+   delivery follow-up gate was completed and approved. Notion projection is
+   checksum-bound and requires Matt's authenticated approval. Connecting the
+   monitor endpoint to the agreed hourly n8n schedule remains deployment work;
+   platform mutation remains disabled.
 
 ## Data model and state machine
 
@@ -156,8 +164,8 @@ that Notion changed without execution evidence.
    Candidate comparison is now included in campaign detail as an exact-version
    selection brief: quality verdict, Tony disposition, rationale, checksum and
    readiness are visible while automatic selection remains forbidden. Exact
-   approval operations and explicit Notion projections remain the next
-   control-surface work.
+   approval operations, exact Creative World/Bible/asset controls and explicit
+   Notion projections are available on the authenticated control surface.
 3. **Campaign World generation** — the registered workflow now requests exactly
    three materially distinct candidates from one approved Growth Blueprint,
    validates every candidate, routes them through Tony's deterministic taste
@@ -255,8 +263,12 @@ that Notion changed without execution evidence.
    service now prepares the exact operational summary and performs an
    idempotent Notion write only with Matt's authenticated approval; mismatched
    record, projection-key or cycle-checksum evidence requires reconciliation.
-   Wiring that service into Tony's live multi-client scheduler remains
-   follow-on work.
+   Tony's live control surface now joins those records to the exact approved
+   asset lineage, rejects pre-fulfilment learning, persists the cycle and
+   prepares the Notion projection. Its repeat-safe multi-client monitor reports
+   each campaign as review-ready or blocked without external writes. The
+   remaining operational step is to call that monitor from the agreed hourly
+   n8n schedule and prove it against live provider snapshots.
 
 Each slice must extend the live acceptance run from its last verified checkpoint
 and must prove restart, retry, isolation, lineage and approval behaviour before

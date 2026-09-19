@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.serialization import workflow_to_dict
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
@@ -24,6 +25,35 @@ from tests.test_tony_workflow_runtime import _production_output
 class FallbackCommands:
     def execute(self, command, objects):
         return CommandResponse("fallback", "healthy", "fallback", {})
+
+
+class FakeCampaignLearning:
+    def __init__(self) -> None:
+        self.calls = []
+
+    def prepare(self, states, reference):
+        self.calls.append(("prepare", reference, len(tuple(states))))
+        return {
+            "cycle_id": "safe-learning-cycle",
+            "checksum": "safe-cycle-checksum",
+            "insights": [{"insight_id": "safe-insight"}],
+            "iteration_proposals": [{"proposal_id": "safe-iteration"}],
+            "external_action_taken": False,
+        }
+
+    def monitor(self, states):
+        self.calls.append(("monitor", len(tuple(states))))
+        return {
+            "campaigns": [],
+            "campaign_count": 0,
+            "ready_count": 0,
+            "blocked_count": 0,
+            "external_action_taken": False,
+        }
+
+    def sync(self, states, reference, *, cycle_checksum, approver, rationale):
+        self.calls.append(("sync", reference, cycle_checksum, approver, rationale, len(tuple(states))))
+        return {"projection_status": "verified", "external_action_taken": True}
 
 
 def lifecycle(client_id: str) -> ClientLifecycleRecord:
@@ -111,6 +141,85 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(len(approvals.data["runs"]), 1)
         self.assertIn("blueprint_lite", artefact.data["artefact_fields"])
         self.assertNotIn("input_payload", status.data)
+
+    def test_campaign_portfolio_reports_one_safe_current_position_per_client(self) -> None:
+        second = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client-two",
+            dispatchers=self.dispatchers,
+            environ={},
+        )
+        second.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-client-two-gate-one",
+            {
+                "diagnostic_input_package": {"overall_score": 55},
+                "company": "SAFE Second Client",
+            },
+            entity_id="safe-lead-two",
+            correlation_id="safe-correlation-two",
+        )
+
+        portfolio = self.service.execute("/campaigns", [])
+
+        self.assertEqual(portfolio.data["client_count"], 2)
+        self.assertEqual(portfolio.data["approval_count"], 1)
+        self.assertFalse(portfolio.data["external_action_taken"])
+        by_client = {item["client_id"]: item for item in portfolio.data["clients"]}
+        self.assertEqual(by_client["safe-client"]["current_gate"], 1)
+        self.assertEqual(by_client["safe-client"]["journey_status"], "awaiting_human_approval")
+        self.assertEqual(by_client["safe-client-two"]["journey_status"], "in_progress")
+        self.assertEqual(by_client["safe-client-two"]["run_count"], 1)
+
+    def test_campaign_portfolio_is_restart_safe_and_does_not_mutate_runs(self) -> None:
+        before = {
+            state.run_id: json.dumps(workflow_to_dict(state), sort_keys=True)
+            for state in self.service.backend.list_states()
+        }
+        restarted = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}),
+        )
+
+        first = restarted.execute("/clients", [])
+        second = restarted.execute("/campaigns", [])
+        after = {
+            state.run_id: json.dumps(workflow_to_dict(state), sort_keys=True)
+            for state in restarted.backend.list_states()
+        }
+
+        self.assertEqual(first.data, second.data)
+        self.assertEqual(before, after)
+
+    def test_campaign_learning_commands_preserve_review_and_exact_approval_boundaries(self) -> None:
+        learning = FakeCampaignLearning()
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            self.service.backend,
+            campaign_learning=learning,
+        )
+
+        preview = service.execute("/learning safe-campaign", [])
+        queue = service.execute("/learning-queue", [])
+        denied = service.execute(
+            "/sync-learning safe-campaign because reviewed exact evidence",
+            [],
+            inputs={"cycle_checksum": "safe-cycle-checksum"},
+        )
+        synced = service.execute(
+            "/sync-learning safe-campaign because reviewed exact evidence",
+            [],
+            principal_id="matt:telegram:123",
+            inputs={"cycle_checksum": "safe-cycle-checksum"},
+        )
+
+        self.assertEqual(preview.status, "attention_required")
+        self.assertFalse(preview.data["external_action_taken"])
+        self.assertEqual(queue.status, "healthy")
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(synced.data["projection_status"], "verified")
+        self.assertEqual(learning.calls[-1][2], "safe-cycle-checksum")
 
     def test_approval_requires_authenticated_principal_and_rationale(self) -> None:
         token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
