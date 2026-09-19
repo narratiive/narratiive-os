@@ -251,8 +251,12 @@ that Notion changed without execution evidence.
    approved Narratiive asset-version IDs and persists immutable Performance,
    Insight and pending Creative Iteration records. Unapproved mappings,
    cross-campaign evidence and non-advisory recommendations fail closed. Each
-   learning cycle explicitly requires Notion projection; verified projection
-   and scheduled multi-client execution remain follow-on work.
+   learning cycle explicitly requires Notion projection. A dedicated projection
+   service now prepares the exact operational summary and performs an
+   idempotent Notion write only with Matt's authenticated approval; mismatched
+   record, projection-key or cycle-checksum evidence requires reconciliation.
+   Wiring that service into Tony's live multi-client scheduler remains
+   follow-on work.
 
 Each slice must extend the live acceptance run from its last verified checkpoint
 and must prove restart, retry, isolation, lineage and approval behaviour before
