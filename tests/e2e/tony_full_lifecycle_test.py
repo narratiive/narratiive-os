@@ -831,6 +831,7 @@ class TonyFullLifecycleTest(unittest.TestCase):
         gated = [item for item in records if item.resulting_state["status"] == "awaiting_approval"]
         self.assertEqual(len(gated), 10)
         self.assertTrue(all(item.resulting_state["approval_status"] == "pending" for item in gated))
+        self.assertTrue(all(item.audit_events.count("approval.requested") == 1 for item in gated))
         self.assertTrue(all(item.continuation_command.startswith("/") for item in gated))
         self.assertTrue(all(f"/continue {item.input_state['run_id']}" in item.continuation_command for item in gated))
 

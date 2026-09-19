@@ -112,6 +112,31 @@ class WorkflowRunServiceTests(unittest.TestCase):
             ["workflow.created", "stage.started", "stage.completed"],
         )
 
+    def test_final_approval_request_is_atomic_and_idempotent(self) -> None:
+        definition = workflow_definition_from_dict(
+            {
+                "workflow_id": "approval_guarded",
+                "approval_required": True,
+                "stages": [{"stage_id": "prepare", "agent_ref": "worker-a"}],
+            }
+        )
+        self.service.create_run(definition, "run-approval", set())
+        self.service.start_stage("run-approval", "prepare")
+        state = self.service.complete_stage(
+            "run-approval",
+            "prepare",
+            [ArtifactRef("artifact-approval", "draft", "runs/run-approval/draft.json")],
+        )
+        action = "Approve completed approval_guarded work before consequential use or handoff."
+        self.assertEqual(state.status, WorkflowStatus.AWAITING_APPROVAL)
+        self.assertEqual(state.approval_status, "pending")
+        self.assertEqual(state.proposed_next_action, action)
+        self.service.pause_for_approval("run-approval", action)
+        events = self.event_log.read("run-approval")
+        requested = [event for event in events if event.event_type == "approval.requested"]
+        self.assertEqual(len(requested), 1)
+        self.assertEqual(requested[0].payload["proposed_next_action"], action)
+
     def test_duplicate_run_is_rejected(self) -> None:
         self.service.create_run(
             self.definition,

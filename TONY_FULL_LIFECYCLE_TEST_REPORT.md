@@ -86,7 +86,7 @@ The common successful audit sequence was:
 
 `workflow.created → stage.started → stage.attempt_recorded → stage.quality_recorded → workflow.outputs_promoted → stage.completed`
 
-Human-gated workflows then recorded `approval.requested`. Gate 4, the read-only Research Engine gate, completed without human approval. The other ten gates halted at `awaiting_approval` before continuation.
+Human-gated workflows then recorded exactly one `approval.requested` event containing the approval ID, exact proposed action and artifact IDs. Gate 4, the read-only Research Engine gate, completed without human approval. The other ten gates halted at `awaiting_approval` before continuation.
 
 Example continuation exposed at a human gate:
 
@@ -125,9 +125,8 @@ All 11 gates use production validators currently composed by `build_tony_workflo
 
 ## Failure reasons and state inconsistencies
 
-1. **Duplicate approval-request events.** Human-gated runs contain two `approval.requested` events: one from stage completion and another from the explicit pause. The snapshot remains consistent, but audit consumers may count two requests for one gate.
-2. **Provider gaps remain fail-closed.** Creative production and client delivery require configured providers; this is correct safety behaviour and prevents false live completion.
-3. **Input payload expansion.** The handoff builder carries most upstream fields into every downstream run. It preserves evidence but creates very large snapshots and increases the chance of field-name collisions. Output fields not required as next inputs are filtered, but the payload remains broader than each specialist's declared input contract.
+1. **Provider gaps remain fail-closed.** Creative production and client delivery require configured providers; this is correct safety behaviour and prevents false live completion.
+2. **Input payload expansion.** The handoff builder carries most upstream fields into every downstream run. It preserves evidence but creates very large snapshots and increases the chance of field-name collisions. Output fields not required as next inputs are filtered, but the payload remains broader than each specialist's declared input contract.
 
 ## Orphaned artefacts
 
@@ -139,10 +138,9 @@ All 11 gates use production validators currently composed by `build_tony_workflo
 ## Recommended fixes
 
 1. Keep bounded downstream-run identity regression coverage in the full lifecycle suite.
-2. Make approval-request creation idempotent for one run, stage, revision and exact artefact checksum.
-3. Wire the approval-gated Campaign Learning Notion projection into Tony's live multi-client scheduler after each agreed observation window.
-4. Configure real creative-production and client-delivery adapters only after credentials, Drive writes, exact-version receipts and retry/reconciliation contracts pass live acceptance.
-5. Narrow cross-workflow handoff payloads to declared inputs plus explicit `_lineage`, while preserving required evidence references and backward compatibility.
+2. Wire the approval-gated Campaign Learning Notion projection into Tony's live multi-client scheduler after each agreed observation window.
+3. Configure real creative-production and client-delivery adapters only after credentials, Drive writes, exact-version receipts and retry/reconciliation contracts pass live acceptance.
+4. Narrow cross-workflow handoff payloads to declared inputs plus explicit `_lineage`, while preserving required evidence references and backward compatibility.
 
 ## Test location and command
 

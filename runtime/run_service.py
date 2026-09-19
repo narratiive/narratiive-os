@@ -104,6 +104,12 @@ class WorkflowRunService:
         state = self.repository.load(run_id)
         output_list = list(outputs)
         self.engine.complete_stage(state, stage_id, output_list, next_available_inputs)
+        if state.status == WorkflowStatus.AWAITING_APPROVAL:
+            state.approval_status = "pending"
+            state.proposed_next_action = (
+                f"Approve completed {state.workflow_id} work before consequential use or handoff."
+            )
+            state.touch()
         self._commit(
             state,
             "stage.completed",
@@ -127,6 +133,7 @@ class WorkflowRunService:
                     payload={
                         "approval_id": approval_id,
                         "stage_id": stage_id,
+                        "proposed_next_action": state.proposed_next_action,
                         "artifact_ids": [
                             item.artifact_id for item in output_list
                         ],
@@ -360,6 +367,12 @@ class WorkflowRunService:
         action = proposed_next_action.strip()
         if not action:
             raise ValueError("approval pause requires an exact proposed next action")
+        if (
+            state.status is WorkflowStatus.AWAITING_APPROVAL
+            and state.approval_status == "pending"
+            and state.proposed_next_action == action
+        ):
+            return state
         if (
             state.approval_status == "approved"
             and state.approval_history
