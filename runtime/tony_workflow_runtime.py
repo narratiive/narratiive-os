@@ -9,6 +9,7 @@ from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
+from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
 from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
@@ -31,12 +32,14 @@ from runtime.workflow_quality import (
     campaign_world_quality_gate,
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
+    creative_asset_production_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_sprint_proposal_quality_gate,
+    production_planning_quality_gate,
     research_evidence_quality_gate,
     validate_operational_inputs,
 )
@@ -501,6 +504,8 @@ def build_tony_workflow_runtime(
         "campaign_world_quality_gate": campaign_world_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
+        "production_planning_quality_gate": production_planning_quality_gate,
+        "creative_asset_production_quality_gate": creative_asset_production_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
         "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
     }
@@ -517,6 +522,7 @@ def build_tony_workflow_runtime(
             document_adapter=document_adapter,
             campaign_world_triage_adapter=CampaignWorldTriageWorker(),
             creative_bible_triage_adapter=CreativeBibleTriageWorker(),
+            production_planning_adapter=CampaignProductionPlanningWorker(),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

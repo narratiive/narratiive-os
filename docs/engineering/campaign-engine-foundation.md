@@ -63,8 +63,10 @@ No advertising API is required for the foundation.
    triage rubric rather than autonomous strategy or approval.
 4. Campaign World and Creative Director's Bible lifecycle state is not yet
    exposed as one durable multi-client campaign portfolio.
-5. Channel specifications and Production Pack jobs are specified but are not
-   yet generated and routed through operational production adapters.
+5. The registered workflow now generates channel specifications, Production
+   Pack jobs and a planned Asset Manifest from the exact approved Bible. Live
+   creative-tool adapters remain unconfigured, so provider execution correctly
+   blocks after its separate human approval gate.
 6. Asset Manifest rules are canonical documentation rather than the complete
    executable asset-version and review service.
 7. Deployment, performance ingestion and learning/iteration are not yet live
@@ -185,7 +187,13 @@ that Notion changed without execution evidence.
    campaign to asset production without erasing the prior review cycle, while
    unanimous approval advances to an approved asset suite that still carries no
    delivery, publication or media-spend authority.
-6. **Production orchestration** — route jobs by declared capability, ingest
+6. **Production orchestration** — the operational workflow now separates local
+   production planning from provider execution. It derives one versioned channel
+   specification, human-reviewed job and planned Asset Manifest record for every
+   Creative Bible asset-matrix entry. The exact Production Pack pauses for human
+   approval; provider execution is a second external-write stage with another
+   approval boundary. With no configured creative provider, it fails closed
+   rather than claiming output. Route jobs by declared capability, ingest
    generated files into Drive, register versions and validate technical
    specifications. A Drive file-probe receipt can now create an append-only
    technical validation bound to the exact asset checksum and channel

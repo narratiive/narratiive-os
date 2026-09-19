@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import tempfile
 import unittest
 
@@ -297,6 +299,56 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             approved = runtime.runs.load_run("safe-creative-bible-run")
             self.assertEqual(approved.approval_history[-1]["decision"], "creative_bible_approval")
             self.assertFalse(approved.external_action_taken)
+
+    def test_asset_production_planning_precedes_separate_provider_execution_approval(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bible = creative_bible_output()["creative_directors_bible"]
+            checksum = hashlib.sha256(
+                json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            runtime.enqueue(
+                "creative_bible_to_asset_production",
+                "safe-production-run",
+                {
+                    "campaign_identity": campaign_identity(),
+                    "approved_creative_bible": bible,
+                    "creative_bible_approval": {
+                        "decision": "creative_bible_approval",
+                        "approver": "telegram:matt",
+                        "rationale": "Exact Bible approved.",
+                        "creative_bible_checksum": checksum,
+                    },
+                    "production_constraints": ["No publication", "Human review required"],
+                },
+                entity_id="safe-campaign",
+                correlation_id="safe-correlation",
+            )
+
+            planned = runtime.advance("safe-production-run", _lifecycle("safe-client"))
+            state = runtime.status("safe-production-run")
+
+            self.assertEqual(planned.status, "awaiting_approval")
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(state["stages"][0]["agent_ref"], "capability:production_planning")
+            self.assertEqual(state["stages"][1]["status"], "ready")
+            self.assertFalse(state["external_action_taken"])
+
+            runtime.approve(
+                "safe-production-run",
+                approver="telegram:matt",
+                rationale="Approve the exact internal Production Pack.",
+            )
+            execution_gate = runtime.advance("safe-production-run", _lifecycle("safe-client"))
+            self.assertEqual(execution_gate.status, "awaiting_approval")
+            self.assertIn("external action", execution_gate.proposed_next_action)
+            self.assertFalse(execution_gate.external_action_taken)
 
     def test_workspace_client_scopes_are_durably_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
