@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -17,6 +18,7 @@ from tests.test_workflow_quality import (
     growth_blueprint_output,
     proposal_output,
 )
+from tests.test_tony_workflow_runtime import _production_output
 
 
 class FallbackCommands:
@@ -282,6 +284,87 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertFalse(approved.data["external_action_taken"])
         state = runtime.runs.load_run("safe-bible-run")
         self.assertEqual(state.approval_history[-1]["decision"], "creative_bible_approval")
+
+    def test_asset_suite_command_binds_matt_to_every_exact_generated_version(self) -> None:
+        bible = creative_bible_output()["creative_directors_bible"]
+        checksum = hashlib.sha256(
+            json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+        ).hexdigest()
+        dispatchers = {"Creative Production": _production_output}
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-assets-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        runtime.enqueue(
+            "creative_bible_to_asset_production",
+            "safe-assets-run",
+            {
+                "campaign_identity": campaign_identity(),
+                "approved_creative_bible": bible,
+                "creative_bible_approval": {
+                    "decision": "creative_bible_approval",
+                    "approver": "telegram:matt",
+                    "rationale": "Exact Bible approved.",
+                    "creative_bible_checksum": checksum,
+                },
+                "production_constraints": ["No publication", "Human review required"],
+            },
+            entity_id="safe-campaign",
+            correlation_id="safe-assets-correlation",
+        )
+        runtime.advance("safe-assets-run", lifecycle("safe-assets-client"))
+        for rationale in (
+            "Approve the exact Production Pack.",
+            "Approve provider execution for the exact Production Pack.",
+            "Accept the produced versions for exact asset review.",
+        ):
+            runtime.approve("safe-assets-run", approver="telegram:matt", rationale=rationale)
+            runtime.advance("safe-assets-run", lifecycle("safe-assets-client"))
+
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(self.root, dispatchers=dispatchers, environ={}),
+        )
+        brief = service.execute("/assets safe-assets-run", [])
+        denied = service.execute(
+            "/approve-assets safe-assets-run because every exact asset version is ready",
+            [],
+            inputs={
+                "asset_suite_checksum": brief.data["asset_suite_checksum"],
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+        stale = service.execute(
+            "/approve-assets safe-assets-run because every exact asset version is ready",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "asset_suite_checksum": "0" * 64,
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+        approved = service.execute(
+            "/approve-assets safe-assets-run because every exact asset version is ready",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "asset_suite_checksum": brief.data["asset_suite_checksum"],
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+
+        self.assertEqual(brief.data["asset_count"], 18)
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(stale.status, "error")
+        self.assertIn("stale", stale.message)
+        self.assertEqual(approved.status, "healthy")
+        self.assertTrue(approved.data["external_action_taken"])  # Production occurred; delivery did not.
+        state = runtime.runs.load_run("safe-assets-run")
+        self.assertEqual(state.approval_history[-1]["decision"], "asset_suite_approval")
+        self.assertFalse(state.approval_history[-1]["delivery_authorised"])
 
     def test_legacy_approved_snapshot_does_not_present_approved_action_as_current(self) -> None:
         token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]

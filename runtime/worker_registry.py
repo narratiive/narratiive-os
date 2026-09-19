@@ -198,6 +198,7 @@ def build_tony_worker_registry(
     campaign_world_triage_adapter: WorkerAdapter | None = None,
     creative_bible_triage_adapter: WorkerAdapter | None = None,
     production_planning_adapter: WorkerAdapter | None = None,
+    creative_production_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
@@ -336,6 +337,30 @@ def build_tony_worker_registry(
             )
         )
 
+    if creative_production_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="configured-creative-production",
+                    provider="configured-creative-provider",
+                    capabilities=(
+                        "creative_asset_production",
+                        "image_generation",
+                        "short_form_video_production",
+                        "audio_production",
+                        "layout_design",
+                    ),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation", "external_write"),
+                    timeout_seconds=600,
+                    max_attempts=1,
+                    cost_class="configured_provider",
+                    selection_priority=10,
+                ),
+                creative_production_adapter,
+            )
+        )
+
     fireflies = dispatchers.get("Fireflies")
     if fireflies is not None:
         registrations.append(
@@ -361,15 +386,6 @@ def build_tony_worker_registry(
         )
 
     planned = (
-        (
-            "creative-production-unavailable",
-            (
-                "creative_asset_production",
-                "image_generation",
-                "video_generation",
-                "short_form_video_production",
-            ),
-        ),
         ("crm-operations-unavailable", ("crm_operations",)),
         ("email-operations-unavailable", ("email_preparation", "email_sending")),
         ("calendar-operations-unavailable", ("calendar_operations",)),
@@ -382,6 +398,18 @@ def build_tony_worker_registry(
         planned = (("creative-bible-triage-unavailable", ("creative_bible_quality_triage",)), *planned)
     if production_planning_adapter is None:
         planned = (("production-planning-unavailable", ("production_planning",)), *planned)
+    if creative_production_adapter is None:
+        planned = ((
+            "creative-production-unavailable",
+            (
+                "creative_asset_production",
+                "image_generation",
+                "video_generation",
+                "short_form_video_production",
+                "audio_production",
+                "layout_design",
+            ),
+        ), *planned)
     if research_adapter is None:
         planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
     if fireflies is None:

@@ -206,6 +206,42 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
     raise AssertionError(f"unhandled registered workflow: {workflow_id}")
 
 
+def _production_output(contract: Mapping[str, Any]) -> dict[str, Any]:
+    manifest = contract["asset_manifest"]
+    manifest_checksum = _checksum(manifest)
+    versions = []
+    receipts = []
+    for item in manifest["assets"]:
+        version_id = f"{item['asset_id']}-v1"
+        versions.append({
+            "asset_version_id": version_id,
+            "asset_id": item["asset_id"],
+            "version_number": 1,
+            "file_checksum": f"northstar-test-checksum-{version_id}",
+            "drive_uri": f"drive://northstar-test/{version_id}",
+            "production_job_id": item["production_job_id"],
+            "source_manifest_checksum": manifest_checksum,
+            "status": "in_review",
+            "human_review_required": True,
+            "approval_status": "pending",
+            "delivery_authorised": False,
+            "publication_authorised": False,
+        })
+        receipts.append({
+            "asset_version_id": version_id,
+            "provider_receipt_id": f"receipt-{version_id}",
+        })
+    return {
+        "asset_versions": versions,
+        "production_receipts": receipts,
+        "external_action_taken": True,
+        "external_action_receipt": {"receipt_id": "northstar-test-production-suite-receipt"},
+        "delivery_authorised": False,
+        "publication_authorised": False,
+        "media_spend_authorised": False,
+    }
+
+
 def _strict_fixture_validator(definition: WorkflowDefinition):
     required = definition.stages[0].output_contract.required_fields
 
@@ -236,7 +272,14 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
     def fixture_worker(contract: dict[str, Any]) -> dict[str, Any]:
         if adapter is not None:
             return adapter(contract)
-        output = _fixture_output(str(contract["workflow_context"]["workflow_id"]))
+        workflow_context = contract["workflow_context"]
+        if (
+            workflow_context["workflow_id"] == "creative_bible_to_asset_production"
+            and workflow_context["stage_id"] == "execute_creative_asset_production"
+        ):
+            output = _production_output(contract)
+        else:
+            output = _fixture_output(str(workflow_context["workflow_id"]))
         # Fields declared as both handoff inputs and outputs are lineage-bearing
         # pass-through values. Preserve their exact value; the runtime correctly
         # rejects a worker that attempts to overwrite an upstream input.
@@ -524,6 +567,14 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
                 approver="matt-authorised-synthetic-e2e",
                 rationale="Approve exact isolated Creative Bible version.",
             )
+        if definition.workflow_id == "creative_bible_to_asset_production":
+            brief = runtime.asset_suite_approval_brief(run_id)
+            runtime.approve_asset_suite(
+                run_id,
+                asset_suite_checksum=brief["asset_suite_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Approve every exact isolated asset version.",
+            )
         if not definition.next_workflow_id:
             break
         prior_state = runtime.runs.load_run(run_id)
@@ -541,6 +592,21 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
             )
             next_inputs["approved_creative_bible"] = dict(prior_state.input_payload["creative_directors_bible"])
             next_inputs["creative_bible_approval"] = dict(approval)
+        if definition.workflow_id == "creative_bible_to_asset_production":
+            approval = next(
+                item for item in reversed(prior_state.approval_history)
+                if item.get("decision") == "asset_suite_approval"
+            )
+            next_inputs["reviewed_assets"] = [
+                {
+                    **dict(item),
+                    "status": "approved",
+                    "approval_status": "approved",
+                    "source_asset_suite_checksum": approval["asset_suite_checksum"],
+                }
+                for item in prior_state.input_payload["asset_versions"]
+            ]
+            next_inputs["asset_suite_approval"] = dict(approval)
         next_stage = next_definition.stages[0]
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
@@ -621,6 +687,14 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
                 creative_bible_checksum=brief["creative_bible_checksum"],
                 approver="matt-authorised-synthetic-e2e",
                 rationale="Approve exact isolated Creative Bible version.",
+            )
+        if definition.workflow_id == "creative_bible_to_asset_production":
+            brief = runtime.asset_suite_approval_brief(run_id)
+            runtime.approve_asset_suite(
+                run_id,
+                asset_suite_checksum=brief["asset_suite_checksum"],
+                approver="matt-authorised-synthetic-e2e",
+                rationale="Approve every exact isolated asset version.",
             )
         if not definition.next_workflow_id:
             return runtime, reached, None

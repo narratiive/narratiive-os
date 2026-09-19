@@ -362,7 +362,7 @@ ASSET_REVIEW_TO_DELIVERY_PREPARATION = _workflow(
     _step(
         "prepare_delivery",
         capability="document_generation",
-        inputs=("campaign_identity", "reviewed_assets", "asset_manifest", "delivery_requirements"),
+        inputs=("campaign_identity", "reviewed_assets", "asset_manifest", "asset_suite_approval", "delivery_requirements"),
         outputs=("delivery_package", "delivery_manifest", "review_findings", "proposed_delivery_action"),
         quality="delivery_preparation_quality_gate",
         approval_required=True,

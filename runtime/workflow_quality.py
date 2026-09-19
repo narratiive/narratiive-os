@@ -115,6 +115,33 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("asset production requires approval bound to the exact Creative Bible checksum")
         if not isinstance(inputs.get("production_constraints"), list):
             raise ValueError("asset production requires explicit production constraints")
+    elif workflow_id == "asset_review_to_delivery_preparation":
+        assets = inputs.get("reviewed_assets")
+        approval = inputs.get("asset_suite_approval")
+        if not isinstance(assets, list) or not assets or not all(isinstance(item, Mapping) for item in assets):
+            raise ValueError("delivery preparation requires reviewed asset versions")
+        if not isinstance(approval, Mapping) or approval.get("decision") != "asset_suite_approval":
+            raise ValueError("delivery preparation requires Matt's exact asset-suite approval")
+        approver_tokens = {
+            token for token in re.split(r"[^a-z0-9]+", str(approval.get("approver") or "").casefold()) if token
+        }
+        if "matt" not in approver_tokens:
+            raise ValueError("delivery preparation requires Matt's authenticated asset-suite approval")
+        approved_ids = {str(item) for item in approval.get("asset_version_ids") or []}
+        asset_ids = {str(item.get("asset_version_id") or "") for item in assets}
+        if not approved_ids or approved_ids != asset_ids:
+            raise ValueError("delivery preparation assets do not match the exact approved version IDs")
+        if any(
+            item.get("status") != "approved"
+            or item.get("approval_status") != "approved"
+            or item.get("source_asset_suite_checksum") != approval.get("asset_suite_checksum")
+            for item in assets
+        ):
+            raise ValueError("delivery preparation requires checksum-bound approved asset versions")
+        if not isinstance(inputs.get("asset_manifest"), Mapping):
+            raise ValueError("delivery preparation requires the authoritative Asset Manifest")
+        if not isinstance(inputs.get("delivery_requirements"), Mapping):
+            raise ValueError("delivery preparation requires structured delivery requirements")
 
 
 def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -507,7 +534,13 @@ def creative_asset_production_quality_gate(output: Mapping[str, Any]) -> Mapping
         and bool(versions)
         and all(
             isinstance(item, Mapping)
-            and all(_meaningful(item.get(field)) for field in ("asset_version_id", "asset_id", "file_checksum", "drive_uri", "production_job_id"))
+            and all(
+                _meaningful(item.get(field))
+                for field in (
+                    "asset_version_id", "asset_id", "file_checksum", "drive_uri",
+                    "production_job_id", "source_manifest_checksum",
+                )
+            )
             and int(item.get("version_number") or 0) >= 1
             and item.get("status") in {"generated", "in_review"}
             and item.get("human_review_required") is True

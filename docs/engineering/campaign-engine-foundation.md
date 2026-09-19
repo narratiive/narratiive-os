@@ -186,7 +186,11 @@ that Notion changed without execution evidence.
    Tony cannot substitute for that approval. Changes requested return the
    campaign to asset production without erasing the prior review cycle, while
    unanimous approval advances to an approved asset suite that still carries no
-   delivery, publication or media-spend authority.
+   delivery, publication or media-spend authority. The generic workflow now
+   exposes `/assets` and `/approve-assets`; the latter records Matt's identity,
+   the exact suite checksum and every approved asset-version ID before delivery
+   preparation can begin. Stale, incomplete and Tony-authored approvals fail
+   closed.
 6. **Production orchestration** — the operational workflow now separates local
    production planning from provider execution. It derives one versioned channel
    specification, human-reviewed job and planned Asset Manifest record for every
@@ -210,8 +214,13 @@ that Notion changed without execution evidence.
    route, job, channel specification, planned asset and production parameters.
    Matt must approve that payload's checksum; Tony and stale approvals are
    rejected, and no preview can authorise execution, publication or spend.
-   Provider execution, Drive ingestion and live probe execution remain bounded
-   follow-on work.
+   A configured creative provider can now execute only after both Production
+   Pack and external-write approval. Its result must cover every exact planned
+   asset/job pair, bind each generated version to the Asset Manifest checksum,
+   supply a receipt for every version, and explicitly deny delivery,
+   publication and spend. Missing providers and malformed, partial, stale or
+   over-authorised provider results fail closed. Live provider credentials,
+   Drive ingestion and live probe execution remain bounded follow-on work.
 7. **Delivery and deployment preparation** — assemble the approved client asset
    suite. Add Meta, TikTok and Google adapters only after exact action-preview,
    approval, idempotency and reconciliation contracts are proven. No adapter

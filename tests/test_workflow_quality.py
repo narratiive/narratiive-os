@@ -468,6 +468,32 @@ class WorkflowQualityTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "exact Creative Bible checksum"):
             validate_operational_inputs("creative_bible_to_asset_production", inputs)
 
+    def test_delivery_preparation_requires_exact_matt_approved_asset_versions(self) -> None:
+        suite_checksum = "a" * 64
+        inputs = {
+            "campaign_identity": campaign_identity(),
+            "reviewed_assets": [
+                {
+                    "asset_version_id": "safe-asset-v1",
+                    "status": "approved",
+                    "approval_status": "approved",
+                    "source_asset_suite_checksum": suite_checksum,
+                }
+            ],
+            "asset_suite_approval": {
+                "decision": "asset_suite_approval",
+                "approver": "telegram:matt",
+                "asset_suite_checksum": suite_checksum,
+                "asset_version_ids": ["safe-asset-v1"],
+            },
+            "asset_manifest": {"manifest_id": "safe-manifest"},
+            "delivery_requirements": {"destination": "client Drive delivery folder"},
+        }
+        validate_operational_inputs("asset_review_to_delivery_preparation", inputs)
+        inputs["reviewed_assets"][0]["asset_version_id"] = "unapproved-version"
+        with self.assertRaisesRegex(ValueError, "exact approved version IDs"):
+            validate_operational_inputs("asset_review_to_delivery_preparation", inputs)
+
     def test_campaign_workflows_require_complete_stable_identity(self) -> None:
         inputs = {
             "approved_growth_blueprint": {"status": "approved"},

@@ -69,6 +69,16 @@ class WorkflowCommandBackend(Protocol):
         approver: str,
         rationale: str,
     ) -> WorkflowState: ...
+    def asset_suite_approval_brief(self, state: WorkflowState) -> Mapping[str, Any]: ...
+    def approve_asset_suite(
+        self,
+        state: WorkflowState,
+        *,
+        asset_suite_checksum: str,
+        approval_token: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState: ...
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
@@ -372,6 +382,38 @@ class FileWorkflowCommandBackend:
         )
         return runtime.runs.load_run(state.run_id)
 
+    def asset_suite_approval_brief(self, state: WorkflowState) -> Mapping[str, Any]:
+        return self._runtime(state).asset_suite_approval_brief(state.run_id)
+
+    def approve_asset_suite(
+        self,
+        state: WorkflowState,
+        *,
+        asset_suite_checksum: str,
+        approval_token: str,
+        approver: str,
+        rationale: str,
+    ) -> WorkflowState:
+        runtime = self._runtime(state)
+        brief = runtime.asset_suite_approval_brief(state.run_id)
+        if asset_suite_checksum.strip() != str(brief.get("asset_suite_checksum") or ""):
+            raise ValueError("asset-suite approval checksum is stale or incorrect")
+        if state.status.value == "awaiting_approval":
+            binding = approval_binding_evidence(state, approval_token)
+            runtime.approve(
+                state.run_id,
+                approver=approver,
+                rationale=rationale,
+                approval_binding=binding,
+            )
+        runtime.approve_asset_suite(
+            state.run_id,
+            asset_suite_checksum=asset_suite_checksum,
+            approver=approver,
+            rationale=rationale,
+        )
+        return runtime.runs.load_run(state.run_id)
+
     def projection(self, state: WorkflowState) -> Mapping[str, Any]:
         runtime = self._runtime(state)
         if runtime.business_projection is None:
@@ -504,7 +546,7 @@ class TonyWorkflowCommandService:
         "commission",
         "artefact-detail", "artifact-detail", "action-preview", "execute-action",
         "drive-preview", "persist-drive",
-        "worlds", "select-world", "bible", "approve-bible",
+        "worlds", "select-world", "bible", "approve-bible", "assets", "approve-assets",
     }
 
     def __init__(self, command_service, backend: WorkflowCommandBackend) -> None:
@@ -698,6 +740,38 @@ class TonyWorkflowCommandService:
                     name,
                     "healthy",
                     "Recorded Matt's exact Creative Bible approval. Production remains a separate planned and approved action.",
+                    self._summary(changed),
+                )
+            if name == "assets":
+                brief = dict(self.backend.asset_suite_approval_brief(state))
+                brief["approval_token"] = workflow_approval_token(state)
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    f"{brief['asset_count']} exact generated asset version(s) await Matt's review. Delivery, publication and spend remain unauthorised.",
+                    brief,
+                )
+            if name == "approve-assets":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Asset-suite approval requires Matt's authenticated identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Use /approve-assets <run> because <reason>.")
+                supplied = dict(inputs or {})
+                asset_suite_checksum = str(supplied.get("asset_suite_checksum") or "").strip()
+                approval_token = str(supplied.get("approval_token") or "").strip()
+                if not asset_suite_checksum or (state.status.value == "awaiting_approval" and not approval_token):
+                    return self._error(name, "asset_approval_binding_required", "Read /assets first and supply its exact suite checksum and approval token.")
+                changed = self.backend.approve_asset_suite(
+                    state,
+                    asset_suite_checksum=asset_suite_checksum,
+                    approval_token=approval_token,
+                    approver=principal_id,
+                    rationale=rationale,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "Recorded Matt's exact asset-suite approval. Client delivery remains a separate approval-gated action.",
                     self._summary(changed),
                 )
             if name == "proposed":
