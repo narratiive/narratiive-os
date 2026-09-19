@@ -78,6 +78,20 @@ class TonyDispatchAdapterTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "no structured evidence"):
                 dispatchers["Claude"]({"instruction": "draft"})
 
+    def test_higgsfield_mode_requires_drive_and_builds_native_creative_provider(self):
+        env = {
+            "TONY_DISPATCH_CREATIVE_PRODUCTION_MODE": "higgsfield_api",
+            "HF_API_KEY_ID": "id:secret",
+            "TONY_DISPATCH_GOOGLE_DRIVE_MODE": "google_api",
+            "TONY_GOOGLE_ACCESS_TOKEN": "synthetic",
+            "TONY_WORKFLOW_RUNTIME_ROOT": "/tmp/safe-runtime",
+        }
+
+        dispatchers = build_http_dispatchers(env)
+
+        self.assertIn("Creative Production", dispatchers)
+        self.assertIn("Google Drive", dispatchers)
+
 
 if __name__ == "__main__":
     unittest.main()

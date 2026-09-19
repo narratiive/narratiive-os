@@ -211,6 +211,21 @@ def _worker_readiness(worker: str, environ: Mapping[str, str]) -> WorkerReadines
             ),
         )
 
+    if worker == "Creative Production" and native_mode == "higgsfield_api":
+        from runtime.higgsfield_creative_production import higgsfield_credential
+
+        missing: list[str] = []
+        if not higgsfield_credential(environ):
+            missing.append("HF_KEY or HF_API_KEY_ID + HF_API_KEY_SECRET")
+        if not _worker_readiness("Google Drive", environ).configured:
+            missing.append("configured Google Drive ingestion")
+        return WorkerReadiness(
+            worker=worker,
+            configured=not missing,
+            mode="higgsfield_api",
+            missing=tuple(missing),
+        )
+
     # Tokens are optional because some local dispatch endpoints are loopback-only or authenticate elsewhere.
     return WorkerReadiness(
         worker=worker,
