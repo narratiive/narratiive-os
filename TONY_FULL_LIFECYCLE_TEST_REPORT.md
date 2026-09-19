@@ -16,6 +16,15 @@ All 11 registered gates pass contract/state-machine conformance with isolated ru
 
 Default live operation remains deliberately fail-closed where an external provider is absent: creative production and client delivery require configured adapters plus explicit external-write approval. Local Production Pack and delivery-package preparation remain available without external writes.
 
+Post-gate operational controls are also verified: Tony now exposes a repeat-safe
+multi-client portfolio (`/campaigns` or `/clients`) and a read-only campaign
+learning monitor (`/learning-queue`). Learning cannot begin until the matching
+asset suite carries exact human-approved version IDs and the terminal delivery
+follow-up gate is complete and approved. A per-campaign learning cycle is
+persisted locally, remains pending human review, and can be projected to Notion
+only with Matt's authenticated identity, rationale and the exact cycle checksum.
+No learning operation can publish, mutate media or authorise spend.
+
 ## Canonical gate architecture discovered
 
 1. `growth_diagnostic_to_blueprint_lite`

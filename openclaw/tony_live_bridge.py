@@ -57,6 +57,7 @@ from runtime.tony_dispatch_adapters import build_http_dispatchers
 from runtime.tony_drive_delivery_workspace import TonyDriveDeliveryWorkspaceCommandService
 from runtime.tony_executive_commands import TonyExecutiveCommandService
 from runtime.tony_executive_learning import TonyExecutiveLearningCommandService
+from runtime.campaign_learning_coordinator import CampaignLearningCoordinator
 from runtime.tony_meeting_reply_preparation import TonyMeetingReplyPreparationCommandService
 from runtime.tony_memory_commands import TonyMemoryCommandService
 from runtime.tony_outcome_accountability import TonyOutcomeAccountabilityCommandService
@@ -240,6 +241,10 @@ class LeadAwareTonyApplication:
                 "additional-research": "research",
                 "deliver-internal-review": "deliver-review",
                 "commission": "commission",
+                "client-portfolio": "campaigns",
+                "campaign-learning": "learning",
+                "campaign-learning-queue": "learning-queue",
+                "sync-campaign-learning": "sync-learning",
             }
             command_name = commands.get(operation)
             if command_name is None:
@@ -252,17 +257,22 @@ class LeadAwareTonyApplication:
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
+                "sync-campaign-learning",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
-            if operation not in {"current-work", "approvals", "blockers", "recover"} and not reference:
+            if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
                 raise ValueError("workflow reference is required")
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
-                principal = self.authorised_principal_id
+                principal = (
+                    f"matt:{self.authorised_principal_id}"
+                    if operation == "sync-campaign-learning"
+                    else self.authorised_principal_id
+                )
             elif operation == "sync-notion" and request.get("approval_granted") is True:
                 principal = "openclaw:native-approval"
             else:
@@ -622,6 +632,16 @@ def build_app() -> LeadAwareTonyApplication:
     workflow_command_service = TonyWorkflowCommandService(
         app.command_service,
         workflow_backend,
+        campaign_learning=CampaignLearningCoordinator(
+            Path(
+                os.getenv(
+                    "TONY_CAMPAIGN_LEARNING_ROOT",
+                    str(REPOSITORY_ROOT / ".runtime" / "campaign-learning"),
+                )
+            ),
+            media_control,
+            notion_dispatcher=live_dispatchers.get("Notion"),
+        ),
     )
     blueprint_lite_service.recover_pending()
     conversation_store = FileConversationWorkStore(
