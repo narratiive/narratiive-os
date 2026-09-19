@@ -53,6 +53,49 @@ def _blueprint_output() -> dict[str, object]:
     }
 
 
+def _production_output(contract: dict[str, object]) -> dict[str, object]:
+    manifest = contract["asset_manifest"]
+    manifest_checksum = hashlib.sha256(
+        json.dumps(manifest, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    ).hexdigest()
+    versions = []
+    receipts = []
+    for index, asset in enumerate(manifest["assets"], start=1):
+        version_id = f"{asset['asset_id']}-v1"
+        versions.append(
+            {
+                "asset_version_id": version_id,
+                "asset_id": asset["asset_id"],
+                "production_job_id": asset["production_job_id"],
+                "file_checksum": hashlib.sha256(version_id.encode("utf-8")).hexdigest(),
+                "drive_uri": f"https://drive.google.invalid/{version_id}",
+                "source_manifest_checksum": manifest_checksum,
+                "version_number": 1,
+                "status": "generated",
+                "approval_status": "pending",
+                "human_review_required": True,
+                "delivery_authorised": False,
+                "publication_authorised": False,
+            }
+        )
+        receipts.append(
+            {
+                "asset_version_id": version_id,
+                "provider_receipt_id": f"provider-receipt-{index}",
+                "status": "complete",
+            }
+        )
+    return {
+        "asset_versions": versions,
+        "production_receipts": receipts,
+        "external_action_taken": True,
+        "external_action_receipt": {"provider_batch_id": "safe-production-batch", "status": "complete"},
+        "delivery_authorised": False,
+        "publication_authorised": False,
+        "media_spend_authorised": False,
+    }
+
+
 class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
     def test_blueprint_lite_executes_through_registered_generic_runtime_and_pauses(self) -> None:
         calls = []
@@ -349,6 +392,89 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             self.assertEqual(execution_gate.status, "awaiting_approval")
             self.assertIn("external action", execution_gate.proposed_next_action)
             self.assertFalse(execution_gate.external_action_taken)
+
+    def test_every_generated_asset_version_requires_exact_matt_approval_before_delivery(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            bible = creative_bible_output()["creative_directors_bible"]
+            checksum = hashlib.sha256(
+                json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={"Creative Production": _production_output},
+                environ={},
+            )
+            runtime.enqueue(
+                "creative_bible_to_asset_production",
+                "safe-production-approval-run",
+                {
+                    "campaign_identity": campaign_identity(),
+                    "approved_creative_bible": bible,
+                    "creative_bible_approval": {
+                        "decision": "creative_bible_approval",
+                        "approver": "telegram:matt",
+                        "rationale": "Exact Bible approved.",
+                        "creative_bible_checksum": checksum,
+                    },
+                    "production_constraints": ["No publication", "Human review required"],
+                },
+                entity_id="safe-campaign",
+                correlation_id="safe-correlation",
+            )
+
+            runtime.advance("safe-production-approval-run", _lifecycle("safe-client"))
+            runtime.approve(
+                "safe-production-approval-run",
+                approver="telegram:matt",
+                rationale="Approve the exact Production Pack.",
+            )
+            runtime.advance("safe-production-approval-run", _lifecycle("safe-client"))
+            runtime.approve(
+                "safe-production-approval-run",
+                approver="telegram:matt",
+                rationale="Approve provider execution for this exact Production Pack.",
+            )
+            produced = runtime.advance("safe-production-approval-run", _lifecycle("safe-client"))
+            self.assertEqual(produced.status, "awaiting_approval", produced.blocker)
+            runtime.approve(
+                "safe-production-approval-run",
+                approver="telegram:matt",
+                rationale="Accept the completed production stage for review.",
+            )
+            runtime.advance("safe-production-approval-run", _lifecycle("safe-client"))
+
+            brief = runtime.asset_suite_approval_brief("safe-production-approval-run")
+            self.assertEqual(brief["asset_count"], 18)
+            self.assertFalse(brief["delivery_authorised"])
+            with self.assertRaisesRegex(ValueError, "Matt"):
+                runtime.approve_asset_suite(
+                    "safe-production-approval-run",
+                    asset_suite_checksum=brief["asset_suite_checksum"],
+                    approver="tony",
+                    rationale="Tony cannot approve the suite.",
+                )
+            with self.assertRaisesRegex(ValueError, "stale"):
+                runtime.approve_asset_suite(
+                    "safe-production-approval-run",
+                    asset_suite_checksum="0" * 64,
+                    approver="telegram:matt",
+                    rationale="Reject stale evidence.",
+                )
+            runtime.approve_asset_suite(
+                "safe-production-approval-run",
+                asset_suite_checksum=brief["asset_suite_checksum"],
+                approver="telegram:matt",
+                rationale="Approve every exact generated version for delivery preparation only.",
+            )
+            state = runtime.runs.load_run("safe-production-approval-run")
+            decision = state.approval_history[-1]
+            self.assertEqual(decision["decision"], "asset_suite_approval")
+            self.assertEqual(len(decision["asset_version_ids"]), 18)
+            self.assertFalse(decision["delivery_authorised"])
+            self.assertFalse(decision["publication_authorised"])
+            self.assertFalse(decision["media_spend_authorised"])
 
     def test_workspace_client_scopes_are_durably_isolated(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

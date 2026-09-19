@@ -548,6 +548,49 @@ class WorkflowRunService:
         self._commit(state, "creative_bible.approved", decision)
         return state
 
+    def record_asset_suite_approval(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        asset_suite_checksum: str,
+        asset_version_ids: Iterable[str],
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        if state.workflow_id != "creative_bible_to_asset_production":
+            raise ValueError("asset-suite approval belongs to the asset-production workflow")
+        if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
+            raise ValueError("asset-suite approval requires a completed approved production review gate")
+        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+            raise ValueError("asset-suite approval requires Matt's authenticated identity")
+        version_ids = tuple(str(item).strip() for item in asset_version_ids if str(item).strip())
+        if not version_ids or len(version_ids) != len(set(version_ids)):
+            raise ValueError("asset-suite approval requires unique exact asset version IDs")
+        decision = {
+            "decision": "asset_suite_approval",
+            "approver": approver.strip(),
+            "rationale": rationale.strip(),
+            "asset_suite_checksum": asset_suite_checksum.strip(),
+            "asset_version_ids": list(version_ids),
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "delivery_authorised": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+        }
+        if any(not decision[key] for key in ("approver", "rationale", "asset_suite_checksum")):
+            raise ValueError("asset-suite approval requires exact-version approval evidence")
+        existing = [item for item in state.approval_history if item.get("decision") == "asset_suite_approval"]
+        if existing:
+            prior = existing[-1]
+            if prior.get("asset_suite_checksum") == decision["asset_suite_checksum"]:
+                return state
+            raise ValueError("a different asset-suite version has already been approved")
+        state.approval_history.append(decision)
+        state.touch()
+        self._commit(state, "asset_suite.approved", decision)
+        return state
+
     def record_handoff(
         self,
         run_id: str,

@@ -11,6 +11,7 @@ from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
+from runtime.creative_production_workflow_adapter import CreativeProductionWorkflowAdapter
 from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
@@ -256,6 +257,67 @@ class TonyWorkflowRuntime:
         self._project(changed)
         return workflow_to_dict(changed)
 
+    def asset_suite_approval_brief(self, run_id: str) -> dict[str, Any]:
+        state = self.runs.load_run(run_id)
+        if state.workflow_id != "creative_bible_to_asset_production":
+            raise ValueError("run is not an asset-suite approval gate")
+        versions = state.input_payload.get("asset_versions")
+        if not isinstance(versions, list) or not versions or not all(isinstance(item, Mapping) for item in versions):
+            raise ValueError("asset-suite approval evidence is incomplete")
+        required = ("asset_version_id", "asset_id", "file_checksum", "drive_uri", "production_job_id")
+        if any(any(not str(item.get(field) or "").strip() for field in required) for item in versions):
+            raise ValueError("asset-suite contains an incomplete generated version")
+        if any(item.get("human_review_required") is not True for item in versions):
+            raise ValueError("asset-suite version does not require human review")
+        checksum = _workflow_value_checksum(versions)
+        return {
+            "asset_suite_checksum": checksum,
+            "asset_count": len(versions),
+            "asset_versions": [
+                {
+                    "asset_version_id": str(item["asset_version_id"]),
+                    "asset_id": str(item["asset_id"]),
+                    "file_checksum": str(item["file_checksum"]),
+                    "drive_uri": str(item["drive_uri"]),
+                    "status": str(item.get("status") or ""),
+                    "approval_status": str(item.get("approval_status") or "pending"),
+                }
+                for item in versions
+            ],
+            "requires_matt": True,
+            "auto_approval_authorised": False,
+            "delivery_authorised": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+            "approval_recorded": any(
+                item.get("decision") == "asset_suite_approval" for item in state.approval_history
+            ),
+        }
+
+    def approve_asset_suite(
+        self,
+        run_id: str,
+        *,
+        asset_suite_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        state = self.runs.load_run(run_id)
+        brief = self.asset_suite_approval_brief(run_id)
+        expected = str(brief["asset_suite_checksum"])
+        if not asset_suite_checksum.strip() or asset_suite_checksum.strip() != expected:
+            raise ValueError("asset-suite approval checksum is stale or incorrect")
+        versions = state.input_payload.get("asset_versions")
+        changed = self.runs.record_asset_suite_approval(
+            run_id,
+            approver=approver,
+            rationale=rationale,
+            asset_suite_checksum=expected,
+            asset_version_ids=[str(item["asset_version_id"]) for item in versions],
+        )
+        self._project(changed)
+        return workflow_to_dict(changed)
+
     def handoff(
         self,
         run_id: str,
@@ -335,6 +397,30 @@ class TonyWorkflowRuntime:
                 raise ValueError("recorded Creative Bible approval no longer matches the Bible evidence")
             inputs["approved_creative_bible"] = dict(bible)
             inputs["creative_bible_approval"] = dict(approval)
+        if state.workflow_id == "creative_bible_to_asset_production":
+            approval = next(
+                (
+                    item for item in reversed(state.approval_history)
+                    if item.get("decision") == "asset_suite_approval"
+                ),
+                None,
+            )
+            versions = state.input_payload.get("asset_versions")
+            if not isinstance(approval, Mapping):
+                raise ValueError("delivery handoff requires Matt's exact asset-suite approval")
+            if not isinstance(versions, list) or _workflow_value_checksum(versions) != approval.get("asset_suite_checksum"):
+                raise ValueError("recorded asset-suite approval no longer matches generated asset evidence")
+            inputs["reviewed_assets"] = [
+                {
+                    **dict(item),
+                    "status": "approved",
+                    "approval_status": "approved",
+                    "source_asset_suite_checksum": approval["asset_suite_checksum"],
+                }
+                for item in versions
+                if isinstance(item, Mapping)
+            ]
+            inputs["asset_suite_approval"] = dict(approval)
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
                 inputs.pop(field, None)
@@ -523,6 +609,11 @@ def build_tony_workflow_runtime(
             campaign_world_triage_adapter=CampaignWorldTriageWorker(),
             creative_bible_triage_adapter=CreativeBibleTriageWorker(),
             production_planning_adapter=CampaignProductionPlanningWorker(),
+            creative_production_adapter=(
+                CreativeProductionWorkflowAdapter(configured_dispatchers["Creative Production"])
+                if "Creative Production" in configured_dispatchers
+                else None
+            ),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

@@ -144,6 +144,18 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         with self.assertRaises(NoAvailableWorker):
             registry.resolve("production_planning", side_effect="external_write")
 
+    def test_configured_creative_production_adapter_requires_external_write_approval(self) -> None:
+        adapter = lambda contract: {"asset_versions": [], "production_receipts": []}
+        registry = build_tony_worker_registry({}, creative_production_adapter=adapter)
+
+        resolution = registry.resolve("creative_asset_production", side_effect="external_write")
+        declared = {item.metadata.worker_id for item in registry.all()}
+
+        self.assertEqual(resolution.worker_id, "configured-creative-production")
+        self.assertNotIn("creative-production-unavailable", declared)
+        with self.assertRaises(ProhibitedWorkerSideEffect):
+            registry.execute(resolution, {"safe": True}, side_effect="external_write")
+
     def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
         calls = []
         registry = build_tony_worker_registry(
