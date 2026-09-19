@@ -11,6 +11,7 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_workflow_quality import (
     campaign_world_candidates_output,
+    creative_bible_output,
     discovery_output,
     growth_blueprint_output,
     proposal_output,
@@ -207,6 +208,77 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertIn("stale", stale.message)
         self.assertEqual(selected.status, "healthy")
         self.assertFalse(selected.data["external_action_taken"])
+
+    def test_creative_bible_approval_is_bound_to_matt_and_exact_checksum(self) -> None:
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-bible-client",
+            dispatchers={"Claude": lambda _contract: creative_bible_output()},
+            environ={},
+        )
+        runtime.enqueue(
+            "campaign_world_to_creative_bible",
+            "safe-bible-run",
+            {
+                "approved_campaign_world": {"status": "approved", "source": "synthetic"},
+                "campaign_world_selection": {
+                    "approver": "telegram:matt",
+                    "rationale": "Exact synthetic selection.",
+                    "candidate_id": "safe-candidate",
+                    "candidate_checksum": "safe-candidate-checksum",
+                },
+                "growth_blueprint": {"status": "approved", "source": "synthetic"},
+                "production_context": {"market": "Synthetic UK market"},
+            },
+            entity_id="safe-campaign",
+            correlation_id="safe-bible-correlation",
+        )
+        runtime.advance("safe-bible-run", lifecycle("safe-bible-client"))
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(
+                self.root,
+                dispatchers={"Claude": lambda _contract: creative_bible_output()},
+                environ={},
+            ),
+        )
+        brief = service.execute("/bible safe-bible-run", [])
+
+        denied = service.execute(
+            "/approve-bible safe-bible-run because the exact Bible is ready",
+            [],
+            inputs={
+                "creative_bible_checksum": brief.data["creative_bible_checksum"],
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+        stale = service.execute(
+            "/approve-bible safe-bible-run because the exact Bible is ready",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "creative_bible_checksum": "0" * 64,
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+        approved = service.execute(
+            "/approve-bible safe-bible-run because the exact Bible is ready",
+            [],
+            principal_id="telegram:matt",
+            inputs={
+                "creative_bible_checksum": brief.data["creative_bible_checksum"],
+                "approval_token": brief.data["approval_token"],
+            },
+        )
+
+        self.assertEqual(denied.data["error_code"], "authorised_principal_required")
+        self.assertEqual(stale.status, "error")
+        self.assertIn("stale", stale.message)
+        self.assertEqual(approved.status, "healthy")
+        self.assertFalse(approved.data["external_action_taken"])
+        state = runtime.runs.load_run("safe-bible-run")
+        self.assertEqual(state.approval_history[-1]["decision"], "creative_bible_approval")
 
     def test_legacy_approved_snapshot_does_not_present_approved_action_as_current(self) -> None:
         token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]

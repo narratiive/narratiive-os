@@ -153,11 +153,14 @@ that Notion changed without execution evidence.
    selection before Creative Bible handoff. The selection cannot produce,
    publish, deliver or fund an asset. Live Claude acceptance and iterative taste
    calibration against Matt's decisions remain follow-on work.
-4. **Creative Director's Bible** — reconcile the v2 draft specification with
-   the stable template, persist one approved Bible, and prove version-bound
-   review and revision. The runtime now binds every submitted Bible version to
-   the exact selected Campaign World ID, version and checksum; revision clears
-   stale reviews rather than carrying them onto new creative work.
+4. **Creative Director's Bible** — the operational workflow now generates the
+   structured v2 Bible, applies the complete structural contract, routes it
+   through Tony's separate bounded taste/producibility review, and pauses for
+   Matt. Matt's approval is bound to the exact Bible checksum and is required
+   before asset-production handoff; Tony, stale versions and unreviewed Bibles
+   fail closed. Production, publication and media-spend authority remain false.
+   Live-provider acceptance and calibration against Matt's review history remain
+   follow-on work.
 5. **Production planning** — the state machine now accepts versioned channel
    specifications and capability-routed Production Pack jobs only when every
    record traces to the exact approved Bible. Jobs require human review, the

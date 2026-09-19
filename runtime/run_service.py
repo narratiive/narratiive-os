@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import re
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
-import re
 from uuid import uuid4
 
 from .definitions import WorkflowDefinition
@@ -511,6 +511,41 @@ class WorkflowRunService:
         state.approval_history.append(decision)
         state.touch()
         self._commit(state, "campaign_world.selected", decision)
+        return state
+
+    def record_creative_bible_approval(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        creative_bible_checksum: str,
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        if state.workflow_id != "campaign_world_to_creative_bible":
+            raise ValueError("Creative Bible approval belongs to the Creative Bible workflow")
+        if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
+            raise ValueError("Creative Bible approval requires an approved completed Tony review gate")
+        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+            raise ValueError("Creative Director's Bible approval requires Matt's authenticated identity")
+        decision = {
+            "decision": "creative_bible_approval",
+            "approver": approver.strip(),
+            "rationale": rationale.strip(),
+            "creative_bible_checksum": creative_bible_checksum.strip(),
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+        }
+        if any(not decision[key] for key in ("approver", "rationale", "creative_bible_checksum")):
+            raise ValueError("Creative Bible approval requires exact-version approval evidence")
+        existing = [item for item in state.approval_history if item.get("decision") == "creative_bible_approval"]
+        if existing:
+            prior = existing[-1]
+            if prior.get("creative_bible_checksum") == decision["creative_bible_checksum"]:
+                return state
+            raise ValueError("a different Creative Director's Bible version has already been approved")
+        state.approval_history.append(decision)
+        state.touch()
+        self._commit(state, "creative_bible.approved", decision)
         return state
 
     def record_handoff(

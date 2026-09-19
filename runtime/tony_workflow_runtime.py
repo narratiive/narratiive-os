@@ -9,6 +9,7 @@ from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
+from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
 from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
@@ -31,6 +32,7 @@ from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
     creative_bible_quality_gate,
+    creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_blueprint_deliverable_quality_gate,
@@ -205,6 +207,52 @@ class TonyWorkflowRuntime:
         self._project(changed)
         return workflow_to_dict(changed)
 
+    def creative_bible_approval_brief(self, run_id: str) -> dict[str, Any]:
+        state = self.runs.load_run(run_id)
+        if state.workflow_id != "campaign_world_to_creative_bible":
+            raise ValueError("run is not a Creative Bible approval gate")
+        bible = state.input_payload.get("creative_directors_bible")
+        brief = state.input_payload.get("creative_bible_approval_brief")
+        review = state.input_payload.get("creative_bible_review")
+        if not isinstance(bible, Mapping) or not isinstance(brief, Mapping) or not isinstance(review, Mapping):
+            raise ValueError("Creative Bible approval evidence is incomplete")
+        checksum = _workflow_value_checksum(bible)
+        if checksum != brief.get("creative_bible_checksum") or checksum != review.get("reviewed_bible_checksum"):
+            raise ValueError("Creative Bible review no longer matches the exact Bible version")
+        north_star = bible.get("creative_north_star")
+        return {
+            **dict(brief),
+            "creative_bible_checksum": checksum,
+            "creative_north_star": dict(north_star) if isinstance(north_star, Mapping) else {},
+            "tony_review": dict(review),
+            "approval_recorded": any(
+                item.get("decision") == "creative_bible_approval" for item in state.approval_history
+            ),
+        }
+
+    def approve_creative_bible(
+        self,
+        run_id: str,
+        *,
+        creative_bible_checksum: str,
+        approver: str,
+        rationale: str,
+    ) -> dict[str, Any]:
+        brief = self.creative_bible_approval_brief(run_id)
+        expected = str(brief.get("creative_bible_checksum") or "")
+        if not creative_bible_checksum.strip() or creative_bible_checksum.strip() != expected:
+            raise ValueError("Creative Bible approval checksum is stale or incorrect")
+        if brief.get("requires_matt") is not True or brief.get("tony_disposition") != "forward":
+            raise ValueError("Creative Bible has not been forwarded by Tony for Matt approval")
+        changed = self.runs.record_creative_bible_approval(
+            run_id,
+            approver=approver,
+            rationale=rationale,
+            creative_bible_checksum=expected,
+        )
+        self._project(changed)
+        return workflow_to_dict(changed)
+
     def handoff(
         self,
         run_id: str,
@@ -269,6 +317,21 @@ class TonyWorkflowRuntime:
                 raise ValueError("recorded Campaign World selection no longer matches candidate evidence")
             inputs["approved_campaign_world"] = dict(selected["campaign_world"])
             inputs["campaign_world_selection"] = dict(selection)
+        if state.workflow_id == "campaign_world_to_creative_bible":
+            approval = next(
+                (
+                    item for item in reversed(state.approval_history)
+                    if item.get("decision") == "creative_bible_approval"
+                ),
+                None,
+            )
+            bible = state.input_payload.get("creative_directors_bible")
+            if not isinstance(approval, Mapping):
+                raise ValueError("Creative Bible handoff requires Matt's exact-version approval")
+            if not isinstance(bible, Mapping) or _workflow_value_checksum(bible) != approval.get("creative_bible_checksum"):
+                raise ValueError("recorded Creative Bible approval no longer matches the Bible evidence")
+            inputs["approved_creative_bible"] = dict(bible)
+            inputs["creative_bible_approval"] = dict(approval)
         for field in next_stage.output_contract.required_fields:
             if field not in next_stage.input_contract.required_fields:
                 inputs.pop(field, None)
@@ -439,6 +502,7 @@ def build_tony_workflow_runtime(
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
+        "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
     coordinator = WorkflowExecutionCoordinator(
@@ -452,6 +516,7 @@ def build_tony_workflow_runtime(
             ),
             document_adapter=document_adapter,
             campaign_world_triage_adapter=CampaignWorldTriageWorker(),
+            creative_bible_triage_adapter=CreativeBibleTriageWorker(),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

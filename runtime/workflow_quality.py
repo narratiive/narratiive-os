@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import json
+import re
 from collections.abc import Mapping
 from typing import Any
 
@@ -89,6 +91,24 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("Creative Director's Bible preparation requires the structured Growth Blueprint")
         if not isinstance(inputs.get("production_context"), Mapping):
             raise ValueError("Creative Director's Bible preparation requires structured production context")
+    elif workflow_id == "creative_bible_to_asset_production":
+        bible = inputs.get("approved_creative_bible")
+        approval = inputs.get("creative_bible_approval")
+        if not isinstance(bible, Mapping):
+            raise ValueError("asset production requires a structured approved Creative Director's Bible")
+        if not isinstance(approval, Mapping) or approval.get("decision") != "creative_bible_approval":
+            raise ValueError("asset production requires Matt's Creative Bible approval record")
+        approver_tokens = {
+            token for token in re.split(r"[^a-z0-9]+", str(approval.get("approver") or "").casefold()) if token
+        }
+        if "matt" not in approver_tokens:
+            raise ValueError("asset production requires Matt's authenticated Creative Bible approval")
+        if approval.get("creative_bible_checksum") != _value_checksum(bible):
+            raise ValueError("asset production requires approval bound to the exact Creative Bible checksum")
+        if not isinstance(inputs.get("asset_manifest"), Mapping):
+            raise ValueError("asset production requires a structured Asset Manifest")
+        if not isinstance(inputs.get("production_constraints"), list):
+            raise ValueError("asset production requires explicit production constraints")
 
 
 def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -390,9 +410,40 @@ def creative_bible_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
     return _result(checks)
 
 
+def creative_bible_triage_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Require a checksum-bound Tony review while preserving Matt's authority."""
+    review = output.get("creative_bible_review")
+    brief = output.get("creative_bible_approval_brief")
+    checks = {
+        "tony_review_is_complete": isinstance(review, Mapping)
+        and _meaningful(review.get("reviewed_bible_checksum"))
+        and review.get("tony_disposition") == "forward"
+        and _meaningful(review.get("tony_rationale"))
+        and isinstance(review.get("taste_checks"), Mapping)
+        and all(value is True for value in review.get("taste_checks", {}).values()),
+        "taste_remains_advisory": isinstance(review, Mapping)
+        and review.get("taste_is_advisory") is True
+        and review.get("approval_granted") is False,
+        "matt_exact_version_approval_is_required": isinstance(brief, Mapping)
+        and brief.get("requires_matt") is True
+        and brief.get("creative_bible_checksum") == review.get("reviewed_bible_checksum")
+        and brief.get("auto_approval_authorised") is False,
+        "production_publication_and_spend_are_unauthorised": output.get("production_authorised") is False
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
 def _result(checks: Mapping[str, bool]) -> dict[str, Any]:
     failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
     return {"passed": not failed, "failed_checks": failed, "checks": dict(checks)}
+
+
+def _value_checksum(value: Any) -> str:
+    encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
 
 
 def _meaningful(value: Any) -> bool:
