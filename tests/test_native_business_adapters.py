@@ -484,6 +484,52 @@ class NativeBusinessAdapterTests(unittest.TestCase):
             metadata = router.requests[1].data.split(b"\r\n", 4)[3]
             self.assertNotIn(b'"parents"', metadata)
 
+    def test_drive_copies_checksum_verified_asset_into_exact_client_folder(self):
+        checksum = "a" * 64
+        router = Router([
+            {"files": []},
+            {
+                "id": "source-file",
+                "name": "safe.png",
+                "mimeType": "image/png",
+                "appProperties": {"narratiiveChecksum": checksum},
+            },
+            {
+                "id": "client-folder",
+                "mimeType": "application/vnd.google-apps.folder",
+                "trashed": False,
+            },
+            {
+                "id": "copied-file",
+                "name": "safe.png",
+                "mimeType": "image/png",
+                "webViewLink": "https://drive.google.invalid/copied-file",
+                "parents": ["client-folder"],
+                "appProperties": {"narratiiveChecksum": checksum},
+            },
+        ])
+        adapter = GoogleDriveDispatcher(
+            GoogleOAuthConfig(access_token="synthetic"),
+            opener=router,
+        )
+
+        result = adapter(
+            approved_contract(
+                {
+                    "kind": "client_delivery_asset_copy",
+                    "source_file_id": "source-file",
+                    "destination_folder_id": "client-folder",
+                    "asset_version_id": "safe-asset-v1",
+                    "checksum": checksum,
+                }
+            )
+        )
+
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["file_id"], "copied-file")
+        self.assertEqual(result["parent_folder_id"], "client-folder")
+        self.assertIn("/files/source-file/copy", router.requests[3].full_url)
+
     def test_drive_binary_upload_rejects_unapproved_path_and_checksum(self):
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as outside:
             root = Path(temporary)

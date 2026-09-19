@@ -8,6 +8,12 @@ from typing import Any, Mapping
 from urllib import request
 
 from runtime.github_work import GitHubConfig, GitHubRESTClient, GitHubWorkError
+from runtime.google_client_delivery import GoogleClientDeliveryDispatcher
+from runtime.higgsfield_creative_production import (
+    HiggsfieldConfig,
+    HiggsfieldCreativeProductionDispatcher,
+    higgsfield_credential,
+)
 from runtime.inbound_leads import CANONICAL_NOTION_LEADS_DATA_SOURCE_ID
 from runtime.native_business_adapters import (
     FirefliesDispatcher,
@@ -18,11 +24,6 @@ from runtime.native_business_adapters import (
     NotionWorkflowProjectionDispatcher,
 )
 from runtime.tony_claude_api_dispatcher import build_claude_api_dispatcher
-from runtime.higgsfield_creative_production import (
-    HiggsfieldConfig,
-    HiggsfieldCreativeProductionDispatcher,
-    higgsfield_credential,
-)
 
 
 SUPPORTED_DISPATCH_WORKERS = (
@@ -128,6 +129,18 @@ def build_http_dispatchers(
             ),
             state_root=state_root,
             drive_dispatcher=handlers["Google Drive"],
+        )
+
+    client_delivery_mode = str(env.get("TONY_DISPATCH_CLIENT_DELIVERY_MODE", "")).strip().casefold()
+    if (
+        "Client Delivery" not in handlers
+        and client_delivery_mode == "google_drive_gmail"
+        and "Google Drive" in handlers
+        and "Gmail" in handlers
+    ):
+        handlers["Client Delivery"] = GoogleClientDeliveryDispatcher(
+            drive_dispatcher=handlers["Google Drive"],
+            gmail_dispatcher=handlers["Gmail"],
         )
 
     if "Notion" not in handlers and str(env.get("TONY_DISPATCH_NOTION_MODE", "")).strip().casefold() == "notion_api":

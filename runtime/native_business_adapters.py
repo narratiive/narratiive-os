@@ -4,6 +4,7 @@ import base64
 import hashlib
 import html
 import json
+import re
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
@@ -620,6 +621,8 @@ class GoogleDriveDispatcher(GoogleAdapter):
             return self._create_text_file(contract, payload, target)
         if kind in {"reviewed_growth_blueprint_file", "creative_asset_version"}:
             return self._create_binary_file(contract, payload, target)
+        if kind == "client_delivery_asset_copy":
+            return self._copy_client_asset(contract, payload, target)
         raise BusinessAdapterError("drive_write_kind_not_supported")
 
     def _key(self, contract: Mapping[str, Any], payload: Mapping[str, Any]) -> str:
@@ -630,9 +633,89 @@ class GoogleDriveDispatcher(GoogleAdapter):
 
     def _find_existing(self, key: str) -> Mapping[str, Any] | None:
         q = parse.quote(f"appProperties has {{ key='narratiiveIdempotencyKey' and value='{key}' }} and trashed=false", safe="")
-        result = self.client.call(f"{self.api_base}/files?q={q}&pageSize=1&fields=files(id,name,mimeType,webViewLink)", headers=self._headers())
+        fields = "files(id,name,mimeType,webViewLink,parents,appProperties)"
+        result = self.client.call(
+            f"{self.api_base}/files?q={q}&pageSize=1&fields={fields}",
+            headers=self._headers(),
+        )
         files = result.get("files", [])
         return _mapping(files[0]) if isinstance(files, list) and files else None
+
+    def _copy_client_asset(
+        self,
+        contract: Mapping[str, Any],
+        payload: Mapping[str, Any],
+        target: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        source_id = _text(payload.get("source_file_id"))
+        folder_id = _text(payload.get("destination_folder_id") or target.get("drive_folder_id"))
+        expected_checksum = _text(payload.get("checksum")).casefold()
+        asset_version_id = _text(payload.get("asset_version_id"))
+        safe_id = re.compile(r"^[A-Za-z0-9_-]{3,200}$")
+        if (
+            not safe_id.fullmatch(source_id)
+            or not safe_id.fullmatch(folder_id)
+            or not asset_version_id
+            or not re.fullmatch(r"[0-9a-f]{64}", expected_checksum)
+        ):
+            raise BusinessAdapterError("drive_client_copy_requires_exact_source_folder_version_and_checksum")
+        key = self._key(contract, payload)
+        copied = self._find_existing(key)
+        mutations = 0
+        if not copied:
+            source_fields = parse.quote("id,name,mimeType,appProperties", safe=",")
+            source = self.client.call(
+                f"{self.api_base}/files/{parse.quote(source_id, safe='')}?fields={source_fields}",
+                headers=self._headers(),
+            )
+            source_checksum = _text(_mapping(source.get("appProperties")).get("narratiiveChecksum")).casefold()
+            if _text(source.get("id")) != source_id or source_checksum != expected_checksum:
+                raise BusinessAdapterError("drive_client_copy_source_checksum_unverified")
+            folder_fields = parse.quote("id,mimeType,trashed", safe=",")
+            folder = self.client.call(
+                f"{self.api_base}/files/{parse.quote(folder_id, safe='')}?fields={folder_fields}",
+                headers=self._headers(),
+            )
+            if (
+                _text(folder.get("id")) != folder_id
+                or _text(folder.get("mimeType")) != "application/vnd.google-apps.folder"
+                or folder.get("trashed") is True
+            ):
+                raise BusinessAdapterError("drive_client_copy_destination_unverified")
+            copy_fields = parse.quote("id,name,mimeType,webViewLink,parents,appProperties", safe=",")
+            copied = self.client.call(
+                f"{self.api_base}/files/{parse.quote(source_id, safe='')}/copy?fields={copy_fields}",
+                method="POST",
+                headers=self._headers(),
+                body={
+                    "parents": [folder_id],
+                    "appProperties": {
+                        "narratiiveIdempotencyKey": key,
+                        "narratiiveChecksum": expected_checksum,
+                        "narratiiveAssetVersionId": asset_version_id,
+                        "narratiiveSourceFileId": source_id,
+                    },
+                },
+            )
+            mutations = 1
+        copied_id = _text(copied.get("id"))
+        copied_checksum = _text(_mapping(copied.get("appProperties")).get("narratiiveChecksum")).casefold()
+        parents = {_text(item) for item in copied.get("parents", [])}
+        if not copied_id or copied_checksum != expected_checksum or folder_id not in parents:
+            raise BusinessAdapterError("drive_client_copy_unverified")
+        url = _text(copied.get("webViewLink")) or f"https://drive.google.com/open?id={copied_id}"
+        return {
+            "verified": True,
+            "created": True,
+            "mutation_count": mutations,
+            "duplicate_suppressed": mutations == 0,
+            "file_id": copied_id,
+            "file_url": url,
+            "url": url,
+            "checksum": copied_checksum,
+            "parent_folder_id": folder_id,
+            "source_file_id": source_id,
+        }
 
     def _create_workspace(self, contract: Mapping[str, Any], payload: Mapping[str, Any], target: Mapping[str, Any]) -> dict[str, Any]:
         key = self._key(contract, payload)
