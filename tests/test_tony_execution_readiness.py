@@ -79,6 +79,24 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertNotIn("not-rendered", rendered)
         self.assertIn("OK — Claude (anthropic_api)", rendered)
 
+    def test_higgsfield_requires_credentials_and_drive_ingestion(self):
+        missing = build_execution_readiness_report(
+            {"TONY_DISPATCH_CREATIVE_PRODUCTION_MODE": "higgsfield_api"}
+        ).workers[1]
+        self.assertFalse(missing.configured)
+        self.assertIn("HF_KEY or HF_API_KEY_ID + HF_API_KEY_SECRET", missing.missing)
+        self.assertIn("configured Google Drive ingestion", missing.missing)
+
+        env = {
+            "TONY_DISPATCH_CREATIVE_PRODUCTION_MODE": "higgsfield_api",
+            "HF_API_KEY_ID": "id:secret",
+            "TONY_DISPATCH_GOOGLE_DRIVE_MODE": "google_api",
+            "TONY_GOOGLE_ACCESS_TOKEN": "synthetic",
+        }
+        ready = build_execution_readiness_report(env).workers[1]
+        self.assertTrue(ready.configured)
+        self.assertEqual(ready.mode, "higgsfield_api")
+
     def test_controlled_integration_points_keep_writes_approval_gated(self):
         integrations = {
             item.surface: item

@@ -538,8 +538,14 @@ class GoogleCalendarDispatcher(GoogleAdapter):
 class GoogleDriveDispatcher(GoogleAdapter):
     api_base = "https://www.googleapis.com/drive/v3"
     _BINARY_TYPES = {
+        ".jpeg": "image/jpeg",
+        ".jpg": "image/jpeg",
+        ".mov": "video/quicktime",
+        ".mp4": "video/mp4",
         ".pdf": "application/pdf",
+        ".png": "image/png",
         ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        ".webp": "image/webp",
     }
     _MAX_BINARY_UPLOAD_BYTES = 100 * 1024 * 1024
 
@@ -612,7 +618,7 @@ class GoogleDriveDispatcher(GoogleAdapter):
             return self._create_workspace(contract, payload, target)
         if kind in {"reviewed_growth_blueprint_artifact", "growth_blueprint_revision"}:
             return self._create_text_file(contract, payload, target)
-        if kind == "reviewed_growth_blueprint_file":
+        if kind in {"reviewed_growth_blueprint_file", "creative_asset_version"}:
             return self._create_binary_file(contract, payload, target)
         raise BusinessAdapterError("drive_write_kind_not_supported")
 
@@ -724,7 +730,7 @@ class GoogleDriveDispatcher(GoogleAdapter):
         filename = _text(payload.get("filename"))
         local_path = Path(_text(payload.get("local_path"))).expanduser().resolve()
         expected_checksum = _text(payload.get("checksum")).casefold()
-        if not parent or not filename or not expected_checksum:
+        if (not parent and _text(payload.get("kind")) != "creative_asset_version") or not filename or not expected_checksum:
             raise BusinessAdapterError("drive_binary_file_requires_parent_name_and_checksum")
         if Path(filename).name != filename or local_path.suffix.casefold() not in self._BINARY_TYPES:
             raise BusinessAdapterError("drive_binary_file_type_not_supported")
@@ -766,13 +772,14 @@ class GoogleDriveDispatcher(GoogleAdapter):
             }
         metadata = {
             "name": filename,
-            "parents": [parent],
             "mimeType": mime_type,
             "appProperties": {
                 "narratiiveIdempotencyKey": key,
                 "narratiiveChecksum": actual_checksum,
             },
         }
+        if parent:
+            metadata["parents"] = [parent]
         boundary = f"narratiive-{hashlib.sha256((key + actual_checksum).encode()).hexdigest()[:24]}"
         if boundary.encode("ascii") in content:
             raise BusinessAdapterError("drive_binary_file_boundary_collision")

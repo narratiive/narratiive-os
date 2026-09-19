@@ -455,6 +455,35 @@ class NativeBusinessAdapterTests(unittest.TestCase):
             self.assertEqual(result["checksum"], hashlib.sha256(content).hexdigest())
             self.assertIn(content, router.requests[1].data)
 
+    def test_drive_ingests_approved_creative_asset_into_internal_root(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            image = root / "safe-asset-v1.png"
+            content = b"safe synthetic png"
+            image.write_bytes(content)
+            router = Router([{"files": []}, {"id": "asset-file", "webViewLink": "https://drive.google.invalid/asset-file"}])
+            adapter = GoogleDriveDispatcher(
+                GoogleOAuthConfig(access_token="synthetic"),
+                opener=router,
+                allowed_upload_root=root,
+            )
+
+            result = adapter(
+                approved_contract(
+                    {
+                        "kind": "creative_asset_version",
+                        "filename": image.name,
+                        "local_path": str(image),
+                        "checksum": hashlib.sha256(content).hexdigest(),
+                        "mime_type": "image/png",
+                    }
+                )
+            )
+
+            self.assertEqual(result["file_id"], "asset-file")
+            metadata = router.requests[1].data.split(b"\r\n", 4)[3]
+            self.assertNotIn(b'"parents"', metadata)
+
     def test_drive_binary_upload_rejects_unapproved_path_and_checksum(self):
         with tempfile.TemporaryDirectory() as temporary, tempfile.TemporaryDirectory() as outside:
             root = Path(temporary)

@@ -18,6 +18,11 @@ from runtime.native_business_adapters import (
     NotionWorkflowProjectionDispatcher,
 )
 from runtime.tony_claude_api_dispatcher import build_claude_api_dispatcher
+from runtime.higgsfield_creative_production import (
+    HiggsfieldConfig,
+    HiggsfieldCreativeProductionDispatcher,
+    higgsfield_credential,
+)
 
 
 SUPPORTED_DISPATCH_WORKERS = (
@@ -97,6 +102,33 @@ def build_http_dispatchers(
                     )
                 else:
                     handlers[worker] = factory(google_oauth)
+
+    higgsfield_mode = str(env.get("TONY_DISPATCH_CREATIVE_PRODUCTION_MODE", "")).strip().casefold()
+    credential = higgsfield_credential(env)
+    if (
+        "Creative Production" not in handlers
+        and higgsfield_mode == "higgsfield_api"
+        and credential
+        and "Google Drive" in handlers
+    ):
+        workflow_root = Path(str(env.get("TONY_WORKFLOW_RUNTIME_ROOT") or ".runtime")).expanduser()
+        state_root = Path(
+            str(env.get("TONY_HIGGSFIELD_STATE_ROOT") or workflow_root / "higgsfield-production")
+        ).expanduser()
+        handlers["Creative Production"] = HiggsfieldCreativeProductionDispatcher(
+            HiggsfieldConfig(
+                credential=credential,
+                api_base=str(env.get("TONY_HIGGSFIELD_API_BASE") or "https://api.higgsfield.ai").strip(),
+                image_model=str(env.get("TONY_HIGGSFIELD_IMAGE_MODEL") or "marketing-studio/image").strip(),
+                video_model=str(
+                    env.get("TONY_HIGGSFIELD_VIDEO_MODEL")
+                    or "bytedance/seedance-2.5/text-to-video"
+                ).strip(),
+                poll_timeout_seconds=float(env.get("TONY_HIGGSFIELD_POLL_TIMEOUT_SECONDS") or 900),
+            ),
+            state_root=state_root,
+            drive_dispatcher=handlers["Google Drive"],
+        )
 
     if "Notion" not in handlers and str(env.get("TONY_DISPATCH_NOTION_MODE", "")).strip().casefold() == "notion_api":
         token = next(

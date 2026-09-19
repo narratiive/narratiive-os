@@ -26,6 +26,25 @@ still include the complete checksum-bound versions and verified receipts
 required by the workflow adapters. No delivery provider may imply publication
 or media-spend authority.
 
+Higgsfield is also available as the native creative-production provider:
+
+```text
+TONY_DISPATCH_CREATIVE_PRODUCTION_MODE=higgsfield_api
+HF_KEY=<KEY_ID:KEY_SECRET>
+TONY_HIGGSFIELD_IMAGE_MODEL=marketing-studio/image
+TONY_HIGGSFIELD_VIDEO_MODEL=bytedance/seedance-2.5/text-to-video
+```
+
+Install or migrate the key without displaying it using
+`.venv/bin/python scripts/configure_higgsfield.py` or add `--use-existing` when
+the complete key is already present under a supported legacy variable. The
+adapter submits only after the workflow's exact external-write approval,
+persists request IDs before polling, never retries an ambiguous generation
+submission, downloads completed media into the protected workflow root and
+ingests the exact checksum into Google Drive. Higgsfield currently covers image
+generation and short-form video production; audio-only and layout-production
+jobs remain blocked for another eligible provider.
+
 ## Runtime configuration
 
 Google uses one OAuth grant shared by the three Google adapters:
