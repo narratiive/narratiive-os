@@ -559,6 +559,103 @@ def creative_asset_production_quality_gate(output: Mapping[str, Any]) -> Mapping
     return _result(checks)
 
 
+def delivery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    package = output.get("delivery_package")
+    manifest = output.get("delivery_manifest")
+    action = output.get("proposed_delivery_action")
+    assets = package.get("assets") if isinstance(package, Mapping) else None
+    manifest_assets = manifest.get("assets") if isinstance(manifest, Mapping) else None
+    checks = {
+        "delivery_package_is_checksum_bound": isinstance(package, Mapping)
+        and all(_meaningful(package.get(field)) for field in (
+            "delivery_package_id", "checksum", "source_asset_manifest_id",
+            "source_asset_manifest_checksum", "source_asset_suite_checksum",
+        ))
+        and package.get("status") == "prepared_for_human_approval",
+        "manifest_covers_every_exact_asset_version": isinstance(assets, list)
+        and bool(assets)
+        and isinstance(manifest_assets, list)
+        and len(assets) == len(manifest_assets) == int(manifest.get("asset_count") or 0)
+        and {str(item.get("asset_version_id") or "") for item in assets if isinstance(item, Mapping)}
+        == {str(item.get("asset_version_id") or "") for item in manifest_assets if isinstance(item, Mapping)}
+        and all(
+            isinstance(item, Mapping)
+            and all(_meaningful(item.get(field)) for field in (
+                "asset_version_id", "asset_id", "production_job_id", "file_checksum",
+                "drive_uri", "source_asset_suite_checksum",
+            ))
+            and item.get("status") == "ready_for_delivery_approval"
+            for item in assets
+        ),
+        "delivery_action_is_only_a_human_approval_preview": isinstance(action, Mapping)
+        and action.get("action_type") == "client_asset_delivery"
+        and action.get("status") == "pending_human_approval"
+        and action.get("requires_human_approval") is True
+        and action.get("execution_authorised") is False
+        and action.get("delivery_package_checksum") == package.get("checksum"),
+        "delivery_publication_and_spend_are_unauthorised": output.get("delivery_authorised") is False
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
+        "no_external_action_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def client_asset_delivery_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    evidence = output.get("verified_delivery_evidence")
+    receipt = output.get("delivery_receipt")
+    delivered_ids = evidence.get("delivered_asset_version_ids") if isinstance(evidence, Mapping) else None
+    checks = {
+        "verified_delivery_evidence_is_complete": isinstance(evidence, Mapping)
+        and all(_meaningful(evidence.get(field)) for field in (
+            "delivery_package_id", "delivery_package_checksum", "destination", "delivered_at",
+        ))
+        and isinstance(delivered_ids, list)
+        and bool(delivered_ids)
+        and len({str(item) for item in delivered_ids}) == len(delivered_ids),
+        "delivery_receipt_is_bound_to_package": isinstance(receipt, Mapping)
+        and all(_meaningful(receipt.get(field)) for field in ("receipt_id", "delivery_package_checksum", "status"))
+        and receipt.get("status") == "delivered"
+        and receipt.get("delivery_package_checksum") == evidence.get("delivery_package_checksum"),
+        "delivery_execution_is_truthful_and_bounded": output.get("external_action_taken") is True
+        and output.get("delivery_authorised") is True
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
+    }
+    return _result(checks)
+
+
+def follow_up_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    plan = output.get("performance_ingestion_plan")
+    control = output.get("iteration_control")
+    actions = output.get("measurement_actions")
+    checks = {
+        "follow_up_is_specific_and_reviewable": _substantive_text(output.get("recommended_follow_up"), minimum_words=8)
+        and _substantive_text(output.get("draft_client_communication"), minimum_words=20),
+        "measurement_actions_cover_safe_learning_loop": isinstance(actions, list)
+        and len(actions) >= 4
+        and all(_substantive_text(item, minimum_words=5) for item in actions),
+        "performance_ingestion_is_read_only_and_mapped": isinstance(plan, Mapping)
+        and _meaningful(plan.get("campaign_id"))
+        and _meaningful_list(plan.get("asset_version_ids"), minimum=1)
+        and set(plan.get("providers") or []) == {"meta", "tiktok", "google"}
+        and plan.get("mode") == "read_only_normalised_ingestion"
+        and plan.get("tracking_must_be_verified") is True
+        and plan.get("provider_mapping_required") is True,
+        "tony_is_orchestrator_not_autonomous_strategist": isinstance(control, Mapping)
+        and control.get("tony_role") == "orchestrate_monitor_and_quality_check"
+        and control.get("strategy_authority") == "human"
+        and control.get("insight_requires_evidence") is True
+        and control.get("creative_iteration_requires_human_approval") is True
+        and control.get("autonomous_publication_authorised") is False
+        and control.get("autonomous_media_spend_authorised") is False,
+        "no_external_action_or_platform_authority": _no_false_action(output)
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
+    }
+    return _result(checks)
+
+
 def _result(checks: Mapping[str, bool]) -> dict[str, Any]:
     failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
     return {"passed": not failed, "failed_checks": failed, "checks": dict(checks)}

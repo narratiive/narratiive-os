@@ -199,6 +199,9 @@ def build_tony_worker_registry(
     creative_bible_triage_adapter: WorkerAdapter | None = None,
     production_planning_adapter: WorkerAdapter | None = None,
     creative_production_adapter: WorkerAdapter | None = None,
+    delivery_preparation_adapter: WorkerAdapter | None = None,
+    client_delivery_adapter: WorkerAdapter | None = None,
+    follow_up_planning_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
@@ -361,6 +364,60 @@ def build_tony_worker_registry(
             )
         )
 
+    if delivery_preparation_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-delivery-preparer",
+                    provider="narratiive-os",
+                    capabilities=("delivery_packaging",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=30,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                delivery_preparation_adapter,
+            )
+        )
+
+    if client_delivery_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="configured-client-asset-delivery",
+                    provider="configured-client-delivery-provider",
+                    capabilities=("client_asset_delivery",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("external_write",),
+                    timeout_seconds=300,
+                    max_attempts=1,
+                    cost_class="configured_provider",
+                    selection_priority=10,
+                ),
+                client_delivery_adapter,
+            )
+        )
+
+    if follow_up_planning_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-performance-follow-up-planner",
+                    provider="narratiive-os",
+                    capabilities=("performance_follow_up_planning",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=30,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                follow_up_planning_adapter,
+            )
+        )
+
     fireflies = dispatchers.get("Fireflies")
     if fireflies is not None:
         registrations.append(
@@ -410,6 +467,10 @@ def build_tony_worker_registry(
                 "layout_design",
             ),
         ), *planned)
+    if client_delivery_adapter is None:
+        planned = (("client-asset-delivery-unavailable", ("client_asset_delivery",)), *planned)
+    if follow_up_planning_adapter is None:
+        planned = (("performance-follow-up-planning-unavailable", ("performance_follow_up_planning",)), *planned)
     if research_adapter is None:
         planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
     if fireflies is None:

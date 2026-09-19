@@ -8,8 +8,11 @@ from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_quality_gate,
     campaign_world_triage_quality_gate,
+    client_asset_delivery_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
+    delivery_preparation_quality_gate,
+    follow_up_preparation_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
@@ -493,6 +496,100 @@ class WorkflowQualityTests(unittest.TestCase):
         inputs["reviewed_assets"][0]["asset_version_id"] = "unapproved-version"
         with self.assertRaisesRegex(ValueError, "exact approved version IDs"):
             validate_operational_inputs("asset_review_to_delivery_preparation", inputs)
+
+    def test_delivery_preparation_quality_requires_a_non_executing_exact_action_preview(self) -> None:
+        asset = {
+            "asset_version_id": "safe-asset-v1",
+            "asset_id": "safe-asset",
+            "production_job_id": "safe-job",
+            "file_checksum": "a" * 64,
+            "drive_uri": "drive://safe/safe-asset-v1",
+            "source_asset_suite_checksum": "b" * 64,
+            "status": "ready_for_delivery_approval",
+        }
+        output = {
+            "delivery_package": {
+                "delivery_package_id": "safe-package",
+                "checksum": "c" * 64,
+                "source_asset_manifest_id": "safe-manifest",
+                "source_asset_manifest_checksum": "d" * 64,
+                "source_asset_suite_checksum": "b" * 64,
+                "status": "prepared_for_human_approval",
+                "assets": [asset],
+            },
+            "delivery_manifest": {"asset_count": 1, "assets": [asset]},
+            "proposed_delivery_action": {
+                "action_type": "client_asset_delivery",
+                "status": "pending_human_approval",
+                "requires_human_approval": True,
+                "execution_authorised": False,
+                "delivery_package_checksum": "c" * 64,
+            },
+            "delivery_authorised": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+            "external_action_taken": False,
+        }
+        self.assertTrue(delivery_preparation_quality_gate(output)["passed"])
+        output["proposed_delivery_action"]["execution_authorised"] = True
+        self.assertFalse(delivery_preparation_quality_gate(output)["passed"])
+
+    def test_client_delivery_quality_requires_verified_receipt_without_publication_or_spend(self) -> None:
+        output = {
+            "verified_delivery_evidence": {
+                "delivery_package_id": "safe-package",
+                "delivery_package_checksum": "a" * 64,
+                "destination": "safe client Drive folder",
+                "delivered_at": "2026-09-19T12:00:00Z",
+                "delivered_asset_version_ids": ["safe-asset-v1"],
+            },
+            "delivery_receipt": {
+                "receipt_id": "safe-receipt",
+                "delivery_package_checksum": "a" * 64,
+                "status": "delivered",
+            },
+            "external_action_taken": True,
+            "delivery_authorised": True,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+        }
+        self.assertTrue(client_asset_delivery_quality_gate(output)["passed"])
+        output["media_spend_authorised"] = True
+        self.assertFalse(client_asset_delivery_quality_gate(output)["passed"])
+
+    def test_follow_up_quality_preserves_human_strategy_and_read_only_media_control(self) -> None:
+        output = {
+            "recommended_follow_up": "Confirm client access and review verified campaign performance after the agreed observation window.",
+            "measurement_actions": [
+                "Confirm tracking health before interpreting campaign outcomes.",
+                "Ingest provider performance through read only normalisation.",
+                "Map provider creative IDs to exact Narratiive versions.",
+                "Prepare evidence graded insights for human approval.",
+            ],
+            "draft_client_communication": "The approved suite has been delivered for your review. We will assess verified performance after the agreed observation window and return any proposed creative iteration for your approval before further production or publication.",
+            "performance_ingestion_plan": {
+                "campaign_id": "safe-campaign",
+                "asset_version_ids": ["safe-asset-v1"],
+                "providers": ["meta", "tiktok", "google"],
+                "mode": "read_only_normalised_ingestion",
+                "tracking_must_be_verified": True,
+                "provider_mapping_required": True,
+            },
+            "iteration_control": {
+                "tony_role": "orchestrate_monitor_and_quality_check",
+                "strategy_authority": "human",
+                "insight_requires_evidence": True,
+                "creative_iteration_requires_human_approval": True,
+                "autonomous_publication_authorised": False,
+                "autonomous_media_spend_authorised": False,
+            },
+            "external_action_taken": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+        }
+        self.assertTrue(follow_up_preparation_quality_gate(output)["passed"])
+        output["iteration_control"]["strategy_authority"] = "tony"
+        self.assertFalse(follow_up_preparation_quality_gate(output)["passed"])
 
     def test_campaign_workflows_require_complete_stable_identity(self) -> None:
         inputs = {

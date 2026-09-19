@@ -12,6 +12,8 @@ from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, Cli
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
+from runtime.asset_delivery_preparation_worker import AssetDeliveryPreparationWorker
+from runtime.delivery_follow_up_worker import DeliveryFollowUpPreparationWorker
 from runtime.inbound_leads import InboundLead
 from runtime.inbound_lifecycle import project_inbound_lead
 from runtime.models import WorkflowStatus
@@ -31,9 +33,12 @@ from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
+    client_asset_delivery_quality_gate,
     creative_asset_production_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
+    delivery_preparation_quality_gate,
+    follow_up_preparation_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_blueprint_quality_gate,
@@ -242,6 +247,34 @@ def _production_output(contract: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _client_delivery_output(contract: Mapping[str, Any]) -> dict[str, Any]:
+    package = contract["delivery_package"]
+    checksum = package["checksum"]
+    delivered_ids = [item["asset_version_id"] for item in package["assets"]]
+    return {
+        "verified_delivery_evidence": {
+            "delivery_package_id": package["delivery_package_id"],
+            "delivery_package_checksum": checksum,
+            "destination": contract["proposed_delivery_action"]["destination"],
+            "delivered_asset_version_ids": delivered_ids,
+            "delivered_at": "2026-09-19T12:00:00Z",
+        },
+        "delivery_receipt": {
+            "receipt_id": "northstar-test-delivery-receipt",
+            "delivery_package_checksum": checksum,
+            "status": "delivered",
+        },
+        "external_action_receipt": {
+            "receipt_id": "northstar-test-delivery-receipt",
+            "delivery_package_checksum": checksum,
+        },
+        "external_action_taken": True,
+        "delivery_authorised": True,
+        "publication_authorised": False,
+        "media_spend_authorised": False,
+    }
+
+
 def _strict_fixture_validator(definition: WorkflowDefinition):
     required = definition.stages[0].output_contract.required_fields
 
@@ -278,6 +311,11 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             and workflow_context["stage_id"] == "execute_creative_asset_production"
         ):
             output = _production_output(contract)
+        elif (
+            workflow_context["workflow_id"] == "asset_review_to_delivery_preparation"
+            and workflow_context["stage_id"] == "execute_client_asset_delivery"
+        ):
+            output = _client_delivery_output(contract)
         else:
             output = _fixture_output(str(workflow_context["workflow_id"]))
         # Fields declared as both handoff inputs and outputs are lineage-bearing
@@ -299,6 +337,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
                     "market_research",
                     "document_generation",
                     "creative_asset_production",
+                    "client_asset_delivery",
                 ),
                 availability=WorkerAvailability.AVAILABLE,
                 side_effect_permissions=("preparation", "external_read", "external_write"),
@@ -339,6 +378,28 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             ),
             CampaignProductionPlanningWorker(),
         ),
+        WorkerRegistration(
+            WorkerMetadata(
+                worker_id="northstar-test-delivery-preparer",
+                provider="isolated-deterministic-fixture",
+                capabilities=("delivery_packaging",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            AssetDeliveryPreparationWorker(),
+        ),
+        WorkerRegistration(
+            WorkerMetadata(
+                worker_id="northstar-test-follow-up-planner",
+                provider="isolated-deterministic-fixture",
+                capabilities=("performance_follow_up_planning",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            DeliveryFollowUpPreparationWorker(),
+        ),
     ))
     validators = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
@@ -353,6 +414,9 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
         "production_planning_quality_gate": production_planning_quality_gate,
         "creative_asset_production_quality_gate": creative_asset_production_quality_gate,
+        "delivery_preparation_quality_gate": delivery_preparation_quality_gate,
+        "client_asset_delivery_quality_gate": client_asset_delivery_quality_gate,
+        "follow_up_preparation_quality_gate": follow_up_preparation_quality_gate,
     }
     for definition in registry.all():
         for stage in definition.stages:
@@ -427,7 +491,6 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             "delivery_requirements": {"repository": "isolated-test-fixture", "human_approval": True},
         },
         "delivery_to_follow_up_next_action": {
-            "verified_delivery_evidence": prior_output.get("delivery_manifest"),
             "client_context": common_context,
             "measurement_context": {"status": "not_started", "test_only": True},
         },
@@ -460,6 +523,10 @@ def _record_gate(runtime: TonyWorkflowRuntime, run_id: str, elapsed_ms: float) -
         command = f"/approve {run_id} because candidate review accepted; /worlds {run_id}; /select-world {run_id} because <reason>; /continue {run_id}"
     elif human_gate and state.workflow_id == "campaign_world_to_creative_bible":
         command = f"/bible {run_id}; /approve-bible {run_id} because <reason>; /continue {run_id}"
+    elif human_gate and state.workflow_id == "creative_bible_to_asset_production":
+        command = f"/approve {run_id} because Production Pack accepted; /continue {run_id}; /approve {run_id} because provider execution accepted; /continue {run_id}; /approve {run_id} because generated outputs accepted; /continue {run_id}; /assets {run_id}; /approve-assets {run_id} because <reason>"
+    elif human_gate and state.workflow_id == "asset_review_to_delivery_preparation":
+        command = f"/approve {run_id} because delivery package accepted; /continue {run_id}; /approve {run_id} because exact client delivery execution accepted; /continue {run_id}; /approve {run_id} because verified delivery receipt accepted; /continue {run_id}"
     elif human_gate:
         command = f"/approve {run_id} because Northstar Test Co gate reviewed; then /continue {run_id}"
     else:
@@ -748,6 +815,8 @@ class TonyFullLifecycleTest(unittest.TestCase):
                 "northstar-test-tony-triage",
                 "northstar-test-creative-bible-triage",
                 "northstar-test-production-planner",
+                "northstar-test-delivery-preparer",
+                "northstar-test-follow-up-planner",
             } for item in records))
             self.assertTrue(all(item.output_artefact for item in records))
             self.assertTrue(all("stage.completed" in item.audit_events for item in records))

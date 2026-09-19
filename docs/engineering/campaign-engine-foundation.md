@@ -221,14 +221,30 @@ that Notion changed without execution evidence.
    publication and spend. Missing providers and malformed, partial, stale or
    over-authorised provider results fail closed. Live provider credentials,
    Drive ingestion and live probe execution remain bounded follow-on work.
-7. **Delivery and deployment preparation** — assemble the approved client asset
-   suite. Add Meta, TikTok and Google adapters only after exact action-preview,
-   approval, idempotency and reconciliation contracts are proven. No adapter
-   may commit spend or publish autonomously.
-8. **Performance and iteration** — normalise platform metrics against campaign,
-   channel and asset IDs; produce evidence-graded findings and human-approved
-   recommendations; create a new downstream version rather than mutating the
-   approved creative source.
+7. **Delivery and deployment preparation** — the exact Matt-approved asset
+   suite is now assembled locally into a deterministic client package and
+   manifest. Every entry preserves its asset-version ID, file checksum, Drive
+   URI, production job, Asset Manifest and approved-suite lineage. Preparation
+   creates only a checksum-bound action preview with an idempotency key; it
+   cannot send anything. Client delivery is a separate external-write stage and
+   therefore pauses for another explicit human approval. A configured delivery
+   provider must return receipt-backed evidence covering every exact version;
+   partial, stale or over-authorised results fail closed. With no provider, the
+   workflow stops safely after package approval. Delivery never grants ad
+   publication or media-spend authority. Add Meta, TikTok and Google adapters
+   only after equivalent exact action-preview, approval, idempotency and
+   reconciliation contracts are proven.
+8. **Performance and iteration** — after receipt-backed delivery, the terminal
+   workflow now creates a bounded measurement and follow-up plan tied to the
+   canonical campaign and exact delivered asset-version IDs. It requires
+   verified tracking and provider mappings, routes Meta, TikTok and Google into
+   read-only normalised ingestion, and specifies evidence-graded insights plus a
+   human-approved creative iteration brief. Tony's role is explicitly
+   `orchestrate_monitor_and_quality_check`; strategy authority remains human and
+   neither publication nor spend can be authorised. The existing Media Control
+   Layer already supplies read-only cross-platform snapshots and deterministic
+   recommendations. Persisting those recommendations as versioned Campaign
+   Engine Insight/iteration records remains follow-on work.
 
 Each slice must extend the live acceptance run from its last verified checkpoint
 and must prove restart, retry, isolation, lineage and approval behaviour before
