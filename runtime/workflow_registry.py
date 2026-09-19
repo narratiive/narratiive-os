@@ -256,7 +256,7 @@ GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD = WorkflowDefinition(
         _step(
             "generate_campaign_world",
             capability="strategic_reasoning",
-            inputs=("approved_growth_blueprint", "evidence_lineage", "activation_implications"),
+            inputs=("campaign_identity", "approved_growth_blueprint", "evidence_lineage", "activation_implications"),
             outputs=("campaign_world_candidates",),
             quality="campaign_world_candidates_quality_gate",
             approval_required=False,
@@ -283,7 +283,7 @@ CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = WorkflowDefinition(
         _step(
             "prepare_creative_bible",
             capability="copy_drafting",
-            inputs=("approved_campaign_world", "campaign_world_selection", "growth_blueprint", "production_context"),
+            inputs=("campaign_identity", "approved_campaign_world", "campaign_world_selection", "growth_blueprint", "production_context"),
             outputs=(
                 "message_system",
                 "tone",
@@ -321,7 +321,7 @@ CREATIVE_BIBLE_TO_ASSET_PRODUCTION = _workflow(
     _step(
         "orchestrate_creative_assets",
         capability="creative_asset_production",
-        inputs=("approved_creative_bible", "creative_bible_approval", "asset_manifest", "production_constraints"),
+        inputs=("campaign_identity", "approved_creative_bible", "creative_bible_approval", "asset_manifest", "production_constraints"),
         outputs=("production_tasks", "asset_versions", "asset_manifest", "production_gaps"),
         quality="creative_asset_production_quality_gate",
         approval_required=True,
@@ -335,7 +335,7 @@ ASSET_REVIEW_TO_DELIVERY_PREPARATION = _workflow(
     _step(
         "prepare_delivery",
         capability="document_generation",
-        inputs=("reviewed_assets", "asset_manifest", "delivery_requirements"),
+        inputs=("campaign_identity", "reviewed_assets", "asset_manifest", "delivery_requirements"),
         outputs=("delivery_package", "delivery_manifest", "review_findings", "proposed_delivery_action"),
         quality="delivery_preparation_quality_gate",
         approval_required=True,
@@ -349,7 +349,7 @@ DELIVERY_TO_FOLLOW_UP_NEXT_ACTION = _workflow(
     _step(
         "prepare_follow_up",
         capability="strategic_reasoning",
-        inputs=("verified_delivery_evidence", "client_context", "measurement_context"),
+        inputs=("campaign_identity", "verified_delivery_evidence", "client_context", "measurement_context"),
         outputs=("recommended_follow_up", "measurement_actions", "draft_client_communication"),
         quality="follow_up_preparation_quality_gate",
         approval_required=True,

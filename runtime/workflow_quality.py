@@ -18,6 +18,14 @@ _FALSE_ACTION_MARKERS = (
 
 def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> None:
     """Validate evidence-bearing inputs before any specialist is dispatched."""
+    if workflow_id in {
+        "growth_blueprint_to_campaign_world",
+        "campaign_world_to_creative_bible",
+        "creative_bible_to_asset_production",
+        "asset_review_to_delivery_preparation",
+        "delivery_to_follow_up_next_action",
+    }:
+        _validate_campaign_identity(inputs.get("campaign_identity"))
     if workflow_id == "blueprint_lite_to_discovery_preparation":
         if not _meaningful(inputs.get("blueprint_lite")):
             raise ValueError("discovery preparation requires a substantive Blueprint Lite")
@@ -444,6 +452,23 @@ def _result(checks: Mapping[str, bool]) -> dict[str, Any]:
 def _value_checksum(value: Any) -> str:
     encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _validate_campaign_identity(value: Any) -> None:
+    if not isinstance(value, Mapping):
+        raise ValueError("campaign workflow requires a structured canonical campaign_identity")
+    required = ("workspace_id", "client_id", "brand_id", "campaign_id")
+    if any(not str(value.get(field) or "").strip() for field in required):
+        raise ValueError("campaign_identity requires workspace, client, brand and campaign IDs")
+    for field in ("market_ids", "product_ids"):
+        identifiers = value.get(field)
+        if (
+            not isinstance(identifiers, (list, tuple))
+            or not identifiers
+            or any(not str(item).strip() for item in identifiers)
+            or len({str(item) for item in identifiers}) != len(identifiers)
+        ):
+            raise ValueError(f"campaign_identity requires unique non-empty {field}")
 
 
 def _meaningful(value: Any) -> bool:

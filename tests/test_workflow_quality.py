@@ -22,6 +22,17 @@ def _record(fields: tuple[str, ...], label: str = "Synthetic Northstar Test Co d
     return {field: f"{label}: {field}" for field in fields}
 
 
+def campaign_identity() -> dict:
+    return {
+        "workspace_id": "agency",
+        "client_id": "safe-client",
+        "brand_id": "safe-brand",
+        "market_ids": ["uk"],
+        "product_ids": ["safe-product"],
+        "campaign_id": "safe-campaign",
+    }
+
+
 def campaign_world_output() -> dict:
     territories = (
         "territory_name", "strategic_role", "audience_job", "key_message", "visual_direction",
@@ -442,6 +453,7 @@ class WorkflowQualityTests(unittest.TestCase):
             json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
         ).hexdigest()
         inputs = {
+            "campaign_identity": campaign_identity(),
             "approved_creative_bible": bible,
             "creative_bible_approval": {
                 "decision": "creative_bible_approval",
@@ -455,6 +467,20 @@ class WorkflowQualityTests(unittest.TestCase):
         inputs["creative_bible_approval"]["creative_bible_checksum"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "exact Creative Bible checksum"):
             validate_operational_inputs("creative_bible_to_asset_production", inputs)
+
+    def test_campaign_workflows_require_complete_stable_identity(self) -> None:
+        inputs = {
+            "approved_growth_blueprint": {"status": "approved"},
+            "evidence_lineage": campaign_world_output()["evidence_lineage"],
+            "activation_implications": {"priority": "Synthetic"},
+        }
+        with self.assertRaisesRegex(ValueError, "campaign_identity"):
+            validate_operational_inputs("growth_blueprint_to_campaign_world", inputs)
+        inputs["campaign_identity"] = campaign_identity()
+        validate_operational_inputs("growth_blueprint_to_campaign_world", inputs)
+        inputs["campaign_identity"]["market_ids"] = []
+        with self.assertRaisesRegex(ValueError, "market_ids"):
+            validate_operational_inputs("growth_blueprint_to_campaign_world", inputs)
 
 
 if __name__ == "__main__":
