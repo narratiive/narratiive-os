@@ -226,6 +226,19 @@ def _worker_readiness(worker: str, environ: Mapping[str, str]) -> WorkerReadines
             missing=tuple(missing),
         )
 
+    if worker == "Client Delivery" and native_mode == "google_drive_gmail":
+        missing: list[str] = []
+        if not _worker_readiness("Google Drive", environ).configured:
+            missing.append("configured Google Drive")
+        if not _worker_readiness("Gmail", environ).configured:
+            missing.append("configured Gmail")
+        return WorkerReadiness(
+            worker=worker,
+            configured=not missing,
+            mode="google_drive_gmail",
+            missing=tuple(missing),
+        )
+
     # Tokens are optional because some local dispatch endpoints are loopback-only or authenticate elsewhere.
     return WorkerReadiness(
         worker=worker,

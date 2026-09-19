@@ -45,6 +45,24 @@ ingests the exact checksum into Google Drive. Higgsfield currently covers image
 generation and short-form video production; audio-only and layout-production
 jobs remain blocked for another eligible provider.
 
+Client asset delivery can use the existing Google Drive and Gmail adapters:
+
+```text
+TONY_DISPATCH_CLIENT_DELIVERY_MODE=google_drive_gmail
+```
+
+Enable the mode without displaying or rewriting credentials using
+`.venv/bin/python scripts/configure_google_client_delivery.py`.
+Each delivery package must contain an exact `client_drive_folder_id` (or
+`drive_folder_id`) and one `notification_email` in `delivery_requirements`.
+After the separate client-delivery approval is recorded, the adapter verifies
+each internal source file against its SHA-256 checksum, creates idempotent
+copies in the specified client Drive folder, and sends the email only after all
+copies are verified. A retry suppresses duplicate copies and duplicate email.
+The adapter never changes Drive sharing permissions: the supplied client folder
+must already have the intended access. Delivery authority does not imply
+publication or media-spend authority.
+
 ## Runtime configuration
 
 Google uses one OAuth grant shared by the three Google adapters:

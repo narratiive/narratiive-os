@@ -92,6 +92,21 @@ class TonyDispatchAdapterTests(unittest.TestCase):
         self.assertIn("Creative Production", dispatchers)
         self.assertIn("Google Drive", dispatchers)
 
+    def test_google_drive_gmail_mode_builds_native_client_delivery_provider(self):
+        env = {
+            "TONY_DISPATCH_CLIENT_DELIVERY_MODE": "google_drive_gmail",
+            "TONY_DISPATCH_GMAIL_MODE": "google_api",
+            "TONY_DISPATCH_GOOGLE_DRIVE_MODE": "google_api",
+            "TONY_GOOGLE_ACCESS_TOKEN": "synthetic",
+            "TONY_WORKFLOW_RUNTIME_ROOT": "/tmp/safe-runtime",
+        }
+
+        dispatchers = build_http_dispatchers(env)
+
+        self.assertIn("Client Delivery", dispatchers)
+        self.assertIn("Gmail", dispatchers)
+        self.assertIn("Google Drive", dispatchers)
+
 
 if __name__ == "__main__":
     unittest.main()

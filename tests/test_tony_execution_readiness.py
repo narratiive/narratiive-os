@@ -97,6 +97,24 @@ class TonyExecutionReadinessTests(unittest.TestCase):
         self.assertTrue(ready.configured)
         self.assertEqual(ready.mode, "higgsfield_api")
 
+    def test_google_client_delivery_requires_drive_and_gmail(self):
+        missing = build_execution_readiness_report(
+            {"TONY_DISPATCH_CLIENT_DELIVERY_MODE": "google_drive_gmail"}
+        ).workers[2]
+        self.assertFalse(missing.configured)
+        self.assertIn("configured Google Drive", missing.missing)
+        self.assertIn("configured Gmail", missing.missing)
+
+        env = {
+            "TONY_DISPATCH_CLIENT_DELIVERY_MODE": "google_drive_gmail",
+            "TONY_DISPATCH_GMAIL_MODE": "google_api",
+            "TONY_DISPATCH_GOOGLE_DRIVE_MODE": "google_api",
+            "TONY_GOOGLE_ACCESS_TOKEN": "synthetic",
+        }
+        ready = build_execution_readiness_report(env).workers[2]
+        self.assertTrue(ready.configured)
+        self.assertEqual(ready.mode, "google_drive_gmail")
+
     def test_controlled_integration_points_keep_writes_approval_gated(self):
         integrations = {
             item.surface: item
