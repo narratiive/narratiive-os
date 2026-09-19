@@ -150,6 +150,25 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertEqual(execution.side_effect_classification, "external_write")
         self.assertTrue(execution.approval_policy.required)
 
+    def test_delivery_preparation_and_client_delivery_are_separate_approval_gates(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve("asset_review_to_delivery_preparation")
+        self.assertEqual(len(definition.stages), 2)
+        preparation, delivery = definition.stages
+        self.assertEqual(preparation.capability, "delivery_packaging")
+        self.assertEqual(preparation.side_effect_classification, "preparation")
+        self.assertTrue(preparation.approval_policy.required)
+        self.assertEqual(delivery.capability, "client_asset_delivery")
+        self.assertEqual(delivery.side_effect_classification, "external_write")
+        self.assertTrue(delivery.approval_policy.required)
+
+    def test_terminal_follow_up_is_a_bounded_local_performance_plan(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve("delivery_to_follow_up_next_action")
+        stage = definition.stages[0]
+        self.assertEqual(stage.capability, "performance_follow_up_planning")
+        self.assertEqual(stage.side_effect_classification, "preparation")
+        self.assertIn("performance_ingestion_plan", stage.output_contract.required_fields)
+        self.assertIn("iteration_control", stage.output_contract.required_fields)
+
     def test_unknown_duplicate_and_unsafe_workflows_fail_closed(self) -> None:
         registry = WorkflowRegistry()
         with self.assertRaises(WorkflowNotFound):

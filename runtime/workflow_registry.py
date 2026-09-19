@@ -357,27 +357,47 @@ CREATIVE_BIBLE_TO_ASSET_PRODUCTION = WorkflowDefinition(
     autonomous_handoff=False,
 )
 
-ASSET_REVIEW_TO_DELIVERY_PREPARATION = _workflow(
-    "asset_review_to_delivery_preparation",
-    _step(
+ASSET_REVIEW_TO_DELIVERY_PREPARATION = WorkflowDefinition(
+    workflow_id="asset_review_to_delivery_preparation",
+    stages=(
+        _step(
         "prepare_delivery",
-        capability="document_generation",
+        capability="delivery_packaging",
         inputs=("campaign_identity", "reviewed_assets", "asset_manifest", "asset_suite_approval", "delivery_requirements"),
         outputs=("delivery_package", "delivery_manifest", "review_findings", "proposed_delivery_action"),
         quality="delivery_preparation_quality_gate",
         approval_required=True,
+        ),
+        _step(
+        "execute_client_asset_delivery",
+        capability="client_asset_delivery",
+        inputs=("delivery_package", "delivery_manifest", "proposed_delivery_action"),
+        outputs=("verified_delivery_evidence", "delivery_receipt"),
+        quality="client_asset_delivery_quality_gate",
+        approval_required=True,
+        side_effect="external_write",
+        ),
     ),
     next_workflow_id="delivery_to_follow_up_next_action",
     approval_required=True,
+    entity_type="client",
+    failure_policy="block_and_escalate",
+    autonomous_handoff=False,
 )
 
 DELIVERY_TO_FOLLOW_UP_NEXT_ACTION = _workflow(
     "delivery_to_follow_up_next_action",
     _step(
         "prepare_follow_up",
-        capability="strategic_reasoning",
+        capability="performance_follow_up_planning",
         inputs=("campaign_identity", "verified_delivery_evidence", "client_context", "measurement_context"),
-        outputs=("recommended_follow_up", "measurement_actions", "draft_client_communication"),
+        outputs=(
+            "recommended_follow_up",
+            "measurement_actions",
+            "draft_client_communication",
+            "performance_ingestion_plan",
+            "iteration_control",
+        ),
         quality="follow_up_preparation_quality_gate",
         approval_required=True,
     ),

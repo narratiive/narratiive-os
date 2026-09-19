@@ -80,6 +80,41 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(received[0]["execution_truth"], "not_dispatched")
         self.assertEqual(received[0]["target"]["brief"], "safe")
 
+    def test_delivery_packaging_is_local_but_client_delivery_requires_configured_external_worker(self) -> None:
+        registry = build_tony_worker_registry(
+            {},
+            {},
+            delivery_preparation_adapter=lambda _contract: {"external_action_taken": False},
+        )
+        packaging = registry.resolve("delivery_packaging")
+        self.assertEqual(packaging.worker_id, "narratiive-delivery-preparer")
+        with self.assertRaises(NoAvailableWorker):
+            registry.resolve("client_asset_delivery", side_effect="external_write")
+
+        configured = build_tony_worker_registry(
+            {},
+            {},
+            delivery_preparation_adapter=lambda _contract: {"external_action_taken": False},
+            client_delivery_adapter=lambda _contract: {
+                "external_action_taken": True,
+                "external_action_receipt": {"receipt_id": "safe"},
+            },
+        )
+        delivery = configured.resolve("client_asset_delivery", side_effect="external_write")
+        self.assertEqual(delivery.worker_id, "configured-client-asset-delivery")
+        with self.assertRaises(ProhibitedWorkerSideEffect):
+            configured.execute(delivery, {}, side_effect="external_write", approval_granted=False)
+
+    def test_performance_follow_up_planning_is_local_and_non_mutating(self) -> None:
+        registry = build_tony_worker_registry(
+            {},
+            {},
+            follow_up_planning_adapter=lambda _contract: {"external_action_taken": False},
+        )
+        resolution = registry.resolve("performance_follow_up_planning")
+        self.assertEqual(resolution.worker_id, "narratiive-performance-follow-up-planner")
+        self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("preparation",))
+
     def test_planned_capability_is_visible_but_not_routable(self) -> None:
         registry = build_tony_worker_registry({})
         declared = {item.metadata.worker_id: item.metadata for item in registry.all()}

@@ -12,6 +12,9 @@ from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
 from runtime.creative_production_workflow_adapter import CreativeProductionWorkflowAdapter
+from runtime.asset_delivery_preparation_worker import AssetDeliveryPreparationWorker
+from runtime.client_asset_delivery_adapter import ClientAssetDeliveryAdapter
+from runtime.delivery_follow_up_worker import DeliveryFollowUpPreparationWorker
 from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
@@ -34,6 +37,9 @@ from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
     creative_asset_production_quality_gate,
+    delivery_preparation_quality_gate,
+    client_asset_delivery_quality_gate,
+    follow_up_preparation_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
@@ -592,6 +598,9 @@ def build_tony_workflow_runtime(
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
         "production_planning_quality_gate": production_planning_quality_gate,
         "creative_asset_production_quality_gate": creative_asset_production_quality_gate,
+        "delivery_preparation_quality_gate": delivery_preparation_quality_gate,
+        "client_asset_delivery_quality_gate": client_asset_delivery_quality_gate,
+        "follow_up_preparation_quality_gate": follow_up_preparation_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
         "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
     }
@@ -614,6 +623,13 @@ def build_tony_workflow_runtime(
                 if "Creative Production" in configured_dispatchers
                 else None
             ),
+            delivery_preparation_adapter=AssetDeliveryPreparationWorker(),
+            client_delivery_adapter=(
+                ClientAssetDeliveryAdapter(configured_dispatchers["Client Delivery"])
+                if "Client Delivery" in configured_dispatchers
+                else None
+            ),
+            follow_up_planning_adapter=DeliveryFollowUpPreparationWorker(),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
