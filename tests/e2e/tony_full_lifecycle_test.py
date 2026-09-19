@@ -57,6 +57,17 @@ CORRELATION_ID = "northstar-test-correlation-e2e"
 RUN_PREFIX = "northstar-test-lifecycle"
 
 
+def _campaign_identity() -> dict[str, Any]:
+    return {
+        "workspace_id": WORKSPACE_ID,
+        "client_id": CLIENT_ID,
+        "brand_id": "northstar-test-brand",
+        "market_ids": ["uk-test-market"],
+        "product_ids": ["northstar-test-product"],
+        "campaign_id": "northstar-test-campaign",
+    }
+
+
 @dataclass(frozen=True, slots=True)
 class GateEvidence:
     gate: str
@@ -321,6 +332,7 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             "blueprint_canon": {"bundle": "synthetic-test-only", "checksum": "northstar-test-canon"},
         },
         "growth_blueprint_to_campaign_world": {
+            "campaign_identity": _campaign_identity(),
             "approved_growth_blueprint": dict(prior_output),
         },
         "campaign_world_to_creative_bible": {

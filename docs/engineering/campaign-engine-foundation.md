@@ -49,8 +49,10 @@ No advertising API is required for the foundation.
 
 ## Gaps against the Campaign Engine
 
-1. No first-class runtime identity currently binds Client, Brand, Market,
-   Product and Campaign before downstream creative work begins.
+1. The canonical Campaign Engine and every registered downstream workflow now
+   require one stable identity binding Client, Brand, Market, Product and
+   Campaign before Campaign World work begins. Automated creation and Notion
+   reconciliation of that identity from approved onboarding remain outstanding.
 2. The canonical Campaign Engine models several Campaign World candidates, and
    the registered Growth Blueprint workflow now generates exactly three,
    quality-checks each, records Tony's bounded taste disposition and requires
@@ -138,6 +140,10 @@ that Notion changed without execution evidence.
    `runtime/campaign_engine.py`. Campaign bootstrap now requires and persists
    Matt's approval bound to the exact Growth Blueprint ID, version and checksum;
    retries are idempotent and conflicting campaign reuse fails closed.
+   The registered Campaign World, Creative Bible, asset-production, delivery
+   and follow-up workflows now carry and validate the same canonical identity;
+   missing, partial or duplicate market/product identifiers fail before worker
+   dispatch.
 2. **Tony control surface** — the authenticated read surface now exposes the
    multi-client Campaign Engine portfolio, current stage, next action and human
    gate through deterministic commands and Tony's native state-read tool.

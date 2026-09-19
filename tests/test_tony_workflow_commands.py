@@ -11,6 +11,7 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_workflow_quality import (
     campaign_world_candidates_output,
+    campaign_identity,
     creative_bible_output,
     discovery_output,
     growth_blueprint_output,
@@ -150,6 +151,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "growth_blueprint_to_campaign_world",
             "safe-world-run",
             {
+                "campaign_identity": campaign_identity(),
                 "approved_growth_blueprint": {"status": "approved", "source": "synthetic"},
                 "evidence_lineage": campaign_world_candidates_output()["campaign_world_candidates"][0]["evidence_lineage"],
                 "activation_implications": {"priority": "Synthetic internal test"},
@@ -221,6 +223,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "campaign_world_to_creative_bible",
             "safe-bible-run",
             {
+                "campaign_identity": campaign_identity(),
                 "approved_campaign_world": {"status": "approved", "source": "synthetic"},
                 "campaign_world_selection": {
                     "approver": "telegram:matt",

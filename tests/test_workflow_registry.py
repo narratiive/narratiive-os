@@ -123,6 +123,20 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertIn("creative_bible_approval_brief", triage.output_contract.required_fields)
         self.assertTrue(triage.approval_policy.required)
 
+    def test_canonical_campaign_identity_is_required_across_downstream_workflows(self) -> None:
+        registry = build_narratiive_workflow_registry()
+        for workflow_id in (
+            "growth_blueprint_to_campaign_world",
+            "campaign_world_to_creative_bible",
+            "creative_bible_to_asset_production",
+            "asset_review_to_delivery_preparation",
+            "delivery_to_follow_up_next_action",
+        ):
+            self.assertIn(
+                "campaign_identity",
+                registry.resolve(workflow_id).stages[0].input_contract.required_fields,
+            )
+
     def test_unknown_duplicate_and_unsafe_workflows_fail_closed(self) -> None:
         registry = WorkflowRegistry()
         with self.assertRaises(WorkflowNotFound):
