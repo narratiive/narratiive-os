@@ -113,8 +113,6 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("asset production requires Matt's authenticated Creative Bible approval")
         if approval.get("creative_bible_checksum") != _value_checksum(bible):
             raise ValueError("asset production requires approval bound to the exact Creative Bible checksum")
-        if not isinstance(inputs.get("asset_manifest"), Mapping):
-            raise ValueError("asset production requires a structured Asset Manifest")
         if not isinstance(inputs.get("production_constraints"), list):
             raise ValueError("asset production requires explicit production constraints")
 
@@ -440,6 +438,90 @@ def creative_bible_triage_quality_gate(output: Mapping[str, Any]) -> Mapping[str
         and output.get("publication_authorised") is False
         and output.get("media_spend_authorised") is False,
         "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def production_planning_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    pack = output.get("production_pack")
+    specifications = output.get("channel_asset_specifications")
+    tasks = output.get("production_tasks")
+    manifest = output.get("asset_manifest")
+    assets = manifest.get("assets") if isinstance(manifest, Mapping) else None
+    specification_ids = {
+        str(item.get("specification_id") or "") for item in specifications or [] if isinstance(item, Mapping)
+    }
+    checks = {
+        "production_pack_is_checksum_bound": isinstance(pack, Mapping)
+        and _meaningful(pack.get("production_pack_id"))
+        and _meaningful(pack.get("checksum"))
+        and _meaningful(pack.get("source_bible_checksum")),
+        "channel_specifications_are_complete": isinstance(specifications, list)
+        and len(specifications) >= 3
+        and all(
+            isinstance(item, Mapping)
+            and all(
+                _meaningful(item.get(field))
+                for field in (
+                    "specification_id", "channel", "placement", "market", "language",
+                    "asset_type", "file_format", "aspect_ratio", "source_bible_checksum",
+                )
+            )
+            for item in specifications
+        ),
+        "production_tasks_are_routable_and_human_reviewed": isinstance(tasks, list)
+        and len(tasks) == len(specifications or [])
+        and all(
+            isinstance(item, Mapping)
+            and item.get("specification_id") in specification_ids
+            and _meaningful(item.get("required_capability"))
+            and item.get("human_review_required") is True
+            and item.get("execution_authorised") is False
+            for item in tasks
+        ),
+        "asset_manifest_matches_tasks": isinstance(assets, list)
+        and len(assets) == len(tasks or [])
+        and {str(item.get("production_job_id") or "") for item in assets if isinstance(item, Mapping)}
+        == {str(item.get("job_id") or "") for item in tasks or [] if isinstance(item, Mapping)}
+        and all(
+            isinstance(item, Mapping)
+            and item.get("status") == "planned"
+            and item.get("planned_version") == 1
+            and item.get("human_review_required") is True
+            for item in assets
+        ),
+        "planning_has_no_execution_authority": output.get("production_executed") is False
+        and output.get("delivery_authorised") is False
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def creative_asset_production_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    versions = output.get("asset_versions")
+    receipts = output.get("production_receipts")
+    checks = {
+        "asset_versions_are_append_only_review_candidates": isinstance(versions, list)
+        and bool(versions)
+        and all(
+            isinstance(item, Mapping)
+            and all(_meaningful(item.get(field)) for field in ("asset_version_id", "asset_id", "file_checksum", "drive_uri", "production_job_id"))
+            and int(item.get("version_number") or 0) >= 1
+            and item.get("status") in {"generated", "in_review"}
+            and item.get("human_review_required") is True
+            and item.get("approval_status") == "pending"
+            and item.get("delivery_authorised") is False
+            and item.get("publication_authorised") is False
+            for item in versions
+        ),
+        "provider_receipts_are_recorded": isinstance(receipts, list)
+        and len(receipts) == len(versions or [])
+        and all(isinstance(item, Mapping) and _meaningful(item.get("provider_receipt_id")) for item in receipts),
+        "publication_delivery_and_spend_are_unauthorised": output.get("delivery_authorised") is False
+        and output.get("publication_authorised") is False
+        and output.get("media_spend_authorised") is False,
     }
     return _result(checks)
 

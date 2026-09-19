@@ -10,6 +10,7 @@ from typing import Any, Mapping
 
 from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
+from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
 from runtime.inbound_leads import InboundLead
 from runtime.inbound_lifecycle import project_inbound_lead
@@ -30,12 +31,14 @@ from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
+    creative_asset_production_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
+    production_planning_quality_gate,
     research_evidence_quality_gate,
 )
 from runtime.workflow_registry import WorkflowDefinition, build_narratiive_workflow_registry
@@ -165,11 +168,25 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
         return creative_bible_output()
     if workflow_id == "creative_bible_to_asset_production":
         return {
-            "production_tasks": [{"task_id": "northstar-test-asset-job-1", "status": "prepared"}],
-            "asset_versions": [{"asset_id": "northstar-test-asset-1", "version": 1, "status": "in_review"}],
-            "asset_manifest": {"manifest_id": "northstar-test-manifest-1", "version": 1},
-            "production_gaps": ["No external production provider invoked by this test."],
-            "external_action_taken": False,
+            "asset_versions": [{
+                "asset_version_id": "northstar-test-asset-1-v1",
+                "asset_id": "northstar-test-asset-1",
+                "version_number": 1,
+                "file_checksum": "northstar-test-file-checksum",
+                "drive_uri": "drive://northstar-test/asset-1-v1.mp4",
+                "production_job_id": "northstar-test-job-1",
+                "status": "in_review",
+                "human_review_required": True,
+                "approval_status": "pending",
+                "delivery_authorised": False,
+                "publication_authorised": False,
+            }],
+            "production_receipts": [{"provider_receipt_id": "northstar-test-production-receipt-1"}],
+            "external_action_taken": True,
+            "external_action_receipt": {"receipt_id": "northstar-test-production-receipt-1"},
+            "delivery_authorised": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
         }
     if workflow_id == "asset_review_to_delivery_preparation":
         return {
@@ -241,7 +258,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
                     "creative_asset_production",
                 ),
                 availability=WorkerAvailability.AVAILABLE,
-                side_effect_permissions=("preparation", "external_read"),
+                side_effect_permissions=("preparation", "external_read", "external_write"),
                 max_attempts=1,
             ),
             fixture_worker,
@@ -268,6 +285,17 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             ),
             CreativeBibleTriageWorker(),
         ),
+        WorkerRegistration(
+            WorkerMetadata(
+                worker_id="northstar-test-production-planner",
+                provider="isolated-deterministic-fixture",
+                capabilities=("production_planning",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            CampaignProductionPlanningWorker(),
+        ),
     ))
     validators = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
@@ -280,6 +308,8 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
         "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
+        "production_planning_quality_gate": production_planning_quality_gate,
+        "creative_asset_production_quality_gate": creative_asset_production_quality_gate,
     }
     for definition in registry.all():
         for stage in definition.stages:
@@ -347,7 +377,7 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             "production_context": {"channels": ["Meta", "TikTok", "Google"], "test_only": True},
         },
         "creative_bible_to_asset_production": {
-            "asset_manifest": {"manifest_id": "northstar-test-manifest-1", "status": "planned"},
+            "production_constraints": ["No publication", "Human review required"],
         },
         "asset_review_to_delivery_preparation": {
             "reviewed_assets": prior_output.get("asset_versions"),
@@ -462,14 +492,20 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
     records.append(_record_gate(runtime, run_id, (time.perf_counter() - started) * 1000))
 
     for index, definition in enumerate(definitions):
-        state = runtime.runs.load_run(run_id)
-        if state.status is WorkflowStatus.AWAITING_APPROVAL:
-            runtime.approve(
-                run_id,
-                approver="matt-authorised-synthetic-e2e",
-                rationale=f"Approve isolated {CLIENT_NAME} gate for lifecycle testing only.",
-                approval_binding={"test_fixture": CLIENT_ID, "artifact_checksum": state.stages[0].output_artifacts[-1].checksum},
-            )
+        while True:
+            state = runtime.runs.load_run(run_id)
+            if state.status is WorkflowStatus.COMPLETE:
+                break
+            if state.status is WorkflowStatus.AWAITING_APPROVAL:
+                runtime.approve(
+                    run_id,
+                    approver="matt-authorised-synthetic-e2e",
+                    rationale=f"Approve isolated {CLIENT_NAME} gate for lifecycle testing only.",
+                    approval_binding={"test_fixture": CLIENT_ID},
+                )
+            outcome = runtime.advance(run_id, _lifecycle())
+            if outcome.status == "blocked":
+                raise AssertionError(f"workflow {definition.workflow_id} blocked during approved fixture execution: {outcome.blocker}")
         if definition.workflow_id == "growth_blueprint_to_campaign_world":
             brief = runtime.campaign_world_selection_brief(run_id)
             selected = brief["candidates"][0]
@@ -555,13 +591,19 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
     runtime.advance(run_id, _lifecycle())
     reached.append(first.workflow_id)
     for index, definition in enumerate(definitions):
-        state = runtime.runs.load_run(run_id)
-        if state.status is WorkflowStatus.AWAITING_APPROVAL:
-            runtime.approve(
-                run_id,
-                approver="matt-authorised-synthetic-e2e",
-                rationale="Approve isolated native-chain test gate.",
-            )
+        while True:
+            state = runtime.runs.load_run(run_id)
+            if state.status is WorkflowStatus.COMPLETE:
+                break
+            if state.status is WorkflowStatus.AWAITING_APPROVAL:
+                runtime.approve(
+                    run_id,
+                    approver="matt-authorised-synthetic-e2e",
+                    rationale="Approve isolated native-chain test gate.",
+                )
+            outcome = runtime.advance(run_id, _lifecycle())
+            if outcome.status == "blocked":
+                return runtime, reached, RuntimeError(outcome.blocker)
         if definition.workflow_id == "growth_blueprint_to_campaign_world":
             brief = runtime.campaign_world_selection_brief(run_id)
             selected = brief["candidates"][0]
@@ -627,7 +669,12 @@ class TonyFullLifecycleTest(unittest.TestCase):
             self.assertEqual([item.gate for item in records], expected)
             self.assertEqual(len(records), 11)
             self.assertTrue(all(item.status == "PASS" for item in records), [asdict(item) for item in records])
-            self.assertTrue(all(item.dispatched_worker in {"northstar-test-fixture-worker", "northstar-test-tony-triage"} for item in records))
+            self.assertTrue(all(item.dispatched_worker in {
+                "northstar-test-fixture-worker",
+                "northstar-test-tony-triage",
+                "northstar-test-creative-bible-triage",
+                "northstar-test-production-planner",
+            } for item in records))
             self.assertTrue(all(item.output_artefact for item in records))
             self.assertTrue(all("stage.completed" in item.audit_events for item in records))
             self.assertTrue(all(item.resulting_state["external_action_taken"] is False for item in records))

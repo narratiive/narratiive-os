@@ -131,6 +131,19 @@ class CapabilityWorkerRegistryTests(unittest.TestCase):
         self.assertEqual(resolution.registration.metadata.provider, "narratiive-os")
         self.assertNotIn("creative-bible-triage-unavailable", declared)
 
+    def test_production_planning_is_local_and_cannot_execute_provider_work(self) -> None:
+        adapter = lambda contract: {"production_pack": {"status": "planned"}}
+        registry = build_tony_worker_registry({}, production_planning_adapter=adapter)
+
+        resolution = registry.resolve("production_planning", side_effect="preparation")
+        declared = {item.metadata.worker_id for item in registry.all()}
+
+        self.assertEqual(resolution.worker_id, "narratiive-production-planner")
+        self.assertEqual(resolution.registration.metadata.side_effect_permissions, ("preparation",))
+        self.assertNotIn("production-planning-unavailable", declared)
+        with self.assertRaises(NoAvailableWorker):
+            registry.resolve("production_planning", side_effect="external_write")
+
     def test_fireflies_resolves_only_for_read_only_evidence_capabilities(self) -> None:
         calls = []
         registry = build_tony_worker_registry(

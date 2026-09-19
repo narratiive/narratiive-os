@@ -41,7 +41,9 @@ class WorkflowRegistryTests(unittest.TestCase):
                 self.assertTrue(step.output_contract.required_fields)
                 self.assertTrue(step.quality_contract)
                 self.assertGreaterEqual(step.retry_policy.max_attempts, 1)
-                self.assertIn(step.side_effect_classification, {"preparation", "external_read"})
+                self.assertIn(step.side_effect_classification, {"preparation", "external_read", "external_write"})
+                if step.side_effect_classification == "external_write":
+                    self.assertTrue(step.approval_policy.required)
                 self.assertTrue(step.approval_policy.before_external_action)
 
     def test_blueprint_lite_and_consequential_preparation_contracts_remain_human_gated(self) -> None:
@@ -136,6 +138,17 @@ class WorkflowRegistryTests(unittest.TestCase):
                 "campaign_identity",
                 registry.resolve(workflow_id).stages[0].input_contract.required_fields,
             )
+
+    def test_production_planning_and_execution_are_separate_approval_gates(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve("creative_bible_to_asset_production")
+        self.assertEqual(len(definition.stages), 2)
+        planning, execution = definition.stages
+        self.assertEqual(planning.capability, "production_planning")
+        self.assertEqual(planning.side_effect_classification, "preparation")
+        self.assertTrue(planning.approval_policy.required)
+        self.assertEqual(execution.capability, "creative_asset_production")
+        self.assertEqual(execution.side_effect_classification, "external_write")
+        self.assertTrue(execution.approval_policy.required)
 
     def test_unknown_duplicate_and_unsafe_workflows_fail_closed(self) -> None:
         registry = WorkflowRegistry()

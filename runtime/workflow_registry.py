@@ -316,18 +316,45 @@ CAMPAIGN_WORLD_TO_CREATIVE_BIBLE = WorkflowDefinition(
     autonomous_handoff=False,
 )
 
-CREATIVE_BIBLE_TO_ASSET_PRODUCTION = _workflow(
-    "creative_bible_to_asset_production",
-    _step(
-        "orchestrate_creative_assets",
-        capability="creative_asset_production",
-        inputs=("campaign_identity", "approved_creative_bible", "creative_bible_approval", "asset_manifest", "production_constraints"),
-        outputs=("production_tasks", "asset_versions", "asset_manifest", "production_gaps"),
-        quality="creative_asset_production_quality_gate",
-        approval_required=True,
+CREATIVE_BIBLE_TO_ASSET_PRODUCTION = WorkflowDefinition(
+    workflow_id="creative_bible_to_asset_production",
+    stages=(
+        _step(
+            "plan_creative_asset_production",
+            capability="production_planning",
+            inputs=("campaign_identity", "approved_creative_bible", "creative_bible_approval", "production_constraints"),
+            outputs=(
+                "production_pack",
+                "channel_asset_specifications",
+                "production_tasks",
+                "asset_manifest",
+                "production_constraints",
+                "production_gaps",
+            ),
+            quality="production_planning_quality_gate",
+            approval_required=True,
+        ),
+        _step(
+            "execute_creative_asset_production",
+            capability="creative_asset_production",
+            inputs=(
+                "production_pack",
+                "channel_asset_specifications",
+                "production_tasks",
+                "asset_manifest",
+                "production_constraints",
+            ),
+            outputs=("asset_versions", "production_receipts"),
+            quality="creative_asset_production_quality_gate",
+            approval_required=True,
+            side_effect="external_write",
+        ),
     ),
     next_workflow_id="asset_review_to_delivery_preparation",
     approval_required=True,
+    entity_type="client",
+    failure_policy="block_and_escalate",
+    autonomous_handoff=False,
 )
 
 ASSET_REVIEW_TO_DELIVERY_PREPARATION = _workflow(

@@ -197,6 +197,7 @@ def build_tony_worker_registry(
     document_adapter: WorkerAdapter | None = None,
     campaign_world_triage_adapter: WorkerAdapter | None = None,
     creative_bible_triage_adapter: WorkerAdapter | None = None,
+    production_planning_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
@@ -317,6 +318,24 @@ def build_tony_worker_registry(
             )
         )
 
+    if production_planning_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-production-planner",
+                    provider="narratiive-os",
+                    capabilities=("production_planning",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=30,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                production_planning_adapter,
+            )
+        )
+
     fireflies = dispatchers.get("Fireflies")
     if fireflies is not None:
         registrations.append(
@@ -361,6 +380,8 @@ def build_tony_worker_registry(
         planned = (("campaign-world-triage-unavailable", ("creative_quality_triage",)), *planned)
     if creative_bible_triage_adapter is None:
         planned = (("creative-bible-triage-unavailable", ("creative_bible_quality_triage",)), *planned)
+    if production_planning_adapter is None:
+        planned = (("production-planning-unavailable", ("production_planning",)), *planned)
     if research_adapter is None:
         planned = (("market-research-unavailable", ("market_research", "web_research")), *planned)
     if fireflies is None:
