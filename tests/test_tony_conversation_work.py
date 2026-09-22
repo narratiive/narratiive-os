@@ -40,6 +40,17 @@ class TonyConversationWorkTests(unittest.TestCase):
         self.assertFalse(router.requires_durable_work("Here is a long conversational observation " * 40))
         self.assertEqual(list((Path(self.temporary.name) / "jobs").glob("*.json")), [])
 
+    def test_material_drafting_request_is_durable(self) -> None:
+        router = SubstantiveConversationRouter()
+        request = (
+            "I think it's pt.2 this will create a secondary revenue source that serves the long tail. "
+            "Could you create a draft for me? Also, that email to Khotso is excellent. Please send."
+        )
+        self.assertTrue(router.requires_durable_work(request))
+        accepted = self.ingress.accept(self.request("739"), request)
+        self.assertIn("come back here", accepted.acknowledgement)
+        self.assertEqual(self.store.get(accepted.work_id)["state"], "queued")
+
     def test_simulated_task_over_120_seconds_is_acknowledged_then_delivered(self) -> None:
         accepted = self.ingress.accept(
             self.request(),
