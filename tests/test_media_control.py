@@ -428,6 +428,53 @@ class MediaControlTests(unittest.TestCase):
             self.assertEqual(diagnostics["health"], ConnectionHealth.DEGRADED.value)
             self.assertEqual(diagnostics["credential_health"], "configured_unverified")
 
+    def test_empty_provider_account_can_be_live_certified(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport_adapter = adapter(MediaProvider.GOOGLE)
+            transport_adapter.transport.responses.update(
+                {
+                    "get_accounts": [{"resource_name": "customers/7620152450"}],
+                    "get_campaigns": [],
+                }
+            )
+            service = MediaControlService(
+                {MediaProvider.GOOGLE: transport_adapter},
+                ExecutionJournal(directory),
+            )
+            result = service.certify_provider(
+                MediaProvider.GOOGLE,
+                request_id="google-empty-account-certification",
+            )
+            self.assertEqual(result["status"], "healthy")
+            self.assertEqual(result["connection_status"], "live")
+            self.assertEqual(result["campaigns_returned"], 0)
+            self.assertTrue(result["empty_campaign_list_valid"])
+            self.assertFalse(result["external_write_performed"])
+            diagnostics = service.diagnostics()["google"]
+            self.assertEqual(diagnostics["health"], ConnectionHealth.HEALTHY.value)
+            self.assertEqual(diagnostics["connection_status"], "live")
+            self.assertEqual(diagnostics["credential_health"], "configured_verified_by_successful_read")
+            self.assertEqual(diagnostics["campaigns_returned"], 0)
+            self.assertEqual(diagnostics["mapped_campaigns"], 0)
+
+    def test_provider_certification_failure_is_offline_and_safe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport_adapter = adapter(MediaProvider.GOOGLE)
+            transport_adapter.transport.responses["get_accounts"] = MediaProviderError("unavailable")
+            service = MediaControlService(
+                {MediaProvider.GOOGLE: transport_adapter},
+                ExecutionJournal(directory),
+            )
+            with self.assertRaises(MediaProviderError):
+                service.certify_provider(
+                    MediaProvider.GOOGLE,
+                    request_id="google-failed-certification",
+                )
+            record = service.journal.read_all()[-1]
+            self.assertEqual(record.status, "failed")
+            self.assertFalse(record.metadata["external_write_performed"])
+            self.assertEqual(service.diagnostics()["google"]["health"], ConnectionHealth.OFFLINE.value)
+
 
 if __name__ == "__main__":
     unittest.main()

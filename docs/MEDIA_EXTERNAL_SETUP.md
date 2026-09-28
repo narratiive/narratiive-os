@@ -87,6 +87,20 @@ Engineering—not Matt—will then:
 - add n8n schedules only for providers that pass;
 - leave every write method disabled.
 
+Run a provider certification through the protected environment with:
+
+```bash
+.venv/bin/python scripts/run_with_env.py ~/.config/narratiive/runtime.env \
+  .venv/bin/python scripts/certify_media_provider.py google
+```
+
+The command performs account and campaign-list reads, appends success or failure
+to the Media Control Layer execution journal, proves all Phase 1 adapter write
+methods remain blocked before transport dispatch, and prints only non-secret
+status and account-mapping evidence. A successful empty campaign list is a
+healthy live result; it must not be converted into a missing-configuration or
+provider-error state.
+
 The live read adapter is not production-accepted until its status is `HEALTHY`, account mapping is explicit and the audit journal contains a successful read. Missing credentials must appear as `NOT_CONFIGURED`, not as a healthy empty account.
 
 ## n8n read-only ingestion contract
