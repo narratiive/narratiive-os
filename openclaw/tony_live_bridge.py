@@ -31,6 +31,12 @@ from runtime.media_control import (
     ProviderObjectMapping,
 )
 from runtime.media_provider_transports import build_configured_media_adapters
+from runtime.meta_oauth import (
+    META_PERMISSION_NAMES,
+    META_REDIRECT_URI,
+    MetaOAuthError,
+    MetaOAuthService,
+)
 from runtime.tiktok_oauth import (
     TIKTOK_PERMISSION_NAMES,
     TIKTOK_REDIRECT_URI,
@@ -104,6 +110,7 @@ class LeadAwareTonyApplication:
         conversation_ingress: TonyConversationIngress | None = None,
         media_control: MediaControlService | None = None,
         tiktok_oauth: TikTokOAuthService | None = None,
+        meta_oauth: MetaOAuthService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -115,6 +122,7 @@ class LeadAwareTonyApplication:
         self.conversation_ingress = conversation_ingress
         self.media_control = media_control
         self.tiktok_oauth = tiktok_oauth
+        self.meta_oauth = meta_oauth
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -136,6 +144,10 @@ class LeadAwareTonyApplication:
             return self._tiktok_oauth_start(environ, start_response)
         if method == "POST" and path == "/oauth/tiktok/callback":
             return self._tiktok_oauth_callback(environ, start_response)
+        if method == "POST" and path == "/oauth/meta/start":
+            return self._meta_oauth_start(environ, start_response)
+        if method == "POST" and path == "/oauth/meta/callback":
+            return self._meta_oauth_callback(environ, start_response)
         return self.base(environ, start_response)
 
     @staticmethod
@@ -463,6 +475,50 @@ class LeadAwareTonyApplication:
             return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "oauth_auth_unavailable", "message": "OAuth requires a configured bridge token"}})
         return self._authorize(environ, start_response)
 
+    def _meta_oauth_start(self, environ, start_response):
+        denied = self._oauth_authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.meta_oauth is None:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "meta_oauth_unavailable", "message": "Meta OAuth is not configured"}})
+        try:
+            url = self.meta_oauth.authorization_url()
+        except MetaOAuthError as exc:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "meta_oauth_unavailable", "message": str(exc)}})
+        return self._respond(start_response, HTTPStatus.OK, {
+            "ok": True,
+            "authorization_url": url,
+            "redirect_uri": META_REDIRECT_URI,
+            "permissions": list(META_PERMISSION_NAMES),
+            "read_only": True,
+            "external_action_taken": False,
+        })
+
+    def _meta_oauth_callback(self, environ, start_response):
+        denied = self._oauth_authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.meta_oauth is None:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "meta_oauth_unavailable", "message": "Meta OAuth is not configured"}})
+        try:
+            request = self._read_json(environ)
+            if str(request.get("error") or "").strip():
+                raise MetaOAuthError("Meta advertising authorisation was not approved")
+            result = self.meta_oauth.exchange(
+                state=str(request.get("state") or ""),
+                code=str(request.get("code") or ""),
+            )
+        except (MetaOAuthError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "meta_oauth_failed", "message": str(exc)}})
+        return self._respond(start_response, HTTPStatus.OK, {
+            "ok": True,
+            "status": "meta_credentials_stored",
+            "authorised_ad_account_ids": list(result.account_ids),
+            "account_selection_required": len(result.account_ids) != 1,
+            "read_only": True,
+            "external_media_write_performed": False,
+        })
+
     @staticmethod
     def _required_string(value: dict[str, Any], field: str) -> str:
         result = str(value.get(field) or "").strip()
@@ -726,6 +782,7 @@ def build_app() -> LeadAwareTonyApplication:
         conversation_ingress=conversation_ingress,
         media_control=media_control,
         tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
+        meta_oauth=MetaOAuthService.from_environment(os.environ),
     )
 
 

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import unittest
+import hashlib
+import hmac
 from typing import Any
 
 from runtime.media_control import MediaMutationDisabled, MediaProvider, ProviderConfiguration
@@ -123,6 +125,31 @@ class MediaProviderTransportTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["video_views"], None)
         self.assertEqual(result["tracking_status"], "unknown")
         self.assertEqual(http.calls[1]["query"]["level"], "campaign")
+        self.assertEqual(
+            http.calls[1]["query"]["action_attribution_windows"],
+            '["1d_view", "1d_click", "7d_click"]',
+        )
+
+    def test_meta_lists_all_pages_and_uses_appsecret_proof(self) -> None:
+        http = FakeHTTP(
+            (
+                JSONResponse(200, {}, {"data": [{"id": "act_1"}], "paging": {"cursors": {"after": "next"}}}),
+                JSONResponse(200, {}, {"data": [{"id": "act_2"}]}),
+            )
+        )
+        transport = MetaMarketingReadTransport(
+            configuration(MediaProvider.META),
+            "meta-secret",
+            http,
+            graph_version="v26.0",
+            app_secret="app-secret",
+        )
+        accounts = transport.request(MediaProvider.META, "get_accounts", {})
+        self.assertEqual([item["id"] for item in accounts], ["act_1", "act_2"])
+        self.assertEqual(http.calls[1]["query"]["after"], "next")
+        expected = hmac.new(b"app-secret", b"meta-secret", hashlib.sha256).hexdigest()
+        self.assertEqual(http.calls[0]["query"]["appsecret_proof"], expected)
+        self.assertNotIn("meta-secret", http.calls[0]["url"])
 
     def test_tiktok_performance_uses_header_token_and_integrated_report(self) -> None:
         http = FakeHTTP(

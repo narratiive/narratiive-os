@@ -28,6 +28,7 @@ from runtime.media_control import (
     ProviderConfiguration,
     ProviderObjectMapping,
     TikTokReadOnlyAdapter,
+    WRITE_OPERATIONS,
 )
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_media_commands import TonyMediaCommandService
@@ -112,19 +113,39 @@ class MediaControlTests(unittest.TestCase):
     def test_every_provider_write_method_is_disabled(self):
         for provider in MediaProvider:
             item = adapter(provider)
-            for operation in (
-                "create_campaign",
-                "create_ad_group",
-                "create_ad",
-                "upload_creative",
-                "update_budget",
-                "pause_ad",
-                "resume_ad",
-                "activate_campaign",
-            ):
+            for operation in sorted(WRITE_OPERATIONS):
                 with self.assertRaises(MediaMutationDisabled, msg=f"{provider.value}:{operation}"):
                     getattr(item, operation)({"unsafe": True})
             self.assertEqual(len(item.transport.calls), 0)
+
+    def test_provider_inventory_is_normalised_audited_idempotent_and_visible_to_tony(self):
+        with tempfile.TemporaryDirectory() as directory:
+            item = adapter(MediaProvider.META)
+            item.transport.responses.update(
+                {
+                    "get_accounts": [{"id": "act_test-meta-account", "name": "Test account", "account_status": 1}],
+                    "get_campaigns": [{"id": "campaign-1", "name": "Campaign", "status": "ACTIVE"}],
+                    "get_ad_groups": [{"id": "adset-1", "name": "Ad set", "effective_status": "ACTIVE"}],
+                    "get_ads": [{"id": "ad-1", "name": "Ad", "effective_status": "ACTIVE"}],
+                    "get_creatives": [{"id": "creative-1", "name": "Creative", "object_type": "VIDEO"}],
+                }
+            )
+            service = MediaControlService({MediaProvider.META: item}, ExecutionJournal(directory))
+            first = service.sync_inventory(MediaProvider.META, request_id="meta-inventory-1")
+            call_count = len(item.transport.calls)
+            replay = service.sync_inventory(MediaProvider.META, request_id="meta-inventory-1")
+            self.assertEqual(first, replay)
+            self.assertEqual(len(item.transport.calls), call_count)
+            self.assertEqual(
+                first.counts(),
+                {"account": 1, "campaign": 1, "ad_group": 1, "ad": 1, "creative": 1},
+            )
+            self.assertEqual(service.journal.verify()["ok"], True)
+            self.assertEqual(service.diagnostics()["meta"]["inventory_counts"]["creative"], 1)
+            report = TonyMediaCommandService(_Fallback(), service).execute("/media inventory meta", ())
+            self.assertEqual(report.status, "ready")
+            self.assertEqual(report.data["providers"][0]["counts"]["ad"], 1)
+            self.assertFalse(report.data["external_action_taken"])
 
     def test_policy_allows_only_read_analyse_recommend(self):
         policy = MediaPolicyEngine()

@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import json
+import hashlib
+import hmac
+import re
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -109,13 +112,15 @@ class MetaMarketingReadTransport:
         http: JSONHTTPClient,
         *,
         graph_version: str,
+        app_secret: str = "",
     ) -> None:
         if not access_token.strip():
             raise MediaConfigurationError("Meta access token is required")
-        if not graph_version.startswith("v") or "." not in graph_version:
-            raise MediaConfigurationError("META_GRAPH_API_VERSION must be an explicit version such as v24.0")
+        if not re.fullmatch(r"v[0-9]+\.[0-9]+", graph_version):
+            raise MediaConfigurationError("META_GRAPH_API_VERSION must be an explicit version such as v26.0")
         self.configuration = configuration
         self._access_token = access_token
+        self._app_secret = app_secret.strip()
         self.http = http
         self.base_url = f"https://graph.facebook.com/{graph_version}"
 
@@ -125,23 +130,76 @@ class MetaMarketingReadTransport:
         if operation == "authenticate":
             return self._get("/me", {"fields": "id,name"})
         if operation == "get_accounts":
-            return _data(self._get("/me/adaccounts", {"fields": "id,name,account_status,currency,timezone_name"}))
+            return self._get_data(
+                "/me/adaccounts",
+                {
+                    "fields": (
+                        "id,account_id,name,business_name,account_status,disable_reason,currency,"
+                        "timezone_name,timezone_offset_hours_utc,amount_spent,balance,spend_cap,business{id,name}"
+                    )
+                },
+            )
         if operation == "get_campaigns":
-            return _data(self._get(f"/{account_id}/campaigns", {"fields": "id,name,status,effective_status,objective"}))
+            return self._get_data(
+                f"/{account_id}/campaigns",
+                {
+                    "fields": (
+                        "id,name,status,effective_status,objective,buying_type,bid_strategy,"
+                        "daily_budget,lifetime_budget,start_time,stop_time,created_time,updated_time,"
+                        "special_ad_categories"
+                    )
+                },
+            )
         campaign_id = _required(parameters, "campaign_id")
         if operation == "get_campaign":
             return self._get(f"/{campaign_id}", {"fields": "id,name,status,effective_status,objective,daily_budget,lifetime_budget"})
         if operation == "get_ad_groups":
-            return _data(self._get(f"/{campaign_id}/adsets", {"fields": "id,name,status,effective_status,daily_budget,lifetime_budget"}))
+            return self._get_data(
+                f"/{campaign_id}/adsets",
+                {
+                    "fields": (
+                        "id,name,campaign_id,status,effective_status,daily_budget,lifetime_budget,"
+                        "bid_amount,bid_strategy,billing_event,optimization_goal,destination_type,"
+                        "attribution_spec,promoted_object,targeting,start_time,end_time,created_time,updated_time"
+                    )
+                },
+            )
         if operation == "get_ads":
-            return _data(self._get(f"/{campaign_id}/ads", {"fields": "id,name,status,effective_status,creative{id,name}"}))
+            return self._get_data(
+                f"/{campaign_id}/ads",
+                {
+                    "fields": (
+                        "id,name,campaign_id,adset_id,status,effective_status,configured_status,"
+                        "created_time,updated_time,tracking_specs,conversion_domain,"
+                        "creative{id,name,object_type,thumbnail_url,effective_object_story_id}"
+                    )
+                },
+            )
         if operation == "get_creatives":
-            ads = _data(self._get(f"/{campaign_id}/ads", {"fields": "id,creative{id,name,object_type}"}))
-            return [item.get("creative", {}) for item in ads if isinstance(item.get("creative"), Mapping)]
+            ads = self._get_data(
+                f"/{campaign_id}/ads",
+                {
+                    "fields": (
+                        "id,name,creative{id,name,title,body,object_type,call_to_action_type,"
+                        "effective_object_story_id,image_hash,image_url,thumbnail_url,"
+                        "object_story_spec,asset_feed_spec,url_tags}"
+                    )
+                },
+            )
+            return [
+                {**dict(item.get("creative", {})), "ad_id": item.get("id"), "ad_name": item.get("name")}
+                for item in ads
+                if isinstance(item.get("creative"), Mapping)
+            ]
         if operation == "get_delivery_status":
             return self._get(f"/{campaign_id}", {"fields": "id,status,effective_status,issues_info"})
         if operation == "get_review_status":
-            return {"ads": _data(self._get(f"/{campaign_id}/ads", {"fields": "id,effective_status,review_feedback"}))}
+            return {
+                "ads": self._get_data(
+                    f"/{campaign_id}/ads",
+                    {"fields": "id,effective_status,review_feedback,issues_info"},
+                )
+            }
         if operation == "get_performance":
             return self._performance(campaign_id, parameters)
         raise MediaProviderError(f"unsupported Meta read operation: {operation}")
@@ -158,11 +216,18 @@ class MetaMarketingReadTransport:
                 f"/{campaign_id}/insights",
                 {
                     "fields": (
-                        "spend,impressions,reach,frequency,cpm,clicks,ctr,cpc,"
-                        "actions,action_values,cost_per_action_type,video_play_actions,video_p100_watched_actions"
+                        "account_id,account_name,campaign_id,campaign_name,date_start,date_stop,"
+                        "spend,impressions,reach,frequency,cpm,clicks,unique_clicks,inline_link_clicks,"
+                        "outbound_clicks,ctr,cpc,cpp,actions,action_values,cost_per_action_type,"
+                        "purchase_roas,website_purchase_roas,video_play_actions,video_30_sec_watched_actions,"
+                        "video_avg_time_watched_actions,video_p25_watched_actions,video_p50_watched_actions,"
+                        "video_p75_watched_actions,video_p95_watched_actions,video_p100_watched_actions,"
+                        "attribution_setting"
                     ),
                     "time_range": json.dumps({"since": start, "until": end}, separators=(",", ":")),
                     "level": "campaign",
+                    "action_attribution_windows": json.dumps(["1d_view", "1d_click", "7d_click"]),
+                    "use_account_attribution_setting": "true",
                 },
             )
         )
@@ -182,11 +247,16 @@ class MetaMarketingReadTransport:
             "frequency": _number(insight.get("frequency")),
             "cpm": _number(insight.get("cpm")),
             "clicks": _number(insight.get("clicks")),
+            "unique_clicks": _number(insight.get("unique_clicks")),
+            "link_clicks": _first_action(actions, ("link_click",)) or _number(insight.get("inline_link_clicks")),
+            "landing_page_views": _first_action(actions, ("landing_page_view",)),
             "ctr": _number(insight.get("ctr")),
             "cpc": _number(insight.get("cpc")),
             "video_views": _sum_action_values(insight.get("video_play_actions")),
             "video_completions": _sum_action_values(insight.get("video_p100_watched_actions")),
             "conversions": conversions,
+            "leads": _first_action(actions, ("lead",)),
+            "purchases": _first_action(actions, ("purchase",)),
             "conversion_value": conversion_value,
             "cpa": cpa,
             "roas": _ratio(conversion_value, spend),
@@ -201,15 +271,54 @@ class MetaMarketingReadTransport:
             authorised_budget=metrics["budget"],
             attribution_context="Meta account attribution settings; verify in Ads Manager",
             metrics=metrics,
+            breakdowns={
+                "action_attribution_windows": ["1d_view", "1d_click", "7d_click"],
+                "attribution_setting": insight.get("attribution_setting"),
+                "actions": insight.get("actions", []),
+                "action_values": insight.get("action_values", []),
+                "purchase_roas": insight.get("purchase_roas", []),
+                "website_purchase_roas": insight.get("website_purchase_roas", []),
+            },
         )
 
     def _get(self, path: str, query: Mapping[str, Any]) -> Mapping[str, Any]:
+        authentication = {"access_token": self._access_token}
+        if self._app_secret:
+            authentication["appsecret_proof"] = hmac.new(
+                self._app_secret.encode("utf-8"),
+                self._access_token.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
         response = self.http.request(
             "GET",
             f"{self.base_url}{path}",
-            query={**dict(query), "access_token": self._access_token},
+            query={**dict(query), **authentication},
         )
         return _mapping_payload(response, "Meta")
+
+    def _get_data(
+        self,
+        path: str,
+        query: Mapping[str, Any],
+        *,
+        max_pages: int = 100,
+        max_items: int = 25_000,
+    ) -> list[Mapping[str, Any]]:
+        rows: list[Mapping[str, Any]] = []
+        after = ""
+        for _page in range(max_pages):
+            payload = self._get(path, {**dict(query), "limit": 100, "after": after})
+            page = _data(payload)
+            rows.extend(page)
+            if len(rows) > max_items:
+                raise MediaHTTPError("Meta response exceeded the configured item limit")
+            paging = payload.get("paging")
+            cursors = paging.get("cursors") if isinstance(paging, Mapping) else None
+            next_after = str(cursors.get("after") or "") if isinstance(cursors, Mapping) else ""
+            if not next_after or next_after == after:
+                return rows
+            after = next_after
+        raise MediaHTTPError("Meta response exceeded the configured page limit")
 
 
 class TikTokBusinessReadTransport:
@@ -486,6 +595,7 @@ def build_configured_media_adapters(
                 str(environment["META_ACCESS_TOKEN"]),
                 client,
                 graph_version=graph_version,
+                app_secret=str(environment.get("META_APP_SECRET", "")),
             )
             adapters[provider] = MetaReadOnlyAdapter(configuration, transport, environment=environment)
         elif provider is MediaProvider.TIKTOK:
@@ -540,6 +650,7 @@ def _canonical_response(
     authorised_budget: Any,
     attribution_context: str,
     metrics: Mapping[str, Any],
+    breakdowns: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     return {
         "period_start": str(start),
@@ -552,7 +663,7 @@ def _canonical_response(
         "authorised_budget": authorised_budget,
         "attribution_context": attribution_context,
         "metrics": dict(metrics),
-        "breakdowns": {},
+        "breakdowns": dict(breakdowns or {}),
     }
 
 

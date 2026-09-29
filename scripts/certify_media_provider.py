@@ -28,6 +28,11 @@ def main() -> int:
     )
     parser.add_argument("provider", choices=tuple(item.value for item in MediaProvider))
     parser.add_argument("--request-id", default="")
+    parser.add_argument(
+        "--include-inventory",
+        action="store_true",
+        help="also read and audit campaigns, ad groups/ad sets, ads and creative metadata",
+    )
     args = parser.parse_args()
 
     provider = MediaProvider(args.provider)
@@ -44,6 +49,18 @@ def main() -> int:
     adapters = build_configured_media_adapters(os.environ)
     service = MediaControlService(adapters, ExecutionJournal(state_root))
     result = service.certify_provider(provider, request_id=request_id)
+    inventory = None
+    if args.include_inventory:
+        inventory_result = service.sync_inventory(
+            provider,
+            request_id=request_id + "-inventory",
+        )
+        inventory = {
+            "provider": provider.value,
+            "counts": inventory_result.counts(),
+            "synced_at": inventory_result.synced_at,
+            "external_write_performed": False,
+        }
 
     adapter = adapters[provider]
     blocked_operations: list[str] = []
@@ -62,6 +79,7 @@ def main() -> int:
                 "ok": True,
                 "certification": result,
                 "diagnostic": diagnostic,
+                "inventory": inventory,
                 "phase_one_write_safety": {
                     "status": "hard_disabled",
                     "blocked_operations": blocked_operations,
