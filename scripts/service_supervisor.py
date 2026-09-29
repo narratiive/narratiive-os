@@ -33,15 +33,22 @@ class ServiceSupervisor:
 
     @staticmethod
     def unhealthy_services(doctor_exit_code: int) -> tuple[str, ...]:
+        if doctor_exit_code not in {0, 10, 20, 30, 40, 50, 60, 70}:
+            raise ValueError(f"unsupported service doctor exit code: {doctor_exit_code}")
+        service_exit_code = doctor_exit_code - 40 if doctor_exit_code >= 40 else doctor_exit_code
         mapping = {
             0: (),
             10: ("runtime-gateway",),
             20: ("tony-http-bridge",),
             30: ("runtime-gateway", "tony-http-bridge"),
         }
-        if doctor_exit_code not in mapping:
+        return mapping[service_exit_code]
+
+    @staticmethod
+    def deployment_unhealthy(doctor_exit_code: int) -> bool:
+        if doctor_exit_code not in {0, 10, 20, 30, 40, 50, 60, 70}:
             raise ValueError(f"unsupported service doctor exit code: {doctor_exit_code}")
-        return mapping[doctor_exit_code]
+        return doctor_exit_code >= 40
 
     def restart(self, service: str, command: Sequence[str] | None) -> RestartResult:
         if not command:
@@ -66,13 +73,23 @@ class ServiceSupervisor:
 
     def run(self, doctor_exit_code: int, commands: dict[str, Sequence[str] | None]) -> tuple[int, dict]:
         services = self.unhealthy_services(doctor_exit_code)
+        deployment_unhealthy = self.deployment_unhealthy(doctor_exit_code)
         results = [self.restart(service, commands.get(service)) for service in services]
         recovered = all(result.succeeded for result in results)
-        exit_code = 0 if not services or recovered else 1
+        exit_code = 0 if (not services or recovered) and not deployment_unhealthy else 1
+        if services and not recovered:
+            status = "recovery_failed"
+        elif deployment_unhealthy:
+            status = "deployment_action_required"
+        elif services:
+            status = "restarted"
+        else:
+            status = "healthy"
         report = {
             "ok": exit_code == 0,
-            "status": "healthy" if not services else ("restarted" if recovered else "recovery_failed"),
+            "status": status,
             "doctor_exit_code": doctor_exit_code,
+            "deployment_unhealthy": deployment_unhealthy,
             "timestamp": datetime.now(timezone.utc).isoformat(),
             "restarts": [self._as_dict(result) for result in results],
         }

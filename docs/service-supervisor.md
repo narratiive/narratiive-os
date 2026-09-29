@@ -20,4 +20,11 @@ Optional settings:
 - `NARRATIIVE_RESTART_TIMEOUT_SECONDS`: timeout per restart command; default 20 seconds.
 - `NARRATIIVE_SUPERVISOR_EVENT_LOG`: append-only JSON Lines event log.
 
-The supervisor exits `0` when the doctor reports healthy services or all required restart commands succeed. It exits `1` when recovery is incomplete. Unsupported doctor exit codes are rejected rather than interpreted as a restart instruction.
+The supervisor decodes both service health and deployment-receipt state. It
+restarts only the unhealthy service components for doctor codes `10`, `20`,
+`30`, `50`, `60`, or `70`. A deployment-only failure (`40`) does not restart a
+healthy service. Codes containing the deployment bit remain
+`deployment_action_required` with exit `1` after any safe service recovery,
+because a restart cannot reconcile an undeployed repository revision.
+Unsupported doctor exit codes are rejected rather than interpreted as a
+restart instruction.
