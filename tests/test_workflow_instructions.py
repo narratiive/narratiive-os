@@ -72,6 +72,8 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("exactly three objects with pattern", instruction)
         self.assertIn("under 4,000 words", instruction)
         self.assertIn("Preserve every supplied contradiction, gap and uncertainty", instruction)
+        self.assertIn("open inputs do not by themselves prevent advance", instruction)
+        self.assertIn("makes responsible formulation of any proposed thesis unsafe", instruction)
 
     def test_strategy_thesis_contract_reserves_gate_three_for_matt(self) -> None:
         instruction = workflow_instruction(
