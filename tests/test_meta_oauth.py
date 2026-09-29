@@ -42,7 +42,7 @@ class MetaOAuthTests(unittest.TestCase):
             http=http,
         )
 
-    def test_authorization_url_uses_exact_redirect_state_and_read_scopes(self):
+    def test_authorization_url_requests_provider_capabilities_without_runtime_authority(self):
         with tempfile.TemporaryDirectory() as directory:
             service = self.service(directory, FakeHTTP())
             url = service.authorization_url()
@@ -51,8 +51,10 @@ class MetaOAuthTests(unittest.TestCase):
             self.assertEqual(parsed.scheme, "https")
             self.assertEqual(parsed.hostname, "www.facebook.com")
             self.assertEqual(query["redirect_uri"], [META_REDIRECT_URI])
-            self.assertEqual(set(query["scope"][0].split(",")), {"ads_read"})
-            self.assertNotIn("ads_management", query["scope"][0])
+            self.assertEqual(
+                set(query["scope"][0].split(",")),
+                {"ads_read", "ads_management", "business_management"},
+            )
             state_file = Path(directory) / "state.json"
             stored = state_file.read_text(encoding="utf-8")
             self.assertNotIn(query["state"][0], stored)
@@ -83,6 +85,8 @@ class MetaOAuthTests(unittest.TestCase):
             self.assertIn("META_ACCOUNT_ID=123", content)
             self.assertIn("META_TIMEZONE=Europe/London", content)
             self.assertIn("META_CURRENCY=GBP", content)
+            self.assertIn("META_GRANTED_SCOPES=ads_read,public_profile", content)
+            self.assertIn("META_PROVIDER_CAPABILITIES=", content)
             self.assertNotIn("short-token", content)
             self.assertEqual((Path(directory) / "runtime.env").stat().st_mode & 0o777, 0o600)
             self.assertTrue(http.calls[2]["query"]["appsecret_proof"])
@@ -120,7 +124,7 @@ class MetaOAuthTests(unittest.TestCase):
             self.assertEqual(http.calls[4]["query"]["after"], "safe-cursor")
             self.assertNotIn("META_ACCOUNT_ID", (Path(directory) / "runtime.env").read_text())
 
-    def test_forbidden_write_scope_fails_closed_without_storing_token(self):
+    def test_approved_write_capability_scopes_are_retained_without_runtime_authority(self):
         with tempfile.TemporaryDirectory() as directory:
             http = FakeHTTP(
                 (
@@ -129,12 +133,42 @@ class MetaOAuthTests(unittest.TestCase):
                     JSONResponse(200, {}, {"data": [
                         {"permission": "ads_read", "status": "granted"},
                         {"permission": "ads_management", "status": "granted"},
+                        {"permission": "business_management", "status": "granted"},
+                    ]}),
+                    JSONResponse(200, {}, {"data": [{"id": "act_123", "account_id": "123"}]}),
+                )
+            )
+            service = self.service(directory, http)
+            state = urllib.parse.parse_qs(urllib.parse.urlsplit(service.authorization_url()).query)["state"][0]
+            result = service.exchange(state=state, code="code")
+            self.assertEqual(
+                result.granted_scopes,
+                ("ads_management", "ads_read", "business_management"),
+            )
+            self.assertIn("manage_campaigns", result.provider_capabilities)
+            self.assertIn("manage_ad_sets", result.provider_capabilities)
+            self.assertIn("manage_ads", result.provider_capabilities)
+            contents = (Path(directory) / "runtime.env").read_text(encoding="utf-8")
+            self.assertIn(
+                "META_GRANTED_SCOPES=ads_management,ads_read,business_management",
+                contents,
+            )
+
+    def test_unknown_scope_still_fails_closed_without_storing_token(self):
+        with tempfile.TemporaryDirectory() as directory:
+            http = FakeHTTP(
+                (
+                    JSONResponse(200, {}, {"access_token": "short-token"}),
+                    JSONResponse(200, {}, {"access_token": "long-token"}),
+                    JSONResponse(200, {}, {"data": [
+                        {"permission": "ads_read", "status": "granted"},
+                        {"permission": "unexpected_permission", "status": "granted"},
                     ]}),
                 )
             )
             service = self.service(directory, http)
             state = urllib.parse.parse_qs(urllib.parse.urlsplit(service.authorization_url()).query)["state"][0]
-            with self.assertRaisesRegex(MetaOAuthError, "prohibited"):
+            with self.assertRaisesRegex(MetaOAuthError, "outside"):
                 service.exchange(state=state, code="code")
             self.assertFalse((Path(directory) / "runtime.env").exists())
 

@@ -21,11 +21,16 @@ from runtime.media_provider_transports import JSONHTTPClient, UrllibJSONHTTPClie
 TIKTOK_TOKEN_URL = "https://business-api.tiktok.com/open_api/v1.3/oauth2/access_token/"
 TIKTOK_REDIRECT_URI = "https://lushly-spoof-reheat.ngrok-free.dev/webhook/tiktok-media-oauth-callback"
 TIKTOK_REQUIRED_SCOPES = frozenset({"44", "100", "200", "210", "220"})
+TIKTOK_WRITE_SCOPES = frozenset({"201", "211", "221"})
+TIKTOK_ALLOWED_SCOPES = TIKTOK_REQUIRED_SCOPES | TIKTOK_WRITE_SCOPES
 TIKTOK_PERMISSION_NAMES = (
     "Read Ad Account Information",
     "Read Campaigns",
+    "Create and Update Campaigns — provider capability only; runtime writes remain disabled",
     "Read Ad Groups",
+    "Create and Update Ad Groups — provider capability only; runtime writes remain disabled",
     "Read Ads",
+    "Create and Update Ads — provider capability only; runtime writes remain disabled",
     "Consolidated Report",
 )
 
@@ -46,6 +51,21 @@ class TikTokOAuthStateError(TikTokOAuthError):
 class TikTokOAuthResult:
     advertiser_ids: tuple[str, ...]
     granted_scopes: tuple[str, ...]
+    provider_capabilities: tuple[str, ...] = ()
+
+
+def tiktok_provider_capabilities(scopes: set[str] | frozenset[str]) -> tuple[str, ...]:
+    mapping = {
+        "44": "read_reporting",
+        "100": "read_accounts",
+        "200": "read_campaigns",
+        "201": "manage_campaigns",
+        "210": "read_ad_groups",
+        "211": "manage_ad_groups",
+        "220": "read_ads",
+        "221": "manage_ads",
+    }
+    return tuple(sorted(mapping[scope] for scope in scopes if scope in mapping))
 
 
 class TikTokOAuthStateStore:
@@ -214,12 +234,24 @@ class TikTokOAuthService:
         advertiser_ids = tuple(str(item).strip() for item in (data.get("advertiser_ids") or []) if str(item).strip())
         if not access_token:
             raise TikTokOAuthError("TikTok returned an invalid token response")
-        if set(scopes) != set(TIKTOK_REQUIRED_SCOPES):
-            raise TikTokOAuthError("TikTok did not grant exactly the approved Phase 1 read-only permissions")
+        granted = set(scopes)
+        if not TIKTOK_REQUIRED_SCOPES.issubset(granted):
+            raise TikTokOAuthError("TikTok did not grant all required advertising read permissions")
+        if granted.difference(TIKTOK_ALLOWED_SCOPES):
+            raise TikTokOAuthError("TikTok granted permissions outside the configured provider capability set")
         if not advertiser_ids:
             raise TikTokOAuthError("TikTok returned no authorised advertiser accounts")
-        values = {"TIKTOK_ACCESS_TOKEN": access_token}
+        capabilities = tiktok_provider_capabilities(granted)
+        values = {
+            "TIKTOK_ACCESS_TOKEN": access_token,
+            "TIKTOK_GRANTED_SCOPES": ",".join(scopes),
+            "TIKTOK_PROVIDER_CAPABILITIES": ",".join(capabilities),
+        }
         if len(advertiser_ids) == 1:
             values["TIKTOK_ACCOUNT_ID"] = advertiser_ids[0]
         self.environment.update(values)
-        return TikTokOAuthResult(advertiser_ids=advertiser_ids, granted_scopes=scopes)
+        return TikTokOAuthResult(
+            advertiser_ids=advertiser_ids,
+            granted_scopes=scopes,
+            provider_capabilities=capabilities,
+        )

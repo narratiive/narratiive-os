@@ -13,6 +13,7 @@ from runtime.tiktok_oauth import (
     ProtectedRuntimeEnvironment,
     TIKTOK_REDIRECT_URI,
     TIKTOK_REQUIRED_SCOPES,
+    TIKTOK_WRITE_SCOPES,
     TikTokOAuthError,
     TikTokOAuthService,
     TikTokOAuthStateError,
@@ -67,7 +68,7 @@ class TikTokOAuthTests(unittest.TestCase):
             self.state.consume("wrong-state")
         self.assertFalse((self.root / "state.json").exists())
 
-    def test_exchange_requires_exact_read_only_scopes_and_stores_securely(self):
+    def test_exchange_requires_read_scopes_and_stores_capability_metadata_securely(self):
         token = "sensitive-access-token"
         http = FakeHTTP({"code": 0, "data": {
             "access_token": token,
@@ -82,10 +83,12 @@ class TikTokOAuthTests(unittest.TestCase):
         contents = (self.root / "runtime.env").read_text(encoding="utf-8")
         self.assertIn("TIKTOK_ACCESS_TOKEN=" + token, contents)
         self.assertIn("TIKTOK_ACCOUNT_ID=123456", contents)
+        self.assertIn("TIKTOK_GRANTED_SCOPES=", contents)
+        self.assertIn("TIKTOK_PROVIDER_CAPABILITIES=", contents)
         self.assertEqual(stat.S_IMODE((self.root / "runtime.env").stat().st_mode), 0o600)
 
-    def test_extra_or_missing_scope_prevents_credential_write(self):
-        for scopes in ({"100", "200"}, set(TIKTOK_REQUIRED_SCOPES) | {"201"}):
+    def test_missing_or_unknown_scope_prevents_credential_write(self):
+        for scopes in ({"100", "200"}, set(TIKTOK_REQUIRED_SCOPES) | {"999999"}):
             with self.subTest(scopes=scopes):
                 http = FakeHTTP({"code": 0, "data": {
                     "access_token": "must-not-be-written",
@@ -93,9 +96,30 @@ class TikTokOAuthTests(unittest.TestCase):
                     "scope": list(scopes),
                 }})
                 state = parse_qs(urlsplit(self.service(http).authorization_url()).query)["state"][0]
-                with self.assertRaisesRegex(TikTokOAuthError, "exactly"):
+                with self.assertRaises(TikTokOAuthError):
                     self.service(http).exchange(state=state, auth_code="auth-code")
                 self.assertFalse((self.root / "runtime.env").exists())
+
+    def test_approved_campaign_ad_group_and_ad_write_scopes_are_retained(self):
+        scopes = set(TIKTOK_REQUIRED_SCOPES) | set(TIKTOK_WRITE_SCOPES)
+        http = FakeHTTP({"code": 0, "data": {
+            "access_token": "write-capable-provider-token",
+            "advertiser_ids": ["123456"],
+            "scope": list(scopes),
+        }})
+        state = parse_qs(urlsplit(self.service(http).authorization_url()).query)["state"][0]
+
+        result = self.service(http).exchange(state=state, auth_code="auth-code")
+
+        self.assertEqual(set(result.granted_scopes), scopes)
+        self.assertIn("manage_campaigns", result.provider_capabilities)
+        self.assertIn("manage_ad_groups", result.provider_capabilities)
+        self.assertIn("manage_ads", result.provider_capabilities)
+        contents = (self.root / "runtime.env").read_text(encoding="utf-8")
+        self.assertIn("TIKTOK_GRANTED_SCOPES=", contents)
+        self.assertIn("201", contents)
+        self.assertIn("211", contents)
+        self.assertIn("221", contents)
 
     def test_provider_failure_is_sanitised(self):
         http = FakeHTTP({"code": 40001, "message": "leaked-code-sensitive-auth-code"})

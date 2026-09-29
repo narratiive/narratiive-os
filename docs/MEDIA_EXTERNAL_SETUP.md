@@ -1,6 +1,6 @@
 # Media provider external setup — Matt checklist
 
-This checklist requests only account-owner actions that cannot be completed in the repository. Phase 1 is read-only. Do not grant campaign-management permission where a read-only scope is available, and do not paste credentials into GitHub, Notion, Telegram, email or this document.
+This checklist requests only account-owner actions that cannot be completed in the repository. Provider applications may hold approved management capabilities, but Narratiive runtime authority remains read/analyse/recommend only. Do not paste credentials into GitHub, Notion, Telegram, email or this document.
 
 ## Before starting
 
@@ -18,7 +18,7 @@ This checklist requests only account-owner actions that cannot be completed in t
    `https://lushly-spoof-reheat.ngrok-free.dev/webhook/meta-media-oauth-callback`
 
 3. [ ] In Business Settings, confirm the app user is authorised for the correct Business Portfolio and exact advertising account.
-4. [ ] Request only `ads_read` for Phase 1 advertising objects and Ads Insights. Do not request or grant `ads_management` or `business_management`: both permit external management actions beyond this read-only phase. Narratiive rejects tokens containing either permission, and every provider mutation is independently blocked before dispatch.
+4. [ ] Request `ads_read`, `ads_management` and `business_management` as submitted for the Narratiive Media Control app. Narratiive records the granted provider capabilities, but every campaign, ad-set, ad, creative, audience, budget, bid, status, pixel and event mutation remains independently blocked before provider dispatch.
 5. [ ] Enter only the app configuration through the protected local prompt:
 
    ```bash
@@ -41,17 +41,20 @@ References: Meta's official [Marketing API authorisation guide](https://develope
 
    `https://lushly-spoof-reheat.ngrok-free.dev/webhook/tiktok-media-oauth-callback`
 
-3. [ ] Under Scope of permission, select only these checkboxes:
+3. [ ] Under Scope of permission, select the submitted read and management capabilities:
 
    - Ad Account Management > Ad Account Information > Read Ad Account Information (scope `100`)
    - Ads Management > Campaign > Read Campaigns (scope `200`)
+   - Ads Management > Campaign > Create and Update Campaigns (scope `201`)
    - Ads Management > Ad Group > Read Ad Groups (scope `210`)
+   - Ads Management > Ad Group > Create and Update Ad Groups (scope `211`)
    - Ads Management > Ad > Read Ads (scope `220`)
+   - Ads Management > Ad > Create and Update Ads (scope `221`)
    - Reporting > Consolidated Report (scope `44`)
 
-   Do not select any create, update, manage or other mutation permission.
+   These provider permissions do not grant Tony or the Media Control Layer runtime mutation authority.
 4. [ ] Retain the app ID/secret only in the protected runtime environment, then have the advertiser authorise the app.
-5. [ ] The local OAuth service validates a one-time state, exchanges the code server-side, rejects any permission set other than the five scopes above, and stores the token without displaying it.
+5. [ ] The local OAuth service validates a one-time state, exchanges the code server-side, requires the five read scopes, accepts only the three configured management scopes in addition, and stores the token plus non-secret capability metadata without displaying credentials.
 6. [ ] Confirm the returned advertiser ID list contains the exact account Narratiive should read.
 7. [ ] Complete these protected runtime values securely:
 

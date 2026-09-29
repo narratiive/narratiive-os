@@ -118,6 +118,48 @@ class MediaControlTests(unittest.TestCase):
                     getattr(item, operation)({"unsafe": True})
             self.assertEqual(len(item.transport.calls), 0)
 
+    def test_write_capable_provider_scopes_cannot_dispatch_a_mutation(self):
+        cases = (
+            (
+                MediaProvider.META,
+                MetaReadOnlyAdapter,
+                ("META_ACCESS_TOKEN",),
+                {
+                    "META_ACCESS_TOKEN": "provider-token",
+                    "META_GRANTED_SCOPES": "ads_management,ads_read,business_management",
+                    "META_PROVIDER_CAPABILITIES": "manage_ads,manage_ad_sets,manage_campaigns",
+                },
+            ),
+            (
+                MediaProvider.TIKTOK,
+                TikTokReadOnlyAdapter,
+                ("TIKTOK_ACCESS_TOKEN",),
+                {
+                    "TIKTOK_ACCESS_TOKEN": "provider-token",
+                    "TIKTOK_GRANTED_SCOPES": "44,100,200,201,210,211,220,221",
+                    "TIKTOK_PROVIDER_CAPABILITIES": "manage_ads,manage_ad_groups,manage_campaigns",
+                },
+            ),
+        )
+        for provider, adapter_class, credential_names, environment in cases:
+            with self.subTest(provider=provider.value):
+                transport = FixtureTransport({})
+                provider_adapter = adapter_class(
+                    ProviderConfiguration(
+                        provider=provider,
+                        account_id="provider-account",
+                        credential_env_names=credential_names,
+                        timezone_name="Europe/London",
+                        currency="GBP",
+                    ),
+                    transport,
+                    environment=environment,
+                )
+                for operation in sorted(WRITE_OPERATIONS):
+                    with self.assertRaises(MediaMutationDisabled):
+                        getattr(provider_adapter, operation)({"unsafe": True})
+                self.assertEqual(transport.calls, [])
+
     def test_provider_inventory_is_normalised_audited_idempotent_and_visible_to_tony(self):
         with tempfile.TemporaryDirectory() as directory:
             item = adapter(MediaProvider.META)

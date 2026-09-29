@@ -54,13 +54,19 @@ class TikTokOAuthBridgeTests(unittest.TestCase):
         self.assertNotIn("app_secret", json.dumps(payload))
 
     def test_callback_does_not_echo_code_state_or_token(self):
-        self.oauth.exchange.return_value = TikTokOAuthResult(("123",), ("44", "100", "200", "210", "220"))
+        self.oauth.exchange.return_value = TikTokOAuthResult(
+            ("123",),
+            ("44", "100", "200", "201", "210", "211", "220", "221"),
+            ("manage_ads", "manage_ad_groups", "manage_campaigns"),
+        )
         status, payload = self.call("/oauth/tiktok/callback", {"state": "state-secret", "auth_code": "code-secret", "provider_code": "0"})
         rendered = json.dumps(payload)
         self.assertTrue(status.startswith("200"))
         self.assertNotIn("state-secret", rendered)
         self.assertNotIn("code-secret", rendered)
         self.assertTrue(payload["read_only"])
+        self.assertFalse(payload["runtime_mutation_authority"])
+        self.assertIn("manage_campaigns", payload["provider_capabilities"])
 
     def test_callback_returns_sanitised_fail_closed_error(self):
         self.oauth.exchange.side_effect = TikTokOAuthError("TikTok rejected the authorisation-code exchange")

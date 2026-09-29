@@ -21,10 +21,12 @@ from runtime.tiktok_oauth import ProtectedRuntimeEnvironment
 
 META_REDIRECT_URI = "https://lushly-spoof-reheat.ngrok-free.dev/webhook/meta-media-oauth-callback"
 META_REQUIRED_SCOPES = frozenset({"ads_read"})
-META_ALLOWED_SCOPES = frozenset({"ads_read", "public_profile"})
-META_FORBIDDEN_SCOPES = frozenset({"ads_management", "business_management"})
+META_REQUESTED_SCOPES = frozenset({"ads_read", "ads_management", "business_management"})
+META_ALLOWED_SCOPES = META_REQUESTED_SCOPES | frozenset({"public_profile"})
 META_PERMISSION_NAMES = (
     "ads_read — read advertising accounts, objects and Ads Insights",
+    "ads_management — provider capability for campaign, ad set and ad management; runtime writes remain disabled",
+    "business_management — provider capability for authorised business assets; runtime writes remain disabled",
 )
 _GRAPH_VERSION = re.compile(r"^v[0-9]+\.[0-9]+$")
 
@@ -45,6 +47,29 @@ class MetaOAuthStateError(MetaOAuthError):
 class MetaOAuthResult:
     account_ids: tuple[str, ...]
     granted_scopes: tuple[str, ...]
+    provider_capabilities: tuple[str, ...] = ()
+
+
+def meta_provider_capabilities(scopes: set[str] | frozenset[str]) -> tuple[str, ...]:
+    capabilities: set[str] = set()
+    if "ads_read" in scopes:
+        capabilities.update(
+            {"read_accounts", "read_campaigns", "read_ad_sets", "read_ads", "read_insights"}
+        )
+    if "ads_management" in scopes:
+        capabilities.update(
+            {
+                "manage_campaigns",
+                "manage_ad_sets",
+                "manage_ads",
+                "manage_budgets_and_status",
+            }
+        )
+    if "business_management" in scopes:
+        capabilities.add("manage_business_assets")
+    if "public_profile" in scopes:
+        capabilities.add("read_identity")
+    return tuple(sorted(capabilities))
 
 
 class MetaOAuthStateStore:
@@ -152,7 +177,7 @@ class MetaOAuthService:
                     "client_id": self.app_id,
                     "redirect_uri": META_REDIRECT_URI,
                     "state": state,
-                    "scope": ",".join(sorted(META_REQUIRED_SCOPES)),
+                    "scope": ",".join(sorted(META_REQUESTED_SCOPES)),
                     "response_type": "code",
                     "auth_type": "rerequest",
                 }
@@ -190,12 +215,10 @@ class MetaOAuthService:
             if isinstance(item, Mapping) and item.get("status") == "granted"
         }
         if not META_REQUIRED_SCOPES.issubset(granted):
-            raise MetaOAuthError("Meta did not grant all approved Phase 1 read permissions")
-        if granted.intersection(META_FORBIDDEN_SCOPES):
-            raise MetaOAuthError("Meta granted a permission prohibited in Phase 1")
+            raise MetaOAuthError("Meta did not grant the required advertising read permission")
         unexpected = granted.difference(META_ALLOWED_SCOPES)
         if unexpected:
-            raise MetaOAuthError("Meta granted permissions outside the approved Phase 1 set")
+            raise MetaOAuthError("Meta granted permissions outside the configured provider capability set")
 
         accounts = self._graph_data(
             "/me/adaccounts",
@@ -210,7 +233,13 @@ class MetaOAuthService:
         )
         if not account_ids:
             raise MetaOAuthError("Meta returned no authorised advertising accounts")
-        values = {"META_ACCESS_TOKEN": long_token}
+        retained_scopes = tuple(sorted(granted.intersection(META_ALLOWED_SCOPES)))
+        capabilities = meta_provider_capabilities(set(retained_scopes))
+        values = {
+            "META_ACCESS_TOKEN": long_token,
+            "META_GRANTED_SCOPES": ",".join(retained_scopes),
+            "META_PROVIDER_CAPABILITIES": ",".join(capabilities),
+        }
         if len(accounts) == 1:
             account = accounts[0]
             values.update(
@@ -223,7 +252,8 @@ class MetaOAuthService:
         self.environment.update({key: value for key, value in values.items() if value})
         return MetaOAuthResult(
             account_ids=account_ids,
-            granted_scopes=tuple(sorted(granted.intersection(META_ALLOWED_SCOPES))),
+            granted_scopes=retained_scopes,
+            provider_capabilities=capabilities,
         )
 
     def _validate_configuration(self) -> None:
