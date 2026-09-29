@@ -74,6 +74,42 @@ class ServiceSupervisorTests(unittest.TestCase):
         self.assertEqual(runner.calls, [["restart-runtime"], ["restart-bridge"]])
         self.assertTrue(all(item["succeeded"] for item in report["restarts"]))
 
+    def test_deployment_only_failure_is_reported_without_restarting_services(self) -> None:
+        runner = RecordingRunner()
+
+        exit_code, report = service_supervisor.ServiceSupervisor(runner=runner).run(40, {})
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["status"], "deployment_action_required")
+        self.assertTrue(report["deployment_unhealthy"])
+        self.assertEqual(report["restarts"], [])
+        self.assertEqual(runner.calls, [])
+
+    def test_combined_service_and_deployment_failure_recovers_services_but_remains_degraded(self) -> None:
+        runner = RecordingRunner(return_codes=[0, 0])
+        commands = {
+            "runtime-gateway": ["restart-runtime"],
+            "tony-http-bridge": ["restart-bridge"],
+        }
+
+        exit_code, report = service_supervisor.ServiceSupervisor(runner=runner).run(70, commands)
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["status"], "deployment_action_required")
+        self.assertEqual(runner.calls, [["restart-runtime"], ["restart-bridge"]])
+        self.assertTrue(all(item["succeeded"] for item in report["restarts"]))
+
+    def test_combined_deployment_and_failed_restart_reports_recovery_failure(self) -> None:
+        runner = RecordingRunner(return_codes=[3])
+
+        exit_code, report = service_supervisor.ServiceSupervisor(runner=runner).run(
+            50, {"runtime-gateway": ["restart-runtime"]}
+        )
+
+        self.assertEqual(exit_code, 1)
+        self.assertEqual(report["status"], "recovery_failed")
+        self.assertTrue(report["deployment_unhealthy"])
+
     def test_missing_restart_command_is_a_recovery_failure(self) -> None:
         exit_code, report = service_supervisor.ServiceSupervisor(runner=RecordingRunner()).run(10, {})
         self.assertEqual(exit_code, 1)

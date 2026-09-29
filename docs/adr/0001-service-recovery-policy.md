@@ -11,6 +11,8 @@ Narratiive OS will recover runtime services by interpreting the stable exit code
 The supervisor will:
 
 - execute restart commands as argument arrays without a shell;
+- decode deployment-state failures independently from service failures;
+- avoid restarting healthy services for a stale or invalid deployment receipt;
 - reject unknown doctor exit codes;
 - treat missing or failed restart commands as recovery failures;
 - emit structured JSON suitable for logs and automation;
