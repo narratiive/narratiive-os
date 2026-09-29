@@ -45,6 +45,8 @@ from runtime.workflow_quality import (
     growth_sprint_proposal_quality_gate,
     production_planning_quality_gate,
     research_evidence_quality_gate,
+    strategic_synthesis_quality_gate,
+    strategy_thesis_quality_gate,
 )
 from runtime.workflow_registry import WorkflowDefinition, build_narratiive_workflow_registry
 from tests.test_tony_workflow_runtime import _blueprint_output
@@ -54,6 +56,8 @@ from tests.test_workflow_quality import (
     discovery_output,
     growth_blueprint_output,
     proposal_output,
+    strategic_synthesis_output,
+    strategy_thesis_output,
 )
 
 
@@ -163,6 +167,12 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
         return proposal_output()
     if workflow_id == "growth_sprint_to_research_engine":
         return _research_output()
+    if workflow_id == "research_to_strategic_synthesis":
+        return strategic_synthesis_output()
+    if workflow_id == "strategic_synthesis_to_strategy_thesis":
+        return strategy_thesis_output()
+    if workflow_id == "strategy_thesis_to_growth_blueprint":
+        return growth_blueprint_output()
     if workflow_id == "research_to_growth_blueprint":
         return growth_blueprint_output()
     if workflow_id == "growth_blueprint_deliverable_production":
@@ -406,6 +416,8 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
         "growth_sprint_proposal_quality_gate": growth_sprint_proposal_quality_gate,
         "research_evidence_quality_gate": research_evidence_quality_gate,
+        "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
+        "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
@@ -437,6 +449,15 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
 
 def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dict[str, Any]:
     common_context = {"name": CLIENT_NAME, "source_ref": "synthetic:northstar-test-co"}
+    if workflow_id == "strategy_thesis_to_growth_blueprint":
+        return {
+            "approved_strategy_thesis": dict(prior_output["strategy_thesis"]),
+            "strategy_thesis_identity": {
+                "artifact_id": "artifact-northstar-test-approved-strategy-thesis",
+                "version": 1,
+                "checksum": _checksum(prior_output),
+            },
+        }
     values: dict[str, dict[str, Any]] = {
         "blueprint_lite_to_discovery_preparation": {},
         "discovery_evidence_to_growth_sprint_proposal": {
@@ -457,6 +478,8 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
                 "policy": {"approved": True},
             }],
         },
+        "research_to_strategic_synthesis": {},
+        "strategic_synthesis_to_strategy_thesis": {},
         "research_to_growth_blueprint": {},
         "growth_blueprint_deliverable_production": {
             "quality_accepted_growth_blueprint": dict(prior_output),
@@ -808,7 +831,7 @@ class TonyFullLifecycleTest(unittest.TestCase):
                 expected.append(workflow_id)
                 workflow_id = runtime.coordinator.registry.resolve(workflow_id).next_workflow_id
             self.assertEqual([item.gate for item in records], expected)
-            self.assertEqual(len(records), 11)
+            self.assertEqual(len(records), 13)
             self.assertTrue(all(item.status == "PASS" for item in records), [asdict(item) for item in records])
             self.assertTrue(all(item.dispatched_worker in {
                 "northstar-test-fixture-worker",
@@ -829,7 +852,7 @@ class TonyFullLifecycleTest(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix="northstar-test-gates-") as directory:
             _runtime, records = execute_all_gate_conformance(Path(directory))
         gated = [item for item in records if item.resulting_state["status"] == "awaiting_approval"]
-        self.assertEqual(len(gated), 10)
+        self.assertEqual(len(gated), 11)
         self.assertTrue(all(item.resulting_state["approval_status"] == "pending" for item in gated))
         self.assertTrue(all(item.audit_events.count("approval.requested") == 1 for item in gated))
         self.assertTrue(all(item.continuation_command.startswith("/") for item in gated))

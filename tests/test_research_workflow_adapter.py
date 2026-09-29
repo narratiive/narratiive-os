@@ -7,7 +7,7 @@ from pathlib import Path
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
-from tests.test_workflow_quality import growth_blueprint_output
+from tests.test_workflow_quality import strategic_synthesis_output
 
 
 def lifecycle() -> ClientLifecycleRecord:
@@ -37,13 +37,13 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
                     "research_sources": [],
                 })
 
-    def test_bounded_research_runs_with_provenance_then_prepares_blueprint(self) -> None:
+    def test_bounded_research_runs_with_provenance_then_prepares_strategic_synthesis(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             runtime = build_tony_workflow_runtime(
                 tmp,
                 workspace_id="agency",
                 client_id="safe-research-client",
-                dispatchers={"Claude": lambda contract: growth_blueprint_output()},
+                dispatchers={"Claude": lambda contract: strategic_synthesis_output()},
                 environ={},
             )
             workspace = runtime.coordinator.artifacts.root.parent / "research" / "workspaces" / "agency"
@@ -88,14 +88,14 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
             output_path = Path(research_state["stages"][0]["output_artifacts"][0]["location"])
             self.assertTrue(output_path.exists())
 
-            blueprint = runtime.handoff("safe-research-run", lifecycle())
-            blueprint_state = runtime.status(blueprint.run_id)
+            synthesis = runtime.handoff("safe-research-run", lifecycle())
+            synthesis_state = runtime.status(synthesis.run_id)
 
-            self.assertEqual(blueprint.workflow_id, "research_to_growth_blueprint")
-            self.assertEqual(blueprint.status, "awaiting_approval")
-            self.assertTrue(blueprint_state["stages"][0]["quality_result"]["passed"])
-            self.assertEqual(blueprint_state["approval_status"], "pending")
-            self.assertFalse(blueprint_state["external_action_taken"])
+            self.assertEqual(synthesis.workflow_id, "research_to_strategic_synthesis")
+            self.assertEqual(synthesis.status, "complete")
+            self.assertTrue(synthesis_state["stages"][0]["quality_result"]["passed"])
+            self.assertEqual(synthesis_state["approval_status"], "not_required")
+            self.assertFalse(synthesis_state["external_action_taken"])
 
     def test_runtime_research_ingests_approved_fireflies_source(self) -> None:
         calls = []

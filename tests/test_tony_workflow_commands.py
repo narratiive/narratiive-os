@@ -18,6 +18,8 @@ from tests.test_workflow_quality import (
     discovery_output,
     growth_blueprint_output,
     proposal_output,
+    strategic_synthesis_output,
+    strategy_thesis_output,
 )
 from tests.test_tony_workflow_runtime import _production_output
 
@@ -99,6 +101,12 @@ class TonyWorkflowCommandTests(unittest.TestCase):
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
                 return proposal_output()
+            if workflow_id == "research_to_strategic_synthesis":
+                return strategic_synthesis_output()
+            if workflow_id == "strategic_synthesis_to_strategy_thesis":
+                return strategy_thesis_output()
+            if workflow_id == "strategy_thesis_to_growth_blueprint":
+                return growth_blueprint_output()
             if workflow_id == "research_to_growth_blueprint":
                 return growth_blueprint_output()
             return blueprint_output()
@@ -720,9 +728,21 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}),
         )
         status = restarted.execute(f"/workflow {commissioned.data['run_id']}", [])
-        blueprint = restarted.execute(f"/continue {commissioned.data['run_id']}", [])
+        synthesis = restarted.execute(f"/continue {commissioned.data['run_id']}", [])
         self.assertEqual(status.data["status"], "complete")
-        self.assertEqual(blueprint.data["workflow_id"], "research_to_growth_blueprint")
+        self.assertEqual(synthesis.data["workflow_id"], "research_to_strategic_synthesis")
+        self.assertEqual(synthesis.data["status"], "complete")
+        thesis = restarted.execute(f"/continue {synthesis.data['run_id']}", [])
+        self.assertEqual(thesis.data["workflow_id"], "strategic_synthesis_to_strategy_thesis")
+        self.assertEqual(thesis.data["status"], "awaiting_approval")
+        restarted.execute(
+            f"/approve {thesis.data['run_id']} because SAFE Strategy Thesis reviewed",
+            [],
+            principal_id="openclaw:native-approval",
+            inputs={"approval_token": thesis.data["approval_token"]},
+        )
+        blueprint = restarted.execute(f"/continue {thesis.data['run_id']}", [])
+        self.assertEqual(blueprint.data["workflow_id"], "strategy_thesis_to_growth_blueprint")
         self.assertEqual(blueprint.data["status"], "awaiting_approval")
         self.assertFalse(blueprint.data["external_action_taken"])
 

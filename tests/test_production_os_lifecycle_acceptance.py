@@ -9,7 +9,13 @@ from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_tony_workflow_runtime import _blueprint_output
-from tests.test_workflow_quality import discovery_output, growth_blueprint_output, proposal_output
+from tests.test_workflow_quality import (
+    discovery_output,
+    growth_blueprint_output,
+    proposal_output,
+    strategic_synthesis_output,
+    strategy_thesis_output,
+)
 
 
 class Fallback:
@@ -40,7 +46,11 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
                 return proposal_output()
-            if workflow_id == "research_to_growth_blueprint":
+            if workflow_id == "research_to_strategic_synthesis":
+                return strategic_synthesis_output()
+            if workflow_id == "strategic_synthesis_to_strategy_thesis":
+                return strategy_thesis_output()
+            if workflow_id == "strategy_thesis_to_growth_blueprint":
                 return growth_blueprint_output()
             return _blueprint_output()
 
@@ -175,12 +185,45 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             self.assertTrue(research_output["source_provenance"])
             self.assertTrue(research_output["fact_interpretation_hypothesis_lineage"]["facts"])
 
-            blueprint = service.execute(f"/continue {research_run}", [])
+            synthesis = service.execute(f"/continue {research_run}", [])
+            synthesis_run = synthesis.data["run_id"]
+            self.assertEqual(synthesis.data["workflow_id"], "research_to_strategic_synthesis")
+            self.assertEqual(synthesis.data["status"], "complete")
+            self.assertTrue(synthesis.data["quality_passed"])
+
+            thesis = service.execute(f"/continue {synthesis_run}", [])
+            thesis_run = thesis.data["run_id"]
+            self.assertEqual(thesis.data["workflow_id"], "strategic_synthesis_to_strategy_thesis")
+            self.assertEqual(thesis.data["status"], "awaiting_approval")
+            self.assertTrue(thesis.data["quality_passed"])
+            service.execute(
+                f"/approve {thesis_run} because SAFE exact Strategy Thesis reviewed",
+                [],
+                principal_id="openclaw:native-approval",
+                inputs={"approval_token": thesis.data["approval_token"]},
+            )
+
+            blueprint = service.execute(f"/continue {thesis_run}", [])
             blueprint_run = blueprint.data["run_id"]
-            self.assertEqual(blueprint.data["workflow_id"], "research_to_growth_blueprint")
+            self.assertEqual(blueprint.data["workflow_id"], "strategy_thesis_to_growth_blueprint")
             self.assertEqual(blueprint.data["status"], "awaiting_approval")
             self.assertTrue(blueprint.data["quality_passed"])
             self.assertFalse(blueprint.data["external_action_taken"])
+            blueprint_state = next(
+                item for item in commands().backend.list_states() if item.run_id == blueprint_run
+            )
+            thesis_state = next(
+                item for item in commands().backend.list_states() if item.run_id == thesis_run
+            )
+            thesis_artifact = thesis_state.stages[0].output_artifacts[-1]
+            self.assertEqual(
+                blueprint_state.input_payload["strategy_thesis_identity"]["artifact_id"],
+                thesis_artifact.artifact_id,
+            )
+            self.assertEqual(
+                blueprint_state.input_payload["strategy_thesis_identity"]["checksum"],
+                thesis_artifact.checksum,
+            )
 
             restarted = commands()
             recovered = restarted.execute("/recover", [])

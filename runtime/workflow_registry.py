@@ -192,10 +192,108 @@ GROWTH_SPRINT_TO_RESEARCH_ENGINE = _workflow(
         approval_required=False,
         side_effect="external_read",
     ),
-    next_workflow_id="research_to_growth_blueprint",
+    next_workflow_id="research_to_strategic_synthesis",
     approval_required=False,
 )
 
+RESEARCH_TO_STRATEGIC_SYNTHESIS = _workflow(
+    "research_to_strategic_synthesis",
+    _step(
+        "prepare_strategic_synthesis",
+        capability="strategic_reasoning",
+        inputs=(
+            "evidence_pack",
+            "source_provenance",
+            "consolidated_findings",
+            "approved_growth_sprint_scope",
+            "client_context",
+        ),
+        outputs=(
+            "strategic_synthesis",
+            "commercial_growth_equation",
+            "evidence_patterns",
+            "strategic_tensions",
+            "contradictions_and_gaps",
+            "open_inputs",
+            "fact_interpretation_hypothesis_lineage",
+            "evidence_lineage",
+            "recommendation",
+        ),
+        quality="strategic_synthesis_quality_gate",
+        approval_required=False,
+    ),
+    next_workflow_id="strategic_synthesis_to_strategy_thesis",
+    approval_required=False,
+)
+
+STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS = _workflow(
+    "strategic_synthesis_to_strategy_thesis",
+    _step(
+        "prepare_strategy_thesis",
+        capability="strategic_reasoning",
+        inputs=(
+            "strategic_synthesis",
+            "commercial_growth_equation",
+            "strategic_tensions",
+            "evidence_lineage",
+            "evidence_pack",
+            "approved_growth_sprint_scope",
+            "client_context",
+        ),
+        outputs=(
+            "strategy_thesis",
+            "strategic_choices",
+            "decision_register",
+            "evidence_and_uncertainty",
+            "fact_interpretation_hypothesis_lineage",
+            "evidence_lineage",
+            "recommendation",
+        ),
+        quality="strategy_thesis_quality_gate",
+        approval_required=True,
+    ),
+    next_workflow_id="strategy_thesis_to_growth_blueprint",
+    approval_required=True,
+)
+
+STRATEGY_THESIS_TO_GROWTH_BLUEPRINT = _workflow(
+    "strategy_thesis_to_growth_blueprint",
+    _step(
+        "prepare_growth_blueprint",
+        capability="strategic_reasoning",
+        inputs=(
+            "approved_strategy_thesis",
+            "strategy_thesis_identity",
+            "strategic_synthesis",
+            "evidence_pack",
+            "approved_growth_sprint_scope",
+            "client_context",
+        ),
+        outputs=(
+            "market_category_diagnosis",
+            "audience",
+            "growth_barriers",
+            "source_of_difference",
+            "positioning",
+            "narrative",
+            "growth_opportunity",
+            "activation_implications",
+            "key_strategic_choices",
+            "evidence_and_uncertainty",
+            "fact_interpretation_hypothesis_lineage",
+            "evidence_lineage",
+            "recommendation",
+        ),
+        quality="growth_blueprint_quality_gate",
+        approval_required=True,
+    ),
+    next_workflow_id="growth_blueprint_deliverable_production",
+    approval_required=True,
+)
+
+# Compatibility contract for persisted pre-Gate-3 runs. New canonical handoffs
+# never target this workflow, but existing immutable run history remains readable
+# and resumable rather than being discarded by the sequence migration.
 RESEARCH_TO_GROWTH_BLUEPRINT = _workflow(
     "research_to_growth_blueprint",
     _step(
@@ -410,6 +508,9 @@ NARRATIIVE_PRODUCTION_WORKFLOWS = (
     BLUEPRINT_LITE_TO_DISCOVERY_PREPARATION,
     DISCOVERY_EVIDENCE_TO_GROWTH_SPRINT_PROPOSAL,
     GROWTH_SPRINT_TO_RESEARCH_ENGINE,
+    RESEARCH_TO_STRATEGIC_SYNTHESIS,
+    STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS,
+    STRATEGY_THESIS_TO_GROWTH_BLUEPRINT,
     RESEARCH_TO_GROWTH_BLUEPRINT,
     GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION,
     GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD,

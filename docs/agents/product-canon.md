@@ -27,6 +27,16 @@ The canonical inbound commercial journey is:
 
 `Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
 
+Inside the paid Growth Sprint, the canonical evidence-to-strategy sequence is:
+
+`Research → Strategic Synthesis → Strategy Thesis → Growth Blueprint`
+
+`knowledge/strategy-thesis/README.md` is the canonical internal contract for
+Strategic Synthesis and the exact-version Strategy Thesis Gate 3. These are
+internal stages of the Growth Sprint, not additional external products. The
+Strategy Director owns their content, Matt owns the Gate 3 decision, and Tony
+orchestrates without acquiring authorship or approval authority.
+
 Do not use `Narratiive Shift` or `Opportunity Card` as external names in this inbound journey. Do not use `Opportunity Card` as an external product name anywhere. `Opportunity Card Pipeline` remains an internal workflow label for Narratiive Signal only. Do not rename a specialist or collapse the Growth Specification, Growth Blueprint, Campaign World, Creative Director's Bible, Production Pack, Asset Manifest, or Performance Feedback into one generic “strategy deck.”
 
 ## Growth Specification

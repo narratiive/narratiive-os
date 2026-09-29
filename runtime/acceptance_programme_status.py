@@ -32,7 +32,9 @@ class AcceptanceProgrammeStatusBuilder:
         ("Discovery", "blueprint_lite_to_discovery_preparation"),
         ("Growth Sprint proposal", "discovery_evidence_to_growth_sprint_proposal"),
         ("Research", "growth_sprint_to_research_engine"),
-        ("Growth Blueprint strategy", "research_to_growth_blueprint"),
+        ("Strategic synthesis", "research_to_strategic_synthesis"),
+        ("Strategy Thesis", "strategic_synthesis_to_strategy_thesis"),
+        ("Growth Blueprint strategy", "strategy_thesis_to_growth_blueprint"),
         ("Growth Blueprint presentation", "growth_blueprint_deliverable_production"),
     )
     SCENARIO_SEQUENCE = (
@@ -258,16 +260,6 @@ class AcceptanceProgrammeStatusBuilder:
             result.append(evidence)
 
         result.append(self._additional_research_capability(all_states))
-        result.extend(
-            (
-                self._missing_workflow_capability(
-                    "Strategic synthesis", "research_to_strategic_synthesis"
-                ),
-                self._missing_workflow_capability(
-                    "Strategy Thesis", "strategic_synthesis_to_strategy_thesis"
-                ),
-            )
-        )
         review = tuple(
             f"gmail_receipt:{state.run_id}:{receipt.get('receipt', {}).get('message_id')}"
             for state in scenario

@@ -341,6 +341,9 @@ def _lifecycle_stage(workflow_id: str) -> str:
         "blueprint_lite_to_discovery_preparation": "discovery",
         "discovery_evidence_to_growth_sprint_proposal": "growth_sprint_proposal",
         "growth_sprint_to_research_engine": "research",
+        "research_to_strategic_synthesis": "strategic_synthesis",
+        "strategic_synthesis_to_strategy_thesis": "strategy_thesis",
+        "strategy_thesis_to_growth_blueprint": "growth_blueprint",
         "research_to_growth_blueprint": "growth_blueprint",
     }.get(workflow_id, "workflow")
 

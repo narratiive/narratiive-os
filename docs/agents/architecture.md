@@ -15,6 +15,14 @@ The corresponding artefact chain is:
 
 `research inputs → Growth Blueprint → Campaign World → Creative Director's Bible → quality review`
 
+Within the Strategy Director boundary, research now passes through a governed
+`Strategic Synthesis → Strategy Thesis` sequence before Growth Blueprint
+production. Strategic Synthesis is evidence-only preparation. Strategy Thesis
+is an immutable Gate 3 review artefact whose exact version requires Matt's
+approval before the Growth Blueprint workflow can begin. Historical direct
+Research-to-Growth-Blueprint runs remain supported for audit compatibility but
+are not the canonical route for new handoffs.
+
 Client-ready workflows enter human approval after the final quality stage.
 
 ## Repository map
