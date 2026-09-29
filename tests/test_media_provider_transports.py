@@ -192,6 +192,28 @@ class MediaProviderTransportTests(unittest.TestCase):
         self.assertEqual(result["metrics"]["roas"], "3")
         self.assertIsNone(result["metrics"]["reach"])
 
+    def test_google_empty_campaign_list_is_a_successful_read(self) -> None:
+        http = FakeHTTP(
+            (
+                JSONResponse(200, {}, {"access_token": "short-lived-access"}),
+                JSONResponse(200, {}, []),
+            )
+        )
+        transport = GoogleAdsReadTransport(
+            configuration(MediaProvider.GOOGLE),
+            client_id="oauth-client", client_secret="oauth-secret", refresh_token="refresh-secret",
+            http=http, api_version="v25",
+        )
+        campaigns = transport.request(
+            MediaProvider.GOOGLE,
+            "get_campaigns",
+            {"account_id": "1234567890"},
+        )
+        self.assertEqual(campaigns, [])
+        self.assertEqual(http.calls[1]["method"], "POST")
+        self.assertIn("FROM campaign", http.calls[1]["body"]["query"])
+        self.assertEqual(http.calls[1]["headers"]["login-customer-id"], "9876543210")
+
     def test_write_methods_remain_blocked_without_network_after_live_factory(self) -> None:
         environment = {
             "META_ACCESS_TOKEN": "meta-secret",

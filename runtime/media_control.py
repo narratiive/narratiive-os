@@ -654,6 +654,104 @@ class MediaControlService:
         self.policy = policy or MediaPolicyEngine()
         self.normaliser = normaliser or MediaNormaliser()
 
+    def certify_provider(
+        self,
+        provider: MediaProvider,
+        *,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Perform and audit a live, read-only provider connectivity check.
+
+        A successful empty campaign list is valid evidence that the configured
+        advertiser was queried. It is deliberately distinct from campaign
+        performance ingestion, which requires a native campaign identifier.
+        """
+
+        self.policy.authorize(MediaAuthority.READ, "certify_provider")
+        if not request_id.strip():
+            raise MediaControlError("provider certification request_id is required")
+        prior = next(
+            (
+                record
+                for record in reversed(self.journal.read_all())
+                if record.action == self.AUDIT_ACTION
+                and record.status == "completed"
+                and record.metadata.get("request_id") == request_id
+                and record.metadata.get("operation") == "certify_provider"
+            ),
+            None,
+        )
+        if prior is not None:
+            if prior.metadata.get("provider") != provider.value:
+                raise MediaControlError(
+                    "provider certification request_id is already bound to another provider"
+                )
+            return self._certification_result(prior)
+
+        adapter = self.adapters.get(provider)
+        if adapter is None:
+            self._audit_certification_failure(provider, request_id, "adapter not configured")
+            raise MediaConfigurationError(f"{provider.value} adapter is not configured")
+        configuration = getattr(adapter, "configuration", None)
+        account_id = str(getattr(configuration, "account_id", "")).strip()
+        manager_account_id = str(getattr(configuration, "manager_account_id", "")).strip()
+        if not account_id:
+            self._audit_certification_failure(
+                provider, request_id, "adapter account identity is unavailable"
+            )
+            raise MediaConfigurationError(
+                f"{provider.value} adapter account identity is unavailable"
+            )
+        try:
+            accounts = adapter.get_accounts()
+            campaigns = adapter.get_campaigns()
+            if isinstance(accounts, (str, bytes, Mapping)) or not isinstance(accounts, Sequence):
+                raise MalformedProviderResponse(
+                    f"{provider.value} account-list response must be a sequence"
+                )
+            if isinstance(campaigns, (str, bytes, Mapping)) or not isinstance(campaigns, Sequence):
+                raise MalformedProviderResponse(
+                    f"{provider.value} campaign-list response must be a sequence"
+                )
+            if any(not isinstance(item, Mapping) for item in (*accounts, *campaigns)):
+                raise MalformedProviderResponse(
+                    f"{provider.value} certification responses must contain objects"
+                )
+        except Exception as exc:
+            self._audit_certification_failure(
+                provider, request_id, _audit_safe_error(exc), account_id=account_id,
+                manager_account_id=manager_account_id,
+            )
+            raise
+
+        record = self.journal.append(
+            decision_id=f"media-{provider.value}-certification",
+            workspace_id="system",
+            action=self.AUDIT_ACTION,
+            rationale="Live read-only provider connectivity certification.",
+            actor="media-control-layer",
+            status="completed",
+            metadata={
+                "timestamp": _utc_now(),
+                "provider": provider.value,
+                "operation": "certify_provider",
+                "authority": MediaAuthority.READ.value,
+                "request_id": request_id,
+                "result": "live_read_verified",
+                "account_id": account_id,
+                "manager_account_id": manager_account_id or None,
+                "accessible_customers_returned": len(accounts),
+                "campaigns_returned": len(campaigns),
+                "empty_campaign_list_valid": len(campaigns) == 0,
+                "external_write_performed": False,
+                "publication_authorised": False,
+                "media_spend_authorised": False,
+                "error": None,
+                "retry_state": "not_required",
+            },
+        )
+        return self._certification_result(record)
+
     def ingest(
         self,
         *,
@@ -864,9 +962,14 @@ class MediaControlService:
             else:
                 health = ConnectionHealth.HEALTHY
             snapshots = [item for item in self.snapshots() if item.provider is provider]
+            latest_success = completed[-1] if completed else None
+            latest_metadata = latest_success.metadata if latest_success else {}
+            adapter_configuration = getattr(self.adapters.get(provider), "configuration", None)
             result[provider.value] = {
                 "health": health.value,
+                "connection_status": "live" if completed else "configured" if provider in self.adapters else "not_configured",
                 "last_successful_sync": completed[-1].occurred_at if completed else None,
+                "last_successful_operation": latest_metadata.get("operation") if completed else None,
                 "last_failed_sync": failed[-1].occurred_at if failed else None,
                 "credential_health": (
                     "configured_verified_by_successful_read"
@@ -877,12 +980,68 @@ class MediaControlService:
                 ),
                 "mapped_campaigns": len({item.provider_mapping.campaign_id for item in snapshots}),
                 "unmapped_campaigns": 0,
+                "configured_account_id": str(getattr(adapter_configuration, "account_id", "")) or None,
+                "configured_manager_account_id": str(getattr(adapter_configuration, "manager_account_id", "")) or None,
+                "campaigns_returned": latest_metadata.get("campaigns_returned"),
                 "data_freshness": max((item.ingested_at for item in snapshots), default=None),
             }
         recommendations = self.analyse(self.snapshots())
         result["pending_recommendations"] = len(recommendations)
         result["pending_approvals"] = sum(1 for item in recommendations if item.human_approval_required)
         return result
+
+    @staticmethod
+    def _certification_result(record: ExecutionRecord) -> dict[str, Any]:
+        metadata = record.metadata
+        return {
+            "provider": metadata.get("provider"),
+            "status": "healthy",
+            "connection_status": "live",
+            "advertiser_account_id": metadata.get("account_id"),
+            "manager_account_id": metadata.get("manager_account_id"),
+            "accessible_customers_returned": metadata.get("accessible_customers_returned"),
+            "campaigns_returned": metadata.get("campaigns_returned"),
+            "empty_campaign_list_valid": metadata.get("empty_campaign_list_valid"),
+            "live_read_status": "passed",
+            "external_write_performed": False,
+            "publication_authorised": False,
+            "media_spend_authorised": False,
+            "evidence_record_id": record.record_id,
+            "certified_at": record.occurred_at,
+        }
+
+    def _audit_certification_failure(
+        self,
+        provider: MediaProvider,
+        request_id: str,
+        error: str,
+        *,
+        account_id: str = "",
+        manager_account_id: str = "",
+    ) -> None:
+        self.journal.append(
+            decision_id=f"media-{provider.value}-certification",
+            workspace_id="system",
+            action=self.AUDIT_ACTION,
+            rationale="Live read-only provider certification failed closed.",
+            actor="media-control-layer",
+            status="failed",
+            metadata={
+                "timestamp": _utc_now(),
+                "provider": provider.value,
+                "operation": "certify_provider",
+                "authority": MediaAuthority.READ.value,
+                "request_id": request_id,
+                "result": "failed",
+                "account_id": account_id or None,
+                "manager_account_id": manager_account_id or None,
+                "external_write_performed": False,
+                "publication_authorised": False,
+                "media_spend_authorised": False,
+                "error": error,
+                "retry_state": "eligible_after_cause_resolved",
+            },
+        )
 
     def _record_for_request(self, request_id: str, request_fingerprint: str) -> ExecutionRecord | None:
         matches = [

@@ -154,8 +154,9 @@ This validator is present for design/testing only; no launch path consumes it in
 
 ## 9. Known blockers and limitations
 
-- No production Meta, TikTok or Google credentials were available to this repository run, so real account reads are **not certified**.
-- Fixed-host read-only HTTP transports now exist for Meta Marketing API, TikTok API for Business and Google Ads SearchStream/OAuth. Their request construction and native-to-canonical translation are fixture-tested, but each remains `DEGRADED` until its first successful audited live read.
+- Google Ads passed an audited live read-only certification on 28 September 2026 for advertiser customer `9780735754` through manager customer `7620152450`. The account returned zero campaigns; that is a valid healthy empty result because the customer-scoped Google Ads query completed successfully. The append-only runtime journal remains the authoritative live evidence.
+- Meta and TikTok have fixture-tested read transports but remain `DEGRADED` until each records its own successful audited live read.
+- Fixed-host read-only HTTP transports exist for Meta Marketing API, TikTok API for Business and Google Ads SearchStream/OAuth. Request construction and native-to-canonical translation remain covered by the Northstar and focused transport tests.
 - Provider attribution models are not harmonised. Canonical output preserves context but does not claim direct comparability.
 - Provider breakdown availability varies and must stay provider-specific.
 - Tony's natural-language interpretation is future work; deterministic `/media` commands are implemented.
