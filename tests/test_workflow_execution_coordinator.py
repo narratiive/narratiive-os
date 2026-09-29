@@ -142,6 +142,59 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(len(state.stages[0].output_artifacts), 1)
         self.assertEqual(state.input_payload["final"], "reviewable synthesis")
 
+    def test_strategy_worker_receives_bounded_declared_context(self) -> None:
+        definition = WorkflowDefinition(
+            "research_to_strategic_synthesis",
+            (_stage("synthesise", inputs=("evidence_pack", "client_context")),),
+        )
+
+        def adapter(contract):
+            self.assertEqual(contract["evidence_pack"], {"records": ["evidence"]})
+            self.assertEqual(contract["client_context"], {"name": "SAFE Synthetic Client"})
+            self.assertEqual(contract["contradictions"], [])
+            self.assertEqual(contract["research_gaps"], ["pricing"])
+            self.assertEqual(contract["_lineage"], {"parent_run_id": "research-run"})
+            self.assertNotIn("work_product", contract)
+            self.assertNotIn("unrelated_upstream_payload", contract)
+            return {"draft": "bounded synthesis"}
+
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            "research_to_strategic_synthesis",
+            "run-bounded-context",
+            {
+                "evidence_pack": {"records": ["evidence"]},
+                "client_context": {"name": "SAFE Synthetic Client"},
+                "contradictions": [],
+                "research_gaps": ["pricing"],
+                "_lineage": {"parent_run_id": "research-run"},
+                "work_product": "x" * 50_000,
+                "unrelated_upstream_payload": {"duplicated": True},
+            },
+            entity_id="entity",
+            correlation_id="corr",
+        )
+        outcome = coordinator.advance("run-bounded-context", _lifecycle())
+        self.assertEqual(outcome.status, "complete")
+
+    def test_non_strategy_worker_keeps_existing_full_context(self) -> None:
+        definition = WorkflowDefinition("ordinary-workflow", (_stage("draft"),))
+
+        def adapter(contract):
+            self.assertEqual(contract["optional_context"], "retained")
+            return {"draft": "complete"}
+
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            "ordinary-workflow",
+            "run-full-context",
+            {"brief": "safe", "optional_context": "retained"},
+            entity_id="entity",
+            correlation_id="corr",
+        )
+        outcome = coordinator.advance("run-full-context", _lifecycle())
+        self.assertEqual(outcome.status, "complete")
+
     def test_authorised_autonomous_cross_workflow_handoff_is_durable(self) -> None:
         first = WorkflowDefinition(
             "first-workflow",
