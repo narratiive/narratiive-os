@@ -710,6 +710,21 @@ class WorkflowRunService:
                 self._commit(state, "stage.recovery_blocked", {"stage_id": stage.stage_id})
                 recovered += 1
                 continue
+            revision_attempts = sum(
+                1
+                for item in stage.attempts
+                if int(item.get("revision", 0)) == stage.revision_count
+            )
+            if revision_attempts >= stage.max_attempts:
+                self.engine.block_for_reason(
+                    state,
+                    stage.stage_id,
+                    "worker_retry_policy_exhausted",
+                    "Request an explicit revision after correcting the worker failure.",
+                )
+                self._commit(state, "stage.recovery_blocked", {"stage_id": stage.stage_id})
+                recovered += 1
+                continue
             self.engine.request_retry(state, stage.stage_id, "recovered_after_runtime_restart")
             self.engine.resume_stage(state, stage.stage_id, stage.required_inputs)
             self._commit(state, "stage.recovered", {"stage_id": stage.stage_id})

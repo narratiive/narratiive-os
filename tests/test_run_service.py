@@ -243,6 +243,33 @@ class WorkflowRunServiceTests(unittest.TestCase):
         self.assertFalse(recovered.external_action_taken)
         self.assertIn("stage.recovered", [event.event_type for event in self.event_log.read("run-recover")])
 
+    def test_interrupted_step_with_exhausted_attempts_requires_explicit_revision(self) -> None:
+        definition = workflow_definition_from_dict(
+            {
+                "workflow_id": "recoverable-exhausted",
+                "stages": [
+                    {
+                        "stage_id": "prepare",
+                        "agent_ref": "worker-a",
+                        "required_inputs": ["brief"],
+                        "retry_policy": {"max_attempts": 2},
+                    }
+                ],
+            }
+        )
+        self.service.create_run(definition, "run-recover-exhausted", {"brief"})
+        self.service.start_stage("run-recover-exhausted", "prepare")
+        self.service.record_attempt("run-recover-exhausted", "prepare", {"status": "failed"})
+        self.service.record_attempt("run-recover-exhausted", "prepare", {"status": "failed"})
+
+        restarted = WorkflowRunService(self.repository, self.event_log)
+        self.assertEqual(restarted.recover_interrupted_runs(), 1)
+        recovered = restarted.load_run("run-recover-exhausted")
+        self.assertEqual(recovered.status, WorkflowStatus.BLOCKED)
+        self.assertEqual(recovered.stage("prepare").status, StageStatus.BLOCKED)
+        self.assertEqual(recovered.blocker, "worker_retry_policy_exhausted")
+        self.assertFalse(recovered.external_action_taken)
+
     def test_interrupted_external_write_requires_reconciliation_instead_of_replay(self) -> None:
         definition = workflow_definition_from_dict(
             {
