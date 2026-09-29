@@ -223,6 +223,37 @@ class WorkflowRunServiceTests(unittest.TestCase):
         completed = self.service.complete_stage("run-quality", "prepare", [output])
         self.assertEqual(completed.status, WorkflowStatus.COMPLETE)
 
+    def test_declared_input_output_overlap_is_promoted_as_a_refinement(self) -> None:
+        definition = workflow_definition_from_dict(
+            {
+                "workflow_id": "lineage-refinement",
+                "stages": [
+                    {
+                        "stage_id": "prepare",
+                        "capability": "synthesis",
+                        "required_inputs": ["evidence_lineage"],
+                        "input_contract": {"required_fields": ["evidence_lineage"]},
+                        "output_contract": {"required_fields": ["evidence_lineage"]},
+                    }
+                ],
+            }
+        )
+        self.service.create_run(
+            definition,
+            "run-lineage-refinement",
+            {"evidence_lineage"},
+            input_payload={"evidence_lineage": ["parent"]},
+        )
+        self.service.start_stage("run-lineage-refinement", "prepare")
+
+        promoted = self.service.promote_stage_outputs(
+            "run-lineage-refinement",
+            "prepare",
+            {"evidence_lineage": ["parent", "derived"]},
+        )
+
+        self.assertEqual(promoted.input_payload["evidence_lineage"], ["parent", "derived"])
+
     def test_interrupted_running_step_recovers_to_ready_without_claiming_execution(self) -> None:
         definition = workflow_definition_from_dict(
             {
