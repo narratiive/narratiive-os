@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import tempfile
+import threading
 import unittest
 import urllib.error
 from dataclasses import replace
@@ -150,6 +151,28 @@ class GitHubWorkServiceTests(unittest.TestCase):
         )
         self.assertEqual(snapshot.baseline_status, "unavailable")
         self.assertEqual(snapshot.changes_since_previous_brief, ())
+
+    def test_live_reads_are_bounded_parallel_and_snapshot_order_is_deterministic(self):
+        list_barrier = threading.Barrier(2, timeout=1)
+        detail_barrier = threading.Barrier(2, timeout=1)
+
+        class ConcurrentAPI(FakeGitHubAPI):
+            def list_open_pull_requests(self):
+                list_barrier.wait()
+                return [work_item(2), work_item(1)]
+
+            def list_open_issues(self):
+                list_barrier.wait()
+                return [work_item(4), work_item(3)]
+
+            def get_pull_request(self, number):
+                detail_barrier.wait()
+                return pull_detail(number)
+
+        snapshot = self.service(ConcurrentAPI()).build()
+
+        self.assertEqual([item.number for item in snapshot.open_pull_requests], [1, 2])
+        self.assertEqual([item.number for item in snapshot.active_issues], [3, 4])
 
     def test_changes_compare_material_state_against_previous_brief(self):
         initial_api = FakeGitHubAPI(
