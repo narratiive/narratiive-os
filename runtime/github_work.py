@@ -6,6 +6,7 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable, Mapping, Protocol
@@ -624,6 +625,7 @@ class GitHubWorkService:
     """Build deterministic executive GitHub state from live read-only responses."""
 
     FAILURE_CONCLUSIONS = GitHubRESTClient.FAILURE_CONCLUSIONS
+    MAX_PARALLEL_READS = 8
 
     def __init__(
         self,
@@ -642,17 +644,26 @@ class GitHubWorkService:
         previous: GitHubWorkSnapshot | None = None,
         baseline_artifact_id: str = "",
     ) -> GitHubWorkSnapshot:
-        pulls = tuple(
-            sorted(
-                (self._pull_item(value) for value in self.api.list_open_pull_requests()),
-                key=lambda item: item.number,
+        # A complete pull-request observation requires a detail read and a check-run
+        # read for every open PR. Keeping those reads serial made Tony's cold
+        # executive brief exceed the control-plane deadline as the repository grew.
+        # Bound concurrency, then sort the result so the snapshot remains stable.
+        with ThreadPoolExecutor(max_workers=self.MAX_PARALLEL_READS) as executor:
+            pull_values_future = executor.submit(self.api.list_open_pull_requests)
+            issue_values_future = executor.submit(self.api.list_open_issues)
+            pull_values = pull_values_future.result()
+            issue_values = issue_values_future.result()
+            pulls = tuple(
+                sorted(
+                    executor.map(self._pull_item, pull_values),
+                    key=lambda item: item.number,
+                )
             )
-        )
         issues = tuple(
             sorted(
                 (
                     self._issue_item(value)
-                    for value in self.api.list_open_issues()
+                    for value in issue_values
                     if "pull_request" not in value
                 ),
                 key=lambda item: item.number,
