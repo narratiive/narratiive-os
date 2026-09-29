@@ -79,7 +79,7 @@ def build_specs(
     return (
         AgentSpec(
             TUNNEL_LABEL,
-            (str(ngrok_path), "http", f"--url={hostname}", "5678"),
+            (str(ngrok_path), "http", f"--url={hostname}", "--inspect=false", "5678"),
         ),
         AgentSpec(
             N8N_LABEL,

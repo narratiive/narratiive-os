@@ -31,6 +31,12 @@ from runtime.media_control import (
     ProviderObjectMapping,
 )
 from runtime.media_provider_transports import build_configured_media_adapters
+from runtime.tiktok_oauth import (
+    TIKTOK_PERMISSION_NAMES,
+    TIKTOK_REDIRECT_URI,
+    TikTokOAuthError,
+    TikTokOAuthService,
+)
 from runtime.notion_leads import build_authoritative_lead_loader
 from runtime.tony_adaptive_response import TonyAdaptiveResponseCommandService
 from runtime.tony_blueprint_client_delivery import TonyBlueprintClientDeliveryCommandService
@@ -97,6 +103,7 @@ class LeadAwareTonyApplication:
         attention_service: LeadAttentionService | None = None,
         conversation_ingress: TonyConversationIngress | None = None,
         media_control: MediaControlService | None = None,
+        tiktok_oauth: TikTokOAuthService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -107,6 +114,7 @@ class LeadAwareTonyApplication:
         self.attention_service = attention_service
         self.conversation_ingress = conversation_ingress
         self.media_control = media_control
+        self.tiktok_oauth = tiktok_oauth
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -124,6 +132,10 @@ class LeadAwareTonyApplication:
             return self._attention_control(environ, start_response)
         if method == "POST" and path == "/media/sync":
             return self._media_sync(environ, start_response)
+        if method == "POST" and path == "/oauth/tiktok/start":
+            return self._tiktok_oauth_start(environ, start_response)
+        if method == "POST" and path == "/oauth/tiktok/callback":
+            return self._tiktok_oauth_callback(environ, start_response)
         return self.base(environ, start_response)
 
     @staticmethod
@@ -324,6 +336,7 @@ class LeadAwareTonyApplication:
                     },
                 },
             )
+
         denied = self._authorize(environ, start_response)
         if denied is not None:
             return denied
@@ -399,6 +412,56 @@ class LeadAwareTonyApplication:
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"ok": False, "error": {"code": "media_sync_failed", "message": "Media performance ingestion failed closed"}},
             )
+
+    def _tiktok_oauth_start(self, environ, start_response):
+        denied = self._oauth_authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.tiktok_oauth is None:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "tiktok_oauth_unavailable", "message": "TikTok OAuth is not configured"}})
+        try:
+            url = self.tiktok_oauth.authorization_url()
+        except TikTokOAuthError as exc:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "tiktok_oauth_unavailable", "message": str(exc)}})
+        return self._respond(start_response, HTTPStatus.OK, {
+            "ok": True,
+            "authorization_url": url,
+            "redirect_uri": TIKTOK_REDIRECT_URI,
+            "permissions": list(TIKTOK_PERMISSION_NAMES),
+            "read_only": True,
+            "external_action_taken": False,
+        })
+
+    def _tiktok_oauth_callback(self, environ, start_response):
+        denied = self._oauth_authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.tiktok_oauth is None:
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "tiktok_oauth_unavailable", "message": "TikTok OAuth is not configured"}})
+        try:
+            request = self._read_json(environ)
+            provider_code = str(request.get("provider_code") or "0").strip()
+            if provider_code not in {"", "0"}:
+                raise TikTokOAuthError("TikTok advertiser authorisation was not approved")
+            result = self.tiktok_oauth.exchange(
+                state=str(request.get("state") or ""),
+                auth_code=str(request.get("auth_code") or ""),
+            )
+        except (TikTokOAuthError, ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "tiktok_oauth_failed", "message": str(exc)}})
+        return self._respond(start_response, HTTPStatus.OK, {
+            "ok": True,
+            "status": "tiktok_credentials_stored",
+            "authorised_advertiser_ids": list(result.advertiser_ids),
+            "account_selection_required": len(result.advertiser_ids) != 1,
+            "read_only": True,
+            "external_media_write_performed": False,
+        })
+
+    def _oauth_authorize(self, environ, start_response):
+        if not str(self.base.bridge_token or "").strip():
+            return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "oauth_auth_unavailable", "message": "OAuth requires a configured bridge token"}})
+        return self._authorize(environ, start_response)
 
     @staticmethod
     def _required_string(value: dict[str, Any], field: str) -> str:
@@ -662,6 +725,7 @@ def build_app() -> LeadAwareTonyApplication:
         attention_service=attention_service,
         conversation_ingress=conversation_ingress,
         media_control=media_control,
+        tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
     )
 
 

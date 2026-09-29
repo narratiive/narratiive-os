@@ -63,6 +63,7 @@ class N8nTelegramIngressInstallerTests(unittest.TestCase):
             [installer.TUNNEL_LABEL, installer.N8N_LABEL],
         )
         self.assertIn("--url=tony.example.test", specs[0].arguments)
+        self.assertIn("--inspect=false", specs[0].arguments)
         self.assertIn("WEBHOOK_URL=https://tony.example.test/", specs[1].arguments)
         self.assertIn("N8N_BLOCK_ENV_ACCESS_IN_NODE=false", specs[1].arguments)
         self.assertIn(f"PATH=/:{installer.SYSTEM_PATH}", specs[1].arguments)
