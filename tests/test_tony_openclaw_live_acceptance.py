@@ -3,11 +3,13 @@ from __future__ import annotations
 import json
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.check_tony_openclaw_live import (
     EXPECTED_AGENT_IDS,
     SCENARIOS,
+    await_yielded_reply,
     build_report,
     extract_configured_agent_ids,
     extract_configured_models,
@@ -104,6 +106,7 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             )
         )
         self.assertFalse(scenario_passes("No active Research Agent session.", "specialist_status"))
+        self.assertTrue(scenario_passes("Done — it completed the mission check.", "specialist_status"))
         self.assertFalse(
             scenario_passes(
                 "There are no active projects or sub-agents running. Who are you trying to reach?",
@@ -123,6 +126,8 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 "specialist_delegation",
             )
         )
+        self.assertFalse(scenario_passes("The internal task partially completed.", "execution_truth"))
+        self.assertTrue(scenario_passes("Nothing was sent externally.", "execution_truth"))
 
     def test_live_probe_preserves_one_response_chain_across_all_followups(self) -> None:
         calls = []
@@ -131,7 +136,9 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
             calls.append((url, body, dict(headers or {}), timeout))
             index = len(calls)
             prompt = str((body or {}).get("input") or "")
-            if "across Narratiive" in prompt:
+            if "Did it go" in prompt:
+                text = "Nothing was sent or changed externally."
+            elif "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
             elif "list the sub-agents" in prompt:
                 text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
@@ -160,6 +167,88 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
         self.assertTrue(all("instructions" not in call[1] for call in calls))
         self.assertTrue(all(set(call[1]).issubset({"model", "input", "previous_response_id"}) for call in calls))
 
+    def test_live_probe_waits_for_push_completion_after_specialist_yield(self) -> None:
+        calls = []
+
+        def transport(url, body=None, *, headers=None, timeout=0):
+            calls.append(body)
+            prompt = str((body or {}).get("input") or "")
+            if "across Narratiive" in prompt:
+                text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current priority."
+            elif "list the sub-agents" in prompt:
+                text = "Research, Strategy, Creative Director, Production and Operations are configured; no child job is currently running."
+            elif "Ask the Research Agent" in prompt:
+                text = "No response from OpenClaw."
+            elif "Research Agent" in prompt:
+                text = "Research completed its delegated inspection."
+            else:
+                text = "Natural evidence-backed response."
+            return {"id": f"resp-{len(calls)}", "output_text": text}
+
+        waits = []
+
+        def wait_for_push(agent_id, session_key, started_at):
+            waits.append((agent_id, session_key, started_at))
+            return "Research completed its delegated inspection and returned its mission."
+
+        results = run_live_probe(
+            responses_url="http://openclaw/v1/responses",
+            agent_id="tony",
+            session_key="push-session",
+            gateway_token="token",
+            transport=transport,
+            yielded_reply=wait_for_push,
+        )
+        delegation = next(item for item in results if item["name"] == "specialist_delegation")
+        self.assertTrue(delegation["passed"])
+        self.assertTrue(delegation["push_completion_observed"])
+        self.assertEqual(len(waits), 1)
+
+    def test_yield_waiter_accepts_resumed_final_without_synthetic_user_message(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            state_dir = Path(directory)
+            sessions = state_dir / "agents" / "tony" / "sessions"
+            sessions.mkdir(parents=True)
+            transcript = sessions / "session.jsonl"
+            entries = (
+                {
+                    "timestamp": "2026-09-29T07:40:09Z",
+                    "message": {
+                        "role": "assistant",
+                        "stopReason": "toolUse",
+                        "content": [
+                            {"type": "text", "text": "Waiting for Research."},
+                            {"type": "toolCall", "name": "sessions_yield"},
+                        ],
+                    },
+                },
+                {
+                    "timestamp": "2026-09-29T07:40:12Z",
+                    "message": {
+                        "role": "assistant",
+                        "stopReason": "stop",
+                        "content": [{"type": "text", "text": "Research returned verified evidence."}],
+                    },
+                },
+            )
+            transcript.write_text(
+                "".join(json.dumps(item) + "\n" for item in entries),
+                encoding="utf-8",
+            )
+            (sessions / "sessions.json").write_text(
+                json.dumps({"agent:tony:test-session": {"sessionFile": str(transcript)}}),
+                encoding="utf-8",
+            )
+            result = await_yielded_reply(
+                "tony",
+                "test-session",
+                datetime(2026, 9, 29, 7, 40, tzinfo=timezone.utc),
+                state_dir=state_dir,
+                timeout_seconds=0.1,
+                poll_seconds=0.01,
+            )
+            self.assertEqual(result, "Research returned verified evidence.")
+
     def test_report_requires_runtime_fleet_not_just_conversation(self) -> None:
         with tempfile.TemporaryDirectory() as tempdir:
             config_path = Path(tempdir) / "openclaw.json"
@@ -172,7 +261,9 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 if body is None:
                     return {"models": [{"name": "qwen3.5:latest"}]}
                 prompt = str(body.get("input") or "")
-                if "across Narratiive" in prompt:
+                if "Did it go" in prompt:
+                    text = "Nothing was sent externally."
+                elif "across Narratiive" in prompt:
                     text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
                 elif "list the sub-agents" in prompt:
                     text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
@@ -217,7 +308,9 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
                 if body is None:
                     return {"models": [{"name": "qwen3.5:latest"}]}
                 prompt = str(body.get("input") or "")
-                if "across Narratiive" in prompt:
+                if "Did it go" in prompt:
+                    text = "Nothing was sent externally."
+                elif "across Narratiive" in prompt:
                     text = "Research, Strategy, Creative, Production and Operations are configured and available; no child job is running. Mission Control shows the current commercial priority."
                 elif "list the sub-agents" in prompt:
                     text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."

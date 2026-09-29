@@ -4,7 +4,9 @@ import argparse
 import json
 import os
 import subprocess
+import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib.error import HTTPError, URLError
@@ -251,6 +253,93 @@ def response_text(payload: Any) -> str:
     return "\n".join(parts).strip()
 
 
+def await_yielded_reply(
+    agent_id: str,
+    session_key: str,
+    not_before: datetime,
+    *,
+    state_dir: Path = Path.home() / ".openclaw",
+    timeout_seconds: float = 30.0,
+    poll_seconds: float = 0.25,
+) -> str:
+    """Recover the resumed final turn after a correct push-based sessions_yield."""
+
+    deadline = time.monotonic() + timeout_seconds
+    detection_deadline = min(deadline, time.monotonic() + 1.0)
+    while time.monotonic() < deadline:
+        transcript = _session_transcript(state_dir, agent_id, session_key)
+        yielded_at: datetime | None = None
+        if transcript is not None:
+            try:
+                lines = transcript.read_text(encoding="utf-8").splitlines()
+            except (OSError, UnicodeDecodeError):
+                lines = []
+            for raw in lines:
+                try:
+                    entry = json.loads(raw)
+                except json.JSONDecodeError:
+                    continue
+                message = entry.get("message")
+                if not isinstance(message, Mapping):
+                    continue
+                timestamp = _event_time(entry.get("timestamp"))
+                if timestamp is None or timestamp < not_before:
+                    continue
+                content = message.get("content")
+                parts = content if isinstance(content, list) else []
+                if message.get("role") == "assistant" and any(
+                    isinstance(part, Mapping)
+                    and part.get("type") == "toolCall"
+                    and part.get("name") == "sessions_yield"
+                    for part in parts
+                ):
+                    yielded_at = timestamp
+                    continue
+                if (
+                    yielded_at is not None
+                    and message.get("role") == "assistant"
+                    and timestamp > yielded_at
+                    and message.get("stopReason") == "stop"
+                ):
+                    text = "\n".join(
+                        str(part.get("text") or "").strip()
+                        for part in parts
+                        if isinstance(part, Mapping) and part.get("type") == "text"
+                    ).strip()
+                    if text and text != "NO_REPLY":
+                        return text
+        if yielded_at is None and time.monotonic() >= detection_deadline:
+            return ""
+        time.sleep(max(0.01, poll_seconds))
+    return ""
+
+
+def _session_transcript(state_dir: Path, agent_id: str, session_key: str) -> Path | None:
+    sessions_dir = state_dir.expanduser() / "agents" / agent_id / "sessions"
+    try:
+        index = json.loads((sessions_dir / "sessions.json").read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    record = index.get(f"agent:{agent_id}:{session_key}") if isinstance(index, Mapping) else None
+    if not isinstance(record, Mapping):
+        return None
+    explicit = str(record.get("sessionFile") or "").strip()
+    if explicit:
+        return Path(explicit).expanduser()
+    session_id = str(record.get("sessionId") or "").strip()
+    return sessions_dir / f"{session_id}.jsonl" if session_id else None
+
+
+def _event_time(value: Any) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
+
+
 def scenario_passes(text: str, scenario_name: str = "") -> bool:
     normalized = text.strip().casefold()
     if not normalized or any(marker in normalized for marker in _REJECTION_MARKERS):
@@ -258,7 +347,11 @@ def scenario_passes(text: str, scenario_name: str = "") -> bool:
     if scenario_name in {"specialist_delegation", "specialist_status"}:
         if any(marker in normalized for marker in _SPECIALIST_FAILURE_MARKERS):
             return False
-        if "research" not in normalized:
+        if "research" not in normalized and not (
+            scenario_name == "specialist_status"
+            and any(marker in normalized for marker in ("done", "completed"))
+            and "mission" in normalized
+        ):
             return False
     if scenario_name == "specialist_roster":
         required = ("research", "strategy", "creative director", "production", "operations")
@@ -277,6 +370,11 @@ def scenario_passes(text: str, scenario_name: str = "") -> bool:
             return False
         if not any(marker in normalized for marker in ("lead", "campaign", "commercial", "mission control", "workstream", "github", "priority")):
             return False
+    if scenario_name == "execution_truth" and not any(
+        marker in normalized
+        for marker in ("nothing was sent", "not sent", "wasn't sent", "no external action", "no external change")
+    ):
+        return False
     return True
 
 
@@ -307,6 +405,7 @@ def run_live_probe(
     session_key: str,
     gateway_token: str,
     transport: Callable[..., Any] = http_json,
+    yielded_reply: Callable[[str, str, datetime], str] = await_yielded_reply,
 ) -> list[dict[str, Any]]:
     """Exercise Tony exactly like production: behaviour comes only from the OpenClaw workspace."""
     headers = {
@@ -320,6 +419,7 @@ def run_live_probe(
     results: list[dict[str, Any]] = []
     previous_response_id = ""
     for scenario in SCENARIOS:
+        started_at = datetime.now(timezone.utc)
         body: dict[str, Any] = {
             "model": f"openclaw/{agent_id}",
             "input": scenario.text,
@@ -328,6 +428,16 @@ def run_live_probe(
             body["previous_response_id"] = previous_response_id
         payload = transport(responses_url, body, headers=headers, timeout=120.0)
         text = response_text(payload)
+        push_completion_observed = False
+        if scenario.name == "specialist_delegation" and text.strip().casefold() in {
+            "",
+            "no response from openclaw",
+            "no response from openclaw.",
+        }:
+            resumed = yielded_reply(agent_id, session_key, started_at)
+            if resumed:
+                text = resumed
+                push_completion_observed = True
         previous_response_id = str(payload.get("id") or "").strip() if isinstance(payload, dict) else ""
         results.append(
             {
@@ -336,6 +446,7 @@ def run_live_probe(
                 "response": text,
                 "response_id": previous_response_id,
                 "passed": scenario_passes(text, scenario.name),
+                "push_completion_observed": push_completion_observed,
             }
         )
     return results

@@ -45,7 +45,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
             calls.append((url, body, dict(headers or {}), timeout))
             index = len(calls)
             prompt = str((body or {}).get("input") or "")
-            if "across Narratiive" in prompt:
+            if "Did it go" in prompt:
+                text = "Nothing was sent or changed externally."
+            elif "across Narratiive" in prompt:
                 text = "Research, Strategy, Creative, Production and Operations are configured and available; persistent specialist assignments are tracked separately, and no child job is currently running. Mission Control shows the current commercial priority."
             elif "list the sub-agents" in prompt:
                 text = "Research gathers evidence; Strategy sets direction; Creative Director guards the idea; Production makes assets; Operations tracks delivery. No child job is currently running."
