@@ -13,22 +13,26 @@ This checklist requests only account-owner actions that cannot be completed in t
 ## Meta Ads
 
 1. [ ] In Meta for Developers, create/select the Narratiive business app and add the Marketing API product.
-2. [ ] In Business Settings, confirm the app/system user is owned by or shared with the correct Business Portfolio.
-3. [ ] Assign the exact ad account to the authorised user/system user.
-4. [ ] Grant the least-privilege `ads_read` permission for Phase 1. Do not grant `ads_management` merely for this read-only build.
-5. [ ] Generate/authorise a server-side access token and note its expiry/renewal policy.
-6. [ ] Confirm the ad account ID shown by Ads Manager (the native API form commonly uses `act_<id>`).
-7. [ ] Enter these runtime values securely:
+2. [ ] Add the Facebook Login for Business use case and register this exact Valid OAuth Redirect URI:
 
-   - `META_ACCESS_TOKEN`
-   - `META_ACCOUNT_ID`
-   - `META_TIMEZONE` (for example `Europe/London`)
-   - `META_CURRENCY` (for example `GBP`)
-   - `META_GRAPH_API_VERSION` (an explicitly reviewed supported version, for example `v24.0`; do not silently float versions)
+   `https://lushly-spoof-reheat.ngrok-free.dev/webhook/meta-media-oauth-callback`
 
-8. [ ] Authorise a read-only smoke test: account list, campaign list, one campaign, creatives, delivery/review status and a seven-day insight query.
+3. [ ] In Business Settings, confirm the app user is authorised for the correct Business Portfolio and exact advertising account.
+4. [ ] Request only `ads_read` for Phase 1 advertising objects and Ads Insights. Do not request or grant `ads_management` or `business_management`: both permit external management actions beyond this read-only phase. Narratiive rejects tokens containing either permission, and every provider mutation is independently blocked before dispatch.
+5. [ ] Enter only the app configuration through the protected local prompt:
 
-Reference: [Meta's official Marketing API collection](https://www.postman.com/meta/facebook-marketing-api/documentation/0zr4mes/facebook-marketing-api-mapi) describes user/system-user tokens, ad-account IDs and `ads_read` access.
+   ```bash
+   .venv/bin/python scripts/configure_meta_oauth.py
+   ```
+
+   The command stores `META_APP_ID`, `META_APP_SECRET` and the explicitly pinned `META_GRAPH_API_VERSION` without displaying the entered values. The current reviewed version is `v26.0`; versions never float silently.
+6. [ ] Start the authenticated OAuth flow through Tony's loopback service. The callback exchanges the one-time code server-side, upgrades it to a long-lived user token, verifies the granted permissions, discovers accessible accounts and writes the token atomically to the mode-`0600` runtime environment.
+7. [ ] If Meta returns one accessible account, Narratiive also stores its account ID, timezone and currency. If multiple accounts are returned, select the intended account before certification; Narratiive does not guess.
+8. [ ] Authorise a read-only smoke test: accessible-account metadata, campaigns, ad sets, ads, creative metadata, delivery/review status and a seven-day Insights query.
+
+The public HTTPS callback terminates at n8n and forwards the one-time values to Tony over authenticated loopback. Successful, failed and manual workflow execution payloads are not persisted. OAuth state is stored only as a short-lived SHA-256 digest and consumed once. Meta tokens are sent only to fixed Meta HTTPS hosts; API reads include `appsecret_proof` when the app secret is configured. Codes, tokens and secrets are never returned by Narratiive's HTTP responses or written to its audit journal.
+
+References: Meta's official [Marketing API authorisation guide](https://developers.facebook.com/documentation/ads-commerce/marketing-api/get-started/authorization), [Ads Insights API guide](https://developers.facebook.com/documentation/ads-commerce/marketing-api/insights), [`ads_read` permission reference](https://developers.facebook.com/docs/permissions/reference/ads_read/) and [Graph/Marketing API v26.0 changelog](https://developers.facebook.com/docs/graph-api/changelog/version26.0/).
 
 ## TikTok Ads
 
@@ -108,7 +112,7 @@ Run a provider certification through the protected environment with:
 
 ```bash
 .venv/bin/python scripts/run_with_env.py ~/.config/narratiive/runtime.env \
-  .venv/bin/python scripts/certify_media_provider.py google
+  .venv/bin/python scripts/certify_media_provider.py PROVIDER
 ```
 
 The command performs account and campaign-list reads, appends success or failure

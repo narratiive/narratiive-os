@@ -10,7 +10,7 @@ class TonyMediaCommandService:
     """Read-only Tony media queries over canonical, audited media state."""
 
     _COMMANDS = {"media", "media-integrations", "media_integrations", "health"}
-    _MODES = {"today", "7d", "creative", "pacing", "recommendations"}
+    _MODES = {"today", "7d", "creative", "pacing", "recommendations", "inventory"}
 
     def __init__(self, command_service, media_control: MediaControlService) -> None:
         self.command_service = command_service
@@ -60,6 +60,40 @@ class TonyMediaCommandService:
         arguments = parts[1:]
         mode = next((item.casefold() for item in arguments if item.casefold() in self._MODES), "summary")
         query = " ".join(item for item in arguments if item.casefold() not in self._MODES).strip()
+        if mode == "inventory":
+            inventories = self.media_control.inventories()
+            if query:
+                needle = query.casefold()
+                inventories = tuple(item for item in inventories if item.provider.value == needle)
+            if not inventories:
+                return CommandResponse(
+                    command="media",
+                    status="empty",
+                    message="No verified provider inventory matched the request.",
+                    data={"query": query, "mode": mode, "external_action_taken": False},
+                )
+            return CommandResponse(
+                command="media",
+                status="ready",
+                message=f"{len(inventories)} verified read-only provider inventor{'y' if len(inventories) == 1 else 'ies'} available.",
+                data={
+                    "mode": mode,
+                    "providers": [
+                        {
+                            "provider": item.provider.value,
+                            "configured_account_id": item.configured_account_id,
+                            "accessible_account_ids": list(item.accessible_account_ids),
+                            "counts": item.counts(),
+                            "synced_at": item.synced_at,
+                            "entities": [entity.to_dict() for entity in item.entities],
+                        }
+                        for item in inventories
+                    ],
+                    "external_action_taken": False,
+                    "publication_authorised": False,
+                    "media_spend_authorised": False,
+                },
+            )
         snapshots = self.media_control.snapshots()
         if query:
             needle = query.casefold()

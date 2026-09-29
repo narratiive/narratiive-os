@@ -72,13 +72,29 @@ class MediaLifecycleStage(str, Enum):
 WRITE_OPERATIONS = frozenset(
     {
         "create_campaign",
+        "update_campaign",
+        "delete_campaign",
         "create_ad_group",
+        "update_ad_group",
+        "delete_ad_group",
         "create_ad",
+        "update_ad",
+        "delete_ad",
         "upload_creative",
+        "update_creative",
+        "delete_creative",
         "update_budget",
+        "update_bid",
         "pause_ad",
         "resume_ad",
         "activate_campaign",
+        "pause_campaign",
+        "resume_campaign",
+        "update_audience",
+        "create_audience",
+        "delete_audience",
+        "configure_pixel",
+        "configure_event",
     }
 )
 
@@ -351,6 +367,84 @@ class CanonicalMediaSnapshot:
 
 
 @dataclass(frozen=True, slots=True)
+class NormalizedMediaEntity:
+    provider: MediaProvider
+    account_id: str
+    entity_type: str
+    provider_id: str
+    parent_id: str = ""
+    name: str = ""
+    status: str = "unknown"
+    effective_status: str = "unknown"
+    attributes: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if self.entity_type not in {"account", "campaign", "ad_group", "ad", "creative"}:
+            raise MediaControlError("media entity type is invalid")
+        if not self.account_id.strip() or not self.provider_id.strip():
+            raise MediaControlError("media entity requires account and provider IDs")
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            **asdict(self),
+            "provider": self.provider.value,
+            "attributes": dict(self.attributes),
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "NormalizedMediaEntity":
+        return cls(
+            provider=MediaProvider(str(value["provider"])),
+            account_id=str(value["account_id"]),
+            entity_type=str(value["entity_type"]),
+            provider_id=str(value["provider_id"]),
+            parent_id=str(value.get("parent_id", "")),
+            name=str(value.get("name", "")),
+            status=str(value.get("status", "unknown")),
+            effective_status=str(value.get("effective_status", "unknown")),
+            attributes=dict(value.get("attributes", {})),
+        )
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderMediaInventory:
+    provider: MediaProvider
+    configured_account_id: str
+    accessible_account_ids: tuple[str, ...]
+    entities: tuple[NormalizedMediaEntity, ...]
+    synced_at: str
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "provider": self.provider.value,
+            "configured_account_id": self.configured_account_id,
+            "accessible_account_ids": list(self.accessible_account_ids),
+            "entities": [item.to_dict() for item in self.entities],
+            "synced_at": self.synced_at,
+        }
+
+    @classmethod
+    def from_dict(cls, value: Mapping[str, Any]) -> "ProviderMediaInventory":
+        return cls(
+            provider=MediaProvider(str(value["provider"])),
+            configured_account_id=str(value["configured_account_id"]),
+            accessible_account_ids=tuple(str(item) for item in value.get("accessible_account_ids", ())),
+            entities=tuple(
+                NormalizedMediaEntity.from_dict(item)
+                for item in value.get("entities", ())
+                if isinstance(item, Mapping)
+            ),
+            synced_at=str(value["synced_at"]),
+        )
+
+    def counts(self) -> dict[str, int]:
+        return {
+            entity_type: sum(1 for item in self.entities if item.entity_type == entity_type)
+            for entity_type in ("account", "campaign", "ad_group", "ad", "creative")
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class MediaRecommendation:
     recommendation_id: str
     client_id: str
@@ -477,13 +571,29 @@ class ReadOnlyProviderAdapter:
         raise MediaMutationDisabled(f"{self.provider.value} {operation} is disabled in Phase 1")
 
     create_campaign = lambda self, *args, **kwargs: self._mutation_disabled("create_campaign", *args, **kwargs)
+    update_campaign = lambda self, *args, **kwargs: self._mutation_disabled("update_campaign", *args, **kwargs)
+    delete_campaign = lambda self, *args, **kwargs: self._mutation_disabled("delete_campaign", *args, **kwargs)
     create_ad_group = lambda self, *args, **kwargs: self._mutation_disabled("create_ad_group", *args, **kwargs)
+    update_ad_group = lambda self, *args, **kwargs: self._mutation_disabled("update_ad_group", *args, **kwargs)
+    delete_ad_group = lambda self, *args, **kwargs: self._mutation_disabled("delete_ad_group", *args, **kwargs)
     create_ad = lambda self, *args, **kwargs: self._mutation_disabled("create_ad", *args, **kwargs)
+    update_ad = lambda self, *args, **kwargs: self._mutation_disabled("update_ad", *args, **kwargs)
+    delete_ad = lambda self, *args, **kwargs: self._mutation_disabled("delete_ad", *args, **kwargs)
     upload_creative = lambda self, *args, **kwargs: self._mutation_disabled("upload_creative", *args, **kwargs)
+    update_creative = lambda self, *args, **kwargs: self._mutation_disabled("update_creative", *args, **kwargs)
+    delete_creative = lambda self, *args, **kwargs: self._mutation_disabled("delete_creative", *args, **kwargs)
     update_budget = lambda self, *args, **kwargs: self._mutation_disabled("update_budget", *args, **kwargs)
+    update_bid = lambda self, *args, **kwargs: self._mutation_disabled("update_bid", *args, **kwargs)
     pause_ad = lambda self, *args, **kwargs: self._mutation_disabled("pause_ad", *args, **kwargs)
     resume_ad = lambda self, *args, **kwargs: self._mutation_disabled("resume_ad", *args, **kwargs)
     activate_campaign = lambda self, *args, **kwargs: self._mutation_disabled("activate_campaign", *args, **kwargs)
+    pause_campaign = lambda self, *args, **kwargs: self._mutation_disabled("pause_campaign", *args, **kwargs)
+    resume_campaign = lambda self, *args, **kwargs: self._mutation_disabled("resume_campaign", *args, **kwargs)
+    update_audience = lambda self, *args, **kwargs: self._mutation_disabled("update_audience", *args, **kwargs)
+    create_audience = lambda self, *args, **kwargs: self._mutation_disabled("create_audience", *args, **kwargs)
+    delete_audience = lambda self, *args, **kwargs: self._mutation_disabled("delete_audience", *args, **kwargs)
+    configure_pixel = lambda self, *args, **kwargs: self._mutation_disabled("configure_pixel", *args, **kwargs)
+    configure_event = lambda self, *args, **kwargs: self._mutation_disabled("configure_event", *args, **kwargs)
 
 
 class MetaReadOnlyAdapter(ReadOnlyProviderAdapter):
@@ -524,11 +634,16 @@ class MediaNormaliser:
         "frequency": "Provider-reported average impressions per reached account.",
         "cpm": "Provider-reported cost per thousand impressions.",
         "clicks": "Provider-counted clicks under its click definition.",
+        "unique_clicks": "Provider-estimated unique accounts that clicked.",
+        "link_clicks": "Provider-counted clicks on links leading to a destination.",
+        "landing_page_views": "Provider-attributed landing-page view events.",
         "ctr": "Provider-reported click-through rate.",
         "cpc": "Provider-reported cost per click.",
         "video_views": "Provider-counted video views under its view threshold.",
         "video_completions": "Provider-counted completed video views.",
         "conversions": "Provider-attributed conversions under the retained attribution context.",
+        "leads": "Provider-attributed lead events under the retained attribution context.",
+        "purchases": "Provider-attributed purchase events under the retained attribution context.",
         "conversion_value": "Provider-attributed conversion value.",
         "cpa": "Provider-reported cost per attributed conversion.",
         "roas": "Provider-reported attributed return on ad spend.",
@@ -866,6 +981,135 @@ class MediaControlService:
         )
         return snapshot
 
+    def sync_inventory(self, provider: MediaProvider, *, request_id: str) -> ProviderMediaInventory:
+        """Read and audit the provider hierarchy without enabling any mutation authority."""
+
+        self.policy.authorize(MediaAuthority.READ, "sync_inventory")
+        if not request_id.strip():
+            raise MediaControlError("provider inventory request_id is required")
+        matches = [
+            record
+            for record in self.journal.read_all()
+            if record.action == self.AUDIT_ACTION
+            and record.metadata.get("request_id") == request_id
+            and record.metadata.get("operation") == "sync_inventory"
+        ]
+        if matches:
+            if any(record.metadata.get("provider") != provider.value for record in matches):
+                raise MediaControlError("provider inventory request_id is already bound to another provider")
+            completed = [record for record in matches if record.status == "completed"]
+            if completed:
+                payload = completed[-1].metadata.get("canonical_inventory")
+                if not isinstance(payload, Mapping):
+                    raise MediaControlError("duplicate inventory request has no trusted canonical output")
+                return ProviderMediaInventory.from_dict(payload)
+
+        adapter = self.adapters.get(provider)
+        if adapter is None:
+            self._audit_inventory_failure(provider, request_id, "adapter not configured")
+            raise MediaConfigurationError(f"{provider.value} adapter is not configured")
+        configuration = getattr(adapter, "configuration", None)
+        account_id = str(getattr(configuration, "account_id", "")).strip()
+        if not account_id:
+            self._audit_inventory_failure(provider, request_id, "adapter account identity is unavailable")
+            raise MediaConfigurationError(f"{provider.value} adapter account identity is unavailable")
+        try:
+            accounts = tuple(adapter.get_accounts())
+            campaigns = tuple(adapter.get_campaigns())
+            entities: list[NormalizedMediaEntity] = [
+                self._normalise_entity(provider, account_id, "account", item)
+                for item in accounts
+            ]
+            for campaign in campaigns:
+                campaign_entity = self._normalise_entity(provider, account_id, "campaign", campaign)
+                entities.append(campaign_entity)
+                native_campaign_id = campaign_entity.provider_id
+                entities.extend(
+                    self._normalise_entity(
+                        provider,
+                        account_id,
+                        "ad_group",
+                        item,
+                        parent_id=native_campaign_id,
+                    )
+                    for item in adapter.get_ad_groups(native_campaign_id)
+                )
+                entities.extend(
+                    self._normalise_entity(
+                        provider,
+                        account_id,
+                        "ad",
+                        item,
+                        parent_id=native_campaign_id,
+                    )
+                    for item in adapter.get_ads(native_campaign_id)
+                )
+                entities.extend(
+                    self._normalise_entity(
+                        provider,
+                        account_id,
+                        "creative",
+                        item,
+                        parent_id=native_campaign_id,
+                    )
+                    for item in adapter.get_creatives(native_campaign_id)
+                )
+            accessible_ids = tuple(
+                str(item.get("account_id") or item.get("advertiser_id") or item.get("customer_id") or item.get("id") or item.get("resource_name") or "")
+                .removeprefix("act_")
+                .removeprefix("customers/")
+                for item in accounts
+                if isinstance(item, Mapping)
+            )
+            inventory = ProviderMediaInventory(
+                provider=provider,
+                configured_account_id=account_id,
+                accessible_account_ids=tuple(item for item in accessible_ids if item),
+                entities=tuple(entities),
+                synced_at=_utc_now(),
+            )
+        except Exception as exc:
+            self._audit_inventory_failure(provider, request_id, _audit_safe_error(exc), account_id=account_id)
+            raise
+        counts = inventory.counts()
+        self.journal.append(
+            decision_id=f"media-{provider.value}-inventory",
+            workspace_id="system",
+            action=self.AUDIT_ACTION,
+            rationale="Read-only provider hierarchy inventory.",
+            actor="media-control-layer",
+            status="completed",
+            record_id=f"media-{_safe_hash(request_id)}",
+            metadata={
+                "timestamp": inventory.synced_at,
+                "provider": provider.value,
+                "operation": "sync_inventory",
+                "authority": MediaAuthority.READ.value,
+                "request_id": request_id,
+                "result": "normalised",
+                "account_id": account_id,
+                "entity_counts": counts,
+                "external_write_performed": False,
+                "publication_authorised": False,
+                "media_spend_authorised": False,
+                "error": None,
+                "retry_state": "not_required",
+                "canonical_inventory": inventory.to_dict(),
+            },
+        )
+        return inventory
+
+    def inventories(self) -> tuple[ProviderMediaInventory, ...]:
+        latest: dict[MediaProvider, ProviderMediaInventory] = {}
+        for record in self.journal.read_all():
+            if record.action != self.AUDIT_ACTION or record.status != "completed":
+                continue
+            payload = record.metadata.get("canonical_inventory")
+            if isinstance(payload, Mapping):
+                inventory = ProviderMediaInventory.from_dict(payload)
+                latest[inventory.provider] = inventory
+        return tuple(latest.values())
+
     def prohibit_mutation(
         self,
         *,
@@ -962,6 +1206,7 @@ class MediaControlService:
             else:
                 health = ConnectionHealth.HEALTHY
             snapshots = [item for item in self.snapshots() if item.provider is provider]
+            inventory = next((item for item in self.inventories() if item.provider is provider), None)
             latest_success = completed[-1] if completed else None
             latest_metadata = latest_success.metadata if latest_success else {}
             adapter_configuration = getattr(self.adapters.get(provider), "configuration", None)
@@ -983,6 +1228,8 @@ class MediaControlService:
                 "configured_account_id": str(getattr(adapter_configuration, "account_id", "")) or None,
                 "configured_manager_account_id": str(getattr(adapter_configuration, "manager_account_id", "")) or None,
                 "campaigns_returned": latest_metadata.get("campaigns_returned"),
+                "inventory_counts": inventory.counts() if inventory else None,
+                "last_inventory_sync": inventory.synced_at if inventory else None,
                 "data_freshness": max((item.ingested_at for item in snapshots), default=None),
             }
         recommendations = self.analyse(self.snapshots())
@@ -1041,6 +1288,81 @@ class MediaControlService:
                 "error": error,
                 "retry_state": "eligible_after_cause_resolved",
             },
+        )
+
+    def _audit_inventory_failure(
+        self,
+        provider: MediaProvider,
+        request_id: str,
+        error: str,
+        *,
+        account_id: str = "",
+    ) -> None:
+        self.journal.append(
+            decision_id=f"media-{provider.value}-inventory",
+            workspace_id="system",
+            action=self.AUDIT_ACTION,
+            rationale="Read-only provider hierarchy inventory failed closed.",
+            actor="media-control-layer",
+            status="failed",
+            metadata={
+                "timestamp": _utc_now(),
+                "provider": provider.value,
+                "operation": "sync_inventory",
+                "authority": MediaAuthority.READ.value,
+                "request_id": request_id,
+                "result": "failed",
+                "account_id": account_id or None,
+                "external_write_performed": False,
+                "publication_authorised": False,
+                "media_spend_authorised": False,
+                "error": error,
+                "retry_state": "eligible_after_cause_resolved",
+            },
+        )
+
+    @staticmethod
+    def _normalise_entity(
+        provider: MediaProvider,
+        account_id: str,
+        entity_type: str,
+        item: Mapping[str, Any],
+        *,
+        parent_id: str = "",
+    ) -> NormalizedMediaEntity:
+        if not isinstance(item, Mapping):
+            raise MalformedProviderResponse(f"{provider.value} {entity_type} response must contain objects")
+        source: Mapping[str, Any] = item
+        if entity_type == "campaign" and isinstance(item.get("campaign"), Mapping):
+            source = item["campaign"]
+        elif entity_type == "ad_group" and isinstance(item.get("adGroup"), Mapping):
+            source = item["adGroup"]
+        elif entity_type in {"ad", "creative"} and isinstance(item.get("adGroupAd"), Mapping):
+            wrapper = item["adGroupAd"]
+            native_ad = wrapper.get("ad") if isinstance(wrapper.get("ad"), Mapping) else {}
+            source = {**dict(native_ad), "status": wrapper.get("status", native_ad.get("status"))}
+        identifiers = {
+            "account": ("account_id", "advertiser_id", "customer_id", "id", "resource_name"),
+            "campaign": ("campaign_id", "id"),
+            "ad_group": ("adgroup_id", "ad_group_id", "id"),
+            "ad": ("ad_id", "id"),
+            "creative": ("creative_id", "id", "ad_id"),
+        }[entity_type]
+        provider_id = next((str(source.get(key) or "").strip() for key in identifiers if str(source.get(key) or "").strip()), "")
+        provider_id = provider_id.removeprefix("act_").removeprefix("customers/")
+        native_status = str(source.get("status") or source.get("operation_status") or "unknown")
+        effective_status = str(source.get("effective_status") or source.get("secondary_status") or native_status)
+        excluded = set(identifiers) | {"name", "status", "effective_status", "operation_status", "secondary_status"}
+        return NormalizedMediaEntity(
+            provider=provider,
+            account_id=account_id,
+            entity_type=entity_type,
+            provider_id=provider_id,
+            parent_id=parent_id,
+            name=str(source.get("name") or source.get("campaign_name") or source.get("adgroup_name") or source.get("ad_name") or ""),
+            status=native_status,
+            effective_status=effective_status,
+            attributes={key: value for key, value in source.items() if key not in excluded},
         )
 
     def _record_for_request(self, request_id: str, request_fingerprint: str) -> ExecutionRecord | None:

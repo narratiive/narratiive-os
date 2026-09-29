@@ -68,6 +68,9 @@ The canonical model includes:
 - a metric value plus provider, definition, period, currency, attribution context and explicit availability state;
 - creative-learning dimensions: Campaign World, territory, format, hook, message, audience, platform and placement;
 - recommendations that are advisory and human-approval-required.
+- an audited provider hierarchy inventory with normalised account, campaign,
+  ad-group/ad-set, ad and creative entities while retaining provider-specific
+  attributes needed for diagnosis.
 
 The conceptual future media lifecycle is represented by `MediaLifecycleStage`:
 
@@ -89,6 +92,8 @@ Phase 1 implements schema and policy support only. It does not transition a real
 6. The normaliser emits provider-aware canonical metrics. Missing metrics become `available=false` and `value=null`, never zero.
 7. The service appends a hash-chained audit event containing request/result metadata and the canonical snapshot, without credentials.
 8. Tony reconstructs the latest provider snapshots from the journal, analyses exceptions and surfaces recommendations.
+   `/media inventory [provider]` reconstructs the latest verified hierarchy
+   without making a live call during the operator query.
 9. Recommendations remain pending human decisions; they do not call platform APIs.
 10. Future creative-learning projections may feed approved observations back to the existing performance-feedback layer.
 
@@ -98,7 +103,7 @@ Cross-provider totals are produced only when currencies match. Attribution conte
 
 Credentials are validated at adapter construction and are never serialised to canonical state or audit events.
 
-- Meta: Meta app with Marketing API, authorised Business Portfolio/ad account, a server-side user or system-user access token, and read permission (`ads_read`; any broader permission requires separate justification). Required local values: `META_ACCESS_TOKEN`, `META_ACCOUNT_ID`, `META_TIMEZONE`, `META_CURRENCY`, and an explicit reviewed `META_GRAPH_API_VERSION`.
+- Meta: Meta business app with Marketing API and Facebook Login for Business, an exact n8n HTTPS callback, one-time hashed OAuth state, server-side short-token exchange and long-lived-token upgrade, and an authorised advertising account. Phase 1 requests only `ads_read` for objects/Insights; `ads_management` and `business_management` are explicitly rejected because both exceed the read-only authority. App configuration is `META_APP_ID`, `META_APP_SECRET` and an explicit reviewed `META_GRAPH_API_VERSION`; successful OAuth supplies `META_ACCESS_TOKEN`, `META_ACCOUNT_ID`, `META_TIMEZONE` and `META_CURRENCY`. Multiple accessible accounts require explicit selection.
 - TikTok: approved TikTok API for Business app, protected app ID/secret, stable n8n HTTPS callback, one-time hashed OAuth state, server-side authorisation-code exchange, exact read-only scope validation, resulting server-side access token and explicit advertiser ID. Required setup values are `TIKTOK_APP_ID`, `TIKTOK_APP_SECRET`, and the portal-generated `TIKTOK_ADVERTISER_AUTH_URL`; resulting adapter values are `TIKTOK_ACCESS_TOKEN`, `TIKTOK_ACCOUNT_ID`, `TIKTOK_TIMEZONE`, and `TIKTOK_CURRENCY`. Only scope IDs `100`, `200`, `210`, `220`, and `44` are accepted.
 - Google Ads: Google Cloud project/API access, OAuth client ID/secret, refresh token for a user with access, target customer ID, and manager/login customer ID when access is indirect. Required values: `GOOGLE_ADS_CLIENT_ID`, `GOOGLE_ADS_CLIENT_SECRET`, `GOOGLE_ADS_REFRESH_TOKEN`, `GOOGLE_ADS_ACCOUNT_ID`, optional `GOOGLE_ADS_MANAGER_ACCOUNT_ID`, `GOOGLE_ADS_TIMEZONE`, `GOOGLE_ADS_CURRENCY`, and an explicit reviewed `GOOGLE_ADS_API_VERSION`. Google sunset developer tokens on 9 September 2026; `GOOGLE_ADS_DEVELOPER_TOKEN` may remain for backwards compatibility but is not a new Phase 1 prerequisite.
 
@@ -155,7 +160,7 @@ This validator is present for design/testing only; no launch path consumes it in
 ## 9. Known blockers and limitations
 
 - Google Ads passed an audited live read-only certification on 28 September 2026 for advertiser customer `9780735754` through manager customer `7620152450`. The account returned zero campaigns; that is a valid healthy empty result because the customer-scoped Google Ads query completed successfully. The append-only runtime journal remains the authoritative live evidence.
-- Meta and TikTok have fixture-tested read transports but remain `DEGRADED` until each records its own successful audited live read.
+- Meta and TikTok have fixture-tested OAuth and read transports but remain `DEGRADED` until each records its own successful audited live read.
 - Fixed-host read-only HTTP transports exist for Meta Marketing API, TikTok API for Business and Google Ads SearchStream/OAuth. Request construction and native-to-canonical translation remain covered by the Northstar and focused transport tests.
 - Provider attribution models are not harmonised. Canonical output preserves context but does not claim direct comparability.
 - Provider breakdown availability varies and must stay provider-specific.
