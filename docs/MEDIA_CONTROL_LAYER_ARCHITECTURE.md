@@ -41,6 +41,9 @@ The current canonical Campaign Engine ends at `asset_suite_approved`. Its state 
 - `CampaignIdentity` supplies workspace, client, brand, markets, products and campaign IDs.
 - existing `ProducedAssetVersion.asset_id` remains the Narratiive creative key. The media layer adds provider creative/ad mappings without replacing it.
 - the Campaign Engine's Blueprint → Campaign World → Creative Director's Bible → Production Pack → Asset Manifest lineage is verified before the certification harness admits a campaign to media monitoring.
+- daily and weekly monitoring reads the append-only snapshot history, compares only equal-duration/equal-currency windows, and persists an idempotent internal report. Observed facts, material-change signals and recommendations are labelled separately; no causal explanation is asserted from correlation.
+- Tony accepts `/media <client-or-campaign> daily`, `/media <client-or-campaign> weekly` and `/media exceptions`. The commands never mutate providers, authorise spend or publish a report.
+- creative diagnostics fail honestly when only campaign-level evidence exists. Campaign results are never attributed to an individual asset unless a provider supplied explicit creative-level rows linked to the canonical asset mapping.
 - `ExecutionJournal` is the authoritative media audit/replay source. Canonical snapshots are stored inside completed read events and reconstructed after restart.
 - Tony's decorator-style command composition now exposes `/media` and `/media-integrations` without changing existing commands.
 - existing n8n, Notion and Drive roles are preserved. Phase 1 does not add another scheduler, CRM or file store.

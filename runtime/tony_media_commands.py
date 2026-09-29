@@ -10,7 +10,10 @@ class TonyMediaCommandService:
     """Read-only Tony media queries over canonical, audited media state."""
 
     _COMMANDS = {"media", "media-integrations", "media_integrations", "health"}
-    _MODES = {"today", "7d", "creative", "pacing", "recommendations", "inventory"}
+    _MODES = {
+        "today", "daily", "7d", "weekly", "exceptions",
+        "creative", "pacing", "recommendations", "inventory",
+    }
 
     def __init__(self, command_service, media_control: MediaControlService) -> None:
         self.command_service = command_service
@@ -93,6 +96,29 @@ class TonyMediaCommandService:
                     "publication_authorised": False,
                     "media_spend_authorised": False,
                 },
+            )
+        if mode in {"today", "daily", "7d", "weekly", "exceptions"}:
+            cadence = "daily" if mode in {"today", "daily", "exceptions"} else "weekly"
+            report = self.media_control.monitor(cadence=cadence, query=query)
+            if not report["facts"]:
+                return CommandResponse(
+                    command="media",
+                    status="empty",
+                    message="No verified media evidence matched the monitoring request.",
+                    data={**report, "mode": mode},
+                )
+            exception_count = len(report["exceptions"])
+            recommendation_count = len(report["recommendations"])
+            return CommandResponse(
+                command="media",
+                status="attention_required" if report["status"] == "attention_required" else "ready",
+                message=(
+                    f"{cadence.title()} media monitor: {len(report['facts'])} verified snapshot(s), "
+                    f"{exception_count} exception(s), {recommendation_count} recommendation(s). "
+                    "Observed facts are separated from rule-based "
+                    "interpretations. No media mutation or spend action was taken."
+                ),
+                data={**report, "mode": mode},
             )
         snapshots = self.media_control.snapshots()
         if query:
