@@ -1,4 +1,4 @@
-# Meta Ads Phase 1 read-only onboarding
+# Meta Ads provider-capability onboarding
 
 Status: backend ready; external app credentials and advertiser consent required
 
@@ -7,10 +7,10 @@ Status: backend ready; external app credentials and advertiser consent required
 - App name: `Narratiive Media Control`
 - Valid OAuth Redirect URI: `https://lushly-spoof-reheat.ngrok-free.dev/webhook/meta-media-oauth-callback`
 - Reviewed API version: `v26.0`
-- Requested permission: `ads_read`
-- Prohibited permissions: `ads_management`, `business_management`
+- Requested permissions: `ads_read`, `ads_management`, `business_management`
+- Runtime mutation authority: disabled
 
-Accessible advertising accounts are discovered through the user's `ads_read` grant. Phase 1 does not request the broader Business Manager or advertising-management permissions. The application contains no Meta mutation transport: campaign, ad-set, ad, creative, budget, bid, activation, audience, pixel and event mutations all raise before provider dispatch.
+Accessible advertising accounts are discovered through the user's `ads_read` grant. Approved management scopes are retained as provider capability metadata for future explicitly governed use. They do not alter runtime authority: campaign, ad-set, ad, creative, budget, bid, activation, audience, pixel and event mutations all raise before provider dispatch.
 
 ## Engineering installation
 
@@ -47,6 +47,8 @@ not contact Meta or trigger any external action.
 - OAuth state is a single-use, expiring SHA-256 digest in a mode-`0600` file.
 - App secret, code and tokens remain outside Git and do not appear in HTTP responses or execution evidence.
 - Tokens are written atomically to the protected runtime environment.
+- Granted scopes and normalized provider capabilities are retained without secrets.
+- Possession of `ads_management` or `business_management` cannot dispatch a provider mutation.
 - Meta API reads use `appsecret_proof` when the app secret is configured.
 - n8n does not persist callback execution payloads.
 - Re-running `/oauth/meta/start` creates a new state; a consumed or expired callback fails closed.

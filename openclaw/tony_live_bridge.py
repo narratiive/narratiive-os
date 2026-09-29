@@ -512,7 +512,10 @@ class LeadAwareTonyApplication:
             "status": "tiktok_credentials_stored",
             "authorised_advertiser_ids": list(result.advertiser_ids),
             "account_selection_required": len(result.advertiser_ids) != 1,
+            "granted_scopes": list(result.granted_scopes),
+            "provider_capabilities": list(result.provider_capabilities),
             "read_only": True,
+            "runtime_mutation_authority": False,
             "external_media_write_performed": False,
         })
 
@@ -561,7 +564,10 @@ class LeadAwareTonyApplication:
             "status": "meta_credentials_stored",
             "authorised_ad_account_ids": list(result.account_ids),
             "account_selection_required": len(result.account_ids) != 1,
+            "granted_scopes": list(result.granted_scopes),
+            "provider_capabilities": list(result.provider_capabilities),
             "read_only": True,
+            "runtime_mutation_authority": False,
             "external_media_write_performed": False,
         })
 

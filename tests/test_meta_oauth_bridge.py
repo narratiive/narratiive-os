@@ -54,13 +54,19 @@ class MetaOAuthBridgeTests(unittest.TestCase):
         self.assertNotIn("access_token", json.dumps(payload))
 
     def test_callback_does_not_echo_code_state_or_token(self):
-        self.oauth.exchange.return_value = MetaOAuthResult(("123",), ("ads_read",))
+        self.oauth.exchange.return_value = MetaOAuthResult(
+            ("123",),
+            ("ads_management", "ads_read"),
+            ("manage_ads", "manage_campaigns", "read_ads"),
+        )
         status, payload = self.call("/oauth/meta/callback", {"state": "state-secret", "code": "code-secret"})
         rendered = json.dumps(payload)
         self.assertTrue(status.startswith("200"))
         self.assertNotIn("state-secret", rendered)
         self.assertNotIn("code-secret", rendered)
         self.assertTrue(payload["read_only"])
+        self.assertFalse(payload["runtime_mutation_authority"])
+        self.assertIn("manage_campaigns", payload["provider_capabilities"])
 
     def test_callback_returns_sanitised_fail_closed_error(self):
         self.oauth.exchange.side_effect = MetaOAuthError("Meta credential verification failed")
