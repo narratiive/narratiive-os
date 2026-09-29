@@ -69,8 +69,9 @@ class WorkflowInstructionTests(unittest.TestCase):
         )
 
         self.assertIn("organises evidence; it does not approve strategy", instruction)
-        self.assertIn("at least three objects with pattern", instruction)
-        self.assertIn("Preserve every contradiction, gap and uncertainty", instruction)
+        self.assertIn("exactly three objects with pattern", instruction)
+        self.assertIn("under 4,000 words", instruction)
+        self.assertIn("Preserve every supplied contradiction, gap and uncertainty", instruction)
 
     def test_strategy_thesis_contract_reserves_gate_three_for_matt(self) -> None:
         instruction = workflow_instruction(

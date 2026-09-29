@@ -29,6 +29,13 @@ from runtime.workflow_run_identity import downstream_run_id
 QualityValidator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 
 
+_BOUNDED_STRATEGY_CONTEXT_FIELDS: dict[str, tuple[str, ...]] = {
+    "research_to_strategic_synthesis": ("contradictions", "research_gaps", "_lineage"),
+    "strategic_synthesis_to_strategy_thesis": ("contradictions_and_gaps", "open_inputs", "_lineage"),
+    "strategy_thesis_to_growth_blueprint": ("evidence_and_uncertainty", "_lineage"),
+}
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionOutcome:
     run_id: str
@@ -251,7 +258,7 @@ class WorkflowExecutionCoordinator:
 
             self.runs.start_stage(run_id, stage.stage_id)
             idempotency_key = f"{state.run_id}:{stage.stage_id}:{len(stage.attempts) + 1}"
-            contract = dict(state.input_payload)
+            contract = self._worker_contract(state, stage_definition.input_contract.required_fields)
             contract["workflow_context"] = {
                 "workflow_id": state.workflow_id,
                 "run_id": state.run_id,
@@ -456,6 +463,15 @@ class WorkflowExecutionCoordinator:
             next_run_id=next_run_id,
             external_action_taken=state.external_action_taken or outcome.external_action_taken,
         )
+
+    @staticmethod
+    def _worker_contract(state: WorkflowState, required_fields: tuple[str, ...]) -> dict[str, Any]:
+        """Keep long-form strategy prompts bounded without weakening persisted evidence."""
+        optional_fields = _BOUNDED_STRATEGY_CONTEXT_FIELDS.get(state.workflow_id)
+        if optional_fields is None:
+            return dict(state.input_payload)
+        allowed = (*required_fields, *optional_fields)
+        return {field: state.input_payload[field] for field in allowed if field in state.input_payload}
 
     @staticmethod
     def _approval_covers(state: WorkflowState, proposed_action: str) -> bool:
