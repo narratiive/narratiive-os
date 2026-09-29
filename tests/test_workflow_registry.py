@@ -19,6 +19,9 @@ class WorkflowRegistryTests(unittest.TestCase):
             "blueprint_lite_to_discovery_preparation",
             "discovery_evidence_to_growth_sprint_proposal",
             "growth_sprint_to_research_engine",
+            "research_to_strategic_synthesis",
+            "strategic_synthesis_to_strategy_thesis",
+            "strategy_thesis_to_growth_blueprint",
             "research_to_growth_blueprint",
             "growth_blueprint_deliverable_production",
             "growth_blueprint_to_campaign_world",
@@ -93,6 +96,22 @@ class WorkflowRegistryTests(unittest.TestCase):
             },
         )
         self.assertTrue(blueprint.approval_policy.required)
+
+    def test_gate_three_separates_synthesis_thesis_and_blueprint_authority(self) -> None:
+        registry = build_narratiive_workflow_registry()
+        research = registry.resolve("growth_sprint_to_research_engine")
+        synthesis = registry.resolve("research_to_strategic_synthesis")
+        thesis = registry.resolve("strategic_synthesis_to_strategy_thesis")
+        blueprint = registry.resolve("strategy_thesis_to_growth_blueprint")
+
+        self.assertEqual(research.next_workflow_id, synthesis.workflow_id)
+        self.assertFalse(synthesis.approval_required)
+        self.assertEqual(synthesis.next_workflow_id, thesis.workflow_id)
+        self.assertTrue(thesis.approval_required)
+        self.assertIn("decision_register", thesis.stages[0].output_contract.required_fields)
+        self.assertEqual(thesis.next_workflow_id, blueprint.workflow_id)
+        self.assertIn("approved_strategy_thesis", blueprint.stages[0].input_contract.required_fields)
+        self.assertIn("strategy_thesis_identity", blueprint.stages[0].input_contract.required_fields)
 
     def test_growth_blueprint_deliverable_is_a_separate_approval_gated_stage(self) -> None:
         definition = build_narratiive_workflow_registry().resolve("growth_blueprint_deliverable_production")

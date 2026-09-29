@@ -17,7 +17,12 @@ from runtime.human_review_artifacts import (
 )
 from runtime.models import ArtifactRef, WorkflowState
 from tests.test_tony_workflow_commands import blueprint_output
-from tests.test_workflow_quality import discovery_output, growth_blueprint_output, proposal_output
+from tests.test_workflow_quality import (
+    discovery_output,
+    growth_blueprint_output,
+    proposal_output,
+    strategy_thesis_output,
+)
 
 
 def state(workflow_id: str) -> WorkflowState:
@@ -38,6 +43,8 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Blueprint Lite"),
             ("discovery_evidence_to_growth_sprint_proposal", proposal_output(), "Growth Sprint Proposal"),
             ("blueprint_lite_to_discovery_preparation", discovery_output(), "Research and Strategy Review"),
+            ("strategic_synthesis_to_strategy_thesis", strategy_thesis_output(), "Strategy Thesis"),
+            ("strategy_thesis_to_growth_blueprint", growth_blueprint_output(), "Narratiive Growth Blueprint"),
             ("research_to_growth_blueprint", growth_blueprint_output(), "Narratiive Growth Blueprint"),
         )
 
@@ -48,6 +55,25 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 self.assertGreaterEqual(len(plan.sections), 4)
                 self.assertTrue(plan.decision_prompt)
                 self.assertTrue(plan.next_if_approved)
+
+    def test_strategy_thesis_review_is_a_gate_three_decision_document(self) -> None:
+        plan = build_review_plan(
+            state("strategic_synthesis_to_strategy_thesis"),
+            strategy_thesis_output(),
+        )
+        visible = " ".join(
+            (
+                plan.product,
+                plan.gate_label,
+                plan.decision_prompt,
+                *(section.heading for section in plan.sections),
+                *(text for section in plan.sections for text in section.body),
+                *(text for section in plan.sections for text in section.items),
+            )
+        )
+        self.assertEqual(plan.gate_label, "GATE 3")
+        self.assertIn("Decisions requiring Matt", visible)
+        self.assertIn("exact Strategy Thesis", plan.decision_prompt)
 
     def test_growth_sprint_plan_is_editorial_not_a_field_dump(self) -> None:
         output = proposal_output()

@@ -153,7 +153,7 @@ class RealEvidencePilotTests(unittest.TestCase):
     def test_acceptance_reports_only_persisted_quality_gates_and_external_action_truth(self):
         manifest = PilotManifest.from_mapping(manifest_payload())
         states = [
-            accepted_state(workflow_id, awaiting=workflow_id == "research_to_growth_blueprint")
+            accepted_state(workflow_id, awaiting=workflow_id == "strategy_thesis_to_growth_blueprint")
             for workflow_id in PILOT_WORKFLOWS
         ]
 
@@ -161,7 +161,7 @@ class RealEvidencePilotTests(unittest.TestCase):
 
         self.assertTrue(report["ready"])
         self.assertFalse(report["external_action_taken"])
-        self.assertEqual(len(report["workflows"]), 5)
+        self.assertEqual(len(report["workflows"]), 7)
         self.assertNotIn("company_label", json.dumps(report))
 
         states[3].external_action_taken = True

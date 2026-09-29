@@ -48,6 +48,8 @@ from runtime.workflow_quality import (
     growth_sprint_proposal_quality_gate,
     production_planning_quality_gate,
     research_evidence_quality_gate,
+    strategic_synthesis_quality_gate,
+    strategy_thesis_quality_gate,
     validate_operational_inputs,
 )
 from runtime.workflow_handoffs import build_next_workflow_inputs
@@ -366,6 +368,19 @@ class TonyWorkflowRuntime:
                 "checksum": source_artifact.checksum,
                 "status": "quality_accepted_and_human_approved",
             }
+        if state.workflow_id == "strategic_synthesis_to_strategy_thesis":
+            source_artifact = artifacts[-1]
+            if not source_artifact.checksum:
+                raise ValueError("approved Strategy Thesis artefact is missing its immutable checksum")
+            thesis = value.get("strategy_thesis")
+            if not isinstance(thesis, Mapping):
+                raise ValueError("approved Strategy Thesis artefact is incomplete")
+            inputs["approved_strategy_thesis"] = dict(thesis)
+            inputs["strategy_thesis_identity"] = {
+                "artifact_id": source_artifact.artifact_id,
+                "version": 1,
+                "checksum": source_artifact.checksum,
+            }
         if state.workflow_id == "growth_blueprint_to_campaign_world":
             selection = next(
                 (
@@ -591,6 +606,8 @@ def build_tony_workflow_runtime(
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
         "growth_sprint_proposal_quality_gate": growth_sprint_proposal_quality_gate,
         "research_evidence_quality_gate": research_evidence_quality_gate,
+        "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
+        "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,

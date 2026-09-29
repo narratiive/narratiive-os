@@ -54,6 +54,46 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             policy = source.get("policy") if isinstance(source, Mapping) and isinstance(source.get("policy"), Mapping) else {}
             if not isinstance(source, Mapping) or not all(_meaningful(source.get(key)) for key in ("source_id", "source_type")) or not _meaningful(source.get("uri") or source.get("location")) or policy.get("approved") is not True:
                 raise ValueError("research sources must be complete and explicitly approved")
+    elif workflow_id == "research_to_strategic_synthesis":
+        pack = inputs.get("evidence_pack")
+        if not isinstance(pack, Mapping) or not _meaningful(pack.get("records")):
+            raise ValueError("Strategic Synthesis requires a substantive evidence pack")
+        if not _provenance(inputs.get("source_provenance")):
+            raise ValueError("Strategic Synthesis requires retained source provenance")
+        if not _research_findings(inputs.get("consolidated_findings")):
+            raise ValueError("Strategic Synthesis requires evidence-linked research findings")
+        if not isinstance(inputs.get("contradictions"), list) or not isinstance(inputs.get("research_gaps"), list):
+            raise ValueError("Strategic Synthesis requires explicit contradictions and research gaps")
+        if not _meaningful(inputs.get("approved_growth_sprint_scope")):
+            raise ValueError("Strategic Synthesis requires the approved Growth Sprint scope")
+        if not isinstance(inputs.get("client_context"), Mapping):
+            raise ValueError("Strategic Synthesis requires structured client context")
+    elif workflow_id == "strategic_synthesis_to_strategy_thesis":
+        if not _strategic_synthesis(inputs.get("strategic_synthesis")):
+            raise ValueError("Strategy Thesis requires a quality-accepted Strategic Synthesis")
+        if not _commercial_growth_equation(inputs.get("commercial_growth_equation")):
+            raise ValueError("Strategy Thesis requires a complete commercial growth equation")
+        if not _strategic_tensions(inputs.get("strategic_tensions")):
+            raise ValueError("Strategy Thesis requires evidence-linked strategic tensions")
+        if not _lineage(inputs.get("evidence_lineage"), minimum=5):
+            raise ValueError("Strategy Thesis requires complete evidence lineage")
+    elif workflow_id == "strategy_thesis_to_growth_blueprint":
+        if not _strategy_thesis(inputs.get("approved_strategy_thesis")):
+            raise ValueError("Growth Blueprint preparation requires an approved Strategy Thesis")
+        identity = inputs.get("strategy_thesis_identity")
+        if not isinstance(identity, Mapping) or not all(
+            _meaningful(identity.get(field)) for field in ("artifact_id", "version", "checksum")
+        ):
+            raise ValueError("Growth Blueprint preparation requires exact immutable Strategy Thesis identity")
+        if not _strategic_synthesis(inputs.get("strategic_synthesis")):
+            raise ValueError("Growth Blueprint preparation requires the Strategic Synthesis")
+        pack = inputs.get("evidence_pack")
+        if not isinstance(pack, Mapping) or not _meaningful(pack.get("records")):
+            raise ValueError("Growth Blueprint preparation requires a substantive evidence pack")
+        if not _meaningful(inputs.get("approved_growth_sprint_scope")):
+            raise ValueError("Growth Blueprint preparation requires approved Growth Sprint scope")
+        if not isinstance(inputs.get("client_context"), Mapping):
+            raise ValueError("Growth Blueprint preparation requires structured client context")
     elif workflow_id == "research_to_growth_blueprint":
         pack = inputs.get("evidence_pack")
         if not isinstance(pack, Mapping) or not _meaningful(pack.get("records")):
@@ -197,6 +237,36 @@ def research_evidence_quality_gate(output: Mapping[str, Any]) -> Mapping[str, An
         "further_research_requests_are_explicit": isinstance(output.get("further_research_requests"), list),
         "fact_interpretation_hypothesis_classes_are_separate": _research_lineage(output.get("fact_interpretation_hypothesis_lineage")),
         "approved_source_policy_is_preserved": _approved_pack_sources(pack),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def strategic_synthesis_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    checks = {
+        "strategic_synthesis_is_substantive_and_bounded": _strategic_synthesis(output.get("strategic_synthesis")),
+        "commercial_growth_equation_is_complete": _commercial_growth_equation(output.get("commercial_growth_equation")),
+        "evidence_patterns_are_linked": _evidence_patterns(output.get("evidence_patterns")),
+        "strategic_tensions_are_explicit": _strategic_tensions(output.get("strategic_tensions")),
+        "contradictions_and_gaps_are_preserved": isinstance(output.get("contradictions_and_gaps"), list),
+        "open_inputs_are_explicit": isinstance(output.get("open_inputs"), list),
+        "fact_interpretation_hypothesis_lineage_is_complete": _lineage(output.get("fact_interpretation_hypothesis_lineage"), minimum=3),
+        "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=5),
+        "recommendation_is_advance": str(output.get("recommendation") or "").casefold() == "advance",
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
+def strategy_thesis_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    checks = {
+        "strategy_thesis_is_complete": _strategy_thesis(output.get("strategy_thesis")),
+        "strategic_choices_are_explicit": _strategic_choices(output.get("strategic_choices")),
+        "decision_register_preserves_human_authority": _decision_register(output.get("decision_register")),
+        "evidence_and_uncertainty_are_explicit": _meaningful_list(output.get("evidence_and_uncertainty"), minimum=3),
+        "fact_interpretation_hypothesis_lineage_is_complete": _lineage(output.get("fact_interpretation_hypothesis_lineage"), minimum=3),
+        "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=5),
+        "recommendation_is_advance": str(output.get("recommendation") or "").casefold() == "advance",
         "no_false_external_execution_claim": _no_false_action(output),
     }
     return _result(checks)
@@ -945,6 +1015,62 @@ def _strategic_choices(value: Any) -> bool:
         and _meaningful(item.get("tradeoff"))
         and _meaningful_list(item.get("evidence_refs"), minimum=1)
         for item in value
+    )
+
+
+def _strategic_synthesis(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and _substantive_text(value.get("executive_synthesis"), minimum_words=50)
+        and _substantive_text(value.get("commercial_problem"), minimum_words=15)
+        and _substantive_text(value.get("growth_opportunity"), minimum_words=15)
+        and _meaningful_list(value.get("implications"), minimum=3)
+    )
+
+
+def _commercial_growth_equation(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and all(_substantive_text(value.get(field), minimum_words=5) for field in (
+            "commercial_ambition", "current_state", "growth_gap", "growth_logic"
+        ))
+        and _meaningful_list(value.get("growth_levers"), minimum=2)
+        and isinstance(value.get("assumptions"), list)
+    )
+
+
+def _evidence_patterns(value: Any) -> bool:
+    return _records_with_fields(value, ("pattern", "implication", "evidence_refs"), minimum=3) and all(
+        _meaningful_list(item.get("evidence_refs"), minimum=1) for item in value
+    )
+
+
+def _strategic_tensions(value: Any) -> bool:
+    return _records_with_fields(value, ("tension", "choice_required", "evidence_refs"), minimum=3) and all(
+        _meaningful_list(item.get("evidence_refs"), minimum=1) for item in value
+    )
+
+
+def _strategy_thesis(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    required = (
+        "thesis_statement", "commercial_ambition", "growth_equation", "priority_audience",
+        "category_choice", "source_of_difference", "positioning_choice", "narrative_platform",
+        "growth_opportunity", "activation_principles",
+    )
+    return all(_substantive_text(value.get(field), minimum_words=8) for field in required)
+
+
+def _decision_register(value: Any) -> bool:
+    return (
+        _records_with_fields(value, ("decision", "status", "owner", "evidence_refs"), minimum=3)
+        and all(
+            str(item.get("status") or "").casefold() in {"proposed", "requires_human_decision"}
+            and str(item.get("owner") or "").casefold() == "matt"
+            and _meaningful_list(item.get("evidence_refs"), minimum=1)
+            for item in value
+        )
     )
 
 

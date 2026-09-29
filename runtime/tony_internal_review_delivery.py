@@ -262,6 +262,8 @@ class InternalReviewDeliveryService:
             "growth_diagnostic_to_blueprint_lite",
             "blueprint_lite_to_discovery_preparation",
             "discovery_evidence_to_growth_sprint_proposal",
+            "strategic_synthesis_to_strategy_thesis",
+            "strategy_thesis_to_growth_blueprint",
             "research_to_growth_blueprint",
             "growth_blueprint_deliverable_production",
         }

@@ -61,6 +61,28 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("evidence_and_uncertainty must be a list of at least three", instruction)
         self.assertIn('recommendation must be the exact JSON string "advance"', instruction)
 
+    def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
+        instruction = workflow_instruction(
+            "research_to_strategic_synthesis",
+            "prepare_strategic_synthesis",
+            ("strategic_synthesis", "commercial_growth_equation", "evidence_lineage"),
+        )
+
+        self.assertIn("organises evidence; it does not approve strategy", instruction)
+        self.assertIn("at least three objects with pattern", instruction)
+        self.assertIn("Preserve every contradiction, gap and uncertainty", instruction)
+
+    def test_strategy_thesis_contract_reserves_gate_three_for_matt(self) -> None:
+        instruction = workflow_instruction(
+            "strategic_synthesis_to_strategy_thesis",
+            "prepare_strategy_thesis",
+            ("strategy_thesis", "decision_register", "evidence_lineage"),
+        )
+
+        self.assertIn("owner must be Matt", instruction)
+        self.assertIn("exact-version Gate 3 review", instruction)
+        self.assertIn("This is a proposed thesis, not approval", instruction)
+
     def test_campaign_world_contract_matches_validator(self) -> None:
         instruction = workflow_instruction(
             "growth_blueprint_to_campaign_world",

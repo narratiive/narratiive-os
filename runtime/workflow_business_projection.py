@@ -194,6 +194,9 @@ def _lifecycle_stage(workflow_id: str) -> str:
         return "proposal"
     if workflow_id in {
         "growth_sprint_to_research_engine",
+        "research_to_strategic_synthesis",
+        "strategic_synthesis_to_strategy_thesis",
+        "strategy_thesis_to_growth_blueprint",
         "research_to_growth_blueprint",
         "growth_blueprint_deliverable_production",
     }:

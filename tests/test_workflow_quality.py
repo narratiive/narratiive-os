@@ -17,6 +17,8 @@ from runtime.workflow_quality import (
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
+    strategic_synthesis_quality_gate,
+    strategy_thesis_quality_gate,
     validate_operational_inputs,
 )
 
@@ -265,6 +267,81 @@ def growth_blueprint_output() -> dict:
     }
 
 
+def strategic_synthesis_output() -> dict:
+    lineage = [
+        {"claim": "Demand quality is a stated priority.", "classification": "fact", "source_refs": ["ev-1"]},
+        {"claim": "Broad positioning weakens commercial choice.", "classification": "interpretation", "source_refs": ["ev-1", "ev-2"]},
+        {"claim": "Earlier proof may improve qualified response.", "classification": "hypothesis", "source_refs": ["ev-2"]},
+        {"claim": "Customer language is incomplete.", "classification": "fact", "source_refs": ["ev-2"]},
+        {"claim": "A narrower entry point may concentrate demand.", "classification": "hypothesis", "source_refs": ["ev-1"]},
+    ]
+    return {
+        "strategic_synthesis": {
+            "executive_synthesis": "The supplied synthetic evidence consistently points to a credible offer constrained by broad positioning, insufficiently explicit audience priority and proof that arrives too late. The commercial problem is not a lack of possible activity but the absence of a shared growth choice. The next strategic stage should decide where demand can be concentrated without pretending unavailable customer evidence is known.",
+            "commercial_problem": "Broad market relevance currently prevents the business from concentrating demand around one commercially urgent customer situation.",
+            "growth_opportunity": "A narrower category entry point supported by earlier proof could improve qualified demand while preserving explicit validation requirements.",
+            "implications": ["Choose one priority audience", "Make the category choice explicit", "Move credible proof earlier"],
+        },
+        "commercial_growth_equation": {
+            "commercial_ambition": "Increase the proportion of demand that converts into commercially qualified opportunities.",
+            "current_state": "The offer appears credible but its broad framing makes comparison and confident choice unnecessarily difficult.",
+            "growth_gap": "The missing bridge is a distinctive position linked to an urgent audience situation and visible proof.",
+            "growth_logic": "Concentrating relevance and proof should improve recognition, confidence and the quality of commercial response.",
+            "growth_levers": ["Sharper audience priority", "Earlier evidence of value"],
+            "assumptions": ["Direct customer validation remains incomplete"],
+        },
+        "evidence_patterns": [
+            {"pattern": "Broad category language", "implication": "Make a deliberate category choice", "evidence_refs": ["ev-1"]},
+            {"pattern": "Proof arrives late", "implication": "Move substantiation earlier", "evidence_refs": ["ev-2"]},
+            {"pattern": "Audience priority is unclear", "implication": "Choose the urgent segment", "evidence_refs": ["ev-1", "ev-2"]},
+        ],
+        "strategic_tensions": [
+            {"tension": "Broad relevance versus urgent specificity", "choice_required": "Choose the priority audience", "evidence_refs": ["ev-1"]},
+            {"tension": "Category familiarity versus distinction", "choice_required": "Choose a defensible category frame", "evidence_refs": ["ev-2"]},
+            {"tension": "Simple opening versus complete proof", "choice_required": "Sequence proof without overload", "evidence_refs": ["ev-1", "ev-2"]},
+        ],
+        "contradictions_and_gaps": ["Direct customer language remains unavailable"],
+        "open_inputs": ["Validate the priority audience with customer evidence"],
+        "fact_interpretation_hypothesis_lineage": lineage[:3],
+        "evidence_lineage": lineage,
+        "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
+def strategy_thesis_output() -> dict:
+    synthesis = strategic_synthesis_output()
+    return {
+        "strategy_thesis": {
+            "thesis_statement": "Growth should come from becoming the clearest credible choice for one urgent audience situation, rather than remaining broadly relevant to everyone.",
+            "commercial_ambition": "Increase qualified demand and conversion by concentrating the company around a more decisive and provable market choice.",
+            "growth_equation": "Sharper audience priority plus distinctive category framing plus earlier proof should create more confident and commercially valuable demand.",
+            "priority_audience": "Prioritise buyers experiencing an urgent need for confidence and outcomes before they will enter a serious commercial conversation.",
+            "category_choice": "Frame the offer around the commercially meaningful outcome rather than the broad service category currently used by competitors.",
+            "source_of_difference": "Make evidence-led strategic clarity the organising difference, supported by visible proof rather than a longer list of capabilities.",
+            "positioning_choice": "Position the company as the decisive route from an ambiguous growth problem to a credible, executable market choice.",
+            "narrative_platform": "Move the audience from costly uncertainty through evidence-led choice to confidence about the next action worth taking.",
+            "growth_opportunity": "Own the moment when an ambitious team needs to turn fragmented marketing activity into one coherent commercial growth system.",
+            "activation_principles": "Lead with the urgent situation, make the strategic choice visible, introduce proof early and preserve every material uncertainty.",
+        },
+        "strategic_choices": [
+            {"choice": "Prioritise the urgent audience", "tradeoff": "Reject undifferentiated reach", "evidence_refs": ["ev-1"]},
+            {"choice": "Lead with an outcome frame", "tradeoff": "Reduce service-list flexibility", "evidence_refs": ["ev-2"]},
+            {"choice": "Use proof earlier", "tradeoff": "Simplify the opening narrative", "evidence_refs": ["ev-1", "ev-2"]},
+        ],
+        "decision_register": [
+            {"decision": "Approve the priority audience", "status": "requires_human_decision", "owner": "Matt", "evidence_refs": ["ev-1"]},
+            {"decision": "Approve the category choice", "status": "proposed", "owner": "Matt", "evidence_refs": ["ev-2"]},
+            {"decision": "Approve the narrative platform", "status": "requires_human_decision", "owner": "Matt", "evidence_refs": ["ev-1", "ev-2"]},
+        ],
+        "evidence_and_uncertainty": ["Customer interviews remain limited", "Competitor response is uncertain", "Channel performance remains an open input"],
+        "fact_interpretation_hypothesis_lineage": synthesis["fact_interpretation_hypothesis_lineage"],
+        "evidence_lineage": synthesis["evidence_lineage"],
+        "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
 class WorkflowQualityTests(unittest.TestCase):
     def test_discovery_preparation_requires_substance_lineage_and_uncertainty(self) -> None:
         result = discovery_preparation_quality_gate(discovery_output())
@@ -358,6 +435,24 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
         output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
         self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_strategic_synthesis_preserves_evidence_and_cannot_claim_external_action(self) -> None:
+        output = strategic_synthesis_output()
+        self.assertTrue(strategic_synthesis_quality_gate(output)["passed"])
+        output["strategic_tensions"][0]["evidence_refs"] = []
+        output["external_action_taken"] = True
+        result = strategic_synthesis_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("strategic tensions are explicit", result["failed_checks"])
+        self.assertIn("no false external execution claim", result["failed_checks"])
+
+    def test_strategy_thesis_keeps_decisions_pending_for_matt(self) -> None:
+        output = strategy_thesis_output()
+        self.assertTrue(strategy_thesis_quality_gate(output)["passed"])
+        output["decision_register"][0]["owner"] = "Tony"
+        result = strategy_thesis_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("decision register preserves human authority", result["failed_checks"])
 
     def test_campaign_world_gate_enforces_canonical_world_and_channel_coverage(self) -> None:
         output = campaign_world_output()

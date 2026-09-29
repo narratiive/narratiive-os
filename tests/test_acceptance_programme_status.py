@@ -44,7 +44,7 @@ class AcceptanceProgrammeStatusTests(unittest.TestCase):
     def setUp(self) -> None:
         self.builder = AcceptanceProgrammeStatusBuilder(build_narratiive_workflow_registry())
 
-    def test_projects_research_checkpoint_and_product_canon_conflict(self) -> None:
+    def test_projects_research_checkpoint_and_implemented_gate_three_sequence(self) -> None:
         blueprint = completed_state("growth_diagnostic_to_blueprint_lite", "safe-blueprint")
         blueprint.approval_status = "approved"
         proposal = completed_state(
@@ -91,14 +91,15 @@ class AcceptanceProgrammeStatusTests(unittest.TestCase):
 
         self.assertEqual(status["deployed_revision"], "safe-revision")
         self.assertEqual(status["last_verified_checkpoint"]["capability"], "Research")
-        self.assertEqual(status["current_stage"], "Strategy Thesis product-canon gate")
-        self.assertEqual(status["next_unimplemented_capability"], "Strategic synthesis")
-        self.assertEqual(status["architectural_conflicts"][0]["observed"], "research_to_growth_blueprint")
-        self.assertTrue(status["requires_matt"])
+        self.assertEqual(status["current_stage"], "Research")
+        self.assertIsNone(status["next_unimplemented_capability"])
+        self.assertEqual(status["architectural_conflicts"], [])
+        self.assertEqual(status["requires_matt"], [])
         capabilities = {item["capability"]: item for item in status["capabilities"]}
         self.assertEqual(capabilities["Research"]["status"], "LIVE_PROVEN")
         self.assertEqual(capabilities["Discovery"]["status"], "LIVE_PROVEN")
-        self.assertEqual(capabilities["Strategy Thesis"]["status"], "NOT_IMPLEMENTED")
+        self.assertEqual(capabilities["Strategic synthesis"]["status"], "IMPLEMENTED")
+        self.assertEqual(capabilities["Strategy Thesis"]["status"], "IMPLEMENTED")
         self.assertEqual(capabilities["Human review delivery"]["status"], "LIVE_PROVEN")
         self.assertEqual(capabilities["Conversational approval"]["status"], "LIVE_PROVEN")
 

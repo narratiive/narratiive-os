@@ -283,9 +283,15 @@ def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> Review
         return _blueprint_lite_plan(company, output)
     if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
         return _growth_sprint_plan(company, output)
-    if state.workflow_id in {"growth_sprint_to_research_engine", "blueprint_lite_to_discovery_preparation"}:
+    if state.workflow_id in {
+        "growth_sprint_to_research_engine",
+        "blueprint_lite_to_discovery_preparation",
+        "research_to_strategic_synthesis",
+    }:
         return _research_strategy_plan(company, output)
-    if state.workflow_id == "research_to_growth_blueprint":
+    if state.workflow_id == "strategic_synthesis_to_strategy_thesis":
+        return _strategy_thesis_plan(company, output)
+    if state.workflow_id in {"research_to_growth_blueprint", "strategy_thesis_to_growth_blueprint"}:
         return _growth_blueprint_plan(company, output)
     raise HumanReviewArtifactError(
         f"no human review presentation contract is registered for {state.workflow_id}"
@@ -613,7 +619,11 @@ def _research_strategy_plan(company: str, output: Mapping[str, Any]) -> ReviewDo
     synthesis = (
         _clean_text(output.get("context_summary"))
         or _clean_text(output.get("consolidated_findings"))
-        or _clean_text(output.get("strategy_thesis"))
+        or _clean_text(
+            output["strategic_synthesis"].get("executive_synthesis")
+            if isinstance(output.get("strategic_synthesis"), Mapping)
+            else ""
+        )
     )
     if not synthesis:
         raise HumanReviewArtifactError("research or strategy review is missing a synthesis")
@@ -636,6 +646,38 @@ def _research_strategy_plan(company: str, output: Mapping[str, Any]) -> ReviewDo
         focus_points=tuple(item for item in (synthesis, *tensions[:2]) if item)[:3],
         decision_prompt="Decide whether the evidence and strategic framing are sufficient to proceed, or identify the unresolved question that must be addressed first.",
         next_if_approved="Tony will advance only the approved strategic scope to the next registered workflow stage.",
+    )
+
+
+def _strategy_thesis_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
+    thesis = output.get("strategy_thesis")
+    if not isinstance(thesis, Mapping):
+        raise HumanReviewArtifactError("Strategy Thesis review is missing the structured thesis")
+    statement = _required_text(thesis, "thesis_statement")
+    choices = _human_items(output.get("strategic_choices"), preferred=("choice",))
+    uncertainty = _text_list(output.get("evidence_and_uncertainty"))
+    decisions = _human_items(output.get("decision_register"), preferred=("decision",))
+    return ReviewDocumentPlan(
+        product="Strategy Thesis",
+        gate_label="GATE 3",
+        company=company,
+        subtitle="The evidence-led strategic choices that will control the Narratiive Growth Blueprint.",
+        sections=(
+            ReviewSection("The thesis", body=(statement,)),
+            ReviewSection("Commercial ambition", body=(_required_text(thesis, "commercial_ambition"),)),
+            ReviewSection("Growth equation", body=(_required_text(thesis, "growth_equation"),)),
+            ReviewSection("Priority audience", body=(_required_text(thesis, "priority_audience"),)),
+            ReviewSection("Positioning and narrative", body=(
+                _required_text(thesis, "positioning_choice"),
+                _required_text(thesis, "narrative_platform"),
+            )),
+            ReviewSection("Strategic choices and trade-offs", items=choices),
+            ReviewSection("Decisions requiring Matt", items=decisions),
+            ReviewSection("Evidence limits and uncertainty", items=uncertainty),
+        ),
+        focus_points=(statement, *choices[:2]),
+        decision_prompt="Approve this exact Strategy Thesis for Growth Blueprint production, request a revision, or identify the evidence question that must be resolved first.",
+        next_if_approved="Tony will commission the Growth Blueprint from this exact approved thesis and its evidence lineage. No client release or external action will occur.",
     )
 
 

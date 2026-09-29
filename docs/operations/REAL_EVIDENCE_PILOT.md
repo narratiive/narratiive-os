@@ -37,13 +37,16 @@ are:
     "blueprint_lite_to_discovery_preparation",
     "discovery_evidence_to_growth_sprint_proposal",
     "growth_sprint_to_research_engine",
-    "research_to_growth_blueprint"
+    "research_to_strategic_synthesis",
+    "strategic_synthesis_to_strategy_thesis",
+    "strategy_thesis_to_growth_blueprint"
   ],
   "approval_gates": [
     "growth_diagnostic_to_blueprint_lite",
     "blueprint_lite_to_discovery_preparation",
     "discovery_evidence_to_growth_sprint_proposal",
-    "research_to_growth_blueprint"
+    "strategic_synthesis_to_strategy_thesis",
+    "strategy_thesis_to_growth_blueprint"
   ]
 }
 ```
