@@ -133,7 +133,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 build_claude_api_dispatcher({**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": value})
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
-    def test_growth_blueprint_uses_its_bounded_long_form_output_budget(self, urlopen):
+    def test_strategy_sequence_uses_its_bounded_long_form_output_budget(self, urlopen):
         urlopen.return_value = _Response(
             {
                 "model": "claude-test-model",
@@ -141,15 +141,20 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 "content": [{"type": "text", "text": '{"work_product":"SAFE Growth Blueprint draft"}'}],
             }
         )
-        contract = self._contract()
-        contract["target"] = {
-            "workflow_context": {"workflow_id": "research_to_growth_blueprint"},
-        }
+        for workflow_id in (
+            "research_to_strategic_synthesis",
+            "strategic_synthesis_to_strategy_thesis",
+            "strategy_thesis_to_growth_blueprint",
+            "research_to_growth_blueprint",
+        ):
+            with self.subTest(workflow_id=workflow_id):
+                contract = self._contract()
+                contract["target"] = {"workflow_context": {"workflow_id": workflow_id}}
 
-        build_claude_api_dispatcher(self._env())(contract)
+                build_claude_api_dispatcher(self._env())(contract)
 
-        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
-        self.assertEqual(sent["max_tokens"], 16384)
+                sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+                self.assertEqual(sent["max_tokens"], 16384)
 
     def test_growth_blueprint_output_budget_must_be_a_positive_integer(self):
         key = "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS"

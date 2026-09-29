@@ -66,7 +66,12 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
         prompt = _render_prompt(contract)
         request_max_tokens = (
             growth_blueprint_max_tokens
-            if _workflow_id(contract) in {"research_to_growth_blueprint", "strategy_thesis_to_growth_blueprint"}
+            if _workflow_id(contract) in {
+                "research_to_strategic_synthesis",
+                "strategic_synthesis_to_strategy_thesis",
+                "strategy_thesis_to_growth_blueprint",
+                "research_to_growth_blueprint",
+            }
             else max_tokens
         )
         payload = {
