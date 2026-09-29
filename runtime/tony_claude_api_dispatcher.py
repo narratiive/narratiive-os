@@ -137,6 +137,16 @@ def _validate_safe_contract(contract: Mapping[str, Any]) -> None:
 def _render_prompt(contract: Mapping[str, Any]) -> str:
     action = str(contract.get("instruction") or contract.get("action") or "").strip()
     target = contract.get("target") if isinstance(contract.get("target"), Mapping) else {}
+    workflow_id = _workflow_id(contract)
+    if workflow_id in {"research_to_strategic_synthesis", "strategic_synthesis_to_strategy_thesis"}:
+        return_contract = (
+            "Return exactly one compact JSON object and no markdown fences. "
+            "Return only the top-level fields named in TASK, plus no commentary or duplicated source material. "
+            "Use short evidence source identifiers in evidence_refs and source_refs. "
+            "Do not add a work_product wrapper."
+        )
+    else:
+        return_contract = _GENERAL_RETURN_CONTRACT
     return (
         "You are the Claude execution worker inside Narratiive OS. Complete only the bounded internal preparation task below.\n\n"
         "SAFETY BOUNDARY\n"
@@ -146,7 +156,11 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
         "- Use only evidence supplied in the task or sources you can genuinely verify within your available research capability.\n\n"
         f"TASK\n{action}\n\n"
         f"TARGET CONTEXT\n{json.dumps(dict(target), sort_keys=True)}\n\n"
-        "RETURN CONTRACT\n"
+        f"RETURN CONTRACT\n{return_contract}"
+    )
+
+
+_GENERAL_RETURN_CONTRACT = (
         "Return exactly one JSON object and no markdown fences. Use task-specific fields where appropriate. "
         "For Blueprint Lite work, follow the canonical inbound product boundary: diagnostic inputs must be represented faithfully; "
         "separate facts, interpretations and hypotheses; include selective outside-in evidence; identify one company-specific growth tension; "
@@ -165,7 +179,7 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
         "For outreach preparation, include email_subject, email_body, and optional creative_brief. "
         "For meeting or proposal preparation, return the requested draft plus the evidence basis. "
         "Always include at least one substantive work-product field such as work_product, draft, content, analysis, recommendation, or result."
-    )
+)
 
 
 def _response_text(payload: Mapping[str, Any]) -> str:

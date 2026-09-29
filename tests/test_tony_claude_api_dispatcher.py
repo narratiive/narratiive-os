@@ -156,6 +156,29 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
                 self.assertEqual(sent["max_tokens"], 16384)
 
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_strategy_reasoning_prompt_excludes_unrelated_product_contracts(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"work_product":"SAFE draft"}'}],
+            }
+        )
+        for workflow_id in ("research_to_strategic_synthesis", "strategic_synthesis_to_strategy_thesis"):
+            with self.subTest(workflow_id=workflow_id):
+                contract = self._contract()
+                contract["target"] = {"workflow_context": {"workflow_id": workflow_id}}
+
+                build_claude_api_dispatcher(self._env())(contract)
+
+                sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+                prompt = sent["messages"][0]["content"]
+                self.assertIn("Return only the top-level fields named in TASK", prompt)
+                self.assertIn("Do not add a work_product wrapper", prompt)
+                self.assertNotIn("For Blueprint Lite work", prompt)
+                self.assertNotIn("For Growth Blueprint work", prompt)
+
     def test_growth_blueprint_output_budget_must_be_a_positive_integer(self):
         key = "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS"
         for value in ("invalid", "0", "-1"):
