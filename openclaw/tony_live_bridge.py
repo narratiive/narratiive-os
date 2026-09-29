@@ -140,6 +140,8 @@ class LeadAwareTonyApplication:
             return self._attention_control(environ, start_response)
         if method == "POST" and path == "/media/sync":
             return self._media_sync(environ, start_response)
+        if method == "POST" and path == "/media/monitor":
+            return self._media_monitor(environ, start_response)
         if method == "POST" and path == "/oauth/tiktok/start":
             return self._tiktok_oauth_start(environ, start_response)
         if method == "POST" and path == "/oauth/tiktok/callback":
@@ -423,6 +425,50 @@ class LeadAwareTonyApplication:
                 start_response,
                 HTTPStatus.INTERNAL_SERVER_ERROR,
                 {"ok": False, "error": {"code": "media_sync_failed", "message": "Media performance ingestion failed closed"}},
+            )
+
+    def _media_monitor(self, environ, start_response):
+        """Authenticated scheduled media analysis; persists evidence but takes no external action."""
+
+        denied = self._authorize(environ, start_response)
+        if denied is not None:
+            return denied
+        if self.media_control is None:
+            return self._respond(
+                start_response,
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"ok": False, "error": {"code": "media_control_unavailable", "message": "Media control is not configured"}},
+            )
+        try:
+            request = self._read_json(environ)
+            report = self.media_control.persist_monitoring_report(
+                cadence=self._required_string(request, "cadence"),
+                request_id=self._required_string(request, "request_id"),
+                query=str(request.get("query") or "").strip(),
+            )
+            return self._respond(
+                start_response,
+                HTTPStatus.OK,
+                {
+                    "ok": True,
+                    "status": report["status"],
+                    "report": report,
+                    "external_action_taken": False,
+                    "publication_authorised": False,
+                    "media_spend_authorised": False,
+                },
+            )
+        except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError, MediaControlError) as exc:
+            return self._respond(
+                start_response,
+                HTTPStatus.BAD_REQUEST,
+                {"ok": False, "error": {"code": "invalid_media_monitor", "message": str(exc)}},
+            )
+        except Exception:
+            return self._respond(
+                start_response,
+                HTTPStatus.INTERNAL_SERVER_ERROR,
+                {"ok": False, "error": {"code": "media_monitor_failed", "message": "Media monitoring failed closed"}},
             )
 
     def _tiktok_oauth_start(self, environ, start_response):

@@ -755,6 +755,7 @@ class MediaControlService:
     """Canonical read-only media control plane backed by Narratiive's execution journal."""
 
     AUDIT_ACTION = "media.provider_interaction"
+    MONITOR_ACTION = "media.monitoring_report"
 
     def __init__(
         self,
@@ -941,6 +942,15 @@ class MediaControlService:
                 raw,
                 creative_mappings,
             )
+            if (
+                _parse_timestamp(snapshot.period_start, "period_start")
+                != _parse_timestamp(period_start, "requested period_start")
+                or _parse_timestamp(snapshot.period_end, "period_end")
+                != _parse_timestamp(period_end, "requested period_end")
+            ):
+                raise MalformedProviderResponse(
+                    "provider reporting period does not match the requested period"
+                )
         except Exception as exc:
             self._audit_failure(
                 identity,
@@ -1149,6 +1159,20 @@ class MediaControlService:
             raise
 
     def snapshots(self, *, client_id: str = "", campaign_id: str = "") -> tuple[CanonicalMediaSnapshot, ...]:
+        snapshots = list(self.snapshot_history(client_id=client_id, campaign_id=campaign_id))
+        latest: dict[tuple[str, str], CanonicalMediaSnapshot] = {}
+        for snapshot in snapshots:
+            latest[(snapshot.identity.campaign_id, snapshot.provider.value)] = snapshot
+        return tuple(latest.values())
+
+    def snapshot_history(
+        self,
+        *,
+        client_id: str = "",
+        campaign_id: str = "",
+    ) -> tuple[CanonicalMediaSnapshot, ...]:
+        """Return every verified snapshot in journal order for trend analysis."""
+
         snapshots: list[CanonicalMediaSnapshot] = []
         for record in self.journal.read_all():
             if record.action != self.AUDIT_ACTION or record.status != "completed":
@@ -1162,10 +1186,116 @@ class MediaControlService:
             if campaign_id and snapshot.identity.campaign_id != campaign_id:
                 continue
             snapshots.append(snapshot)
-        latest: dict[tuple[str, str], CanonicalMediaSnapshot] = {}
-        for snapshot in snapshots:
-            latest[(snapshot.identity.campaign_id, snapshot.provider.value)] = snapshot
-        return tuple(latest.values())
+        return tuple(snapshots)
+
+    def monitor(
+        self,
+        *,
+        cadence: str,
+        query: str = "",
+        generated_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Build a fact/inference-separated read-only monitoring report."""
+
+        self.policy.authorize(MediaAuthority.ANALYSE, "monitor_performance")
+        from runtime.media_monitoring import MediaMonitoringEngine
+
+        history = tuple(
+            snapshot
+            for snapshot in self.snapshot_history()
+            if self._snapshot_matches(snapshot, query)
+        )
+        latest = tuple(
+            snapshot
+            for snapshot in self.snapshots()
+            if self._snapshot_matches(snapshot, query)
+        )
+        return MediaMonitoringEngine().build(
+            history,
+            self.analyse(latest),
+            self.diagnostics(),
+            cadence=cadence,
+            query=query,
+            generated_at=generated_at,
+        )
+
+    def persist_monitoring_report(
+        self,
+        *,
+        cadence: str,
+        request_id: str,
+        query: str = "",
+        generated_at: str | None = None,
+    ) -> dict[str, Any]:
+        """Persist one idempotent internal report; never dispatch an external action."""
+
+        if not request_id.strip():
+            raise MediaControlError("media monitoring request_id is required")
+        fingerprint = _safe_hash(
+            json.dumps(
+                {"cadence": cadence.strip().casefold(), "query": query.strip()},
+                sort_keys=True,
+                separators=(",", ":"),
+            )
+        )
+        matches = [
+            record
+            for record in self.journal.read_all()
+            if record.action == self.MONITOR_ACTION
+            and record.metadata.get("request_id") == request_id
+        ]
+        if any(record.metadata.get("request_fingerprint") != fingerprint for record in matches):
+            raise MediaControlError("media monitoring request_id is already bound to a different request")
+        completed = [record for record in matches if record.status == "completed"]
+        if completed:
+            payload = completed[-1].metadata.get("canonical_report")
+            if not isinstance(payload, Mapping):
+                raise MediaControlError("duplicate monitoring request has no trusted report")
+            return dict(payload)
+        report = json.loads(
+            json.dumps(
+                self.monitor(cadence=cadence, query=query, generated_at=generated_at),
+                sort_keys=True,
+                default=str,
+            )
+        )
+        self.journal.append(
+            decision_id=f"media-{cadence.strip().casefold()}-monitor",
+            workspace_id="system",
+            action=self.MONITOR_ACTION,
+            rationale="Scheduled read-only media monitoring and exception analysis.",
+            actor="media-control-layer",
+            status="completed",
+            record_id=f"media-monitor-{_safe_hash('monitor:' + request_id)}",
+            metadata={
+                "timestamp": report["generated_at"],
+                "request_id": request_id,
+                "request_fingerprint": fingerprint,
+                "cadence": report["cadence"],
+                "query": report["query"],
+                "result": report["status"],
+                "report_id": report["report_id"],
+                "exception_count": len(report["exceptions"]),
+                "external_write_performed": False,
+                "publication_authorised": False,
+                "media_spend_authorised": False,
+                "canonical_report": report,
+            },
+        )
+        return report
+
+    def monitoring_reports(self, *, cadence: str = "") -> tuple[dict[str, Any], ...]:
+        reports: list[dict[str, Any]] = []
+        for record in self.journal.read_all():
+            if record.action != self.MONITOR_ACTION or record.status != "completed":
+                continue
+            payload = record.metadata.get("canonical_report")
+            if not isinstance(payload, Mapping):
+                continue
+            if cadence and str(payload.get("cadence")) != cadence.strip().casefold():
+                continue
+            reports.append(dict(payload))
+        return tuple(reports)
 
     def analyse(self, snapshots: Sequence[CanonicalMediaSnapshot]) -> tuple[MediaRecommendation, ...]:
         self.policy.authorize(MediaAuthority.ANALYSE, "analyse_performance")
@@ -1188,6 +1318,17 @@ class MediaControlService:
                     recommendations.append(self._recommend(snapshot, "high", "poor_performer", "Provider-attributed ROAS indicates a poor performer.", (f"roas={roas.value}", roas.attribution_context), "Prepare a creative or targeting review for human decision."))
         return tuple(recommendations)
 
+    @staticmethod
+    def _snapshot_matches(snapshot: CanonicalMediaSnapshot, query: str) -> bool:
+        needle = query.strip().casefold()
+        return not needle or needle in {
+            snapshot.identity.workspace_id.casefold(),
+            snapshot.identity.client_id.casefold(),
+            snapshot.identity.brand_id.casefold(),
+            snapshot.identity.campaign_id.casefold(),
+            snapshot.provider.value,
+        }
+
     def diagnostics(self) -> dict[str, Any]:
         records = [record for record in self.journal.read_all() if record.action == self.AUDIT_ACTION]
         result: dict[str, Any] = {}
@@ -1201,8 +1342,6 @@ class MediaControlService:
                 health = ConnectionHealth.DEGRADED
             elif failed and (not completed or failed[-1].sequence > completed[-1].sequence):
                 health = ConnectionHealth.OFFLINE
-            elif failed:
-                health = ConnectionHealth.DEGRADED
             else:
                 health = ConnectionHealth.HEALTHY
             snapshots = [item for item in self.snapshots() if item.provider is provider]

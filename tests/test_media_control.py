@@ -217,6 +217,22 @@ class MediaControlTests(unittest.TestCase):
                         tony_request="validate provider context",
                     )
 
+    def test_provider_period_must_match_requested_period(self):
+        with tempfile.TemporaryDirectory() as directory:
+            service = MediaControlService(
+                {MediaProvider.META: adapter(MediaProvider.META)},
+                ExecutionJournal(directory),
+            )
+            with self.assertRaisesRegex(MalformedProviderResponse, "does not match"):
+                service.ingest(
+                    identity=identity(), provider_mapping=mapping(MediaProvider.META),
+                    period_start="2026-09-09T00:00:00Z",
+                    period_end="2026-09-17T00:00:00Z",
+                    request_id="northstar-mismatched-provider-period",
+                    tony_request="validate provider period",
+                )
+            self.assertEqual(service.journal.read_all()[-1].status, "failed")
+
     def test_provider_failure_and_expired_credential_fail_closed(self):
         for error in (MediaProviderError("api unavailable"), MediaProviderError("credential expired")):
             with tempfile.TemporaryDirectory() as directory:
@@ -251,6 +267,10 @@ class MediaControlTests(unittest.TestCase):
             self.assertEqual(snapshot.identity.client_id, "northstar-test-co")
             self.assertEqual([record.status for record in service.journal.read_all()], ["failed", "completed"])
             self.assertEqual(len(transport_adapter.transport.calls), 2)
+            diagnostics = service.diagnostics()["meta"]
+            self.assertEqual(diagnostics["health"], ConnectionHealth.HEALTHY.value)
+            self.assertIsNotNone(diagnostics["last_failed_sync"])
+            self.assertIsNotNone(diagnostics["last_successful_sync"])
 
     def test_invalid_requested_period_is_rejected_before_provider_read(self):
         invalid_periods = (

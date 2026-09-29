@@ -419,7 +419,7 @@ def compact_output(value):
     if isinstance(data, dict):
         compact["data"] = {
             "mode": data.get("mode"),
-            "provider_count": len(data.get("providers", [])),
+            "provider_count": len(data.get("providers") or data.get("facts", [])),
             "total_spend": data.get("total_spend"),
             "total_spend_currency": data.get("total_spend_currency"),
             "recommendation_categories": [
