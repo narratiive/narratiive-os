@@ -318,10 +318,12 @@ class WorkflowRunService:
     ) -> WorkflowState:
         """Promote validated stage outputs into the run's current derived view.
 
-        Initial execution retains the strict no-overwrite input contract.  A
-        formally requested revision may replace only fields declared as outputs
-        of the same previously completed stage.  Prior artefacts and events stay
-        immutable and remain the audit history for the replaced view.
+        Initial execution retains the strict no-overwrite input contract except
+        where a stage explicitly declares the same field as both an input and an
+        output. That overlap is a typed refinement (for example evidence lineage),
+        not an arbitrary overwrite. A formally requested revision may replace
+        fields declared as outputs of the same previously completed stage. Prior
+        artefacts and events stay immutable as the audit history.
         """
         state = self.repository.load(run_id)
         stage = state.stage(stage_id)
@@ -333,11 +335,9 @@ class WorkflowRunService:
             for key, value in outputs.items()
             if key in state.input_payload and state.input_payload[key] != value
         )
-        if conflicts and not (
-            stage.revision_count > 0
-            and stage.output_artifacts
-            and set(conflicts).issubset(set(stage.expected_outputs))
-        ):
+        declared_refinements = set(stage.required_inputs).intersection(stage.expected_outputs)
+        revision_outputs = set(stage.expected_outputs) if stage.revision_count > 0 and stage.output_artifacts else set()
+        if conflicts and not set(conflicts).issubset(declared_refinements.union(revision_outputs)):
             raise ValueError(f"workflow output cannot overwrite existing inputs: {','.join(conflicts)}")
         state.input_payload.update(dict(outputs))
         state.touch()
