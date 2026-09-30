@@ -126,9 +126,15 @@ class MetaMarketingReadTransport:
 
     def request(self, provider: MediaProvider, operation: str, parameters: Mapping[str, Any]) -> Any:
         _require_provider(provider, self.provider)
-        account_id = _meta_account_id(self.configuration.account_id)
         if operation == "authenticate":
             return self._get("/me", {"fields": "id,name"})
+        if operation == "get_permissions":
+            return self._get_data("/me/permissions", {"fields": "permission,status"})
+        if operation == "get_businesses":
+            return self._get_data(
+                "/me/businesses",
+                {"fields": "id,name,verification_status,created_time"},
+            )
         if operation == "get_accounts":
             return self._get_data(
                 "/me/adaccounts",
@@ -139,6 +145,9 @@ class MetaMarketingReadTransport:
                     )
                 },
             )
+        account_id = _meta_account_id(
+            str(parameters.get("account_id") or self.configuration.account_id)
+        )
         if operation == "get_campaigns":
             return self._get_data(
                 f"/{account_id}/campaigns",
@@ -584,11 +593,14 @@ def build_configured_media_adapters(
     adapters: dict[MediaProvider, MediaProviderAdapter] = {}
     for provider in MediaProvider:
         configuration = _configuration(provider, environment)
-        if configuration.validate(environment):
-            continue
+        failures = configuration.validate(environment)
         if provider is MediaProvider.META:
             graph_version = str(environment.get("META_GRAPH_API_VERSION", "")).strip()
-            if not graph_version:
+            discovery_failures = {
+                "account_id is required",
+                "timezone is required",
+            }
+            if not graph_version or any(failure not in discovery_failures for failure in failures):
                 continue
             transport = MetaMarketingReadTransport(
                 configuration,
@@ -597,8 +609,15 @@ def build_configured_media_adapters(
                 graph_version=graph_version,
                 app_secret=str(environment.get("META_APP_SECRET", "")),
             )
-            adapters[provider] = MetaReadOnlyAdapter(configuration, transport, environment=environment)
+            adapters[provider] = MetaReadOnlyAdapter(
+                configuration,
+                transport,
+                environment=environment,
+                discovery_only=bool(failures),
+            )
         elif provider is MediaProvider.TIKTOK:
+            if failures:
+                continue
             transport = TikTokBusinessReadTransport(
                 configuration,
                 str(environment["TIKTOK_ACCESS_TOKEN"]),
@@ -606,6 +625,8 @@ def build_configured_media_adapters(
             )
             adapters[provider] = TikTokReadOnlyAdapter(configuration, transport, environment=environment)
         else:
+            if failures:
+                continue
             api_version = str(environment.get("GOOGLE_ADS_API_VERSION", "")).strip()
             if not api_version:
                 continue

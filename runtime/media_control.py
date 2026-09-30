@@ -493,6 +493,8 @@ class MediaProviderAdapter(Protocol):
 
     def authenticate(self) -> Mapping[str, Any]: ...
     def get_accounts(self) -> Sequence[Mapping[str, Any]]: ...
+    def get_permissions(self) -> Sequence[Mapping[str, Any]]: ...
+    def get_businesses(self) -> Sequence[Mapping[str, Any]]: ...
     def get_campaigns(self) -> Sequence[Mapping[str, Any]]: ...
     def get_campaign(self, campaign_id: str) -> Mapping[str, Any]: ...
     def get_ad_groups(self, campaign_id: str) -> Sequence[Mapping[str, Any]]: ...
@@ -534,6 +536,12 @@ class ReadOnlyProviderAdapter:
 
     def get_accounts(self) -> Sequence[Mapping[str, Any]]:
         return self._read("get_accounts")
+
+    def get_permissions(self) -> Sequence[Mapping[str, Any]]:
+        return self._read("get_permissions")
+
+    def get_businesses(self) -> Sequence[Mapping[str, Any]]:
+        return self._read("get_businesses")
 
     def get_campaigns(self) -> Sequence[Mapping[str, Any]]:
         return self._read("get_campaigns", account_id=self.configuration.account_id)
@@ -598,6 +606,29 @@ class ReadOnlyProviderAdapter:
 
 class MetaReadOnlyAdapter(ReadOnlyProviderAdapter):
     provider = MediaProvider.META
+
+    def __init__(
+        self,
+        configuration: ProviderConfiguration,
+        transport: ProviderTransport,
+        *,
+        environment: Mapping[str, str] | None = None,
+        discovery_only: bool = False,
+    ) -> None:
+        if not discovery_only:
+            super().__init__(configuration, transport, environment=environment)
+            self.discovery_only = False
+            return
+        if configuration.provider is not self.provider:
+            raise MediaConfigurationError("adapter/provider configuration mismatch")
+        allowed = {"account_id is required", "timezone is required"}
+        failures = set(configuration.validate(environment))
+        unexpected = sorted(failures.difference(allowed))
+        if unexpected:
+            raise MediaConfigurationError("; ".join(unexpected))
+        self.configuration = configuration
+        self.transport = transport
+        self.discovery_only = True
 
 
 class TikTokReadOnlyAdapter(ReadOnlyProviderAdapter):
@@ -811,7 +842,10 @@ class MediaControlService:
         configuration = getattr(adapter, "configuration", None)
         account_id = str(getattr(configuration, "account_id", "")).strip()
         manager_account_id = str(getattr(configuration, "manager_account_id", "")).strip()
-        if not account_id:
+        discovery_only = provider is MediaProvider.META and bool(
+            getattr(adapter, "discovery_only", False)
+        )
+        if not account_id and not discovery_only:
             self._audit_certification_failure(
                 provider, request_id, "adapter account identity is unavailable"
             )
@@ -819,8 +853,30 @@ class MediaControlService:
                 f"{provider.value} adapter account identity is unavailable"
             )
         try:
+            identity: Mapping[str, Any] = {}
+            permissions: Sequence[Mapping[str, Any]] = ()
+            businesses: Sequence[Mapping[str, Any]] = ()
+            if provider is MediaProvider.META:
+                identity = adapter.authenticate()
+                permissions = adapter.get_permissions()
+                businesses = adapter.get_businesses()
+                if not isinstance(identity, Mapping) or not str(identity.get("id") or "").strip():
+                    raise MalformedProviderResponse("meta identity response must contain an id")
+                if any(not isinstance(item, Mapping) for item in (*permissions, *businesses)):
+                    raise MalformedProviderResponse(
+                        "meta permission and business responses must contain objects"
+                    )
+                granted_scopes = {
+                    str(item.get("permission") or "").strip()
+                    for item in permissions
+                    if str(item.get("status") or "").strip() == "granted"
+                }
+                if "ads_read" not in granted_scopes:
+                    raise MediaConfigurationError(
+                        "meta credential does not grant the required ads_read permission"
+                    )
             accounts = adapter.get_accounts()
-            campaigns = adapter.get_campaigns()
+            campaigns = adapter.get_campaigns() if account_id else ()
             if isinstance(accounts, (str, bytes, Mapping)) or not isinstance(accounts, Sequence):
                 raise MalformedProviderResponse(
                     f"{provider.value} account-list response must be a sequence"
@@ -840,6 +896,20 @@ class MediaControlService:
             )
             raise
 
+        accessible_account_ids = tuple(
+            str(item.get("account_id") or item.get("id") or "").removeprefix("act_")
+            for item in accounts
+            if isinstance(item, Mapping)
+            and str(item.get("account_id") or item.get("id") or "").strip()
+        )
+        granted_scope_names = tuple(
+            sorted(
+                str(item.get("permission") or "").strip()
+                for item in permissions
+                if str(item.get("status") or "").strip() == "granted"
+            )
+        )
+        provider_capabilities = _meta_provider_capabilities(granted_scope_names)
         record = self.journal.append(
             decision_id=f"media-{provider.value}-certification",
             workspace_id="system",
@@ -857,8 +927,22 @@ class MediaControlService:
                 "account_id": account_id,
                 "manager_account_id": manager_account_id or None,
                 "accessible_customers_returned": len(accounts),
+                "accessible_account_ids": accessible_account_ids,
+                "authenticated_identity_id": str(identity.get("id") or "") or None,
+                "authenticated_identity_name": str(identity.get("name") or "") or None,
+                "granted_scopes": granted_scope_names,
+                "provider_capabilities": provider_capabilities,
+                "accessible_businesses_returned": len(businesses),
+                "accessible_business_ids": tuple(
+                    str(item.get("id") or "")
+                    for item in businesses
+                    if str(item.get("id") or "").strip()
+                ),
                 "campaigns_returned": len(campaigns),
-                "empty_campaign_list_valid": len(campaigns) == 0,
+                "campaign_list_queried": bool(account_id),
+                "empty_campaign_list_valid": bool(account_id) and len(campaigns) == 0,
+                "asset_access_limited": not bool(account_id),
+                "account_assignment_required": len(accounts) == 0,
                 "external_write_performed": False,
                 "publication_authorised": False,
                 "media_spend_authorised": False,
@@ -1367,6 +1451,12 @@ class MediaControlService:
                 "configured_account_id": str(getattr(adapter_configuration, "account_id", "")) or None,
                 "configured_manager_account_id": str(getattr(adapter_configuration, "manager_account_id", "")) or None,
                 "campaigns_returned": latest_metadata.get("campaigns_returned"),
+                "accessible_accounts_returned": latest_metadata.get("accessible_customers_returned"),
+                "accessible_businesses_returned": latest_metadata.get("accessible_businesses_returned"),
+                "granted_scopes": latest_metadata.get("granted_scopes", ()),
+                "provider_capabilities": latest_metadata.get("provider_capabilities", ()),
+                "asset_access_limited": latest_metadata.get("asset_access_limited", False),
+                "account_assignment_required": latest_metadata.get("account_assignment_required", False),
                 "inventory_counts": inventory.counts() if inventory else None,
                 "last_inventory_sync": inventory.synced_at if inventory else None,
                 "data_freshness": max((item.ingested_at for item in snapshots), default=None),
@@ -1386,8 +1476,18 @@ class MediaControlService:
             "advertiser_account_id": metadata.get("account_id"),
             "manager_account_id": metadata.get("manager_account_id"),
             "accessible_customers_returned": metadata.get("accessible_customers_returned"),
+            "accessible_account_ids": metadata.get("accessible_account_ids", ()),
+            "authenticated_identity_id": metadata.get("authenticated_identity_id"),
+            "authenticated_identity_name": metadata.get("authenticated_identity_name"),
+            "granted_scopes": metadata.get("granted_scopes", ()),
+            "provider_capabilities": metadata.get("provider_capabilities", ()),
+            "accessible_businesses_returned": metadata.get("accessible_businesses_returned"),
+            "accessible_business_ids": metadata.get("accessible_business_ids", ()),
             "campaigns_returned": metadata.get("campaigns_returned"),
+            "campaign_list_queried": metadata.get("campaign_list_queried", True),
             "empty_campaign_list_valid": metadata.get("empty_campaign_list_valid"),
+            "asset_access_limited": metadata.get("asset_access_limited", False),
+            "account_assignment_required": metadata.get("account_assignment_required", False),
             "live_read_status": "passed",
             "external_write_performed": False,
             "publication_authorised": False,
@@ -1654,6 +1754,24 @@ def _safe_hash(value: str) -> str:
     if not value.strip():
         raise MediaControlError("request identifier is required")
     return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+
+
+def _meta_provider_capabilities(scopes: Sequence[str]) -> tuple[str, ...]:
+    values = set(scopes)
+    capabilities: set[str] = set()
+    if "ads_read" in values:
+        capabilities.update(
+            {"read_accounts", "read_campaigns", "read_ad_sets", "read_ads", "read_insights"}
+        )
+    if "ads_management" in values:
+        capabilities.update(
+            {"manage_campaigns", "manage_ad_sets", "manage_ads", "manage_budgets_and_status"}
+        )
+    if "business_management" in values:
+        capabilities.add("manage_business_assets")
+    if "public_profile" in values:
+        capabilities.add("read_identity")
+    return tuple(sorted(capabilities))
 
 
 def _utc_now() -> str:

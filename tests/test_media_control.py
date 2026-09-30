@@ -540,6 +540,67 @@ class MediaControlTests(unittest.TestCase):
             self.assertEqual(diagnostics["campaigns_returned"], 0)
             self.assertEqual(diagnostics["mapped_campaigns"], 0)
 
+    def test_meta_credential_can_be_live_certified_before_ad_account_assignment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            transport = FixtureTransport(
+                {
+                    "authenticate": {"id": "system-user", "name": "SAFE System User"},
+                    "get_permissions": [
+                        {"permission": "ads_read", "status": "granted"},
+                        {"permission": "ads_management", "status": "granted"},
+                        {"permission": "business_management", "status": "granted"},
+                    ],
+                    "get_businesses": [],
+                    "get_accounts": [],
+                }
+            )
+            environment = {
+                "META_ACCESS_TOKEN": "provider-token",
+                "META_GRANTED_SCOPES": "ads_management,ads_read,business_management",
+            }
+            provider_adapter = MetaReadOnlyAdapter(
+                ProviderConfiguration(
+                    provider=MediaProvider.META,
+                    account_id="",
+                    credential_env_names=("META_ACCESS_TOKEN",),
+                ),
+                transport,
+                environment=environment,
+                discovery_only=True,
+            )
+            service = MediaControlService(
+                {MediaProvider.META: provider_adapter},
+                ExecutionJournal(directory),
+            )
+
+            result = service.certify_provider(
+                MediaProvider.META,
+                request_id="meta-discovery-certification",
+            )
+
+            self.assertEqual(result["status"], "healthy")
+            self.assertEqual(result["connection_status"], "live")
+            self.assertEqual(result["accessible_customers_returned"], 0)
+            self.assertEqual(result["accessible_businesses_returned"], 0)
+            self.assertEqual(
+                set(result["granted_scopes"]),
+                {"ads_management", "ads_read", "business_management"},
+            )
+            self.assertIn("manage_ads", result["provider_capabilities"])
+            self.assertTrue(result["asset_access_limited"])
+            self.assertTrue(result["account_assignment_required"])
+            self.assertFalse(result["campaign_list_queried"])
+            self.assertFalse(result["empty_campaign_list_valid"])
+            self.assertFalse(result["external_write_performed"])
+            self.assertNotIn("get_campaigns", [call[1] for call in transport.calls])
+            calls_before_mutation_probe = len(transport.calls)
+            with self.assertRaises(MediaMutationDisabled):
+                provider_adapter.create_campaign({"unsafe": True})
+            self.assertEqual(len(transport.calls), calls_before_mutation_probe)
+            diagnostics = service.diagnostics()["meta"]
+            self.assertEqual(diagnostics["health"], ConnectionHealth.HEALTHY.value)
+            self.assertTrue(diagnostics["account_assignment_required"])
+
     def test_provider_certification_failure_is_offline_and_safe(self):
         with tempfile.TemporaryDirectory() as directory:
             transport_adapter = adapter(MediaProvider.GOOGLE)
