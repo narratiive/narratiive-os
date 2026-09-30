@@ -51,16 +51,25 @@ def main() -> int:
     result = service.certify_provider(provider, request_id=request_id)
     inventory = None
     if args.include_inventory:
-        inventory_result = service.sync_inventory(
-            provider,
-            request_id=request_id + "-inventory",
-        )
-        inventory = {
-            "provider": provider.value,
-            "counts": inventory_result.counts(),
-            "synced_at": inventory_result.synced_at,
-            "external_write_performed": False,
-        }
+        if result.get("advertiser_account_id"):
+            inventory_result = service.sync_inventory(
+                provider,
+                request_id=request_id + "-inventory",
+            )
+            inventory = {
+                "provider": provider.value,
+                "status": "completed",
+                "counts": inventory_result.counts(),
+                "synced_at": inventory_result.synced_at,
+                "external_write_performed": False,
+            }
+        else:
+            inventory = {
+                "provider": provider.value,
+                "status": "not_available_no_configured_account",
+                "counts": {name: 0 for name in ("account", "campaign", "ad_group", "ad", "creative")},
+                "external_write_performed": False,
+            }
 
     adapter = adapters[provider]
     blocked_operations: list[str] = []

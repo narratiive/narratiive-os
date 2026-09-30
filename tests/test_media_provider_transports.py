@@ -5,7 +5,12 @@ import hashlib
 import hmac
 from typing import Any
 
-from runtime.media_control import MediaMutationDisabled, MediaProvider, ProviderConfiguration
+from runtime.media_control import (
+    MediaMutationDisabled,
+    MediaProvider,
+    ProviderConfiguration,
+    WRITE_OPERATIONS,
+)
 from runtime.media_provider_transports import (
     GoogleAdsReadTransport,
     JSONResponse,
@@ -254,6 +259,48 @@ class MediaProviderTransportTests(unittest.TestCase):
         with self.assertRaises(MediaMutationDisabled):
             adapter.activate_campaign("unsafe")
         self.assertEqual(http.calls, [])
+
+    def test_meta_discovery_adapter_accepts_write_scopes_but_cannot_mutate(self) -> None:
+        environment = {
+            "META_ACCESS_TOKEN": "meta-secret",
+            "META_GRAPH_API_VERSION": "v26.0",
+            "META_GRANTED_SCOPES": "ads_management,ads_read,business_management",
+            "META_PROVIDER_CAPABILITIES": "manage_ads,manage_ad_sets,manage_campaigns",
+        }
+        http = FakeHTTP()
+
+        adapter = build_configured_media_adapters(environment, http=http)[MediaProvider.META]
+
+        self.assertTrue(adapter.discovery_only)
+        for operation in sorted(WRITE_OPERATIONS):
+            with self.assertRaises(MediaMutationDisabled):
+                getattr(adapter, operation)({"unsafe": True})
+        self.assertEqual(http.calls, [])
+
+    def test_meta_discovery_reads_identity_permissions_businesses_and_empty_accounts(self) -> None:
+        environment = {
+            "META_ACCESS_TOKEN": "meta-secret",
+            "META_GRAPH_API_VERSION": "v26.0",
+        }
+        http = FakeHTTP(
+            (
+                JSONResponse(200, {}, {"id": "system-user", "name": "SAFE System User"}),
+                JSONResponse(200, {}, {"data": [
+                    {"permission": "ads_read", "status": "granted"},
+                    {"permission": "ads_management", "status": "granted"},
+                ]}),
+                JSONResponse(200, {}, {"data": []}),
+                JSONResponse(200, {}, {"data": []}),
+            )
+        )
+        adapter = build_configured_media_adapters(environment, http=http)[MediaProvider.META]
+
+        self.assertEqual(adapter.authenticate()["id"], "system-user")
+        self.assertEqual(len(adapter.get_permissions()), 2)
+        self.assertEqual(adapter.get_businesses(), [])
+        self.assertEqual(adapter.get_accounts(), [])
+        self.assertTrue(all(call["method"] == "GET" for call in http.calls))
+        self.assertTrue(all("meta-secret" not in call["url"] for call in http.calls))
 
     def test_provider_error_never_contains_secret_or_response_body(self) -> None:
         secret = "super-secret-token"

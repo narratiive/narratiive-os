@@ -1,6 +1,6 @@
 # Meta Ads provider-capability onboarding
 
-Status: backend ready; external app credentials and advertiser consent required
+Status: backend ready; credential discovery and account-scoped reads are independently certified
 
 ## Fixed values
 
@@ -35,10 +35,12 @@ After exactly one intended account is configured, restart the Tony runtime so it
   .venv/bin/python scripts/certify_media_provider.py meta --include-inventory
 ```
 
-The integration becomes `HEALTHY / LIVE` only after Meta successfully returns the accessible-account list and the configured account's campaign list. A successful empty campaign list is healthy. A token, callback or API failure is audited as offline and never inferred to be healthy.
+The integration becomes `HEALTHY / LIVE` only after Meta successfully authenticates the system-user identity, confirms `ads_read`, and returns genuine business and accessible-account reads. Zero accessible businesses or ad accounts is a valid authenticated empty result, recorded as limited asset access with account assignment still required. It does not claim that campaign inventory was queried. When an ad account is configured, certification also requires that account's campaign list; a successful empty campaign list is healthy. A token, permission, callback or API failure is audited as offline and never inferred to be healthy.
 
 The optional inventory pass reads and normalises account, campaign, ad-set, ad
-and creative metadata. Tony can then report the verified hierarchy with
+and creative metadata when an advertiser account is configured. Before account
+assignment it reports `not_available_no_configured_account` and performs no
+invented or placeholder provider query. Tony can then report the verified hierarchy with
 `/media inventory meta`; that command reads the append-only journal and does
 not contact Meta or trigger any external action.
 
