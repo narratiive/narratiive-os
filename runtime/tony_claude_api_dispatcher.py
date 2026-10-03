@@ -67,6 +67,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
         request_max_tokens = (
             growth_blueprint_max_tokens
             if _workflow_id(contract) in {
+                "blueprint_lite_to_discovery_preparation",
                 "research_to_strategic_synthesis",
                 "strategic_synthesis_to_strategy_thesis",
                 "strategy_thesis_to_growth_blueprint",
