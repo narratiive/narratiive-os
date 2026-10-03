@@ -166,6 +166,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn('if (view === "campaign_portfolio") return "/campaigns";', source)
         self.assertNotIn('return "/what\'s the status"', source)
         self.assertIn("TONY_CONTROL_PLANE_TIMEOUT_MS", source)
+        self.assertIn("TONY_WORKFLOW_CONTROL_TIMEOUT_MS", source)
+        self.assertIn("DEFAULT_WORKFLOW_CONTROL_TIMEOUT_MS = 240000", source)
         self.assertIn("AbortSignal.timeout(timeoutMs)", source)
         self.assertIn("Narratiive control plane timed out after", source)
         for legacy_tool in LEGACY_STATE_TOOLS:

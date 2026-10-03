@@ -8,6 +8,7 @@ import { buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent }
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
+const DEFAULT_WORKFLOW_CONTROL_TIMEOUT_MS = 240000;
 
 function schema(properties = {}, required = []) {
   return { type: "object", properties, required, additionalProperties: false };
@@ -93,6 +94,11 @@ function controlPlaneTimeoutMs() {
   return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_CONTROL_PLANE_TIMEOUT_MS;
 }
 
+function workflowControlTimeoutMs() {
+  const configured = Number(process.env.TONY_WORKFLOW_CONTROL_TIMEOUT_MS || DEFAULT_WORKFLOW_CONTROL_TIMEOUT_MS);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_WORKFLOW_CONTROL_TIMEOUT_MS;
+}
+
 function workflowControlUrl() {
   return controlPlaneUrl().replace(/\/control-plane$/, "/workflow/control");
 }
@@ -115,7 +121,7 @@ async function executeWorkflowControl(params) {
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
-  const timeoutMs = controlPlaneTimeoutMs();
+  const timeoutMs = workflowControlTimeoutMs();
   let response;
   try {
     response = await fetch(workflowControlUrl(), {
