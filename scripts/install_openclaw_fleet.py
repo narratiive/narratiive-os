@@ -98,6 +98,8 @@ def _enable_control_plane_plugin(config: dict[str, Any]) -> None:
     entries = plugins.setdefault("entries", {})
     entry = entries.setdefault(CONTROL_PLANE_PLUGIN_ID, {})
     entry["enabled"] = True
+    hooks = entry.setdefault("hooks", {})
+    hooks["allowConversationAccess"] = True
 
     # OpenClaw's plugins.allow is exclusive when present. Preserve every existing
     # trusted plugin and add Narratiive's local plugin rather than replacing policy.

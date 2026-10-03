@@ -4,6 +4,7 @@ import { buildNativeApprovalRequirement, buildWorkflowApprovalRequirement } from
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 import { resolveBridgeToken } from "./bridge-auth.js";
+import { buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
@@ -49,6 +50,7 @@ const WORKFLOW_SCHEMA = {
   reference: { type: "string", minLength: 1, maxLength: 500 },
   rationale: { type: "string", minLength: 1, maxLength: 1000 },
   approval_token: { type: "string", minLength: 64, maxLength: 64 },
+  approval_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human message that explicitly approves, rejects, or requests revision of this exact workflow artefact. Commercial status such as 'we won it' is not artefact approval." },
   action_digest: { type: "string", minLength: 64, maxLength: 64 },
   recipient: { type: "string", minLength: 1, maxLength: 320 },
   workflow_id: { type: "string", minLength: 1, maxLength: 200 },
@@ -105,6 +107,9 @@ async function executeWorkflowControl(params) {
   if (operation === "commission" && (!params?.workflow_id || !params?.commitment_id)) throw new Error("commission requires workflow_id and commitment_id");
   const approvalToken = String(params?.approval_token || "").trim();
   if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
+  const approvalInstruction = String(params?.approval_instruction || "");
+  if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !approvalInstruction) throw new Error("workflow decision requires the verbatim current human approval instruction");
+  if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !hasExplicitWorkflowDecisionIntent(operation, approvalInstruction)) throw new Error(`the current human instruction does not explicitly ${operation.replace("_", " ")} this artefact`);
   const actionDigest = String(params?.action_digest || "").trim();
   if (operation === "execute_action" && !actionDigest) throw new Error("action execution requires the exact preview action digest");
   const token = resolveBridgeToken();
@@ -123,6 +128,9 @@ async function executeWorkflowControl(params) {
         inputs: {
           ...(params?.inputs && typeof params.inputs === "object" && !Array.isArray(params.inputs) ? params.inputs : {}),
           ...(approvalToken ? { approval_token: approvalToken } : {}),
+          ...(approvalInstruction ? { approval_instruction: approvalInstruction } : {}),
+          ...(params?._approval_instruction_run_id ? { approval_instruction_run_id: String(params._approval_instruction_run_id) } : {}),
+          ...(params?._approval_instruction_proof ? { approval_instruction_proof: String(params._approval_instruction_proof) } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),
@@ -240,7 +248,7 @@ function approvalTool() {
 function workflowControlTool() {
   return {
     name: "narratiive_workflow_control",
-    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Use artifact_detail for authoritative business fields. Before proposing a client-facing send, use action_preview and show the complete resolved action; never ask for blind approval. For the KatKin acceptance simulation, pass inputs with simulation_mode=true and delivery_override=hello@narratiive.com; the preview must show that override. Real client delivery is not enabled by this simulation path. Call execute_action only after Matt unambiguously approves that preview in Telegram, using its exact action_digest; changed payloads fail closed and verified execution is idempotent. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Interpret Matt's natural Telegram reply, but call approve, reject or request_revision only when intent is unambiguous and include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. Use artifact_detail for authoritative business fields. Before proposing a client-facing send, use action_preview and show the complete resolved action; never ask for blind approval. For the KatKin acceptance simulation, pass inputs with simulation_mode=true and delivery_override=hello@narratiive.com; the preview must show that override. Real client delivery is not enabled by this simulation path. Call execute_action only after Matt unambiguously approves that preview in Telegram, using its exact action_digest; changed payloads fail closed and verified execution is idempotent. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Call approve, reject or request_revision only when the current human message explicitly names an artefact and uses matching decision intent. Copy that entire current message verbatim into approval_instruction; never compose, paraphrase, infer or reuse one. General language such as 'we won it', 'proceed', 'looks good' or 'continue' is not artefact approval. Include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
     parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
     async execute(_id, params) {
       try {
@@ -266,7 +274,27 @@ export default definePluginEntry({
   name: "Narratiive Control Plane",
   description: "Authoritative Narratiive OS state and evidence plus bounded autonomous reads, native approval and verified consequence execution for Tony.",
   register(api) {
-    api.on("before_tool_call", async (event) => {
+    const trustedTurns = new Map();
+    const rememberTrustedTurn = (event, ctx) => {
+      const runId = String(ctx?.runId || "").trim();
+      if (!runId || typeof event?.prompt !== "string") return;
+      trustedTurns.set(runId, { runId, prompt: event.prompt, recordedAt: Date.now() });
+      while (trustedTurns.size > 256) trustedTurns.delete(trustedTurns.keys().next().value);
+    };
+    api.on("before_agent_run", rememberTrustedTurn);
+    api.on("before_tool_call", async (event, ctx) => {
+      if (event.toolName === "narratiive_workflow_control" && WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase())) {
+        const runId = String(ctx?.runId || event.runId || "").trim();
+        const trustedTurn = trustedTurns.get(runId);
+        if (!trustedTurn || Date.now() - trustedTurn.recordedAt > 10 * 60 * 1000) {
+          return { block: true, blockReason: "Workflow artefact decision requires a current trusted human turn." };
+        }
+        try {
+          return { params: buildTrustedWorkflowDecisionParams(event.params || {}, trustedTurn, resolveBridgeToken()) };
+        } catch (error) {
+          return { block: true, blockReason: String(error?.message || error) };
+        }
+      }
       if (event.toolName === "narratiive_request_action_approval") {
         const requirement = buildNativeApprovalRequirement(event.params || {});
         if (!requirement.required) return;

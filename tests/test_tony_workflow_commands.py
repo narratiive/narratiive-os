@@ -245,7 +245,16 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "/approve safe-executive-run because reviewed synthetic work",
             [],
             principal_id="telegram:123",
-            inputs={"approval_token": token},
+            inputs={
+                "approval_token": token,
+                "approval_decision_evidence": {
+                    "human_instruction": "I approve the current Blueprint Lite artefact.",
+                    "human_instruction_sha256": "b" * 64,
+                    "turn_run_id": "turn-safe-1",
+                    "verbatim_current_human_instruction_verified": True,
+                    "explicit_decision_intent": "approve",
+                },
+            },
         )
 
         self.assertEqual(denied.data["error_code"], "authorised_principal_required")
@@ -254,6 +263,10 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(approved.data["status"], "complete")
         self.assertIsNone(approved.data["proposed_next_action"])
         self.assertFalse(approved.data["external_action_taken"])
+        persisted = next(state for state in FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}).list_states() if state.run_id == "safe-executive-run")
+        human_decision = persisted.approval_history[-1]["approval_binding"]["human_decision"]
+        self.assertEqual(human_decision["human_instruction"], "I approve the current Blueprint Lite artefact.")
+        self.assertTrue(human_decision["verbatim_current_human_instruction_verified"])
 
         proposed = self.service.execute("/proposed safe-executive-run", [])
         self.assertIn("No current proposed next action", proposed.message)

@@ -7,11 +7,25 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from openclaw.tony_live_bridge import LeadAwareTonyApplication
-from runtime.inbound_leads import FileInboundLeadStore
+from openclaw.tony_live_bridge import LeadAwareTonyApplication, build_runtime_lead_loader
+from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 
 
 class TonyLiveBlueprintLiteIngestTests(unittest.TestCase):
+    def test_isolated_runtime_can_explicitly_read_its_local_lead_projection(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileInboundLeadStore(Path(tmp) / "leads.json")
+            lead = InboundLead("safe-test", "Test Contact", company="SAFE TEST CO")
+            store.upsert(lead)
+            loader = build_runtime_lead_loader(store, {"TONY_INBOUND_LEAD_SOURCE": "local_projection"})
+            self.assertEqual(loader(), (lead,))
+
+    def test_unknown_runtime_lead_source_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            store = FileInboundLeadStore(Path(tmp) / "leads.json")
+            with self.assertRaisesRegex(ValueError, "TONY_INBOUND_LEAD_SOURCE"):
+                build_runtime_lead_loader(store, {"TONY_INBOUND_LEAD_SOURCE": "fallback_somewhere"})
+
     @staticmethod
     def _environ() -> dict:
         payload = json.dumps(

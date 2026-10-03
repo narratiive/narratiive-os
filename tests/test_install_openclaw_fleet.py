@@ -126,6 +126,9 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             tony = next(agent for agent in merged["agents"]["list"] if agent["id"] == "tony")
 
             self.assertNotIn("allow", tony["tools"])
+            self.assertTrue(
+                merged["plugins"]["entries"]["narratiive-control-plane"]["hooks"]["allowConversationAccess"]
+            )
             self.assertEqual(
                 set(tony["tools"]["alsoAllow"]),
                 {

@@ -28,8 +28,8 @@ from runtime.workflow_portfolio import project_client_portfolio
 
 class WorkflowCommandBackend(Protocol):
     def list_states(self) -> tuple[WorkflowState, ...]: ...
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str) -> WorkflowState: ...
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str) -> WorkflowState: ...
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def recover(self) -> int: ...
@@ -143,8 +143,10 @@ class FileWorkflowCommandBackend:
             states.append(state)
         return tuple(states)
 
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str) -> WorkflowState:
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState:
         binding = approval_binding_evidence(state, approval_token)
+        if decision_evidence:
+            binding["human_decision"] = dict(decision_evidence)
         runtime = self._runtime(state)
         runtime.approve(
             state.run_id,
@@ -154,10 +156,12 @@ class FileWorkflowCommandBackend:
         )
         return runtime.runs.load_run(state.run_id)
 
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str) -> WorkflowState:
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState:
         binding = None
         if state.approval_status == "pending":
             binding = approval_binding_evidence(state, approval_token)
+            if decision_evidence:
+                binding["human_decision"] = dict(decision_evidence)
         runtime = self._runtime(state)
         runtime.reject_for_revision(
             state.run_id,
@@ -939,6 +943,9 @@ class TonyWorkflowCommandService:
                 if not rationale:
                     return self._error(name, "rationale_required", f"Use /{name} <run or company> because <reason>.")
                 approval_token = str((inputs or {}).get("approval_token") or "").strip()
+                decision_evidence = (inputs or {}).get("approval_decision_evidence")
+                if decision_evidence is not None and not isinstance(decision_evidence, Mapping):
+                    return self._error(name, "approval_evidence_invalid", "Verified human decision evidence must be an object.")
                 if state.approval_status == "pending" and not approval_token:
                     return self._error(
                         name,
@@ -946,9 +953,21 @@ class TonyWorkflowCommandService:
                         "Read the current workflow gate first and use its exact approval token; this prevents stale artefact approval.",
                     )
                 if name == "approve":
-                    changed = self.backend.approve(state, approver=principal_id, rationale=rationale, approval_token=approval_token)
+                    changed = self.backend.approve(
+                        state,
+                        approver=principal_id,
+                        rationale=rationale,
+                        approval_token=approval_token,
+                        decision_evidence=decision_evidence,
+                    )
                     return CommandResponse(name, "healthy", f"Approved {changed.run_id} for its exact proposed action. No external action was performed.", self._summary(changed))
-                changed = self.backend.reject(state, reviewer=principal_id, rationale=rationale, approval_token=approval_token)
+                changed = self.backend.reject(
+                    state,
+                    reviewer=principal_id,
+                    rationale=rationale,
+                    approval_token=approval_token,
+                    decision_evidence=decision_evidence,
+                )
                 return CommandResponse("reject", "healthy", f"Revision requested for {changed.run_id}; progression remains stopped until revised work passes quality.", self._summary(changed))
             if name == "resume":
                 changed = self.backend.resume(state)
