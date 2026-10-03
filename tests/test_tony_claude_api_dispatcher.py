@@ -133,7 +133,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 build_claude_api_dispatcher({**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": value})
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
-    def test_strategy_sequence_uses_its_bounded_long_form_output_budget(self, urlopen):
+    def test_long_form_strategy_and_discovery_work_uses_its_bounded_output_budget(self, urlopen):
         urlopen.return_value = _Response(
             {
                 "model": "claude-test-model",
@@ -142,6 +142,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
             }
         )
         for workflow_id in (
+            "blueprint_lite_to_discovery_preparation",
             "research_to_strategic_synthesis",
             "strategic_synthesis_to_strategy_thesis",
             "strategy_thesis_to_growth_blueprint",
