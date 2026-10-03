@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import io
+import hashlib
+import hmac
 import json
 import tempfile
 import unittest
@@ -8,7 +10,7 @@ from http import HTTPStatus
 from pathlib import Path
 
 from openclaw.telegram_inbound import TelegramInboundConfig, TelegramInboundService
-from openclaw.tony_live_bridge import LeadAwareTonyApplication
+from openclaw.tony_live_bridge import LeadAwareTonyApplication, workflow_decision_proof_material
 
 
 class FakeSender:
@@ -230,6 +232,34 @@ class TelegramInboundTests(unittest.TestCase):
             response = b"".join(app(environ, lambda status, headers: None))
             return json.loads(response.decode("utf-8"))
 
+        def decision(operation: str, instruction: str, *, source: str = "openclaw_telegram_workflow_tool") -> dict:
+            reference = "SAFE Company"
+            approval_token = "a" * 64
+            run_id = "openclaw-turn-safe-1"
+            proof = hmac.new(
+                b"secret",
+                workflow_decision_proof_material(
+                    run_id=run_id,
+                    operation=operation,
+                    reference=reference,
+                    approval_token=approval_token,
+                    instruction=instruction,
+                ),
+                hashlib.sha256,
+            ).hexdigest()
+            return call({
+                "operation": operation,
+                "reference": reference,
+                "rationale": "Reviewed the exact current artefact",
+                "inputs": {
+                    "approval_token": approval_token,
+                    "approval_instruction": instruction,
+                    "approval_instruction_run_id": run_id,
+                    "approval_instruction_proof": proof,
+                },
+                "source": source,
+            })
+
         call({
             "operation": "continue",
             "reference": "SAFE Director's Company",
@@ -246,20 +276,13 @@ class TelegramInboundTests(unittest.TestCase):
                 }
             },
         })
-        call({
-            "operation": "approve",
-            "reference": "SAFE Company",
-            "rationale": "Reviewed internal work",
-            "inputs": {"approval_token": "a" * 64},
-            "source": "untrusted",
-        })
-        call({
-            "operation": "approve",
-            "reference": "SAFE Company",
-            "rationale": "Reviewed internal work",
-            "inputs": {"approval_token": "a" * 64},
-            "source": "openclaw_telegram_workflow_tool",
-        })
+        decision("approve", "I approve the current Blueprint Lite artefact.", source="untrusted")
+        for instruction in ("We've won it. Get us ready to start", "proceed", "looks good", "continue"):
+            with self.subTest(instruction=instruction):
+                rejected = decision("approve", instruction)
+                self.assertFalse(rejected["ok"])
+        accepted = decision("approve", "I explicitly approve the current Blueprint Lite artefact.")
+        self.assertTrue(accepted["ok"])
 
         self.assertEqual(workflows.calls[0]["inputs"]["discovery_evidence"]["notes"], "SAFE evidence")
         self.assertIn("SAFE Director", workflows.calls[0]["text"])
@@ -267,6 +290,34 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertEqual(workflows.calls[1]["inputs"]["focus"]["kind"], "evidence_gap")
         self.assertEqual(len(workflows.calls), 3)
         self.assertEqual(workflows.calls[2]["principal_id"], "telegram:123")
+        evidence = workflows.calls[2]["inputs"]["approval_decision_evidence"]
+        self.assertEqual(evidence["human_instruction"], "I explicitly approve the current Blueprint Lite artefact.")
+        self.assertTrue(evidence["verbatim_current_human_instruction_verified"])
+
+    def test_workflow_decision_proof_cannot_be_reused_after_any_bound_field_changes(self):
+        workflows = FakeWorkflowCommands()
+        app = LeadAwareTonyApplication(
+            FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),
+            workflow_command_service=workflows, authorised_principal_id="telegram:123",
+        )
+        instruction = "I approve the current Blueprint Lite artefact."
+        material = workflow_decision_proof_material(
+            run_id="turn-1", operation="approve", reference="SAFE Company",
+            approval_token="a" * 64, instruction=instruction,
+        )
+        proof = hmac.new(b"secret", material, hashlib.sha256).hexdigest()
+        body = {
+            "operation": "approve", "reference": "DIFFERENT Company", "rationale": "Reviewed",
+            "inputs": {"approval_token": "a" * 64, "approval_instruction": instruction,
+                       "approval_instruction_run_id": "turn-1", "approval_instruction_proof": proof},
+            "source": "openclaw_telegram_workflow_tool",
+        }
+        raw = json.dumps(body).encode("utf-8")
+        environ = {"REQUEST_METHOD": "POST", "PATH_INFO": "/workflow/control", "CONTENT_LENGTH": str(len(raw)),
+                   "HTTP_AUTHORIZATION": "Bearer secret", "wsgi.input": io.BytesIO(raw)}
+        response = json.loads(b"".join(app(environ, lambda status, headers: None)).decode("utf-8"))
+        self.assertFalse(response["ok"])
+        self.assertEqual(workflows.calls, [])
 
 
 if __name__ == "__main__":

@@ -3,9 +3,12 @@ from __future__ import annotations
 import json
 import os
 import shlex
+import hashlib
+import hmac
+import re
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Mapping
 from socketserver import ThreadingMixIn
 from wsgiref.simple_server import WSGIServer, make_server
 
@@ -87,6 +90,101 @@ from runtime.tony_conversation_work import FileConversationWorkStore, TonyConver
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+
+_WORKFLOW_DECISION_TARGET = re.compile(
+    r"\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|"
+    r"creative(?:\s+director(?:'s|’s))?\s+bible|proposal|version|current\s+work)\b",
+    re.IGNORECASE,
+)
+_NEGATED_WORKFLOW_DECISION = re.compile(
+    r"\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b",
+    re.IGNORECASE,
+)
+_QUESTION_WORKFLOW_DECISION = re.compile(r"^\s*(?:can|could|should|would|may)\s+(?:i|we)\b", re.IGNORECASE)
+
+
+def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> bool:
+    """Recognise only an explicit artefact decision, never general progress language."""
+
+    decision = operation.strip().casefold().replace("-", "_")
+    text = str(instruction or "")
+    if decision not in {"approve", "reject", "request_revision"} or not text.strip():
+        return False
+    if not _WORKFLOW_DECISION_TARGET.search(text):
+        return False
+    if _NEGATED_WORKFLOW_DECISION.search(text) or _QUESTION_WORKFLOW_DECISION.search(text):
+        return False
+    if decision == "approve":
+        return bool(re.search(r"(?:^|[.!?]\s*|\b(?:i|we)\s+)(?:explicitly\s+)?approve\b", text, re.IGNORECASE))
+    if decision == "reject":
+        return bool(re.search(r"(?:^|[.!?]\s*|\b(?:i|we)\s+)(?:explicitly\s+)?reject\b", text, re.IGNORECASE))
+    return bool(
+        re.search(
+            r"(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
+def workflow_decision_proof_material(
+    *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str
+) -> bytes:
+    values = (
+        "narratiive-workflow-decision-v1",
+        run_id,
+        operation.strip().casefold().replace("-", "_"),
+        reference,
+        approval_token,
+        instruction,
+    )
+    return "\0".join(values).encode("utf-8")
+
+
+def verify_workflow_decision_proof(
+    secret: str,
+    *,
+    run_id: str,
+    operation: str,
+    reference: str,
+    approval_token: str,
+    instruction: str,
+    proof: str,
+) -> bool:
+    if not secret or not run_id or not proof:
+        return False
+    expected = hmac.new(
+        secret.encode("utf-8"),
+        workflow_decision_proof_material(
+            run_id=run_id,
+            operation=operation,
+            reference=reference,
+            approval_token=approval_token,
+            instruction=instruction,
+        ),
+        hashlib.sha256,
+    ).hexdigest()
+    return hmac.compare_digest(expected, proof)
+
+
+def build_runtime_lead_loader(
+    lead_store: FileInboundLeadStore,
+    env: Mapping[str, str] | None = None,
+) -> Callable[[], tuple[InboundLead, ...]]:
+    """Select Tony's lead source explicitly.
+
+    Production remains Notion-authoritative.  Isolated acceptance runtimes may
+    opt into their own local inbound projection so a synthetic lead never has
+    to be written to the live Notion workspace merely to be visible to Tony.
+    Unknown modes fail closed during startup.
+    """
+    active_env = os.environ if env is None else env
+    mode = str(active_env.get("TONY_INBOUND_LEAD_SOURCE") or "notion").strip().casefold()
+    if mode == "notion":
+        return build_authoritative_lead_loader(lead_store, env=active_env)
+    if mode == "local_projection":
+        return lead_store.read
+    raise ValueError("TONY_INBOUND_LEAD_SOURCE must be 'notion' or 'local_projection'")
 
 
 class ThreadingTonyServer(ThreadingMixIn, WSGIServer):
@@ -294,6 +392,32 @@ class LeadAwareTonyApplication:
             if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
+                if operation in {"approve", "reject", "request-revision"}:
+                    instruction = str((inputs or {}).get("approval_instruction") or "")
+                    approval_token = str((inputs or {}).get("approval_token") or "").strip()
+                    instruction_run_id = str((inputs or {}).get("approval_instruction_run_id") or "").strip()
+                    instruction_proof = str((inputs or {}).get("approval_instruction_proof") or "").strip()
+                    if not has_explicit_workflow_decision_intent(operation, instruction):
+                        raise ValueError(
+                            "workflow artefact decision requires explicit approve, reject, or revision intent naming the artefact"
+                        )
+                    if not verify_workflow_decision_proof(
+                        str(self.base.bridge_token or ""),
+                        run_id=instruction_run_id,
+                        operation=operation,
+                        reference=reference,
+                        approval_token=approval_token,
+                        instruction=instruction,
+                        proof=instruction_proof,
+                    ):
+                        raise ValueError("workflow artefact decision lacks verified verbatim current-human instruction provenance")
+                    inputs["approval_decision_evidence"] = {
+                        "human_instruction": instruction,
+                        "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+                        "turn_run_id": instruction_run_id,
+                        "verbatim_current_human_instruction_verified": True,
+                        "explicit_decision_intent": operation.replace("-", "_"),
+                    }
                 principal = (
                     f"matt:{self.authorised_principal_id}"
                     if operation == "sync-campaign-learning"
@@ -713,7 +837,7 @@ def build_app() -> LeadAwareTonyApplication:
     lead_path = Path(os.getenv("TONY_INBOUND_LEADS_PATH", str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"))).resolve()
     lead_store = FileInboundLeadStore(lead_path)
     attention_service = LeadAttentionService(lead_store, Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))))
-    authoritative_lead_loader = build_authoritative_lead_loader(lead_store)
+    authoritative_lead_loader = build_runtime_lead_loader(lead_store)
     visibility = ExecutiveVisibilityPolicy()
     executive_service = TonyExecutiveCommandService(
         app.command_service,

@@ -42,6 +42,23 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             },
         }
 
+    def test_worker_instruction_names_the_machine_checked_evidence_contract(self) -> None:
+        instruction = TonyInboundBlueprintLiteService._instruction(self._lead())
+        for field in (
+            "blueprint_lite",
+            "diagnostic_signals_used",
+            "diagnostic_input_coverage",
+            "source_backed_evidence",
+            "fact_interpretation_hypothesis_lineage",
+            "questions_to_answer_next",
+            "recommendation",
+            "quality_gate",
+            "external_action_taken",
+        ):
+            self.assertIn(field, instruction)
+        self.assertIn("Set recommendation to 'advance' only when", instruction)
+        self.assertNotIn("separate facts, Use", instruction)
+
     @staticmethod
     def _good_evidence() -> dict:
         return {
