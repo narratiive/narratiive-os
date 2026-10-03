@@ -46,7 +46,7 @@ STAGE_WORKFLOWS = {
     "Creative": {"growth_blueprint_to_campaign_worlds", "campaign_worlds_to_creative_bible", "creative_bible_to_asset_production"},
     "Media": {"growth_blueprint_to_campaign_worlds", "creative_bible_to_asset_production"},
     "Measurement/reporting": {"asset_production_to_delivery_prep", "delivery_to_follow_up"},
-    "Client operations": {"blueprint_lite_to_discovery_prep", "delivery_prep_to_client_delivery"},
+    "Client operations": {"blueprint_lite_to_discovery_preparation", "delivery_prep_to_client_delivery"},
 }
 STATUS_VALUES = {"PASS", "PASS WITH ISSUE", "HUMAN GATE", "EXTERNAL BLOCKER", "PRODUCT GAP", "FAIL"}
 
@@ -473,8 +473,6 @@ def run(output_dir: Path, *, max_gate_turns: int = 14) -> dict[str, Any]:
             time.sleep(1)
             states = _states(work_root)
             if states and any(s.get("workflow_id") == "delivery_to_follow_up" and s.get("status") in {"complete", "awaiting_approval"} for s in states):
-                break
-            if len(turns) >= 5 and not pending and "block" in turn.response.casefold():
                 break
 
         report = evaluate(_states(work_root), turns, approvals, work_root, commercial_instruction_checkpoint)
