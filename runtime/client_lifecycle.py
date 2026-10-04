@@ -15,6 +15,11 @@ class ClientLifecycleStage(str, Enum):
     INVOICE = "invoice"
     COMPLETE = "complete"
 
+    # Legacy persisted values remain the wire format.  These aliases make the
+    # canonical customer meaning explicit without rewriting historical records.
+    DISCOVERY = "meeting"
+    COMMERCIAL = "invoice"
+
     @classmethod
     def _missing_(cls, value: object) -> "ClientLifecycleStage | None":
         # Backwards compatibility for lifecycle records created before
@@ -25,6 +30,43 @@ class ClientLifecycleStage(str, Enum):
 
 
 _STAGE_ORDER = tuple(ClientLifecycleStage)
+
+
+class CustomerLifecycleStage(str, Enum):
+    """Canonical customer journey, independent of legacy storage labels."""
+
+    LEAD = "lead"
+    BLUEPRINT_LITE = "blueprint_lite"
+    DISCOVERY = "discovery"
+    PROPOSAL = "proposal"
+    DELIVERY = "delivery"
+    COMMERCIAL = "commercial"
+    COMPLETE = "complete"
+
+
+_CUSTOMER_STAGE = {
+    ClientLifecycleStage.LEAD: CustomerLifecycleStage.LEAD,
+    ClientLifecycleStage.RESEARCH: CustomerLifecycleStage.LEAD,
+    ClientLifecycleStage.BLUEPRINT_LITE: CustomerLifecycleStage.BLUEPRINT_LITE,
+    ClientLifecycleStage.OUTREACH: CustomerLifecycleStage.LEAD,
+    ClientLifecycleStage.MEETING: CustomerLifecycleStage.DISCOVERY,
+    ClientLifecycleStage.PROPOSAL: CustomerLifecycleStage.PROPOSAL,
+    ClientLifecycleStage.DELIVERY: CustomerLifecycleStage.DELIVERY,
+    ClientLifecycleStage.INVOICE: CustomerLifecycleStage.COMMERCIAL,
+    ClientLifecycleStage.COMPLETE: CustomerLifecycleStage.COMPLETE,
+}
+
+_DEFAULT_OPERATIONAL_STATE = {
+    ClientLifecycleStage.LEAD: "qualified",
+    ClientLifecycleStage.RESEARCH: "opportunity_research",
+    ClientLifecycleStage.BLUEPRINT_LITE: "ready_for_review",
+    ClientLifecycleStage.OUTREACH: "outreach_preparation",
+    ClientLifecycleStage.MEETING: "awaiting_discovery",
+    ClientLifecycleStage.PROPOSAL: "generating",
+    ClientLifecycleStage.DELIVERY: "commissioned",
+    ClientLifecycleStage.INVOICE: "invoice_pending",
+    ClientLifecycleStage.COMPLETE: "complete",
+}
 
 
 class AcquisitionPath(str, Enum):
@@ -72,6 +114,7 @@ class ClientLifecycleRecord:
     requires_matt: bool = False
     value_gbp: int | None = None
     acquisition_path: AcquisitionPath = AcquisitionPath.LEGACY
+    operational_state: str = ""
 
     def __post_init__(self) -> None:
         if not isinstance(self.stage, ClientLifecycleStage):
@@ -94,6 +137,14 @@ class ClientLifecycleRecord:
             raise ValueError(
                 f"stage {self.stage.value} is not valid for {self.acquisition_path.value} acquisition"
             )
+
+    @property
+    def customer_lifecycle_stage(self) -> CustomerLifecycleStage:
+        return _CUSTOMER_STAGE[self.stage]
+
+    @property
+    def canonical_operational_state(self) -> str:
+        return self.operational_state.strip() or _DEFAULT_OPERATIONAL_STATE[self.stage]
 
     @property
     def stage_index(self) -> int:
@@ -137,6 +188,7 @@ class ClientLifecycleRecord:
             requires_matt=False,
             value_gbp=self.value_gbp,
             acquisition_path=self.acquisition_path,
+            operational_state="",
         )
 
     def to_dict(self) -> dict[str, object]:
@@ -152,4 +204,6 @@ class ClientLifecycleRecord:
             "requires_matt": self.requires_matt,
             "value_gbp": self.value_gbp,
             "acquisition_path": self.acquisition_path.value,
+            "customer_lifecycle_stage": self.customer_lifecycle_stage.value,
+            "operational_state": self.canonical_operational_state,
         }

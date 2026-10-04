@@ -263,18 +263,25 @@ class WorkflowRunService:
         stage = state.stage(state.current_stage_id)
         if stage.status is not StageStatus.BLOCKED:
             raise ValueError("blocked workflow step is not revisable")
-        stage.revision_count += 1
+        owner = (
+            state.stage("prepare_growth_blueprint")
+            if state.workflow_id == "strategy_thesis_to_growth_blueprint"
+            and stage.stage_id == "review_growth_blueprint"
+            else stage
+        )
+        owner.revision_count += 1
         revision = {
             "reviewer": identity,
             "rationale": reason,
             "decision": "request_revision",
             "requested_at": datetime.now(timezone.utc).isoformat(),
             "stage_id": stage.stage_id,
-            "revision_count": stage.revision_count,
+            "owner_stage_id": owner.stage_id,
+            "revision_count": owner.revision_count,
         }
         state.approval_history.append(revision)
-        self.engine.request_revision(state, stage.stage_id, stage.stage_id, reason)
-        self.engine.resume_stage(state, stage.stage_id, state.input_payload.keys())
+        self.engine.request_revision(state, stage.stage_id, owner.stage_id, reason)
+        self.engine.resume_stage(state, owner.stage_id, state.input_payload.keys())
         self._commit(state, "quality.revision_requested", revision)
         return state
 
@@ -307,6 +314,45 @@ class WorkflowRunService:
             state,
             "workflow.inputs_merged",
             {"input_fields": sorted(inputs)},
+        )
+        return state
+
+    def record_stage_artifact_identity(
+        self,
+        run_id: str,
+        *,
+        stage_id: str,
+        input_key: str,
+        artifact: ArtifactRef,
+    ) -> WorkflowState:
+        """Record a derived immutable artefact identity for a downstream reviewer.
+
+        A revision may replace the current derived pointer, while the prior
+        artefact and append-only event remain intact.
+        """
+
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        if artifact not in stage.output_artifacts and stage.status is not StageStatus.RUNNING:
+            raise ValueError("derived identity must reference the producing stage")
+        previous = state.input_payload.get(input_key)
+        identity = {
+            "artifact_id": artifact.artifact_id,
+            "checksum": artifact.checksum or "",
+            "version": stage.revision_count + 1,
+            "location": artifact.location,
+        }
+        state.input_payload[input_key] = identity
+        state.touch()
+        self._commit(
+            state,
+            "artifact.identity_recorded",
+            {
+                "stage_id": stage_id,
+                "input_key": input_key,
+                "identity": identity,
+                "superseded_identity": previous if isinstance(previous, Mapping) else None,
+            },
         )
         return state
 
@@ -624,6 +670,52 @@ class WorkflowRunService:
                     for artifact in stage.output_artifacts
                 ],
             },
+        )
+        return state
+
+    def record_handoff_blocked(
+        self,
+        run_id: str,
+        *,
+        blocker: str,
+        proposed_next_action: str,
+    ) -> WorkflowState:
+        """Persist a terminal-workflow handoff failure without rewriting output."""
+
+        state = self.repository.load(run_id)
+        if state.status is not WorkflowStatus.COMPLETE:
+            raise ValueError("only a completed workflow can be blocked at handoff")
+        state.status = WorkflowStatus.BLOCKED
+        state.blocker = blocker.strip()
+        state.proposed_next_action = proposed_next_action.strip()
+        state.touch()
+        self._commit(
+            state,
+            "workflow.handoff_blocked",
+            {
+                "blocker": state.blocker,
+                "proposed_next_action": state.proposed_next_action,
+            },
+        )
+        return state
+
+    def prepare_handoff_retry(self, run_id: str) -> WorkflowState:
+        """Reopen only a durable handoff blocker for an explicit handoff retry."""
+
+        state = self.repository.load(run_id)
+        if state.status is not WorkflowStatus.BLOCKED or not str(state.blocker or "").startswith(
+            "handoff_"
+        ):
+            raise ValueError("workflow is not blocked at a recoverable handoff")
+        prior_blocker = state.blocker
+        state.status = WorkflowStatus.COMPLETE
+        state.blocker = None
+        state.proposed_next_action = None
+        state.touch()
+        self._commit(
+            state,
+            "workflow.handoff_retry_prepared",
+            {"prior_blocker": prior_blocker},
         )
         return state
 

@@ -8,6 +8,7 @@ import tempfile
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from runtime.worker_registry import (
     ProhibitedWorkerSideEffect,
 )
 from runtime.workflow_registry import WorkflowRegistry
+from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_run_identity import downstream_run_id
 
 
@@ -55,8 +57,21 @@ class FileWorkflowArtifactStore:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
 
-    def persist(self, state: WorkflowState, stage_id: str, output: Mapping[str, Any]) -> ArtifactRef:
-        return self._persist(state, stage_id, output, artifact_type="workflow_step_output")
+    def persist(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+        output: Mapping[str, Any],
+        *,
+        governance: Mapping[str, Any] | None = None,
+    ) -> ArtifactRef:
+        return self._persist(
+            state,
+            stage_id,
+            output,
+            artifact_type="workflow_step_output",
+            governance=governance,
+        )
 
     def persist_attempt(
         self,
@@ -64,6 +79,7 @@ class FileWorkflowArtifactStore:
         stage_id: str,
         output: Mapping[str, Any],
         attempt_number: int,
+        governance: Mapping[str, Any] | None = None,
     ) -> ArtifactRef:
         return self._persist(
             state,
@@ -71,6 +87,7 @@ class FileWorkflowArtifactStore:
             output,
             artifact_type="worker_attempt_output",
             discriminator=f"attempt-{attempt_number}",
+            governance=governance,
         )
 
     def _persist(
@@ -81,6 +98,7 @@ class FileWorkflowArtifactStore:
         *,
         artifact_type: str,
         discriminator: str = "accepted",
+        governance: Mapping[str, Any] | None = None,
     ) -> ArtifactRef:
         encoded = json.dumps(dict(output), sort_keys=True, separators=(",", ":")).encode("utf-8")
         checksum = hashlib.sha256(encoded).hexdigest()
@@ -105,18 +123,36 @@ class FileWorkflowArtifactStore:
             finally:
                 if os.path.exists(temporary):
                     os.unlink(temporary)
+        stage = state.stage(stage_id)
+        previous = stage.output_artifacts[-1] if stage.output_artifacts else None
+        metadata = {
+            "workspace_id": state.workspace_id,
+            "client_id": state.client_id,
+            "entity_id": state.entity_id,
+            "correlation_id": state.correlation_id,
+            "workflow_id": state.workflow_id,
+            "run_id": state.run_id,
+            "stage_id": stage_id,
+            "version": stage.revision_count + 1,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "parent_artifact_ids": list(
+                state.input_payload.get("_lineage", {}).get("parent_artifact_ids", ())
+            ) if isinstance(state.input_payload.get("_lineage"), Mapping) else [],
+            "supersedes_artifact_id": previous.artifact_id if previous else None,
+            "revision_count": stage.revision_count,
+            "revision_history": [
+                dict(item)
+                for item in state.approval_history
+                if item.get("decision") == "request_revision" or item.get("rejected_at")
+            ],
+            **dict(governance or {}),
+        }
         return ArtifactRef(
             artifact_id=artifact_id,
             artifact_type=artifact_type,
             location=str(target),
             checksum=checksum,
-            metadata={
-                "workflow_id": state.workflow_id,
-                "stage_id": stage_id,
-                "parent_artifact_ids": list(
-                    state.input_payload.get("_lineage", {}).get("parent_artifact_ids", ())
-                ) if isinstance(state.input_payload.get("_lineage"), Mapping) else [],
-            },
+            metadata=metadata,
         )
 
 
@@ -309,6 +345,17 @@ class WorkflowExecutionCoordinator:
                     }
             else:
                 quality = {"passed": True, "failed_checks": []}
+            if stage.quality_contract == "senior_strategist_review_quality_gate":
+                identity = state.input_payload.get("growth_blueprint_candidate_identity")
+                expected = str(identity.get("checksum") or "") if isinstance(identity, Mapping) else ""
+                supplied = str(output.get("reviewed_blueprint_checksum") or "")
+                checks = dict(quality.get("checks") or {})
+                checks["review_binds_exact_blueprint_checksum"] = bool(expected) and supplied == expected
+                quality["checks"] = checks
+                quality["failed_checks"] = [
+                    label.replace("_", " ") for label, passed in checks.items() if not passed
+                ]
+                quality["passed"] = all(checks.values())
             attempt_evidence: dict[str, Any] = {
                 "status": "returned",
                 "worker_id": worker.worker_id,
@@ -322,6 +369,9 @@ class WorkflowExecutionCoordinator:
                     stage.stage_id,
                     output,
                     len(current.stage(stage.stage_id).attempts) + 1,
+                    governance=self._artifact_governance(
+                        current, stage.stage_id, worker, quality, approval_status="blocked"
+                    ),
                 )
                 attempt_evidence["candidate_artifact"] = artifact_to_dict(candidate)
             self.runs.record_attempt(run_id, stage.stage_id, attempt_evidence)
@@ -352,7 +402,30 @@ class WorkflowExecutionCoordinator:
                 )
 
             current = self.runs.load_run(run_id)
-            artifact = self.artifacts.persist(current, stage.stage_id, output)
+            artifact = self.artifacts.persist(
+                current,
+                stage.stage_id,
+                output,
+                governance=self._artifact_governance(
+                    current,
+                    stage.stage_id,
+                    worker,
+                    quality,
+                    approval_status="pending" if current.approval_required else "not_required",
+                ),
+            )
+            derived_inputs: dict[str, Any] = {}
+            if (
+                current.workflow_id == "strategy_thesis_to_growth_blueprint"
+                and stage.stage_id == "prepare_growth_blueprint"
+            ):
+                self.runs.record_stage_artifact_identity(
+                    run_id,
+                    stage_id=stage.stage_id,
+                    input_key="growth_blueprint_candidate_identity",
+                    artifact=artifact,
+                )
+                derived_inputs["growth_blueprint_candidate_identity"] = True
             durable_outputs = {
                 field: output[field]
                 for field in stage_definition.output_contract.required_fields
@@ -362,7 +435,7 @@ class WorkflowExecutionCoordinator:
                 run_id,
                 stage.stage_id,
                 [artifact],
-                durable_outputs.keys(),
+                (*durable_outputs.keys(), *derived_inputs.keys()),
             )
             if state.status is WorkflowStatus.AWAITING_APPROVAL or (
                 stage.step_approval_required and not external_action
@@ -445,24 +518,83 @@ class WorkflowExecutionCoordinator:
             )
             return self._outcome(state, AutonomyAction.APPROVAL.value)
         next_run_id = downstream_run_id(state.run_id, next_definition.workflow_id)
-        latest = state.stages[-1].output_artifacts[-1]
+        latest = next(
+            (stage.output_artifacts[-1] for stage in reversed(state.stages) if stage.output_artifacts),
+            None,
+        )
+        if latest is None:
+            state = self.runs.record_handoff_blocked(
+                state.run_id,
+                blocker="handoff_artifact_missing",
+                proposed_next_action="Restore the immutable source artefact before retrying the handoff.",
+            )
+            return self._outcome(state, AutonomyAction.ESCALATE.value)
         output = json.loads(Path(latest.location).read_text(encoding="utf-8"))
+        inputs = build_next_workflow_inputs(state, output)
+        required = next_definition.stages[0].input_contract.required_fields
+        for field in next_definition.stages[0].output_contract.required_fields:
+            if field not in required:
+                inputs.pop(field, None)
+        missing = [field for field in required if field not in inputs or inputs[field] in (None, "", [], {})]
+        if missing:
+            state = self.runs.record_handoff_blocked(
+                state.run_id,
+                blocker="handoff_inputs_missing",
+                proposed_next_action=f"Supply the required downstream evidence: {','.join(missing)}.",
+            )
+            return self._outcome(state, AutonomyAction.ESCALATE.value)
         self.enqueue(
             next_definition.workflow_id,
             next_run_id,
-            output,
+            inputs,
             entity_id=state.entity_id,
             correlation_id=state.correlation_id,
+        )
+        self.runs.record_handoff(
+            state.run_id,
+            next_workflow_id=next_definition.workflow_id,
+            next_run_id=next_run_id,
         )
         outcome = self.advance(next_run_id, lifecycle)
         return ExecutionOutcome(
             run_id=state.run_id,
             workflow_id=state.workflow_id,
-            status=state.status.value,
-            action="continue_autonomously",
-            next_run_id=next_run_id,
+            status=outcome.status,
+            action=outcome.action if outcome.action != "complete" else "continue_autonomously",
+            next_run_id=outcome.next_run_id or next_run_id,
             external_action_taken=state.external_action_taken or outcome.external_action_taken,
         )
+
+    @staticmethod
+    def _artifact_governance(
+        state: WorkflowState,
+        stage_id: str,
+        worker: Any,
+        quality: Mapping[str, Any],
+        *,
+        approval_status: str,
+    ) -> dict[str, Any]:
+        metadata = worker.registration.metadata
+        governance = {
+            "source_input_fields": sorted(
+                key for key in state.input_payload if not key.startswith("_")
+            ),
+            "generating_specialist": metadata.worker_id,
+            "provider": metadata.provider,
+            "model": metadata.model,
+            "quality_contract": state.stage(stage_id).quality_contract,
+            "quality_status": "passed" if quality.get("passed") is True else "failed",
+            "quality_checks": dict(quality.get("checks") or {}),
+            "quality_failures": list(quality.get("failed_checks") or []),
+            "approval_status": approval_status,
+            "external_action_taken": state.external_action_taken,
+        }
+        reviewed = state.input_payload.get("growth_blueprint_candidate_identity")
+        if stage_id == "review_growth_blueprint" and isinstance(reviewed, Mapping):
+            governance["reviewed_artifact_id"] = str(reviewed.get("artifact_id") or "")
+            governance["reviewed_artifact_checksum"] = str(reviewed.get("checksum") or "")
+            governance["reviewed_artifact_version"] = int(reviewed.get("version") or 0)
+        return governance
 
     @staticmethod
     def _worker_contract(state: WorkflowState, required_fields: tuple[str, ...]) -> dict[str, Any]:

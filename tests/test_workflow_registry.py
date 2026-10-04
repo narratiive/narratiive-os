@@ -37,7 +37,15 @@ class WorkflowRegistryTests(unittest.TestCase):
     def test_every_registered_step_has_an_executable_fail_safe_contract(self) -> None:
         for definition in build_narratiive_workflow_registry().all():
             self.assertEqual(definition.failure_policy, "block_and_escalate")
-            self.assertFalse(definition.autonomous_handoff)
+            if definition.autonomous_handoff:
+                self.assertIn(
+                    definition.workflow_id,
+                    {
+                        "growth_sprint_to_research_engine",
+                        "research_to_strategic_synthesis",
+                        "strategic_synthesis_to_strategy_thesis",
+                    },
+                )
             for step in definition.stages:
                 self.assertTrue(step.capability)
                 self.assertTrue(step.input_contract.required_fields)
@@ -112,6 +120,12 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertEqual(thesis.next_workflow_id, blueprint.workflow_id)
         self.assertIn("approved_strategy_thesis", blueprint.stages[0].input_contract.required_fields)
         self.assertIn("strategy_thesis_identity", blueprint.stages[0].input_contract.required_fields)
+        self.assertEqual(blueprint.stages[1].capability, "strategic_quality_review")
+        self.assertEqual(
+            blueprint.stages[1].quality_contract,
+            "senior_strategist_review_quality_gate",
+        )
+        self.assertTrue(blueprint.stages[1].approval_policy.required)
 
     def test_growth_blueprint_deliverable_is_a_separate_approval_gated_stage(self) -> None:
         definition = build_narratiive_workflow_registry().resolve("growth_blueprint_deliverable_production")

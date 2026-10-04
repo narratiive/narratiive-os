@@ -279,6 +279,44 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
     )
     checks = {
         "all_strategic_questions_are_substantive": all(_strategic_section(output.get(field)) for field in strategic_fields),
+        "audience_intelligence_exceeds_demographics": _mapping_fields(
+            output.get("audience"),
+            ("motivations", "tensions", "barriers", "triggers", "behaviours"),
+        ),
+        "central_thesis_is_non_obvious_specific_and_evidence_linked": _central_thesis(
+            output.get("central_thesis")
+        ),
+        "commercial_consequence_is_explicit": _meaningful(
+            _mapping_value(output.get("growth_opportunity"), "commercial_consequence")
+        ),
+        "narrative_is_a_cumulative_argument": _meaningful_list(
+            output.get("narrative_progression"), minimum=4
+        ),
+        "editorial_judgement_is_explicit": _editorial_judgement(
+            output.get("editorial_judgement")
+        ),
+        "material_contradictions_are_resolved": (
+            isinstance(output.get("contradiction_resolution"), Mapping)
+            and output["contradiction_resolution"].get("unresolved_material_contradictions") == []
+            and _meaningful_list(output["contradiction_resolution"].get("resolution_notes"), minimum=1)
+        ),
+        "quantitative_evidence_is_honestly_labelled": (
+            isinstance(output.get("quantitative_evidence_treatment"), Mapping)
+            and output["quantitative_evidence_treatment"].get("unsourced_numbers_present") is False
+            and isinstance(output["quantitative_evidence_treatment"].get("known_facts"), list)
+            and isinstance(output["quantitative_evidence_treatment"].get("illustrative_or_directional"), list)
+        ),
+        "missing_evidence_is_not_silently_guessed": (
+            isinstance(output.get("assumption_control"), Mapping)
+            and output["assumption_control"].get("silent_guesses") is False
+            and output["assumption_control"].get("suppositions_labelled") is True
+            and isinstance(output["assumption_control"].get("missing_evidence"), list)
+        ),
+        "artefact_is_complete_and_not_truncated": (
+            isinstance(output.get("completeness"), Mapping)
+            and output["completeness"].get("materially_complete") is True
+            and output["completeness"].get("truncated") is False
+        ),
         "key_strategic_choices_are_explicit": _strategic_choices(output.get("key_strategic_choices")),
         "evidence_and_uncertainty_are_explicit": _meaningful_list(output.get("evidence_and_uncertainty"), minimum=3),
         "fact_interpretation_hypothesis_lineage_is_complete": _lineage(output.get("fact_interpretation_hypothesis_lineage"), minimum=3),
@@ -287,6 +325,66 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
         "no_false_external_execution_claim": _no_false_action(output),
     }
     return _result(checks)
+
+
+def senior_strategist_review_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    review = output.get("senior_strategist_review")
+    director = output.get("director_judgement")
+    axes = (
+        "evidence",
+        "diagnosis",
+        "non_obvious_insight",
+        "specificity",
+        "audience_intelligence",
+        "strategic_choice",
+        "commercial_consequence",
+        "narrative_coherence",
+        "editorial_judgement",
+        "activation",
+    )
+    axis_checks = {
+        axis: isinstance(review, Mapping)
+        and isinstance(review.get(axis), Mapping)
+        and review[axis].get("passed") is True
+        and _substantive_text(review[axis].get("rationale"), minimum_words=8)
+        and _meaningful_list(review[axis].get("evidence_refs"), minimum=1)
+        for axis in axes
+    }
+    director_questions = (
+        "non_obvious_central_thesis",
+        "evidence_earns_conclusion",
+        "progressively_more_specific",
+        "every_major_section_advances_argument",
+        "removable_material_identified",
+        "competitor_substitution_resisted",
+        "worth_paying_for",
+        "meaningfully_reframes_founder_problem",
+        "commercial_consequence_clear",
+        "presentable_without_intellectual_rebuild",
+    )
+    director_checks = {
+        question: isinstance(director, Mapping)
+        and isinstance(director.get(question), Mapping)
+        and director[question].get("passed") is True
+        and _substantive_text(director[question].get("rationale"), minimum_words=8)
+        for question in director_questions
+    }
+    checks = {
+        "reference_standard_is_rave_calibre_not_content": (
+            str(output.get("reference_standard") or "").casefold()
+            == "rave coffee growth blueprint calibre, not content template"
+        ),
+        "all_senior_strategy_axes_pass": all(axis_checks.values()),
+        "all_strategy_director_questions_pass": all(director_checks.values()),
+        "review_is_exactly_checksum_bound": len(str(output.get("reviewed_blueprint_checksum") or "")) == 64,
+        "review_forwards_only_fully_accepted_work": str(output.get("review_disposition") or "").casefold() == "forward",
+        "no_revision_instructions_remain": output.get("revision_instructions") == [],
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    result = _result(checks)
+    result["axis_checks"] = axis_checks
+    result["director_checks"] = director_checks
+    return result
 
 
 def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -1005,6 +1103,24 @@ def _strategic_section(value: Any) -> bool:
         and _meaningful_list(value.get("evidence_refs"), minimum=1)
         and _substantive_text(value.get("implication"), minimum_words=8)
         and isinstance(value.get("uncertainties"), list)
+    )
+
+
+def _central_thesis(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and _substantive_text(value.get("insight"), minimum_words=12)
+        and _substantive_text(value.get("why_non_obvious"), minimum_words=10)
+        and _substantive_text(value.get("competitor_substitution_test"), minimum_words=10)
+        and _substantive_text(value.get("commercial_consequence"), minimum_words=10)
+        and _meaningful_list(value.get("evidence_refs"), minimum=2)
+    )
+
+
+def _editorial_judgement(value: Any) -> bool:
+    return isinstance(value, Mapping) and all(
+        _meaningful_list(value.get(field), minimum=1)
+        for field in ("primary_emphasis", "supporting_evidence", "remove_or_deprioritise")
     )
 
 

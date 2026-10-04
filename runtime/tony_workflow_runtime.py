@@ -19,6 +19,7 @@ from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_d
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
+from runtime.senior_strategist_review_worker import SeniorStrategistReviewWorker
 from runtime.run_service import WorkflowRunService
 from runtime.serialization import workflow_to_dict
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
@@ -48,6 +49,7 @@ from runtime.workflow_quality import (
     growth_sprint_proposal_quality_gate,
     production_planning_quality_gate,
     research_evidence_quality_gate,
+    senior_strategist_review_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
     validate_operational_inputs,
@@ -333,6 +335,10 @@ class TonyWorkflowRuntime:
         additional_inputs: Mapping[str, Any] | None = None,
     ) -> ExecutionOutcome:
         state = self.runs.load_run(run_id)
+        if state.status is WorkflowStatus.BLOCKED and str(state.blocker or "").startswith(
+            "handoff_"
+        ):
+            state = self.runs.prepare_handoff_retry(run_id)
         definition = self.coordinator.registry.resolve(state.workflow_id)
         if state.status is not WorkflowStatus.COMPLETE:
             raise ValueError("workflow must be complete before handoff")
@@ -343,7 +349,12 @@ class TonyWorkflowRuntime:
         artifacts = [artifact for stage in state.stages for artifact in stage.output_artifacts]
         if not artifacts:
             raise ValueError("workflow handoff requires a persisted artefact")
-        output = self.coordinator.artifacts.root.joinpath(Path(artifacts[-1].location).name)
+        handoff_artifact = (
+            state.stage("prepare_growth_blueprint").output_artifacts[-1]
+            if state.workflow_id == "strategy_thesis_to_growth_blueprint"
+            else artifacts[-1]
+        )
+        output = self.coordinator.artifacts.root.joinpath(Path(handoff_artifact.location).name)
         try:
             value = json.loads(output.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -354,7 +365,7 @@ class TonyWorkflowRuntime:
         next_definition = self.coordinator.registry.resolve(definition.next_workflow_id)
         next_stage = next_definition.stages[0]
         if definition.next_workflow_id == "growth_blueprint_deliverable_production":
-            source_artifact = artifacts[-1]
+            source_artifact = handoff_artifact
             if not source_artifact.checksum:
                 raise ValueError("approved Blueprint artefact is missing its immutable checksum")
             inputs["quality_accepted_growth_blueprint"] = dict(value)
@@ -609,6 +620,7 @@ def build_tony_workflow_runtime(
         "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
         "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
+        "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
@@ -647,6 +659,7 @@ def build_tony_workflow_runtime(
                 else None
             ),
             follow_up_planning_adapter=DeliveryFollowUpPreparationWorker(),
+            senior_strategist_review_adapter=SeniorStrategistReviewWorker(),
         ),
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),

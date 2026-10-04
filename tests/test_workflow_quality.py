@@ -17,6 +17,7 @@ from runtime.workflow_quality import (
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
+    senior_strategist_review_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
     validate_operational_inputs,
@@ -237,13 +238,56 @@ def growth_blueprint_output() -> dict:
 
     return {
         "market_category_diagnosis": section("market and category", "ev-1"),
-        "audience": section("priority audience", "ev-2"),
+        "audience": {
+            **section("priority audience", "ev-2"),
+            "motivations": ["Make a confident high-stakes choice"],
+            "tensions": ["Urgency conflicts with uncertainty"],
+            "barriers": ["Broad language and late proof"],
+            "triggers": ["A costly growth problem becomes unavoidable"],
+            "behaviours": ["Seeks proof before entering a serious conversation"],
+        },
         "growth_barriers": section("growth barriers", "ev-1"),
         "source_of_difference": section("source of difference", "ev-2"),
         "positioning": section("positioning", "ev-1"),
         "narrative": section("narrative platform", "ev-2"),
-        "growth_opportunity": section("growth opportunity", "ev-1"),
+        "growth_opportunity": {
+            **section("growth opportunity", "ev-1"),
+            "commercial_consequence": "Improve qualified acquisition and conversion by concentrating relevance and presenting credible proof earlier in the buying journey.",
+        },
         "activation_implications": section("activation implications", "ev-2"),
+        "central_thesis": {
+            "insight": "The real constraint is not awareness but the absence of a decisive commercial choice that makes proof relevant at the moment buyers need confidence.",
+            "why_non_obvious": "The business appears to need more activity, yet the evidence indicates that more broadly framed activity would amplify ambiguity rather than create qualified demand.",
+            "competitor_substitution_test": "A close competitor could not reuse this thesis because it depends on this company's documented broad positioning, late proof and urgent-buyer evidence pattern.",
+            "commercial_consequence": "Concentrating relevance and moving proof earlier should improve qualified acquisition and conversion without assuming unknown client revenue or margin figures.",
+            "evidence_refs": ["ev-1", "ev-2"],
+        },
+        "narrative_progression": [
+            "Establish that activity volume is not the root constraint.",
+            "Show how broad positioning prevents confident buyer choice.",
+            "Identify the urgent audience situation and the proof it requires.",
+            "Translate that choice into commercial and activation consequences.",
+        ],
+        "editorial_judgement": {
+            "primary_emphasis": ["The decisive commercial choice and its evidence"],
+            "supporting_evidence": ["Audience urgency and proof-timing evidence"],
+            "remove_or_deprioritise": ["Generic channel lists and unsupported market sizing"],
+        },
+        "contradiction_resolution": {
+            "unresolved_material_contradictions": [],
+            "resolution_notes": ["The evidence, diagnosis and recommendation were checked for material contradiction."],
+        },
+        "quantitative_evidence_treatment": {
+            "known_facts": [],
+            "illustrative_or_directional": [],
+            "unsourced_numbers_present": False,
+        },
+        "assumption_control": {
+            "silent_guesses": False,
+            "suppositions_labelled": True,
+            "missing_evidence": ["Direct customer interviews remain limited."],
+        },
+        "completeness": {"materially_complete": True, "truncated": False},
         "key_strategic_choices": [
             {"choice": "Prioritise the urgent audience", "tradeoff": "Reject broad relevance", "evidence_refs": ["ev-1"]},
             {"choice": "Lead with a category point of view", "tradeoff": "Reduce feature-led flexibility", "evidence_refs": ["ev-2"]},
@@ -263,6 +307,43 @@ def growth_blueprint_output() -> dict:
             {"claim": "Earlier proof may improve confidence.", "classification": "hypothesis", "source_refs": ["ev-2"]},
         ],
         "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
+def senior_strategist_review_output(checksum: str) -> dict:
+    axes = (
+        "evidence", "diagnosis", "non_obvious_insight", "specificity",
+        "audience_intelligence", "strategic_choice", "commercial_consequence",
+        "narrative_coherence", "editorial_judgement", "activation",
+    )
+    director_questions = (
+        "non_obvious_central_thesis", "evidence_earns_conclusion",
+        "progressively_more_specific", "every_major_section_advances_argument",
+        "removable_material_identified", "competitor_substitution_resisted",
+        "worth_paying_for", "meaningfully_reframes_founder_problem",
+        "commercial_consequence_clear", "presentable_without_intellectual_rebuild",
+    )
+    return {
+        "reference_standard": "Rave Coffee Growth Blueprint calibre, not content template",
+        "senior_strategist_review": {
+            axis: {
+                "passed": True,
+                "rationale": f"The synthetic candidate demonstrates sufficient {axis.replace('_', ' ')} through a specific cumulative argument grounded in the supplied evidence.",
+                "evidence_refs": ["ev-1", "ev-2"],
+            }
+            for axis in axes
+        },
+        "director_judgement": {
+            question: {
+                "passed": True,
+                "rationale": f"The synthetic candidate demonstrates {question.replace('_', ' ')} at credible senior strategy director calibre for this isolated test.",
+            }
+            for question in director_questions
+        },
+        "reviewed_blueprint_checksum": checksum,
+        "review_disposition": "forward",
+        "revision_instructions": [],
         "external_action_taken": False,
     }
 
@@ -435,6 +516,14 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
         output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
         self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
+        output = senior_strategist_review_output("a" * 64)
+        self.assertTrue(senior_strategist_review_quality_gate(output)["passed"])
+        output["senior_strategist_review"]["specificity"]["passed"] = False
+        output["review_disposition"] = "revise"
+        output["revision_instructions"] = ["Make the opportunity client-specific."]
+        self.assertFalse(senior_strategist_review_quality_gate(output)["passed"])
 
     def test_strategic_synthesis_preserves_evidence_and_cannot_claim_external_action(self) -> None:
         output = strategic_synthesis_output()

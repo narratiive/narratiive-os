@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import hashlib
+import hmac
 import shlex
 from collections.abc import Iterable, Mapping
 from pathlib import Path
@@ -186,7 +187,10 @@ class FileWorkflowCommandBackend:
             next_action=state.proposed_next_action or "Continue authorised internal workflow preparation.",
             evidence=(f"workflow_run:{state.run_id}",),
         )
-        if state.status.value == "complete" and runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id:
+        handoff_retry = state.status.value == "blocked" and str(state.blocker or "").startswith(
+            "handoff_"
+        )
+        if (state.status.value == "complete" or handoff_retry) and runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id:
             outcome = runtime.handoff(state.run_id, lifecycle, additional_inputs)
             next_workflow_id = runtime.coordinator.registry.resolve(state.workflow_id).next_workflow_id
             return runtime.runs.load_run(
@@ -248,7 +252,22 @@ class FileWorkflowCommandBackend:
         artifacts = [artifact for stage in state.stages for artifact in stage.output_artifacts]
         if not artifacts:
             return None
-        location = Path(artifacts[-1].location).resolve()
+        artifact = artifacts[-1]
+        reviewed_id = str(artifact.metadata.get("reviewed_artifact_id") or "").strip()
+        if reviewed_id:
+            reviewed = next((item for item in artifacts if item.artifact_id == reviewed_id), None)
+            reviewed_checksum = str(
+                artifact.metadata.get("reviewed_artifact_checksum") or ""
+            ).strip()
+            if (
+                reviewed is None
+                or not reviewed.checksum
+                or not reviewed_checksum
+                or not hmac.compare_digest(reviewed.checksum, reviewed_checksum)
+            ):
+                return None
+            artifact = reviewed
+        location = Path(artifact.location).resolve()
         try:
             location.relative_to(self.root)
         except ValueError:

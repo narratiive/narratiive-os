@@ -7,7 +7,7 @@ from pathlib import Path
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
-from tests.test_workflow_quality import strategic_synthesis_output
+from tests.test_workflow_quality import strategic_synthesis_output, strategy_thesis_output
 
 
 def lifecycle() -> ClientLifecycleRecord:
@@ -39,11 +39,19 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
 
     def test_bounded_research_runs_with_provenance_then_prepares_strategic_synthesis(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
+            def claude(contract):
+                workflow_id = contract["target"]["workflow_context"]["workflow_id"]
+                if workflow_id == "research_to_strategic_synthesis":
+                    return strategic_synthesis_output()
+                if workflow_id == "strategic_synthesis_to_strategy_thesis":
+                    return strategy_thesis_output()
+                raise AssertionError(f"unexpected workflow: {workflow_id}")
+
             runtime = build_tony_workflow_runtime(
                 tmp,
                 workspace_id="agency",
                 client_id="safe-research-client",
-                dispatchers={"Claude": lambda contract: strategic_synthesis_output()},
+                dispatchers={"Claude": claude},
                 environ={},
             )
             workspace = runtime.coordinator.artifacts.root.parent / "research" / "workspaces" / "agency"
@@ -81,21 +89,31 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
             research = runtime.advance("safe-research-run", lifecycle())
             research_state = runtime.status("safe-research-run")
 
-            self.assertEqual(research.status, "complete", research_state)
+            self.assertEqual(research.status, "awaiting_approval", research_state)
             self.assertTrue(research_state["stages"][0]["quality_result"]["passed"])
             self.assertEqual(research_state["stages"][0]["side_effect_classification"], "external_read")
             self.assertFalse(research_state["external_action_taken"])
             output_path = Path(research_state["stages"][0]["output_artifacts"][0]["location"])
             self.assertTrue(output_path.exists())
 
-            synthesis = runtime.handoff("safe-research-run", lifecycle())
-            synthesis_state = runtime.status(synthesis.run_id)
-
-            self.assertEqual(synthesis.workflow_id, "research_to_strategic_synthesis")
-            self.assertEqual(synthesis.status, "complete")
+            states = [
+                runtime.runs.load_run(run_id)
+                for run_id in runtime.runs.repository.list_run_ids()
+            ]
+            synthesis_state = next(
+                runtime.status(item.run_id)
+                for item in states
+                if item.workflow_id == "research_to_strategic_synthesis"
+            )
+            thesis_state = next(
+                runtime.status(item.run_id)
+                for item in states
+                if item.workflow_id == "strategic_synthesis_to_strategy_thesis"
+            )
             self.assertTrue(synthesis_state["stages"][0]["quality_result"]["passed"])
             self.assertEqual(synthesis_state["approval_status"], "not_required")
             self.assertFalse(synthesis_state["external_action_taken"])
+            self.assertEqual(thesis_state["status"], "awaiting_approval")
 
     def test_runtime_research_ingests_approved_fireflies_source(self) -> None:
         calls = []
@@ -145,8 +163,8 @@ class ResearchWorkflowAdapterTests(unittest.TestCase):
             replay = runtime.advance("safe-fireflies-research-run", lifecycle())
             state = runtime.status("safe-fireflies-research-run")
 
-            self.assertEqual(outcome.status, "complete", state)
-            self.assertEqual(replay.status, "complete", state)
+            self.assertEqual(outcome.status, "blocked", state)
+            self.assertEqual(replay.status, "blocked", state)
             self.assertTrue(state["stages"][0]["quality_result"]["passed"])
             self.assertEqual(len(calls), 1)
             self.assertEqual(calls[0]["payload"]["transcript_id"], "transcript-safe")

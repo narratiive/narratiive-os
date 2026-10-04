@@ -24,6 +24,19 @@ def build_next_workflow_inputs(
         combined.setdefault("approved_growth_sprint_scope", output.get("proposed_scope"))
         combined.setdefault("research_requirements", {"workstreams_and_questions": output.get("workstreams_and_questions", [])})
         combined.setdefault("client_context", combined.get("commercial_context"))
+    elif source.workflow_id == "strategic_synthesis_to_strategy_thesis":
+        artifact = next(
+            (stage.output_artifacts[-1] for stage in reversed(source.stages) if stage.output_artifacts),
+            None,
+        )
+        thesis = output.get("strategy_thesis")
+        if artifact is not None and artifact.checksum and isinstance(thesis, Mapping):
+            combined["approved_strategy_thesis"] = dict(thesis)
+            combined["strategy_thesis_identity"] = {
+                "artifact_id": artifact.artifact_id,
+                "version": int(artifact.metadata.get("version") or 1),
+                "checksum": artifact.checksum,
+            }
     combined["_lineage"] = {
         "parent_workflow_id": source.workflow_id,
         "parent_run_id": source.run_id,
