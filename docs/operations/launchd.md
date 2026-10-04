@@ -213,6 +213,10 @@ curl -fsS http://127.0.0.1:8787/health
 curl -fsS http://127.0.0.1:8790/health
 ```
 
+The same Tony bridge serves the private read-only Mission Control interface at
+`http://127.0.0.1:8790/mission-control`; see
+[`MISSION_CONTROL.md`](MISSION_CONTROL.md) for operator and security guidance.
+
 ## Uninstall
 
 ```bash
