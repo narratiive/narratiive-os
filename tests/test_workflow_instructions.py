@@ -72,7 +72,10 @@ class WorkflowInstructionTests(unittest.TestCase):
             "exact list-valued keys primary_emphasis, supporting_evidence and remove_or_deprioritise",
             instruction,
         )
-        self.assertIn("unresolved_material_contradictions", instruction)
+        self.assertIn(
+            "exact list-valued keys unresolved_material_contradictions and resolution_notes",
+            instruction,
+        )
 
     def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
         instruction = workflow_instruction(
