@@ -61,6 +61,19 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("evidence_and_uncertainty must be a list of at least three", instruction)
         self.assertIn('recommendation must be the exact JSON string "advance"', instruction)
 
+    def test_strategy_thesis_growth_blueprint_contract_names_editorial_schema(self) -> None:
+        instruction = workflow_instruction(
+            "strategy_thesis_to_growth_blueprint",
+            "prepare_growth_blueprint",
+            ("editorial_judgement", "contradiction_resolution"),
+        )
+
+        self.assertIn(
+            "exact list-valued keys primary_emphasis, supporting_evidence and remove_or_deprioritise",
+            instruction,
+        )
+        self.assertIn("unresolved_material_contradictions", instruction)
+
     def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
         instruction = workflow_instruction(
             "research_to_strategic_synthesis",

@@ -346,6 +346,13 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual([item["revision"] for item in state.stage("draft").attempts], [0, 0, 1])
         self.assertEqual(state.stage("draft").attempts[0]["error_code"], "worker_execution_failed")
         self.assertEqual(state.approval_history[-1]["decision"], "request_revision")
+        self.assertEqual(calls[2]["revision_feedback"]["revision_count"], 1)
+        self.assertEqual(calls[2]["revision_feedback"]["failed_checks"], ["substantive_draft"])
+        self.assertEqual(
+            calls[2]["revision_feedback"]["reviewer_rationale"],
+            "Retry with the corrected worker contract",
+        )
+        self.assertNotIn("draft", calls[2]["revision_feedback"])
 
     def test_explicit_revision_reopens_worker_retry_exhaustion(self) -> None:
         calls = []

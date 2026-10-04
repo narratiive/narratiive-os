@@ -312,6 +312,25 @@ class WorkflowExecutionCoordinator:
                 worker_attempt=1,
             )
             contract = self._worker_contract(state, stage_definition.input_contract.required_fields)
+            if stage.revision_count > 0:
+                latest_revision = next(
+                    (
+                        item
+                        for item in reversed(state.approval_history)
+                        if item.get("decision") == "request_revision"
+                        and item.get("owner_stage_id") == stage.stage_id
+                    ),
+                    {},
+                )
+                contract["revision_feedback"] = {
+                    "revision_count": stage.revision_count,
+                    "failed_checks": list((stage.quality_result or {}).get("failed_checks") or []),
+                    "reviewer_rationale": str(latest_revision.get("rationale") or ""),
+                    "instruction": (
+                        "Revise from the supplied authoritative inputs. Correct every failed check without "
+                        "inventing evidence, weakening uncertainty, or claiming approval."
+                    ),
+                }
             contract["workflow_context"] = {
                 "workflow_id": state.workflow_id,
                 "run_id": state.run_id,
