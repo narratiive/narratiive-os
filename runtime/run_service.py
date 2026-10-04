@@ -430,6 +430,39 @@ class WorkflowRunService:
         )
         return state
 
+    def reconcile_stage_outputs(
+        self,
+        run_id: str,
+        stage_id: str,
+        required_outputs: Iterable[str],
+    ) -> WorkflowState:
+        """Add newly canonical output fields to an older persisted run contract.
+
+        This is an additive schema reconciliation only. Existing declared fields,
+        attempts, artefacts and history are retained, and the change is recorded
+        as an append-only event before any worker dispatch.
+        """
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        canonical = tuple(
+            dict.fromkeys(
+                str(item).strip()
+                for item in required_outputs
+                if str(item).strip()
+            )
+        )
+        added = tuple(item for item in canonical if item not in stage.expected_outputs)
+        if not added:
+            return state
+        stage.expected_outputs = (*stage.expected_outputs, *added)
+        state.touch()
+        self._commit(
+            state,
+            "stage.contract_reconciled",
+            {"stage_id": stage_id, "added_output_fields": list(added)},
+        )
+        return state
+
     def block_for_reason(self, run_id: str, stage_id: str, blocker: str, next_action: str) -> WorkflowState:
         state = self.repository.load(run_id)
         self.engine.block_for_reason(state, stage_id, blocker, next_action)

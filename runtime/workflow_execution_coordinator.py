@@ -292,6 +292,12 @@ class WorkflowExecutionCoordinator:
                 )
                 return self._outcome(state, AutonomyAction.ESCALATE.value)
 
+            state = self.runs.reconcile_stage_outputs(
+                run_id,
+                stage.stage_id,
+                stage_definition.output_contract.required_fields,
+            )
+            stage = state.stage(stage.stage_id)
             self.runs.start_stage(run_id, stage.stage_id)
             idempotency_key = f"{state.run_id}:{stage.stage_id}:{len(stage.attempts) + 1}"
             worker_metadata = worker.registration.metadata
@@ -316,7 +322,11 @@ class WorkflowExecutionCoordinator:
                 "client_id": state.client_id,
                 "idempotency_key": idempotency_key,
                 "side_effect_classification": stage.side_effect_classification,
-                "expected_outputs": list(stage.expected_outputs),
+                # The executable registry is authoritative for the current output
+                # contract. Persisted runs may predate a compatible contract
+                # expansion, so advertising their snapshot here can make the
+                # worker omit fields the current validator requires.
+                "expected_outputs": list(stage_definition.output_contract.required_fields),
                 "quality_contract": stage.quality_contract,
             }
             try:

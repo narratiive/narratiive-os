@@ -177,6 +177,47 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         outcome = coordinator.advance("run-bounded-context", _lifecycle())
         self.assertEqual(outcome.status, "complete")
 
+    def test_worker_uses_current_registry_outputs_when_persisted_run_contract_is_older(self) -> None:
+        definition = WorkflowDefinition(
+            "schema-upgrade",
+            (_stage("draft", outputs=("original_output", "new_required_output")),),
+        )
+
+        def adapter(contract):
+            self.assertEqual(
+                contract["workflow_context"]["expected_outputs"],
+                ["original_output", "new_required_output"],
+            )
+            return {"original_output": "retained", "new_required_output": "present"}
+
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            "schema-upgrade",
+            "run-schema-upgrade",
+            {"brief": "safe"},
+            entity_id="entity",
+            correlation_id="corr",
+        )
+        persisted = self.runs.load_run("run-schema-upgrade")
+        persisted.stage("draft").expected_outputs = ("original_output",)
+        self.repository.save(persisted)
+
+        outcome = coordinator.advance("run-schema-upgrade", _lifecycle())
+
+        self.assertEqual(outcome.status, "complete")
+        state = self.runs.load_run("run-schema-upgrade")
+        self.assertEqual(
+            state.stage("draft").expected_outputs,
+            ("original_output", "new_required_output"),
+        )
+        reconciled = [
+            event
+            for event in self.events.read("run-schema-upgrade")
+            if event.event_type == "stage.contract_reconciled"
+        ]
+        self.assertEqual(len(reconciled), 1)
+        self.assertEqual(reconciled[0].payload["added_output_fields"], ["new_required_output"])
+
     def test_non_strategy_worker_keeps_existing_full_context(self) -> None:
         definition = WorkflowDefinition("ordinary-workflow", (_stage("draft"),))
 
