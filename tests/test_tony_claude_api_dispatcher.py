@@ -155,7 +155,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 build_claude_api_dispatcher(self._env())(contract)
 
                 sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
-                self.assertEqual(sent["max_tokens"], 16384)
+                self.assertEqual(sent["max_tokens"], 32768)
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_strategy_reasoning_prompt_excludes_unrelated_product_contracts(self, urlopen):
