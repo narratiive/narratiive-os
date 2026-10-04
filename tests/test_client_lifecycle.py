@@ -1,6 +1,11 @@
 import unittest
 
-from runtime.client_lifecycle import AcquisitionPath, ClientLifecycleRecord, ClientLifecycleStage
+from runtime.client_lifecycle import (
+    AcquisitionPath,
+    ClientLifecycleRecord,
+    ClientLifecycleStage,
+    CustomerLifecycleStage,
+)
 
 
 class ClientLifecycleTests(unittest.TestCase):
@@ -30,6 +35,28 @@ class ClientLifecycleTests(unittest.TestCase):
 
     def test_legacy_narrative_shift_state_maps_to_blueprint_lite(self):
         self.assertIs(ClientLifecycleStage("narrative_shift"), ClientLifecycleStage.BLUEPRINT_LITE)
+
+    def test_legacy_meeting_and_invoice_have_unambiguous_canonical_meaning(self):
+        discovery = ClientLifecycleRecord(
+            client_id="discovery-client",
+            client_name="Discovery Client",
+            stage=ClientLifecycleStage.MEETING,
+            owner="Tony",
+            next_action="Prepare Discovery.",
+        )
+        commercial = ClientLifecycleRecord(
+            client_id="commercial-client",
+            client_name="Commercial Client",
+            stage=ClientLifecycleStage.INVOICE,
+            owner="Matt",
+            next_action="Reconcile the commercial obligation.",
+        )
+        self.assertIs(ClientLifecycleStage.DISCOVERY, ClientLifecycleStage.MEETING)
+        self.assertIs(ClientLifecycleStage.COMMERCIAL, ClientLifecycleStage.INVOICE)
+        self.assertIs(discovery.customer_lifecycle_stage, CustomerLifecycleStage.DISCOVERY)
+        self.assertIs(commercial.customer_lifecycle_stage, CustomerLifecycleStage.COMMERCIAL)
+        self.assertEqual(discovery.to_dict()["operational_state"], "awaiting_discovery")
+        self.assertEqual(commercial.to_dict()["customer_lifecycle_stage"], "commercial")
 
     def test_skipping_a_stage_is_rejected(self):
         lead = ClientLifecycleRecord(

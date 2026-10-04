@@ -19,6 +19,7 @@ from runtime.inbound_lifecycle import project_inbound_lead
 from runtime.models import WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.run_service import WorkflowRunService
+from runtime.senior_strategist_review_worker import SeniorStrategistReviewWorker
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime
 from runtime.worker_registry import (
@@ -45,6 +46,7 @@ from runtime.workflow_quality import (
     growth_sprint_proposal_quality_gate,
     production_planning_quality_gate,
     research_evidence_quality_gate,
+    senior_strategist_review_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
 )
@@ -357,6 +359,17 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         ),
         WorkerRegistration(
             WorkerMetadata(
+                worker_id="northstar-test-senior-strategist-reviewer",
+                provider="isolated-deterministic-fixture",
+                capabilities=("strategic_quality_review",),
+                availability=WorkerAvailability.AVAILABLE,
+                side_effect_permissions=("preparation",),
+                max_attempts=1,
+            ),
+            SeniorStrategistReviewWorker(),
+        ),
+        WorkerRegistration(
+            WorkerMetadata(
                 worker_id="northstar-test-tony-triage",
                 provider="isolated-deterministic-fixture",
                 capabilities=("creative_quality_triage",),
@@ -419,6 +432,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
         "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
+        "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,

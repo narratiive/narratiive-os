@@ -56,6 +56,9 @@ def workflow_approval_token(state: WorkflowState) -> str | None:
             artifact.artifact_id,
             artifact.checksum or "",
             _artifact_version(artifact),
+            str(artifact.metadata.get("reviewed_artifact_id") or ""),
+            str(artifact.metadata.get("reviewed_artifact_checksum") or ""),
+            str(artifact.metadata.get("reviewed_artifact_version") or ""),
         )
     )
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
@@ -66,6 +69,34 @@ def latest_artifact(state: WorkflowState) -> ArtifactRef | None:
         (stage.output_artifacts[-1] for stage in reversed(state.stages) if stage.output_artifacts),
         None,
     )
+
+
+def reviewable_artifact(state: WorkflowState) -> ArtifactRef | None:
+    """Return the immutable work product reviewed by a separate quality artefact."""
+
+    approval_artifact = latest_artifact(state)
+    if approval_artifact is None:
+        return None
+    reviewed_id = str(approval_artifact.metadata.get("reviewed_artifact_id") or "").strip()
+    reviewed_checksum = str(
+        approval_artifact.metadata.get("reviewed_artifact_checksum") or ""
+    ).strip()
+    if not reviewed_id:
+        return approval_artifact
+    candidate = next(
+        (
+            artifact
+            for stage in state.stages
+            for artifact in stage.output_artifacts
+            if artifact.artifact_id == reviewed_id
+        ),
+        None,
+    )
+    if candidate is None or not reviewed_checksum or not candidate.checksum:
+        raise InternalReviewDeliveryError("reviewed workflow artefact identity is incomplete")
+    if not hmac.compare_digest(candidate.checksum, reviewed_checksum):
+        raise InternalReviewDeliveryError("reviewed workflow artefact checksum is stale")
+    return candidate
 
 
 def assert_current_approval_token(state: WorkflowState, supplied: str) -> None:
@@ -85,7 +116,7 @@ def approval_binding_evidence(state: WorkflowState, supplied: str) -> dict[str, 
     artifact = latest_artifact(state)
     if artifact is None:  # Kept defensive even though token validation requires one.
         raise InternalReviewDeliveryError("workflow run has no current artefact approval gate")
-    return {
+    binding = {
         "workflow_id": state.workflow_id,
         "run_id": state.run_id,
         "stage_id": state.current_stage_id or "",
@@ -95,6 +126,19 @@ def approval_binding_evidence(state: WorkflowState, supplied: str) -> dict[str, 
         "artifact_version": _artifact_version(artifact),
         "approval_binding_digest": supplied.strip(),
     }
+    if artifact.metadata.get("reviewed_artifact_id"):
+        binding.update(
+            {
+                "reviewed_artifact_id": str(artifact.metadata.get("reviewed_artifact_id") or ""),
+                "reviewed_artifact_checksum": str(
+                    artifact.metadata.get("reviewed_artifact_checksum") or ""
+                ),
+                "reviewed_artifact_version": str(
+                    artifact.metadata.get("reviewed_artifact_version") or ""
+                ),
+            }
+        )
+    return binding
 
 
 class InternalReviewDeliveryService:
@@ -121,7 +165,7 @@ class InternalReviewDeliveryService:
             )
         if state.status is not WorkflowStatus.AWAITING_APPROVAL or state.approval_status != "pending":
             raise InternalReviewDeliveryError("internal review delivery requires a current human approval gate")
-        artifact = latest_artifact(state)
+        artifact = reviewable_artifact(state)
         if artifact is None:
             raise InternalReviewDeliveryError("workflow has no persisted artefact to deliver")
         if not self._is_substantial(state, artifact):

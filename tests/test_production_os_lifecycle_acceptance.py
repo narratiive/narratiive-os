@@ -38,8 +38,10 @@ def lifecycle() -> ClientLifecycleRecord:
 class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
     def test_safe_company_traverses_internal_chain_with_quality_lineage_and_gates(self) -> None:
         calls = []
+        blueprint_attempts = 0
 
         def claude(contract):
+            nonlocal blueprint_attempts
             calls.append(contract)
             workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
             if workflow_id == "blueprint_lite_to_discovery_preparation":
@@ -51,7 +53,17 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             if workflow_id == "strategic_synthesis_to_strategy_thesis":
                 return strategy_thesis_output()
             if workflow_id == "strategy_thesis_to_growth_blueprint":
-                return growth_blueprint_output()
+                blueprint_attempts += 1
+                candidate = growth_blueprint_output()
+                if blueprint_attempts == 1:
+                    candidate["central_thesis"] = {
+                        "insight": "Generic awareness opportunity",
+                        "why_non_obvious": "Not yet demonstrated",
+                        "competitor_substitution_test": "Any competitor could use this",
+                        "commercial_consequence": "Do more marketing activity",
+                        "evidence_refs": [],
+                    }
+                return candidate
             return _blueprint_output()
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -155,7 +167,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 inputs={"approval_token": proposal.data["approval_token"]},
             )
 
-            research = service.execute(
+            thesis = service.execute(
                 f"/continue {proposal_run}",
                 [],
                 inputs={
@@ -175,23 +187,19 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                     ]
                 },
             )
-            research_run = research.data["run_id"]
-            self.assertEqual(research.data["workflow_id"], "growth_sprint_to_research_engine")
-            self.assertEqual(research.data["status"], "complete")
             research_backend = commands().backend
-            research_state = next(item for item in research_backend.list_states() if item.run_id == research_run)
+            states = research_backend.list_states()
+            research_state = next(
+                item for item in states if item.workflow_id == "growth_sprint_to_research_engine"
+            )
             research_output = research_backend.latest_output(research_state)
             self.assertIsNotNone(research_output)
             self.assertTrue(research_output["source_provenance"])
             self.assertTrue(research_output["fact_interpretation_hypothesis_lineage"]["facts"])
-
-            synthesis = service.execute(f"/continue {research_run}", [])
-            synthesis_run = synthesis.data["run_id"]
-            self.assertEqual(synthesis.data["workflow_id"], "research_to_strategic_synthesis")
-            self.assertEqual(synthesis.data["status"], "complete")
-            self.assertTrue(synthesis.data["quality_passed"])
-
-            thesis = service.execute(f"/continue {synthesis_run}", [])
+            synthesis_state = next(
+                item for item in states if item.workflow_id == "research_to_strategic_synthesis"
+            )
+            self.assertEqual(synthesis_state.status.value, "complete")
             thesis_run = thesis.data["run_id"]
             self.assertEqual(thesis.data["workflow_id"], "strategic_synthesis_to_strategy_thesis")
             self.assertEqual(thesis.data["status"], "awaiting_approval")
@@ -203,7 +211,20 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 inputs={"approval_token": thesis.data["approval_token"]},
             )
 
-            blueprint = service.execute(f"/continue {thesis_run}", [])
+            weak_blueprint = service.execute(f"/continue {thesis_run}", [])
+            self.assertEqual(weak_blueprint.data["status"], "blocked")
+            self.assertEqual(
+                weak_blueprint.data["blocker"],
+                "quality_failed:growth_blueprint_quality_gate",
+            )
+            blueprint_run = weak_blueprint.data["run_id"]
+            revision = service.execute(
+                f"/reject {blueprint_run} because the thesis is generic and fails competitor substitution",
+                [],
+                principal_id="openclaw:native-approval",
+            )
+            self.assertEqual(revision.data["status"], "active")
+            blueprint = service.execute(f"/continue {blueprint_run}", [])
             blueprint_run = blueprint.data["run_id"]
             self.assertEqual(blueprint.data["workflow_id"], "strategy_thesis_to_growth_blueprint")
             self.assertEqual(blueprint.data["status"], "awaiting_approval")
@@ -216,6 +237,16 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
                 item for item in commands().backend.list_states() if item.run_id == thesis_run
             )
             thesis_artifact = thesis_state.stages[0].output_artifacts[-1]
+            candidate_versions = blueprint_state.stage("prepare_growth_blueprint").output_artifacts
+            self.assertEqual(len(candidate_versions), 1)
+            failed_candidate = blueprint_state.stage("prepare_growth_blueprint").attempts[0]["candidate_artifact"]
+            self.assertNotEqual(failed_candidate["checksum"], candidate_versions[-1].checksum)
+            self.assertEqual(candidate_versions[-1].metadata["version"], 2)
+            review_artifact = blueprint_state.stage("review_growth_blueprint").output_artifacts[-1]
+            self.assertEqual(
+                review_artifact.metadata["reviewed_artifact_checksum"],
+                candidate_versions[-1].checksum,
+            )
             self.assertEqual(
                 blueprint_state.input_payload["strategy_thesis_identity"]["artifact_id"],
                 thesis_artifact.artifact_id,
@@ -242,6 +273,14 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             )
             self.assertEqual(approved.data["status"], "complete")
             self.assertFalse(approved.data["external_action_taken"])
+            approved_state = next(
+                item for item in restarted.backend.list_states() if item.run_id == blueprint_run
+            )
+            binding = approved_state.approval_history[-1]["approval_binding"]
+            self.assertEqual(
+                binding["reviewed_artifact_checksum"],
+                candidate_versions[-1].checksum,
+            )
             self.assertGreaterEqual(len(calls), 5)
 
 

@@ -741,11 +741,8 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             FileWorkflowCommandBackend(self.root, dispatchers=self.dispatchers, environ={}),
         )
         status = restarted.execute(f"/workflow {commissioned.data['run_id']}", [])
-        synthesis = restarted.execute(f"/continue {commissioned.data['run_id']}", [])
+        thesis = restarted.execute(f"/continue {commissioned.data['run_id']}", [])
         self.assertEqual(status.data["status"], "complete")
-        self.assertEqual(synthesis.data["workflow_id"], "research_to_strategic_synthesis")
-        self.assertEqual(synthesis.data["status"], "complete")
-        thesis = restarted.execute(f"/continue {synthesis.data['run_id']}", [])
         self.assertEqual(thesis.data["workflow_id"], "strategic_synthesis_to_strategy_thesis")
         self.assertEqual(thesis.data["status"], "awaiting_approval")
         restarted.execute(

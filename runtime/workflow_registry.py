@@ -80,20 +80,21 @@ def _step(
 
 def _workflow(
     workflow_id: str,
-    step: StageDefinition,
+    step: StageDefinition | tuple[StageDefinition, ...],
     *,
     next_workflow_id: str = "",
     approval_required: bool,
     entity_type: str = "client",
+    autonomous_handoff: bool = False,
 ) -> WorkflowDefinition:
     return WorkflowDefinition(
         workflow_id=workflow_id,
-        stages=(step,),
+        stages=step if isinstance(step, tuple) else (step,),
         approval_required=approval_required,
         entity_type=entity_type,
         next_workflow_id=next_workflow_id,
         failure_policy="block_and_escalate",
-        autonomous_handoff=False,
+        autonomous_handoff=autonomous_handoff,
     )
 
 
@@ -194,6 +195,7 @@ GROWTH_SPRINT_TO_RESEARCH_ENGINE = _workflow(
     ),
     next_workflow_id="research_to_strategic_synthesis",
     approval_required=False,
+    autonomous_handoff=True,
 )
 
 RESEARCH_TO_STRATEGIC_SYNTHESIS = _workflow(
@@ -224,6 +226,7 @@ RESEARCH_TO_STRATEGIC_SYNTHESIS = _workflow(
     ),
     next_workflow_id="strategic_synthesis_to_strategy_thesis",
     approval_required=False,
+    autonomous_handoff=True,
 )
 
 STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS = _workflow(
@@ -254,38 +257,84 @@ STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS = _workflow(
     ),
     next_workflow_id="strategy_thesis_to_growth_blueprint",
     approval_required=True,
+    autonomous_handoff=True,
 )
 
 STRATEGY_THESIS_TO_GROWTH_BLUEPRINT = _workflow(
     "strategy_thesis_to_growth_blueprint",
-    _step(
-        "prepare_growth_blueprint",
-        capability="strategic_reasoning",
-        inputs=(
-            "approved_strategy_thesis",
-            "strategy_thesis_identity",
-            "strategic_synthesis",
-            "evidence_pack",
-            "approved_growth_sprint_scope",
-            "client_context",
+    (
+        _step(
+            "prepare_growth_blueprint",
+            capability="strategic_reasoning",
+            inputs=(
+                "approved_strategy_thesis",
+                "strategy_thesis_identity",
+                "strategic_synthesis",
+                "evidence_pack",
+                "approved_growth_sprint_scope",
+                "client_context",
+            ),
+            outputs=(
+                "market_category_diagnosis",
+                "audience",
+                "growth_barriers",
+                "source_of_difference",
+                "positioning",
+                "narrative",
+                "growth_opportunity",
+                "activation_implications",
+                "central_thesis",
+                "narrative_progression",
+                "editorial_judgement",
+                "contradiction_resolution",
+                "quantitative_evidence_treatment",
+                "assumption_control",
+                "completeness",
+                "key_strategic_choices",
+                "evidence_and_uncertainty",
+                "fact_interpretation_hypothesis_lineage",
+                "evidence_lineage",
+                "recommendation",
+            ),
+            quality="growth_blueprint_quality_gate",
+            approval_required=False,
         ),
-        outputs=(
-            "market_category_diagnosis",
-            "audience",
-            "growth_barriers",
-            "source_of_difference",
-            "positioning",
-            "narrative",
-            "growth_opportunity",
-            "activation_implications",
-            "key_strategic_choices",
-            "evidence_and_uncertainty",
-            "fact_interpretation_hypothesis_lineage",
-            "evidence_lineage",
-            "recommendation",
+        _step(
+            "review_growth_blueprint",
+            capability="strategic_quality_review",
+            inputs=(
+                "market_category_diagnosis",
+                "audience",
+                "growth_barriers",
+                "source_of_difference",
+                "positioning",
+                "narrative",
+                "growth_opportunity",
+                "activation_implications",
+                "central_thesis",
+                "narrative_progression",
+                "editorial_judgement",
+                "contradiction_resolution",
+                "quantitative_evidence_treatment",
+                "assumption_control",
+                "completeness",
+                "key_strategic_choices",
+                "evidence_and_uncertainty",
+                "fact_interpretation_hypothesis_lineage",
+                "evidence_lineage",
+                "growth_blueprint_candidate_identity",
+            ),
+            outputs=(
+                "reference_standard",
+                "senior_strategist_review",
+                "director_judgement",
+                "reviewed_blueprint_checksum",
+                "review_disposition",
+                "revision_instructions",
+            ),
+            quality="senior_strategist_review_quality_gate",
+            approval_required=True,
         ),
-        quality="growth_blueprint_quality_gate",
-        approval_required=True,
     ),
     next_workflow_id="growth_blueprint_deliverable_production",
     approval_required=True,

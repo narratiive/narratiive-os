@@ -202,9 +202,27 @@ def build_tony_worker_registry(
     delivery_preparation_adapter: WorkerAdapter | None = None,
     client_delivery_adapter: WorkerAdapter | None = None,
     follow_up_planning_adapter: WorkerAdapter | None = None,
+    senior_strategist_review_adapter: WorkerAdapter | None = None,
 ) -> CapabilityWorkerRegistry:
     env = os.environ if environ is None else environ
     registrations: list[WorkerRegistration] = []
+    if senior_strategist_review_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-senior-strategist-reviewer",
+                    provider="narratiive-os",
+                    capabilities=("strategic_quality_review",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=30,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                senior_strategist_review_adapter,
+            )
+        )
     claude = dispatchers.get("Claude")
     if claude is not None:
         def claude_preparation_adapter(contract: dict[str, Any]) -> dict[str, Any]:
@@ -237,7 +255,12 @@ def build_tony_worker_registry(
                     worker_id="claude-anthropic",
                     provider="anthropic",
                     model=str(env.get("TONY_DISPATCH_CLAUDE_MODEL", "")).strip(),
-                    capabilities=("strategic_reasoning", "synthesis", "copy_drafting", "structured_data_processing"),
+                    capabilities=(
+                        "strategic_reasoning",
+                        "synthesis",
+                        "copy_drafting",
+                        "structured_data_processing",
+                    ),
                     availability=WorkerAvailability.AVAILABLE,
                     side_effect_permissions=("preparation",),
                     timeout_seconds=int(env.get("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS") or DEFAULT_TIMEOUT_SECONDS),
