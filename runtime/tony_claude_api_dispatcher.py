@@ -146,6 +146,14 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
             "Use short evidence source identifiers in evidence_refs and source_refs. "
             "Do not add a work_product wrapper."
         )
+    elif workflow_id in {"strategy_thesis_to_growth_blueprint", "research_to_growth_blueprint"}:
+        return_contract = (
+            "Return exactly one compact JSON object under 6,000 words and no markdown fences. "
+            "Return only the top-level fields named in TASK, plus no commentary or duplicated source material. "
+            "Keep each diagnosis, implication, uncertainty, choice and narrative step concise while preserving "
+            "every required field and material caveat. Use short evidence source identifiers in evidence_refs "
+            "and source_refs; do not reproduce source passages. Do not add a work_product wrapper."
+        )
     else:
         return_contract = _GENERAL_RETURN_CONTRACT
     return (
