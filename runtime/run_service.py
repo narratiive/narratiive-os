@@ -94,6 +94,38 @@ class WorkflowRunService:
         self._commit(state, "stage.started", {"stage_id": stage_id})
         return state
 
+    def record_dispatch_started(
+        self,
+        run_id: str,
+        stage_id: str,
+        *,
+        idempotency_key: str,
+        worker_id: str,
+        provider: str,
+        model: str,
+        timeout_seconds: int,
+        worker_attempt: int,
+    ) -> WorkflowState:
+        """Persist non-secret dispatch intent before entering a synchronous provider call."""
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        if stage.status is not StageStatus.RUNNING:
+            raise ValueError("workflow dispatch can only start for a running step")
+        self._commit(
+            state,
+            "stage.dispatch_started",
+            {
+                "stage_id": stage_id,
+                "idempotency_key": idempotency_key,
+                "worker_id": worker_id,
+                "provider": provider,
+                "model": model,
+                "timeout_seconds": timeout_seconds,
+                "worker_attempt": worker_attempt,
+            },
+        )
+        return state
+
     def complete_stage(
         self,
         run_id: str,

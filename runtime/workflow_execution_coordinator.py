@@ -294,6 +294,17 @@ class WorkflowExecutionCoordinator:
 
             self.runs.start_stage(run_id, stage.stage_id)
             idempotency_key = f"{state.run_id}:{stage.stage_id}:{len(stage.attempts) + 1}"
+            worker_metadata = worker.registration.metadata
+            self.runs.record_dispatch_started(
+                run_id,
+                stage.stage_id,
+                idempotency_key=idempotency_key,
+                worker_id=worker_metadata.worker_id,
+                provider=worker_metadata.provider,
+                model=worker_metadata.model,
+                timeout_seconds=worker_metadata.timeout_seconds,
+                worker_attempt=1,
+            )
             contract = self._worker_contract(state, stage_definition.input_contract.required_fields)
             contract["workflow_context"] = {
                 "workflow_id": state.workflow_id,

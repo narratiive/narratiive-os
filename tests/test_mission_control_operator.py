@@ -32,6 +32,7 @@ class MissionControlOperatorTests(unittest.TestCase):
         stage = StageRecord(
             "prepare_growth_blueprint", "claude-anthropic", status=StageStatus.BLOCKED if blocked else StageStatus.RUNNING,
             started_at="2026-10-04T10:00:00+00:00", revision_count=1,
+            capability="strategic_reasoning",
             output_artifacts=[ArtifactRef("artifact-v1", "workflow_step_output", str(artifact), "abc", {"parent_artifact_ids": ["parent-v0"]})],
             attempts=[{"status": "returned", "revision": 0, "quality_passed": False, "candidate_artifact": {"artifact_id": "artifact-failed", "artifact_type": "worker_attempt_output", "location": str(artifact), "checksum": "bad", "metadata": {}}}],
             quality_result={"passed": True, "failed_checks": []}, blocker=blocked,
@@ -101,6 +102,33 @@ class MissionControlOperatorTests(unittest.TestCase):
         restarted = OperatorMissionControlProjector(workflow_root=self.root, workflow_workspace_id="narratiive")
         second = restarted.project(states=[state], leads=[], generated_at="2026-10-04T12:00:00Z")
         self.assertEqual(first, second)
+
+    def test_overdue_running_stage_is_labelled_stalled_from_runtime_timeout_evidence(self):
+        state = self._state()
+        projector = OperatorMissionControlProjector(
+            workflow_root=self.root,
+            workflow_workspace_id="narratiive",
+            worker_timeout_seconds={"strategic_reasoning": 180},
+        )
+        item = projector.project(
+            states=[state],
+            leads=[],
+            generated_at="2026-10-04T12:00:00Z",
+        )["opportunities"][0]
+        self.assertEqual(item["attention_state"], "stalled")
+        self.assertEqual(item["operational_substate"], "stalled")
+        self.assertEqual(item["current_activity"], "Growth Blueprint stalled")
+        self.assertFalse(item["blocked"])
+
+    def test_recovered_stage_is_retrying_not_running(self):
+        state = self._state()
+        stage = state.stage(state.current_stage_id)
+        stage.status = StageStatus.READY
+        stage.retry_count = 1
+        item = self.projector.project(states=[state], leads=[])["opportunities"][0]
+        self.assertEqual(item["attention_state"], "retrying")
+        self.assertEqual(item["operational_substate"], "retrying")
+        self.assertIn("governed retry ready", item["current_activity"])
 
 
 if __name__ == "__main__":

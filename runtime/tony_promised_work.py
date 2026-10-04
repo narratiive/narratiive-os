@@ -33,6 +33,12 @@ class TonyPromisedWorkWorker:
         state = candidates[0]
         try:
             if state.status.value == "active":
+                current = state.stage(state.current_stage_id) if state.current_stage_id else None
+                # A RUNNING step is already owned by the canonical coordinator.
+                # Calling advance again would convert an interrupted/in-flight
+                # provider request into a false workflow_step_not_ready blocker.
+                if current is not None and current.status.value == "running":
+                    return state
                 state = self.backend.advance(state)
         except Exception as exc:
             return self._deliver_once(

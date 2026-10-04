@@ -172,12 +172,15 @@ class TonyAgentGateway:
             "[Durable work execution protocol]\n"
             "The Telegram ingress has already acknowledged this commission. "
             "Do not send another acknowledgement and do not answer the substantive "
-            "request from Tony's own unaided reasoning. Delegate the required "
-            "investigation or production to the appropriate specialist with "
-            "sessions_spawn, then call sessions_yield. After OpenClaw pushes the "
-            "specialist completion into this session, review its evidence and return "
-            "Tony's useful final result or a genuine human gate. The durable worker "
-            "will reject a final response that has no sessions_yield evidence."
+            "request from Tony's own unaided reasoning. First use the governed "
+            "Narratiive workflow path when the requested work maps to a registered "
+            "workflow. A successful canonical commission or continue call is the "
+            "specialist delegation: do not also use sessions_spawn for the same work. "
+            "Use sessions_spawn followed by sessions_yield only when no canonical "
+            "workflow owns the requested production. Return only verified workflow "
+            "state, reviewed specialist evidence, or a genuine human gate. The durable "
+            "worker rejects a final response without either governed workflow evidence "
+            "or sessions_yield evidence."
         )
 
     def _await_yielded_reply(self, session_key: str) -> str:
@@ -210,8 +213,10 @@ class TonyAgentGateway:
         if transcript is None:
             return False, ""
         yielded_at = ""
+        governed_at = ""
         pushed_at = ""
         completed = ""
+        workflow_calls: dict[str, str] = {}
         try:
             lines = transcript.read_text(encoding="utf-8").splitlines()
         except (OSError, UnicodeDecodeError):
@@ -236,7 +241,13 @@ class TonyAgentGateway:
                         yielded_at = timestamp
                         pushed_at = ""
                         completed = ""
-                if pushed_at and timestamp > pushed_at and message.get("stopReason") == "stop":
+                    if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "narratiive_workflow_control":
+                        arguments = part.get("arguments")
+                        operation = str(arguments.get("operation") or "") if isinstance(arguments, Mapping) else ""
+                        call_id = str(part.get("id") or "")
+                        if call_id and operation in {"commission", "continue", "additional_research"}:
+                            workflow_calls[call_id] = operation
+                if (pushed_at or governed_at) and timestamp > (pushed_at or governed_at) and message.get("stopReason") == "stop":
                     texts = [
                         str(part.get("text") or "").strip()
                         for part in content
@@ -245,7 +256,25 @@ class TonyAgentGateway:
                     text = "\n".join(item for item in texts if item).strip()
                     if text and text != "NO_REPLY":
                         completed = text
-        return bool(yielded_at), completed
+            if message.get("role") == "toolResult" and not message.get("isError"):
+                call_id = str(message.get("toolCallId") or "")
+                if call_id in workflow_calls and self._verified_workflow_result(content):
+                    governed_at = timestamp
+                    completed = ""
+        return bool(yielded_at or governed_at), completed
+
+    @staticmethod
+    def _verified_workflow_result(content: list[object]) -> bool:
+        for part in content:
+            if not isinstance(part, Mapping) or part.get("type") != "text":
+                continue
+            try:
+                payload = json.loads(str(part.get("text") or ""))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(payload, Mapping) and payload.get("ok") is True:
+                return True
+        return False
 
     def _session_transcript(self, session_key: str) -> Path | None:
         sessions_dir = self.config.state_dir / "agents" / self.config.agent_id / "sessions"

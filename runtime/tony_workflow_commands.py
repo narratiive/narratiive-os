@@ -918,7 +918,10 @@ class TonyWorkflowCommandService:
                     name,
                     "healthy",
                     (
-                        "I’ve commissioned that work against the persisted evidence and will return here "
+                        "That exact governed work is already commissioned; no duplicate run was created. "
+                        "Read its workflow status for the current execution state."
+                        if replay
+                        else "I’ve commissioned that work against the persisted evidence and will return here "
                         "when it reaches the next review gate."
                     ),
                     {**self._summary(commissioned), "commissioned": True, "replay": replay},
@@ -1067,7 +1070,13 @@ class TonyWorkflowCommandService:
         summary = self._summary(state)
         message = f"{_state_name(state)} — {state.workflow_id}: {state.status.value.replace('_', ' ')}."
         if state.current_stage_id:
-            message += f" Current step: {state.current_stage_id.replace('_', ' ')}."
+            stage = state.stage(state.current_stage_id)
+            stage_state = stage.status.value.replace("_", " ")
+            message += f" Current step: {state.current_stage_id.replace('_', ' ')} ({stage_state})."
+            if stage.started_at:
+                message += f" Started: {stage.started_at}."
+            if stage.status.value == "ready" and stage.retry_count:
+                message += " The interrupted execution was recovered and is ready for its governed retry."
         if state.blocker:
             message += f" Blocker: {state.blocker}."
         next_action = state.current_proposed_next_action()

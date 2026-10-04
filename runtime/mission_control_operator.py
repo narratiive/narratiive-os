@@ -68,10 +68,21 @@ class FileWorkflowEvidenceReader:
 class OperatorMissionControlProjector:
     """Executive-safe projection of canonical lead and workflow truth."""
 
-    def __init__(self, *, workflow_root: str | Path, workflow_workspace_id: str) -> None:
+    def __init__(
+        self,
+        *,
+        workflow_root: str | Path,
+        workflow_workspace_id: str,
+        worker_timeout_seconds: Mapping[str, int] | None = None,
+    ) -> None:
         self.workflow_root = Path(workflow_root).resolve()
         self.workflow_workspace_id = workflow_workspace_id
         self.evidence = FileWorkflowEvidenceReader(self.workflow_root)
+        self.worker_timeout_seconds = {
+            str(capability): int(seconds)
+            for capability, seconds in (worker_timeout_seconds or {}).items()
+            if int(seconds) > 0
+        }
 
     def project(
         self,
@@ -93,7 +104,7 @@ class OperatorMissionControlProjector:
             if lead.disposition not in {"suppressed", "test", "archived"}:
                 grouped.setdefault(lead.lead_id, [])
 
-        opportunities = [self._opportunity(key, runs, lead_by_id.get(key)) for key, runs in grouped.items()]
+        opportunities = [self._opportunity(key, runs, lead_by_id.get(key), now) for key, runs in grouped.items()]
         opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
         live = [item for item in opportunities if not item["synthetic"]]
         active = [item for item in live if item["lifecycle_stage"] != "complete"]
@@ -128,7 +139,13 @@ class OperatorMissionControlProjector:
             "capabilities": {"read_only": True, "approvals": False, "external_actions": False},
         }
 
-    def _opportunity(self, key: str, runs: list[WorkflowState], lead: InboundLead | None) -> dict[str, Any]:
+    def _opportunity(
+        self,
+        key: str,
+        runs: list[WorkflowState],
+        lead: InboundLead | None,
+        generated_at: str,
+    ) -> dict[str, Any]:
         runs.sort(key=lambda state: (state.updated_at, state.run_id))
         latest = runs[-1] if runs else None
         name = (lead.company or lead.contact).strip() if lead else ""
@@ -159,21 +176,37 @@ class OperatorMissionControlProjector:
         waiting = bool(latest and latest.status.value == "awaiting_approval")
         requires_matt = waiting or bool(latest and (latest.revision_owner or "").casefold() == "matt")
         waiting_externally = bool(blocker and str(blocker).casefold().startswith("waiting_external"))
-        attention = "failed" if failed else "waiting_externally" if waiting_externally else "blocked" if blocker else "matt_required" if requires_matt else "running" if latest and latest.status.value == "active" else "complete" if lifecycle == "complete" else "ready"
+        stage = latest.stage(latest.current_stage_id) if latest and latest.current_stage_id else None
+        stalled = bool(latest and stage and self._stage_is_stalled(latest, stage, generated_at))
+        retrying = bool(
+            latest
+            and stage
+            and latest.status.value == "active"
+            and stage.status.value == "ready"
+            and stage.retry_count
+        )
+        queued = bool(
+            latest
+            and stage
+            and latest.status.value == "active"
+            and stage.status.value == "ready"
+            and not stage.retry_count
+        )
+        attention = "failed" if failed else "waiting_externally" if waiting_externally else "blocked" if blocker else "matt_required" if requires_matt else "stalled" if stalled else "retrying" if retrying else "queued" if queued else "running" if latest and latest.status.value == "active" else "complete" if lifecycle == "complete" else "ready"
         owner = "Matt" if requires_matt else self._owner(latest)
         artefacts = self._artefacts(runs)
         events = [self._event_item(state, event, name) for state in runs for event in self.evidence.events(state)]
         events = [event for event in events if event is not None]
         events.sort(key=lambda item: item["occurred_at"], reverse=True)
         next_action = latest.current_proposed_next_action() if latest else (lead.recommended_next_action if lead else None)
-        current_activity = self._activity(latest) if latest else "Opportunity recorded"
+        current_activity = self._activity(latest, attention) if latest else "Opportunity recorded"
         return {
             "id": key,
             "company": name,
             "kind": "TEST" if synthetic else "LIVE",
             "synthetic": synthetic,
             "lifecycle_stage": lifecycle,
-            "operational_substate": latest.status.value if latest else (lead.status if lead else "unknown"),
+            "operational_substate": attention if latest and latest.status.value == "active" else latest.status.value if latest else (lead.status if lead else "unknown"),
             "current_owner": owner,
             "current_activity": current_activity,
             "started_at": self._started(latest),
@@ -224,7 +257,7 @@ class OperatorMissionControlProjector:
         return state.revision_owner or "Tony"
 
     @staticmethod
-    def _activity(state: WorkflowState | None) -> str:
+    def _activity(state: WorkflowState | None, attention: str = "") -> str:
         if not state:
             return "Opportunity recorded"
         label = DELIVERY_STEPS.get(state.workflow_id) or ARTEFACT_NAMES.get(state.workflow_id) or state.workflow_id.replace("_", " ").title()
@@ -234,7 +267,31 @@ class OperatorMissionControlProjector:
             return f"{label} complete"
         if state.status.value == "blocked":
             return f"{label} blocked"
+        if attention == "stalled":
+            return f"{label} stalled"
+        if attention == "retrying":
+            return f"{label} recovered; governed retry ready"
+        if attention == "queued":
+            return f"{label} queued"
         return f"{label} in progress"
+
+    def _stage_is_stalled(
+        self,
+        state: WorkflowState,
+        stage: StageRecord,
+        generated_at: str,
+    ) -> bool:
+        if state.status.value != "active" or stage.status.value != "running" or not stage.started_at:
+            return False
+        timeout = self.worker_timeout_seconds.get(stage.capability)
+        if timeout is None:
+            return False
+        try:
+            now = datetime.fromisoformat(generated_at.replace("Z", "+00:00"))
+            started = datetime.fromisoformat(stage.started_at.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        return (now - started).total_seconds() > max(timeout * 2, 300)
 
     @staticmethod
     def _started(state: WorkflowState | None) -> str | None:

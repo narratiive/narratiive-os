@@ -160,6 +160,31 @@ class TonyPromisedWorkTests(unittest.TestCase):
         persisted = next(item for item in backend_after_restart.list_states() if item.run_id == state.run_id)
         self.assertEqual(persisted.status.value, "awaiting_approval")
 
+    def test_promised_worker_does_not_readvance_an_already_running_canonical_stage(self) -> None:
+        state, _, dispatchers = self._commission()
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        runtime.runs.start_stage(state.run_id, state.current_stage_id)
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+
+        observed = TonyPromisedWorkWorker(backend, self._sender).run_once()
+
+        self.assertEqual(observed.run_id, state.run_id)
+        self.assertEqual(observed.status.value, "active")
+        self.assertEqual(observed.stage(observed.current_stage_id).status.value, "running")
+        self.assertIsNone(observed.blocker)
+        self.assertEqual(self.telegram_messages, [])
+
     def test_specialist_failure_proactively_reports_blocker_without_duplicate(self) -> None:
         dispatchers = self._dispatchers(fail_specialist=True)
         state, _, _ = self._commission(dispatchers)
