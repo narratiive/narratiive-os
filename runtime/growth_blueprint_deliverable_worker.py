@@ -14,6 +14,7 @@ from runtime.deliverable_production import (
     LocalArtifactToolPresentationRenderer,
     PresentationSpecification,
     _checksum,
+    build_blueprint_director_presentation_spec,
     build_directed_growth_blueprint_presentation_spec,
 )
 
@@ -79,7 +80,12 @@ class GrowthBlueprintDeliverableWorker:
         stable_id = hashlib.sha256(
             f"{RENDERER_CONTRACT_VERSION}:{workspace_id}:{client_id}:{run_id}:{source_id}:{source_checksum}".encode("utf-8")
         ).hexdigest()[:20]
-        specification = build_directed_growth_blueprint_presentation_spec(
+        specification_builder = (
+            build_blueprint_director_presentation_spec
+            if isinstance(blueprint.get("client_facing_blueprint"), Mapping)
+            else build_directed_growth_blueprint_presentation_spec
+        )
+        specification = specification_builder(
             blueprint,
             specification_id=f"blueprint-spec-{stable_id}",
             source_blueprint_id=source_id,

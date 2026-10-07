@@ -5,6 +5,7 @@ import json
 import unittest
 
 from runtime.workflow_quality import (
+    blueprint_director_quality_gate,
     campaign_world_candidates_quality_gate,
     campaign_world_quality_gate,
     campaign_world_triage_quality_gate,
@@ -313,9 +314,9 @@ def growth_blueprint_output() -> dict:
 
 def senior_strategist_review_output(checksum: str) -> dict:
     axes = (
-        "evidence", "diagnosis", "non_obvious_insight", "specificity",
-        "audience_intelligence", "strategic_choice", "commercial_consequence",
-        "narrative_coherence", "editorial_judgement", "activation",
+        "strategic_coherence", "non_obviousness", "client_specificity",
+        "evidence_support", "audience_insight", "commercial_consequence",
+        "narrative_progression", "editorial_judgement", "activation_usefulness",
     )
     director_questions = (
         "non_obvious_central_thesis", "evidence_earns_conclusion",
@@ -424,6 +425,40 @@ def strategy_thesis_output() -> dict:
 
 
 class WorkflowQualityTests(unittest.TestCase):
+    def test_blueprint_director_output_is_client_facing_while_trace_stays_backstage(self) -> None:
+        acts = ["Case", "Market", "Audience", "Positioning", "Growth", "Activation"]
+        output = {
+            "client_facing_blueprint": {
+                "title": "Synthetic Client Growth Blueprint",
+                "central_argument": "Synthetic Client can concentrate growth by becoming the clearest credible choice for one urgent buyer situation rather than broadening activity.",
+                "pages": [
+                    {
+                        "page_number": index,
+                        "act": acts[(index - 1) // 5],
+                        "headline": f"Synthetic Client earns a sharper choice on page {index}",
+                        "body": "This client-ready page advances one specific part of the cumulative strategic argument without exposing internal governance language.",
+                        "commercial_consequence": "The choice concentrates demand and makes commercial response more likely.",
+                        "visual_opportunity": "A concise comparison diagram showing the strategic shift.",
+                        "visual_archetype": (
+                            "cover", "thesis", "provocation", "question", "market_forces",
+                            "comparison", "audience", "positioning", "roadmap", "measurement",
+                        )[(index - 1) % 10],
+                    }
+                    for index in range(1, 31)
+                ],
+            },
+            "editorial_trace": [
+                {"page_number": index, "evidence_refs": ["ev-1"]}
+                for index in range(1, 31)
+            ],
+            "external_action_taken": False,
+        }
+        self.assertTrue(blueprint_director_quality_gate(output)["passed"])
+        output["client_facing_blueprint"]["pages"][0]["evidence_refs"] = ["ev-1"]
+        result = blueprint_director_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("client copy excludes internal governance schema", result["failed_checks"])
+
     def test_discovery_preparation_requires_substance_lineage_and_uncertainty(self) -> None:
         result = discovery_preparation_quality_gate(discovery_output())
         self.assertTrue(result["passed"], result)
@@ -520,7 +555,7 @@ class WorkflowQualityTests(unittest.TestCase):
     def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
         output = senior_strategist_review_output("a" * 64)
         self.assertTrue(senior_strategist_review_quality_gate(output)["passed"])
-        output["senior_strategist_review"]["specificity"]["passed"] = False
+        output["senior_strategist_review"]["client_specificity"]["passed"] = False
         output["review_disposition"] = "revise"
         output["revision_instructions"] = ["Make the opportunity client-specific."]
         self.assertFalse(senior_strategist_review_quality_gate(output)["passed"])

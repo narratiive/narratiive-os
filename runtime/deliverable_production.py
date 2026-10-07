@@ -130,6 +130,55 @@ ARCHETYPE_LIBRARY = (
 )
 
 
+def build_blueprint_director_presentation_spec(
+    artifact: Mapping[str, Any], *, specification_id: str, source_blueprint_id: str,
+    source_blueprint_version: int, workspace_id: str, client_id: str, title: str,
+    brand_name: str,
+) -> PresentationSpecification:
+    """Render the approved Blueprint Director story without rewriting its argument."""
+    blueprint = artifact.get("client_facing_blueprint")
+    trace = artifact.get("editorial_trace")
+    if not isinstance(blueprint, Mapping) or not isinstance(blueprint.get("pages"), list):
+        raise ValueError("Blueprint Director source is incomplete")
+    trace_by_page = {
+        item.get("page_number"): item
+        for item in trace or []
+        if isinstance(item, Mapping)
+    }
+    slides = []
+    for page in blueprint["pages"]:
+        if not isinstance(page, Mapping):
+            raise ValueError("Blueprint Director pages must be objects")
+        number = int(page.get("page_number") or 0)
+        evidence = trace_by_page.get(number, {})
+        slides.append(PresentationSlideSpec(
+            slide_no=number,
+            title=_client_copy(page.get("headline"), 120),
+            takeaway=_client_copy(page.get("commercial_consequence"), 180),
+            body=_client_copy(page.get("body"), 420),
+            visual_treatment=_client_copy(page.get("visual_opportunity"), 120),
+            evidence_refs=tuple(str(ref) for ref in evidence.get("evidence_refs") or [] if str(ref).strip()),
+            source_notes=("Detailed evidence lineage is retained in the immutable Blueprint Director review record.",),
+            layout_type=str(page.get("visual_archetype") or ("cover" if number == 1 else "evidence_implication")),
+        ))
+    return PresentationSpecification(
+        specification_id=specification_id,
+        source_blueprint_id=source_blueprint_id,
+        source_blueprint_version=source_blueprint_version,
+        workspace_id=workspace_id,
+        client_id=client_id,
+        title=title,
+        status="ready_for_production",
+        template_source="Narratiive Blueprint Director editorial commission using the Rave benchmark as calibre only.",
+        slides=tuple(slides),
+        source_checksum=_checksum(artifact),
+        notes=(
+            "INTERNAL REVIEW DRAFT — HUMAN APPROVAL REQUIRED",
+            "Visible copy is the approved Blueprint Director output; evidence governance remains backstage.",
+        ),
+    )
+
+
 def _human_source_note(section: str) -> str:
     return f"Internal provenance retained for {section}; detailed evidence remains in the review record."
 

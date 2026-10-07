@@ -295,8 +295,11 @@ class WorkflowRunService:
         stage = state.stage(state.current_stage_id)
         if stage.status is not StageStatus.BLOCKED:
             raise ValueError("blocked workflow step is not revisable")
+        blueprint_owner = "direct_growth_blueprint" if any(
+            item.stage_id == "direct_growth_blueprint" for item in state.stages
+        ) else "prepare_growth_blueprint"
         owner = (
-            state.stage("prepare_growth_blueprint")
+            state.stage(blueprint_owner)
             if state.workflow_id == "strategy_thesis_to_growth_blueprint"
             and stage.stage_id == "review_growth_blueprint"
             else stage

@@ -10,15 +10,15 @@ class SeniorStrategistReviewWorker:
     REFERENCE_STANDARD = "Rave Coffee Growth Blueprint calibre, not content template"
 
     _AXES = (
-        "evidence", "diagnosis", "non_obvious_insight", "specificity",
-        "audience_intelligence", "strategic_choice", "commercial_consequence",
-        "narrative_coherence", "editorial_judgement", "activation",
+        "strategic_coherence", "non_obviousness", "client_specificity",
+        "evidence_support", "audience_insight", "commercial_consequence",
+        "narrative_progression", "editorial_judgement", "activation_usefulness",
     )
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
-        identity = contract.get("growth_blueprint_candidate_identity")
+        identity = contract.get("blueprint_director_output_identity")
         if not isinstance(identity, Mapping) or len(str(identity.get("checksum") or "")) != 64:
-            raise ValueError("senior strategy review requires an immutable Blueprint checksum")
+            raise ValueError("senior strategy review requires an immutable Blueprint Director checksum")
 
         lineage = contract.get("evidence_lineage")
         thesis = contract.get("central_thesis")
@@ -26,12 +26,29 @@ class SeniorStrategistReviewWorker:
         opportunity = contract.get("growth_opportunity")
         progression = contract.get("narrative_progression")
         editorial = contract.get("editorial_judgement")
-        choices = contract.get("key_strategic_choices")
         activation = contract.get("activation_implications")
-        contradiction_control = contract.get("contradiction_resolution")
         quantitative_control = contract.get("quantitative_evidence_treatment")
         assumption_control = contract.get("assumption_control")
         completeness = contract.get("completeness")
+        blueprint = contract.get("client_facing_blueprint")
+        pages = blueprint.get("pages") if isinstance(blueprint, Mapping) else None
+        trace = contract.get("editorial_trace")
+        client_context = contract.get("client_context")
+        client_name = ""
+        if isinstance(client_context, Mapping):
+            client_name = str(
+                client_context.get("brand_name")
+                or client_context.get("company_name")
+                or client_context.get("company")
+                or client_context.get("name")
+                or ""
+            ).strip()
+        visible = " ".join(
+            str(value)
+            for page in pages or []
+            if isinstance(page, Mapping)
+            for value in (page.get("headline"), page.get("body"), page.get("commercial_consequence"))
+        )
         refs = sorted({
             str(ref)
             for item in lineage or []
@@ -39,49 +56,65 @@ class SeniorStrategistReviewWorker:
             for ref in item.get("source_refs") or []
             if str(ref).strip()
         }) or ["candidate:missing-evidence-reference"]
+        traced_refs = {
+            str(ref)
+            for item in trace or []
+            if isinstance(item, Mapping)
+            for ref in item.get("evidence_refs") or []
+            if str(ref).strip()
+        }
         passed = {
-            "evidence": (
+            "strategic_coherence": (
+                isinstance(blueprint, Mapping)
+                and self._substantive(blueprint.get("central_argument"), 12)
+                and isinstance(pages, list)
+                and len(pages) == 30
+            ),
+            "non_obviousness": self._substantive(self._field(thesis, "why_non_obvious"), 10),
+            "client_specificity": bool(client_name) and client_name.casefold() in visible.casefold(),
+            "evidence_support": (
                 isinstance(lineage, list)
                 and len(lineage) >= 5
+                and isinstance(trace, list)
+                and len(trace) == 30
+                and all(isinstance(item, Mapping) and item.get("evidence_refs") for item in trace)
+                and bool(traced_refs)
+                and traced_refs.issubset(set(refs))
                 and isinstance(quantitative_control, Mapping)
                 and quantitative_control.get("unsourced_numbers_present") is False
                 and isinstance(assumption_control, Mapping)
                 and assumption_control.get("silent_guesses") is False
             ),
-            "diagnosis": self._substantive(self._field(contract.get("growth_barriers"), "diagnosis"), 15),
-            "non_obvious_insight": self._substantive(self._field(thesis, "why_non_obvious"), 10),
-            "specificity": self._substantive(self._field(thesis, "competitor_substitution_test"), 10),
-            "audience_intelligence": isinstance(audience, Mapping) and all(
+            "audience_insight": isinstance(audience, Mapping) and all(
                 self._meaningful(audience.get(key))
                 for key in ("motivations", "tensions", "barriers", "triggers", "behaviours")
             ),
-            "strategic_choice": isinstance(choices, list) and len(choices) >= 3,
             "commercial_consequence": self._substantive(self._field(opportunity, "commercial_consequence"), 10),
-            "narrative_coherence": (
+            "narrative_progression": (
                 isinstance(progression, list)
                 and len(progression) >= 4
-                and isinstance(contradiction_control, Mapping)
-                and contradiction_control.get("unresolved_material_contradictions") == []
                 and isinstance(completeness, Mapping)
                 and completeness.get("materially_complete") is True
                 and completeness.get("truncated") is False
+                and isinstance(pages, list)
+                and [page.get("page_number") for page in pages if isinstance(page, Mapping)] == list(range(1, 31))
             ),
             "editorial_judgement": isinstance(editorial, Mapping) and all(
                 self._meaningful(editorial.get(key))
                 for key in ("primary_emphasis", "supporting_evidence", "remove_or_deprioritise")
             ),
-            "activation": isinstance(activation, Mapping) and self._substantive(activation.get("implication"), 8),
+            "activation_usefulness": isinstance(activation, Mapping) and self._substantive(activation.get("implication"), 8),
         }
         failed = [axis for axis in self._AXES if not passed[axis]]
         director_checks = {
-            "non_obvious_central_thesis": passed["non_obvious_insight"],
-            "evidence_earns_conclusion": passed["evidence"] and passed["diagnosis"],
-            "progressively_more_specific": passed["specificity"] and passed["narrative_coherence"],
-            "every_major_section_advances_argument": passed["narrative_coherence"],
+            "non_obvious_central_thesis": passed["non_obviousness"],
+            "evidence_earns_conclusion": passed["evidence_support"] and passed["strategic_coherence"],
+            "progressively_more_specific": passed["client_specificity"] and passed["narrative_progression"],
+            "every_major_section_advances_argument": passed["narrative_progression"],
             "removable_material_identified": passed["editorial_judgement"],
-            "competitor_substitution_resisted": passed["specificity"],
+            "competitor_substitution_resisted": passed["client_specificity"],
             "worth_paying_for": all(passed.values()),
-            "meaningfully_reframes_founder_problem": passed["non_obvious_insight"] and passed["diagnosis"],
+            "meaningfully_reframes_founder_problem": passed["non_obviousness"] and passed["strategic_coherence"],
             "commercial_consequence_clear": passed["commercial_consequence"],
             "presentable_without_intellectual_rebuild": all(passed.values()),
         }

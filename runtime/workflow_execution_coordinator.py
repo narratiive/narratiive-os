@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.autonomy_planner import AutonomyAction, TonyAutonomyPlanner
+from runtime.blueprint_director import BlueprintDirectorCommissionBuilder
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.models import ArtifactRef, StageStatus, WorkflowState, WorkflowStatus
 from runtime.run_service import WorkflowRunService
@@ -168,6 +169,7 @@ class WorkflowExecutionCoordinator:
         artifacts: FileWorkflowArtifactStore,
         quality_validators: Mapping[str, QualityValidator] | None = None,
         planner: TonyAutonomyPlanner | None = None,
+        blueprint_director_commission: BlueprintDirectorCommissionBuilder | None = None,
     ) -> None:
         self.registry = registry
         self.workers = workers
@@ -175,6 +177,9 @@ class WorkflowExecutionCoordinator:
         self.artifacts = artifacts
         self.quality_validators = dict(quality_validators or {})
         self.planner = planner or TonyAutonomyPlanner()
+        self.blueprint_director_commission = (
+            blueprint_director_commission or BlueprintDirectorCommissionBuilder()
+        )
         self.lock_root = self.artifacts.root / ".locks"
         self.lock_root.mkdir(parents=True, exist_ok=True)
 
@@ -189,13 +194,20 @@ class WorkflowExecutionCoordinator:
     ) -> WorkflowState:
         with self._run_lock(run_id):
             definition = self.registry.resolve(workflow_id)
+            prepared_inputs = dict(inputs)
+            if workflow_id == "strategy_thesis_to_growth_blueprint":
+                prepared_inputs = self.blueprint_director_commission.enrich(
+                    prepared_inputs,
+                    workspace_id=self.runs.workspace_id,
+                    client_id=self.runs.client_id,
+                )
             return self.runs.create_or_load_run(
                 definition,
                 run_id,
-                inputs.keys(),
+                prepared_inputs.keys(),
                 entity_id=entity_id,
                 correlation_id=correlation_id,
-                input_payload=inputs,
+                input_payload=prepared_inputs,
             )
 
     def approve(
@@ -386,7 +398,7 @@ class WorkflowExecutionCoordinator:
             else:
                 quality = {"passed": True, "failed_checks": []}
             if stage.quality_contract == "senior_strategist_review_quality_gate":
-                identity = state.input_payload.get("growth_blueprint_candidate_identity")
+                identity = state.input_payload.get("blueprint_director_output_identity")
                 expected = str(identity.get("checksum") or "") if isinstance(identity, Mapping) else ""
                 supplied = str(output.get("reviewed_blueprint_checksum") or "")
                 checks = dict(quality.get("checks") or {})
@@ -455,17 +467,14 @@ class WorkflowExecutionCoordinator:
                 ),
             )
             derived_inputs: dict[str, Any] = {}
-            if (
-                current.workflow_id == "strategy_thesis_to_growth_blueprint"
-                and stage.stage_id == "prepare_growth_blueprint"
-            ):
+            if current.workflow_id == "strategy_thesis_to_growth_blueprint" and stage.stage_id == "direct_growth_blueprint":
                 self.runs.record_stage_artifact_identity(
                     run_id,
                     stage_id=stage.stage_id,
-                    input_key="growth_blueprint_candidate_identity",
+                    input_key="blueprint_director_output_identity",
                     artifact=artifact,
                 )
-                derived_inputs["growth_blueprint_candidate_identity"] = True
+                derived_inputs["blueprint_director_output_identity"] = True
             durable_outputs = {
                 field: output[field]
                 for field in stage_definition.output_contract.required_fields
@@ -629,7 +638,7 @@ class WorkflowExecutionCoordinator:
             "approval_status": approval_status,
             "external_action_taken": state.external_action_taken,
         }
-        reviewed = state.input_payload.get("growth_blueprint_candidate_identity")
+        reviewed = state.input_payload.get("blueprint_director_output_identity")
         if stage_id == "review_growth_blueprint" and isinstance(reviewed, Mapping):
             governance["reviewed_artifact_id"] = str(reviewed.get("artifact_id") or "")
             governance["reviewed_artifact_checksum"] = str(reviewed.get("checksum") or "")

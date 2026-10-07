@@ -327,20 +327,111 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
     return _result(checks)
 
 
+def blueprint_director_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    blueprint = output.get("client_facing_blueprint")
+    pages = blueprint.get("pages") if isinstance(blueprint, Mapping) else None
+    trace = output.get("editorial_trace")
+    forbidden = {
+        "evidence_refs",
+        "uncertainties",
+        "contradiction_resolution",
+        "assumption_control",
+        "fact_interpretation_hypothesis_lineage",
+        "evidence_lineage",
+        "quality_predicates",
+        "quality_contract",
+        "workflow_id",
+        "stage_id",
+    }
+    page_fields = (
+        "page_number", "act", "headline", "body",
+        "commercial_consequence", "visual_opportunity", "visual_archetype",
+    )
+    allowed_archetypes = {
+        "cover", "thesis", "provocation", "question", "market_forces", "comparison",
+        "competitive_landscape", "sea_of_sameness", "opportunity", "audience",
+        "demand_pools", "evidence_board", "journey", "entry_points", "diagnosis",
+        "positioning", "positioning_map", "narrative", "message_architecture",
+        "commercial_model", "flywheel", "channel_roles", "campaign_system", "roadmap",
+        "prioritisation", "measurement", "closing",
+    }
+    checks = {
+        "client_facing_blueprint_is_a_complete_editorial_product": (
+            isinstance(blueprint, Mapping)
+            and _substantive_text(blueprint.get("title"), minimum_words=2)
+            and _substantive_text(blueprint.get("central_argument"), minimum_words=12)
+            and isinstance(pages, list)
+            and len(pages) == 30
+            and all(
+                isinstance(page, Mapping)
+                and all(_meaningful(page.get(field)) for field in page_fields)
+                for page in pages
+            )
+        ),
+        "canonical_page_sequence_is_preserved": (
+            isinstance(pages, list)
+            and [page.get("page_number") for page in pages if isinstance(page, Mapping)]
+            == list(range(1, 31))
+            and len({str(page.get("act") or "").strip() for page in pages if isinstance(page, Mapping)}) == 6
+        ),
+        "headlines_and_consequences_are_substantive": (
+            isinstance(pages, list)
+            and all(
+                isinstance(page, Mapping)
+                and _substantive_text(page.get("headline"), minimum_words=3)
+                and _substantive_text(page.get("body"), minimum_words=8)
+                and _substantive_text(page.get("commercial_consequence"), minimum_words=5)
+                for page in pages
+            )
+        ),
+        "visual_story_has_editorial_variety": (
+            isinstance(pages, list)
+            and all(
+                isinstance(page, Mapping)
+                and str(page.get("visual_archetype") or "").casefold() in allowed_archetypes
+                for page in pages
+            )
+            and len({str(page.get("visual_archetype") or "").casefold() for page in pages if isinstance(page, Mapping)}) >= 8
+        ),
+        "client_copy_excludes_internal_governance_schema": (
+            isinstance(blueprint, Mapping)
+            and not (_mapping_keys(blueprint) & forbidden)
+            and not any(token in json.dumps(blueprint, sort_keys=True).casefold() for token in (
+                "evidence_refs", "uncertainties", "contradiction_resolution",
+                "assumption_control", "quality predicate", "quality_contract",
+                "fact_interpretation_hypothesis_lineage", "evidence_lineage",
+                "workflow_id", "stage_id", "governed strategic intelligence",
+                "approved strategy thesis",
+            ))
+        ),
+        "backstage_editorial_trace_preserves_evidence": (
+            isinstance(trace, list)
+            and len(trace) == 30
+            and all(
+                isinstance(item, Mapping)
+                and item.get("page_number") == index
+                and _meaningful_list(item.get("evidence_refs"), minimum=1)
+                for index, item in enumerate(trace, start=1)
+            )
+        ),
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    return _result(checks)
+
+
 def senior_strategist_review_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
     review = output.get("senior_strategist_review")
     director = output.get("director_judgement")
     axes = (
-        "evidence",
-        "diagnosis",
-        "non_obvious_insight",
-        "specificity",
-        "audience_intelligence",
-        "strategic_choice",
+        "strategic_coherence",
+        "non_obviousness",
+        "client_specificity",
+        "evidence_support",
+        "audience_insight",
         "commercial_consequence",
-        "narrative_coherence",
+        "narrative_progression",
         "editorial_judgement",
-        "activation",
+        "activation_usefulness",
     )
     axis_checks = {
         axis: isinstance(review, Mapping)
@@ -385,6 +476,20 @@ def senior_strategist_review_quality_gate(output: Mapping[str, Any]) -> Mapping[
     result["axis_checks"] = axis_checks
     result["director_checks"] = director_checks
     return result
+
+
+def _mapping_keys(value: Any) -> set[str]:
+    if isinstance(value, Mapping):
+        result = {str(key).casefold() for key in value}
+        for nested in value.values():
+            result.update(_mapping_keys(nested))
+        return result
+    if isinstance(value, list):
+        result: set[str] = set()
+        for nested in value:
+            result.update(_mapping_keys(nested))
+        return result
+    return set()
 
 
 def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:

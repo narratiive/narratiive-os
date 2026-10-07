@@ -77,6 +77,19 @@ class WorkflowInstructionTests(unittest.TestCase):
             instruction,
         )
 
+    def test_blueprint_director_contract_prioritises_editorial_product(self) -> None:
+        instruction = workflow_instruction(
+            "strategy_thesis_to_growth_blueprint",
+            "direct_growth_blueprint",
+            ("client_facing_blueprint", "editorial_trace"),
+        )
+
+        self.assertIn("one coherent argument", instruction)
+        self.assertIn("Compress, prioritise and delete", instruction)
+        self.assertIn("canonical_blueprint_guidance controls", instruction)
+        self.assertIn("never copy Rave", instruction)
+        self.assertIn("must not contain internal field names", instruction)
+
     def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
         instruction = workflow_instruction(
             "research_to_strategic_synthesis",
