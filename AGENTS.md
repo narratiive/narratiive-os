@@ -109,16 +109,18 @@ following are true:
 - the work is within an already authorised Narratiive OS objective or task;
 - the pull request uses a branch and does not edit `main` directly;
 - all required automated checks for the pull request are green;
+- independent review evidence is recorded against the exact commit under the
+  Constitution's preferred-human or solo-founder fallback contract;
 - the complete diff has been reviewed for scope, secrets, client data,
   terminology, lineage, destructive migration risk, and approval-gate regressions;
 - there is no unresolved review thread, merge conflict, or known material risk;
 - the merge itself does not release, publish, dispatch, export, or send a
   client-facing artefact.
 
-This delegation includes PRs authored by ChatGPT: passing required checks plus
-the explicit diff/risk review above is sufficient for repository merge. A
-separate self-approval review event must not be fabricated or counted as an
-independent human review.
+This delegation includes PRs authored by ChatGPT, but it does not make the
+implementer their own reviewer. Required checks, independent review evidence,
+and the explicit diff/risk review above must all be complete. A self-approval or
+human-review event must not be fabricated.
 
 The standing delegation does **not** delegate Matt's reserved commercial,
 client-facing, security-sensitive, destructive, legal, financial, credential,

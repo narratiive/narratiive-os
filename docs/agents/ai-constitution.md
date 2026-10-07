@@ -217,6 +217,31 @@ successfully, or reaches the final workflow stage.
 - Quality Reviewer may return `APPROVE`, `APPROVE_WITH_MINOR_CHANGES`, `REVISE`,
   or `BLOCK`; only an authorised human releases client-facing work.
 
+## Independent review
+
+A qualified independent human reviewer is preferred. When repository evidence
+shows that no eligible independent human collaborator exists, a fresh-context
+independent reviewer may satisfy the non-waivable review requirement.
+
+The fallback reviewer must be separate from the implementation session or agent
+that authored the change; receive no hidden implementation conversation or
+context; inspect the exact diff, relevant canonical contracts, tests, and CI
+evidence directly; actively test for regressions, scope creep, unsafe
+assumptions, and governance violations; make no code changes while reviewing;
+and issue an explicit `PASS` or `REQUEST CHANGES` decision with reasons. The
+review evidence and reviewer identity must be recorded durably against the exact
+commit SHA.
+
+The fallback reviewer may not approve from the implementer's summary, treat
+passing CI as sufficient review, manufacture human approval, or modify the
+implementation and then approve that modification. `REQUEST CHANGES` returns
+the work to the implementer; every revised commit requires a new fresh-context
+review, and a reviewer who becomes the implementer cannot approve that repair.
+
+For material architecture, product-canon, authority, external-action, or
+governance changes, Matt remains the final human decision authority after the
+independent review. Review, implementation, and authorisation remain separate.
+
 ## Prohibited for every agent
 
 - direct edits to `main`;

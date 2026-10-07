@@ -13,10 +13,10 @@ and route its review and decision.
 - **Owns execution:** prepares the branch, artefacts, implementation, or
   operational action after authority is established.
 - **Decides:** gives the required approval for the decision class.
-- **Reviews:** provides domain review evidence. Where the standing technical
-  merge delegation applies, automated required checks plus explicit diff/risk
-  review satisfy the repository merge gate; no fake self-approval review event
-  may be created.
+- **Reviews:** provides domain review evidence under the independent-review
+  contract in the Constitution. Automated checks and an implementer's diff/risk
+  review do not alone satisfy that gate; no fake self-approval or human-review
+  event may be created.
 - **Consulted:** supplies relevant evidence but does not approve the decision.
 - **Record:** the durable place where the proposal, reviews, decision, and
   resulting version are traceable.
@@ -72,7 +72,7 @@ the change as substantive.
 
 | Decision class | Proposes | Owns execution | Decides | Required review / verification | Record |
 | --- | --- | --- | --- | --- | --- |
-| Constitutional, role-authority, or governance exception | Any role may raise it | Executive Layer | Matt | ChatGPT, Codex, Claude Code; Tony when operations are affected, unless Matt's explicit decision resolves the requested authority change | Pull request and explicit Matt decision |
+| Constitutional, role-authority, or governance exception | Any role may raise it | Executive Layer | Matt | Independent review under the Constitution; ChatGPT, Codex, Claude Code, and Tony domain review where applicable | Pull request, exact-commit review evidence, and explicit Matt decision |
 | Non-substantive governance documentation | Document owner or contributor | Executive Layer | Document owner or standing repository delegate | Required PR checks and diff review | Pull request |
 | Material architecture or cross-stream interface | ChatGPT or affected owner | Codex for code; Executive Layer for architecture docs | ChatGPT within approved company/product intent; Matt when commercially, legally, operationally, or reputationally material | Required checks; affected-stream review where material | Pull request, tests, and architecture decision rationale |
 | Runtime, schema, CI, script, bridge, operations, or technical configuration implementation | Codex or ChatGPT | Worker Infrastructure | Standing repository delegate within an authorised objective; Matt when a reserved decision is implicated | Required automated checks and explicit diff/risk review | Pull request and test/check results |
@@ -90,7 +90,8 @@ Matt's explicit decision of 12 August 2026 establishes a standing delegation for
 Narratiive OS repository administration. ChatGPT may create, push, mark ready,
 and merge pull requests without seeking separate per-PR permission when the
 change is within an already authorised objective and every required automated
-check is green.
+check is green and independent review evidence for the exact commit has been
+recorded under the Constitution.
 
 Before merging, ChatGPT must inspect the complete diff and confirm there is no
 known unresolved merge conflict, review thread, secret exposure, client-data
@@ -98,7 +99,7 @@ leak, destructive migration risk, approval-gate regression, or material reserved
 decision that has not already been made. This standing delegation applies to
 ChatGPT-authored PRs as well as PRs authored by other agents. It authorises the
 merge action; it does not authorise fabrication of an independent approval or
-review event.
+review event, and it does not make the implementer their own reviewer.
 
 The delegation does not authorise client-facing release, publication, dispatch,
 export, or sending; credential disclosure; destructive production changes;
@@ -127,6 +128,7 @@ The governance documents state mandatory repository policy:
 
 - nobody edits `main` directly;
 - work uses branches and pull requests;
+- independent review is recorded against the exact commit before merge;
 - required automated checks pass before merge;
 - ChatGPT may merge under the recorded standing repository delegation when its
   conditions are satisfied;
