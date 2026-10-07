@@ -63,12 +63,17 @@ class SeniorStrategistReviewWorker:
             for ref in item.get("evidence_refs") or []
             if str(ref).strip()
         }
+        page_numbers = [
+            page.get("page_number")
+            for page in pages or []
+            if isinstance(page, Mapping)
+        ]
         passed = {
             "strategic_coherence": (
                 isinstance(blueprint, Mapping)
                 and self._substantive(blueprint.get("central_argument"), 12)
                 and isinstance(pages, list)
-                and len(pages) == 30
+                and bool(pages)
             ),
             "non_obviousness": self._substantive(self._field(thesis, "why_non_obvious"), 10),
             "client_specificity": bool(client_name) and client_name.casefold() in visible.casefold(),
@@ -76,8 +81,14 @@ class SeniorStrategistReviewWorker:
                 isinstance(lineage, list)
                 and len(lineage) >= 5
                 and isinstance(trace, list)
-                and len(trace) == 30
-                and all(isinstance(item, Mapping) and item.get("evidence_refs") for item in trace)
+                and isinstance(pages, list)
+                and len(trace) == len(pages)
+                and all(
+                    isinstance(item, Mapping)
+                    and item.get("page_number") == page_number
+                    and item.get("evidence_refs")
+                    for page_number, item in zip(page_numbers, trace)
+                )
                 and bool(traced_refs)
                 and traced_refs.issubset(set(refs))
                 and isinstance(quantitative_control, Mapping)
@@ -97,7 +108,8 @@ class SeniorStrategistReviewWorker:
                 and completeness.get("materially_complete") is True
                 and completeness.get("truncated") is False
                 and isinstance(pages, list)
-                and [page.get("page_number") for page in pages if isinstance(page, Mapping)] == list(range(1, 31))
+                and bool(pages)
+                and page_numbers == list(range(1, len(pages) + 1))
             ),
             "editorial_judgement": isinstance(editorial, Mapping) and all(
                 self._meaningful(editorial.get(key))

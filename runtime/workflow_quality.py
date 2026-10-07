@@ -347,32 +347,28 @@ def blueprint_director_quality_gate(output: Mapping[str, Any]) -> Mapping[str, A
         "page_number", "act", "headline", "body",
         "commercial_consequence", "visual_opportunity", "visual_archetype",
     )
-    allowed_archetypes = {
-        "cover", "thesis", "provocation", "question", "market_forces", "comparison",
-        "competitive_landscape", "sea_of_sameness", "opportunity", "audience",
-        "demand_pools", "evidence_board", "journey", "entry_points", "diagnosis",
-        "positioning", "positioning_map", "narrative", "message_architecture",
-        "commercial_model", "flywheel", "channel_roles", "campaign_system", "roadmap",
-        "prioritisation", "measurement", "closing",
-    }
+    page_numbers = [
+        page.get("page_number")
+        for page in pages or []
+        if isinstance(page, Mapping)
+    ]
     checks = {
         "client_facing_blueprint_is_a_complete_editorial_product": (
             isinstance(blueprint, Mapping)
             and _substantive_text(blueprint.get("title"), minimum_words=2)
             and _substantive_text(blueprint.get("central_argument"), minimum_words=12)
             and isinstance(pages, list)
-            and len(pages) == 30
+            and bool(pages)
             and all(
                 isinstance(page, Mapping)
                 and all(_meaningful(page.get(field)) for field in page_fields)
                 for page in pages
             )
         ),
-        "canonical_page_sequence_is_preserved": (
+        "page_sequence_supports_coherent_pacing": (
             isinstance(pages, list)
-            and [page.get("page_number") for page in pages if isinstance(page, Mapping)]
-            == list(range(1, 31))
-            and len({str(page.get("act") or "").strip() for page in pages if isinstance(page, Mapping)}) == 6
+            and bool(pages)
+            and page_numbers == list(range(1, len(pages) + 1))
         ),
         "headlines_and_consequences_are_substantive": (
             isinstance(pages, list)
@@ -384,14 +380,15 @@ def blueprint_director_quality_gate(output: Mapping[str, Any]) -> Mapping[str, A
                 for page in pages
             )
         ),
-        "visual_story_has_editorial_variety": (
+        "visual_story_uses_purposeful_forms": (
             isinstance(pages, list)
+            and bool(pages)
             and all(
                 isinstance(page, Mapping)
-                and str(page.get("visual_archetype") or "").casefold() in allowed_archetypes
+                and _meaningful(page.get("visual_archetype"))
+                and _substantive_text(page.get("visual_opportunity"), minimum_words=3)
                 for page in pages
             )
-            and len({str(page.get("visual_archetype") or "").casefold() for page in pages if isinstance(page, Mapping)}) >= 8
         ),
         "client_copy_excludes_internal_governance_schema": (
             isinstance(blueprint, Mapping)
@@ -406,12 +403,13 @@ def blueprint_director_quality_gate(output: Mapping[str, Any]) -> Mapping[str, A
         ),
         "backstage_editorial_trace_preserves_evidence": (
             isinstance(trace, list)
-            and len(trace) == 30
+            and isinstance(pages, list)
+            and len(trace) == len(pages)
             and all(
                 isinstance(item, Mapping)
-                and item.get("page_number") == index
+                and item.get("page_number") == page_number
                 and _meaningful_list(item.get("evidence_refs"), minimum=1)
-                for index, item in enumerate(trace, start=1)
+                for page_number, item in zip(page_numbers, trace)
             )
         ),
         "no_false_external_execution_claim": _no_false_action(output),

@@ -89,6 +89,10 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("canonical_blueprint_guidance controls", instruction)
         self.assertIn("never copy Rave", instruction)
         self.assertIn("must not contain internal field names", instruction)
+        self.assertIn("number of ordered pages needed", instruction)
+        self.assertIn("guidance, not a fixed template or validity quota", instruction)
+        self.assertNotIn("exactly 30 ordered pages", instruction)
+        self.assertNotIn("use at least eight", instruction)
 
     def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
         instruction = workflow_instruction(

@@ -382,10 +382,16 @@ class VisualQAResult:
 def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
-    archetypes = {s.layout_type for s in specification.slides}
     return {
-        "variable_editorial_arc": 12 <= len(specification.slides) <= 40,
-        "layout_variety": len(archetypes) >= 8,
+        "editorial_arc_is_complete": (
+            bool(specification.slides)
+            and [slide.slide_no for slide in specification.slides]
+            == list(range(1, len(specification.slides) + 1))
+        ),
+        "visual_forms_are_intentional": all(
+            bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
+            for slide in specification.slides
+        ),
         "no_visible_machine_runtime_artefacts": not any(token.lower() in visible for token in ("ev_", "artifact-", "workflow_run", "evidence / source refs")),
         "conclusion_led_headlines": sum(bool(s.takeaway.strip()) for s in specification.slides) >= len(specification.slides) * 0.9,
         "source_provenance_retained": all(s.source_notes for s in specification.slides),
@@ -555,7 +561,17 @@ class FakePresentationRenderer:
         pdf = output_dir / "blueprint.pdf"
         pptx.write_bytes(b"PK\x03\x04 synthetic pptx")
         pdf.write_bytes(b"%PDF-1.7 synthetic pdf")
-        checks = {"pptx_exists": True, "pdf_exists": True, "slide_count": len(specification.slides) >= 12, "source_labels_present": True, "no_overflow_or_overlap": True}
+        checks = {
+            "pptx_exists": True,
+            "pdf_exists": True,
+            "slide_sequence_complete": (
+                bool(specification.slides)
+                and [slide.slide_no for slide in specification.slides]
+                == list(range(1, len(specification.slides) + 1))
+            ),
+            "source_labels_present": True,
+            "no_overflow_or_overlap": True,
+        }
         return pptx, pdf, VisualQAResult("passed", checks)
 
 

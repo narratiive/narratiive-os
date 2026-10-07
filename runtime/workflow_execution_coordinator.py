@@ -480,11 +480,12 @@ class WorkflowExecutionCoordinator:
                 for field in stage_definition.output_contract.required_fields
             }
             self.runs.promote_stage_outputs(run_id, stage.stage_id, durable_outputs)
+            available_inputs = self.runs.load_run(run_id).input_payload.keys()
             state = self.runs.complete_stage(
                 run_id,
                 stage.stage_id,
                 [artifact],
-                (*durable_outputs.keys(), *derived_inputs.keys()),
+                available_inputs,
             )
             if state.status is WorkflowStatus.AWAITING_APPROVAL or (
                 stage.step_approval_required and not external_action

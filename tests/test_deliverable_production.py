@@ -39,10 +39,6 @@ def artifact() -> dict:
 
 class DeliverableProductionTests(unittest.TestCase):
     def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
-        archetypes = (
-            "cover", "thesis", "provocation", "question", "market_forces",
-            "comparison", "audience", "positioning", "roadmap", "measurement",
-        )
         source = {
             "client_facing_blueprint": {
                 "title": "Northstar Growth Blueprint",
@@ -55,14 +51,14 @@ class DeliverableProductionTests(unittest.TestCase):
                         "body": "The page advances the approved strategic argument in concise client-ready language.",
                         "commercial_consequence": "This improves recognition and the quality of commercial response.",
                         "visual_opportunity": "A comparison diagram showing the strategic shift.",
-                        "visual_archetype": archetypes[(index - 1) % len(archetypes)],
+                        "visual_archetype": "argument diagram" if index % 2 else "evidence contrast",
                     }
-                    for index in range(1, 31)
+                    for index in range(1, 18)
                 ],
             },
             "editorial_trace": [
                 {"page_number": index, "evidence_refs": [f"ev-{index}"]}
-                for index in range(1, 31)
+                for index in range(1, 18)
             ],
         }
         spec = build_blueprint_director_presentation_spec(
@@ -70,9 +66,10 @@ class DeliverableProductionTests(unittest.TestCase):
             source_blueprint_version=1, workspace_id="workspace-safe", client_id="client-safe",
             title="Northstar Growth Blueprint", brand_name="Northstar",
         )
-        self.assertEqual(len(spec.slides), 30)
-        self.assertGreaterEqual(len({slide.layout_type for slide in spec.slides}), 8)
-        self.assertTrue(presentation_quality_checks(spec)["layout_variety"])
+        self.assertEqual(len(spec.slides), 17)
+        self.assertEqual(len({slide.layout_type for slide in spec.slides}), 2)
+        self.assertTrue(presentation_quality_checks(spec)["editorial_arc_is_complete"])
+        self.assertTrue(presentation_quality_checks(spec)["visual_forms_are_intentional"])
         visible = " ".join(f"{slide.title} {slide.takeaway} {slide.body}" for slide in spec.slides)
         self.assertNotIn("evidence_refs", visible)
         self.assertNotIn("ev-", visible)
