@@ -999,7 +999,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
             system.setdefault("connections", []).append(
                 {
                     "name": provider_labels[provider],
-                    "state": "healthy_live" if verified else "unknown",
+                    "state": "connected" if verified else "unknown",
                     "evidence": (
                         f"Successful live read recorded at {record.occurred_at}"
                         if verified

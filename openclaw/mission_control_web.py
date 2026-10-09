@@ -37,14 +37,23 @@ class MissionControlWebApplication:
     def _artifact(self, artifact_id: str, start_response):
         if not artifact_id or Path(artifact_id).name != artifact_id:
             return self._response(start_response, HTTPStatus.BAD_REQUEST, b"Invalid artefact", "text/plain; charset=utf-8")
-        matches = list(self.workflow_root.glob(f"*/artifacts/{artifact_id}.json"))
-        if len(matches) != 1:
+        snapshot = self.snapshot_loader()
+        matches = [
+            artifact
+            for opportunity in snapshot.get("opportunities", [])
+            if isinstance(opportunity, dict)
+            for artifact in opportunity.get("artefacts", [])
+            if isinstance(artifact, dict) and artifact.get("artifact_id") == artifact_id
+        ]
+        if len(matches) != 1 or not matches[0].get("open_url"):
             return self._response(start_response, HTTPStatus.NOT_FOUND, b"Artefact unavailable", "text/plain; charset=utf-8")
-        resolved = matches[0].resolve()
+        resolved = Path(str(matches[0].get("location") or "")).resolve()
         try:
             resolved.relative_to(self.workflow_root)
         except ValueError:
             return self._response(start_response, HTTPStatus.FORBIDDEN, b"Artefact unavailable", "text/plain; charset=utf-8")
+        if not resolved.is_file():
+            return self._response(start_response, HTTPStatus.NOT_FOUND, b"Artefact unavailable", "text/plain; charset=utf-8")
         return self._response(start_response, HTTPStatus.OK, resolved.read_bytes(), "application/json; charset=utf-8", [("Cache-Control", "no-store"), ("Content-Security-Policy", "default-src 'none'")])
 
     @staticmethod

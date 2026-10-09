@@ -68,9 +68,80 @@ class MissionControlOperatorTests(unittest.TestCase):
         result = self.projector.project(states=[live, test], leads=[lead], generated_at="2026-10-04T12:00:00Z")
         self.assertEqual(result["summary"]["active_opportunities"], 1)
         self.assertEqual(result["summary"]["synthetic_hidden"], 1)
-        synthetic = next(item for item in result["opportunities"] if item["id"] == "fixture")
-        self.assertEqual(synthetic["kind"], "TEST")
-        self.assertTrue(synthetic["synthetic"])
+        self.assertEqual([item["id"] for item in result["opportunities"]], ["catkin"])
+
+    def test_archived_suppressed_and_completed_leads_do_not_enter_projection(self):
+        states = [
+            self._state(client="archived"),
+            self._state(client="suppressed"),
+            self._state(client="completed"),
+            self._state(client="live"),
+        ]
+        leads = [
+            InboundLead("archived", "Archived", disposition="archived"),
+            InboundLead("suppressed", "Suppressed", disposition="suppressed"),
+            InboundLead("completed", "Completed", status="Completed"),
+            InboundLead("live", "Live"),
+        ]
+
+        result = self.projector.project(states=states, leads=leads, generated_at="2026-10-04T12:00:00Z")
+
+        self.assertEqual([item["id"] for item in result["opportunities"]], ["live"])
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
+        self.assertEqual(result["summary"]["synthetic_hidden"], 3)
+        self.assertTrue(all(item["company"] == "Live" for item in result["activity"]))
+
+    def test_artifact_route_rejects_unprojected_foreign_scope(self):
+        state = self._state()
+        foreign = self.root / "foreign" / "artifacts" / "artifact-foreign.json"
+        foreign.parent.mkdir(parents=True)
+        foreign.write_text('{"foreign":true}', encoding="utf-8")
+        app = MissionControlWebApplication(
+            lambda: self.projector.project(states=[state], leads=[]),
+            workflow_root=self.root,
+        )
+        status = {}
+
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/artifact","QUERY_STRING":"artifact_id=artifact-foreign","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+
+        self.assertTrue(status["value"].startswith("404"))
+        self.assertEqual(b"".join(body), b"Artefact unavailable")
+
+    def test_artifact_route_serves_only_projected_artifact(self):
+        state = self._state()
+        app = MissionControlWebApplication(
+            lambda: self.projector.project(states=[state], leads=[]),
+            workflow_root=self.root,
+        )
+        status = {}
+
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/artifact","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+
+        self.assertTrue(status["value"].startswith("200"))
+        self.assertEqual(json.loads(b"".join(body)), {"safe": True})
+
+    def test_connection_projection_uses_only_canonical_states(self):
+        result = self.projector.project(
+            states=[self._state()],
+            leads=[],
+            system_snapshot={
+                "connections": [
+                    {"name": "Google Ads", "state": "healthy_live", "evidence": "verified"},
+                    {"name": "Runtime", "state": "connected"},
+                ]
+            },
+        )
+
+        self.assertEqual(
+            [item["state"] for item in result["system"]["connections"]],
+            ["unknown", "connected"],
+        )
 
     def test_blocker_and_operational_substate_are_visible(self):
         state = self._state(status=WorkflowStatus.BLOCKED, blocked="quality_failed:evidence_specificity")
