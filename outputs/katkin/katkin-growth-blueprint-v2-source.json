@@ -1,0 +1,9 @@
+{
+  "canonical_revision": "fb20a4e66231539d646d5ca79a6ec9f99050ecea",
+  "input_artifact_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
+  "input_artifact_checksum": "e132ba8e4d19c8e0d370207c0c87b4e27b3928b45c53620ea2cf506fb7ff887d",
+  "approved_strategy_thesis_artifact_id": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+  "approved_strategy_thesis_checksum": "92b790e0f4def86f35c013e2fff78ce7dbb4ac2bb7b28647eafc69f6d622508c",
+  "prior_blueprint": "katkin-growth-blueprint-v1",
+  "prior_review": "katkin-growth-blueprint-v1-quality-review.json"
+}
