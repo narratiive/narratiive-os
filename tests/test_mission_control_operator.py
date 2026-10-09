@@ -23,8 +23,9 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.tmp.cleanup()
 
     def _state(self, *, client="catkin", workflow="strategy_thesis_to_growth_blueprint", status=WorkflowStatus.ACTIVE, blocked=None, approval="not_required", synthetic=False):
-        artifact_dir = self.root / "scope" / "artifacts"
-        event_dir = self.root / "scope" / "events"
+        scope = hashlib.sha256(f"narratiive:{client}".encode("utf-8")).hexdigest()[:24]
+        artifact_dir = self.root / scope / "artifacts"
+        event_dir = self.root / scope / "events"
         artifact_dir.mkdir(parents=True, exist_ok=True)
         event_dir.mkdir(parents=True, exist_ok=True)
         artifact = artifact_dir / "artifact-v1.json"
@@ -110,6 +111,36 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertTrue(status["value"].startswith("404"))
         self.assertEqual(b"".join(body), b"Artefact unavailable")
 
+    def test_artifact_route_rejects_projected_reference_to_sibling_client_scope(self):
+        state = self._state()
+        foreign_scope = hashlib.sha256(b"narratiive:foreign-client").hexdigest()[:24]
+        foreign = self.root / foreign_scope / "artifacts" / "artifact-foreign.json"
+        foreign.parent.mkdir(parents=True)
+        foreign.write_text('{"foreign":true}', encoding="utf-8")
+        state.stage(state.current_stage_id).output_artifacts = [
+            ArtifactRef("artifact-foreign", "workflow_step_output", str(foreign), "foreign", {})
+        ]
+        app = MissionControlWebApplication(
+            lambda: self.projector.project(states=[state], leads=[]),
+            workflow_root=self.root,
+        )
+        status = {}
+
+        snapshot = self.projector.project(states=[state], leads=[])
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/artifact","QUERY_STRING":"artifact_id=artifact-foreign","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+
+        projected = next(
+            item
+            for item in snapshot["opportunities"][0]["artefacts"]
+            if item["artifact_id"] == "artifact-foreign"
+        )
+        self.assertIsNone(projected["open_url"])
+        self.assertTrue(status["value"].startswith("404"))
+        self.assertEqual(b"".join(body), b"Artefact unavailable")
+
     def test_artifact_route_serves_only_projected_artifact(self):
         state = self._state()
         app = MissionControlWebApplication(
@@ -152,7 +183,7 @@ class MissionControlOperatorTests(unittest.TestCase):
 
     def test_web_is_loopback_read_only_and_viewing_does_not_mutate_state(self):
         state = self._state()
-        watched = next(self.root.glob("scope/artifacts/*.json"))
+        watched = next(self.root.glob("*/artifacts/*.json"))
         before = hashlib.sha256(watched.read_bytes()).hexdigest(), watched.stat().st_mtime_ns
         app = MissionControlWebApplication(lambda: self.projector.project(states=[state], leads=[]), workflow_root=self.root)
         status = {}

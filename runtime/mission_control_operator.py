@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -341,7 +342,7 @@ class OperatorMissionControlProjector:
                     location = Path(artifact.location)
                     if not location.is_absolute():
                         location = Path.cwd() / location
-                    safe = self._within_root(location)
+                    safe = self._within_scope(location, state)
                     items.append({
                         "artifact_id": artifact.artifact_id, "name": title, "type": artifact.artifact_type,
                         "version": version, "created_at": stage.completed_at or state.updated_at,
@@ -352,9 +353,13 @@ class OperatorMissionControlProjector:
                     })
         return items
 
-    def _within_root(self, path: Path) -> bool:
+    def _within_scope(self, path: Path, state: WorkflowState) -> bool:
+        scope = hashlib.sha256(
+            f"{state.workspace_id}:{state.client_id}".encode("utf-8")
+        ).hexdigest()[:24]
+        artifact_root = self.workflow_root / scope / "artifacts"
         try:
-            path.resolve().relative_to(self.workflow_root)
+            path.resolve().relative_to(artifact_root.resolve())
             return path.is_file()
         except (OSError, ValueError):
             return False
