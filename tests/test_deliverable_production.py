@@ -9,6 +9,7 @@ from runtime.deliverable_production import (
     DeliverableProductionService,
     FakePresentationRenderer,
     FileDeliverableStore,
+    build_blueprint_director_presentation_spec,
     build_growth_blueprint_presentation_spec,
     build_directed_growth_blueprint_presentation_spec,
     presentation_quality_checks,
@@ -37,6 +38,42 @@ def artifact() -> dict:
 
 
 class DeliverableProductionTests(unittest.TestCase):
+    def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
+        source = {
+            "client_facing_blueprint": {
+                "title": "Northstar Growth Blueprint",
+                "central_argument": "Northstar should concentrate growth around one urgent buyer situation and make credible proof visible earlier in the decision journey.",
+                "pages": [
+                    {
+                        "page_number": index,
+                        "act": f"Act {(index - 1) // 5 + 1}",
+                        "headline": f"Northstar makes a decisive choice on page {index}",
+                        "body": "The page advances the approved strategic argument in concise client-ready language.",
+                        "commercial_consequence": "This improves recognition and the quality of commercial response.",
+                        "visual_opportunity": "A comparison diagram showing the strategic shift.",
+                        "visual_archetype": "argument diagram" if index % 2 else "evidence contrast",
+                    }
+                    for index in range(1, 18)
+                ],
+            },
+            "editorial_trace": [
+                {"page_number": index, "evidence_refs": [f"ev-{index}"]}
+                for index in range(1, 18)
+            ],
+        }
+        spec = build_blueprint_director_presentation_spec(
+            source, specification_id="director-safe", source_blueprint_id="blueprint-safe",
+            source_blueprint_version=1, workspace_id="workspace-safe", client_id="client-safe",
+            title="Northstar Growth Blueprint", brand_name="Northstar",
+        )
+        self.assertEqual(len(spec.slides), 17)
+        self.assertEqual(len({slide.layout_type for slide in spec.slides}), 2)
+        self.assertTrue(presentation_quality_checks(spec)["editorial_arc_is_complete"])
+        self.assertTrue(presentation_quality_checks(spec)["visual_forms_are_intentional"])
+        visible = " ".join(f"{slide.title} {slide.takeaway} {slide.body}" for slide in spec.slides)
+        self.assertNotIn("evidence_refs", visible)
+        self.assertNotIn("ev-", visible)
+
     def test_specification_preserves_source_and_canonical_slide_order(self) -> None:
         source = artifact()
         spec = build_growth_blueprint_presentation_spec(

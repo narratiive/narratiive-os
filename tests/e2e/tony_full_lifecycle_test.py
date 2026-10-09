@@ -32,6 +32,7 @@ from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, Wo
 from runtime.deliverable_production import _checksum
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
+    blueprint_director_quality_gate,
     campaign_world_candidates_quality_gate,
     campaign_world_triage_quality_gate,
     client_asset_delivery_quality_gate,
@@ -53,6 +54,7 @@ from runtime.workflow_quality import (
 from runtime.workflow_registry import WorkflowDefinition, build_narratiive_workflow_registry
 from tests.test_tony_workflow_runtime import _blueprint_output
 from tests.test_workflow_quality import (
+    blueprint_director_output,
     campaign_world_candidates_output,
     creative_bible_output,
     discovery_output,
@@ -319,6 +321,14 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             return adapter(contract)
         workflow_context = contract["workflow_context"]
         if (
+            workflow_context["workflow_id"] == "strategy_thesis_to_growth_blueprint"
+            and workflow_context["stage_id"] == "direct_growth_blueprint"
+        ):
+            client = contract.get("client_context", {})
+            output = blueprint_director_output(
+                client_name=str(client.get("name") or client.get("company") or CLIENT_NAME)
+            )
+        elif (
             workflow_context["workflow_id"] == "creative_bible_to_asset_production"
             and workflow_context["stage_id"] == "execute_creative_asset_production"
         ):
@@ -432,6 +442,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
         "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
+        "blueprint_director_quality_gate": blueprint_director_quality_gate,
         "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,

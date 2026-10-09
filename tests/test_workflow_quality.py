@@ -5,6 +5,7 @@ import json
 import unittest
 
 from runtime.workflow_quality import (
+    blueprint_director_quality_gate,
     campaign_world_candidates_quality_gate,
     campaign_world_quality_gate,
     campaign_world_triage_quality_gate,
@@ -311,11 +312,48 @@ def growth_blueprint_output() -> dict:
     }
 
 
+def blueprint_director_output(
+    *, client_name: str = "Synthetic Client", page_count: int = 17,
+) -> dict:
+    acts = (
+        "Case for Change",
+        "Market Diagnosis",
+        "Audience Opportunity",
+        "Strategic Answer",
+        "Growth System",
+        "Activation",
+    )
+    pages = [
+        {
+            "page_number": index,
+            "act": acts[min((index - 1) * len(acts) // page_count, len(acts) - 1)],
+            "headline": f"{client_name} earns a sharper strategic choice on page {index}",
+            "body": "This client-ready page advances one specific part of the cumulative strategic argument without exposing internal governance language.",
+            "commercial_consequence": "The choice concentrates demand and makes a valuable commercial response more likely.",
+            "visual_opportunity": "A concise visual that makes this part of the strategic argument immediately understandable.",
+            "visual_archetype": "argument diagram" if index % 2 else "evidence contrast",
+        }
+        for index in range(1, page_count + 1)
+    ]
+    return {
+        "client_facing_blueprint": {
+            "title": f"{client_name} Growth Blueprint",
+            "central_argument": f"{client_name} can concentrate growth by becoming the clearest credible choice for one urgent buyer situation rather than broadening activity.",
+            "pages": pages,
+        },
+        "editorial_trace": [
+            {"page_number": index, "evidence_refs": ["ev-1", "ev-2"]}
+            for index in range(1, page_count + 1)
+        ],
+        "external_action_taken": False,
+    }
+
+
 def senior_strategist_review_output(checksum: str) -> dict:
     axes = (
-        "evidence", "diagnosis", "non_obvious_insight", "specificity",
-        "audience_intelligence", "strategic_choice", "commercial_consequence",
-        "narrative_coherence", "editorial_judgement", "activation",
+        "strategic_coherence", "non_obviousness", "client_specificity",
+        "evidence_support", "audience_insight", "commercial_consequence",
+        "narrative_progression", "editorial_judgement", "activation_usefulness",
     )
     director_questions = (
         "non_obvious_central_thesis", "evidence_earns_conclusion",
@@ -424,6 +462,19 @@ def strategy_thesis_output() -> dict:
 
 
 class WorkflowQualityTests(unittest.TestCase):
+    def test_blueprint_director_output_is_client_facing_while_trace_stays_backstage(self) -> None:
+        output = blueprint_director_output(page_count=17)
+        self.assertTrue(blueprint_director_quality_gate(output)["passed"])
+        self.assertEqual(len(output["client_facing_blueprint"]["pages"]), 17)
+        self.assertEqual(
+            len({page["visual_archetype"] for page in output["client_facing_blueprint"]["pages"]}),
+            2,
+        )
+        output["client_facing_blueprint"]["pages"][0]["evidence_refs"] = ["ev-1"]
+        result = blueprint_director_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("client copy excludes internal governance schema", result["failed_checks"])
+
     def test_discovery_preparation_requires_substance_lineage_and_uncertainty(self) -> None:
         result = discovery_preparation_quality_gate(discovery_output())
         self.assertTrue(result["passed"], result)
@@ -520,7 +571,7 @@ class WorkflowQualityTests(unittest.TestCase):
     def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
         output = senior_strategist_review_output("a" * 64)
         self.assertTrue(senior_strategist_review_quality_gate(output)["passed"])
-        output["senior_strategist_review"]["specificity"]["passed"] = False
+        output["senior_strategist_review"]["client_specificity"]["passed"] = False
         output["review_disposition"] = "revise"
         output["revision_instructions"] = ["Make the opportunity client-specific."]
         self.assertFalse(senior_strategist_review_quality_gate(output)["passed"])

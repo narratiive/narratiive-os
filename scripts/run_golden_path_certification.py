@@ -20,6 +20,7 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_tony_workflow_runtime import _blueprint_output
 from tests.test_workflow_quality import (
+    blueprint_director_output,
     discovery_output,
     growth_blueprint_output,
     proposal_output,
@@ -81,6 +82,7 @@ def run(root: Path) -> dict:
     def claude(contract):
         nonlocal blueprint_attempts
         context = contract.get("target", {}).get("workflow_context", {})
+        target = contract.get("target", {})
         workflow_id = context.get("workflow_id")
         if workflow_id == "blueprint_lite_to_discovery_preparation":
             return discovery_output()
@@ -91,6 +93,11 @@ def run(root: Path) -> dict:
         if workflow_id == "strategic_synthesis_to_strategy_thesis":
             return strategy_thesis_output()
         if workflow_id == "strategy_thesis_to_growth_blueprint":
+            if context.get("stage_id") == "direct_growth_blueprint":
+                client = target.get("client_context", {})
+                return blueprint_director_output(
+                    client_name=str(client.get("name") or client.get("company") or COMPANY)
+                )
             blueprint_attempts += 1
             candidate = growth_blueprint_output()
             if blueprint_attempts == 1:
@@ -226,6 +233,7 @@ def run(root: Path) -> dict:
     states = _states(restarted_backend)
     blueprint = states["strategy_thesis_to_growth_blueprint"]
     candidate = blueprint.stage("prepare_growth_blueprint").output_artifacts[-1]
+    directed_blueprint = blueprint.stage("direct_growth_blueprint").output_artifacts[-1]
     review = blueprint.stage("review_growth_blueprint").output_artifacts[-1]
     binding = blueprint.approval_history[-1]["approval_binding"]
     workflows = (
@@ -262,8 +270,8 @@ def run(root: Path) -> dict:
         and not false_success
         and governance_complete
         and candidate.metadata.get("version") == 2
-        and review.metadata.get("reviewed_artifact_checksum") == candidate.checksum
-        and binding.get("reviewed_artifact_checksum") == candidate.checksum
+        and review.metadata.get("reviewed_artifact_checksum") == directed_blueprint.checksum
+        and binding.get("reviewed_artifact_checksum") == directed_blueprint.checksum
         and blueprint.status.value == "complete"
         and blueprint.approval_status == "approved"
     )
@@ -296,6 +304,8 @@ def run(root: Path) -> dict:
             "final_version": candidate.metadata.get("version"),
             "final_artifact_id": candidate.artifact_id,
             "final_checksum": candidate.checksum,
+            "blueprint_director_artifact_id": directed_blueprint.artifact_id,
+            "blueprint_director_checksum": directed_blueprint.checksum,
             "senior_review_artifact_id": review.artifact_id,
             "senior_review_bound_checksum": review.metadata.get("reviewed_artifact_checksum"),
         },
@@ -315,7 +325,7 @@ def run(root: Path) -> dict:
                 blueprint.stage("prepare_growth_blueprint").attempts[0].get("candidate_artifact")
             ),
             "revision_created_new_version": candidate.metadata.get("version") == 2,
-            "human_review_bound_final_version": binding.get("reviewed_artifact_checksum") == candidate.checksum,
+            "human_review_bound_final_version": binding.get("reviewed_artifact_checksum") == directed_blueprint.checksum,
             "restart_resume_preserved": True,
             "duplicate_execution_suppressed": True,
             "external_action_separately_gated": not false_success,
