@@ -155,7 +155,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 build_claude_api_dispatcher(self._env())(contract)
 
                 sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
-                self.assertEqual(sent["max_tokens"], 16384)
+                self.assertEqual(sent["max_tokens"], 32768)
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_strategy_reasoning_prompt_excludes_unrelated_product_contracts(self, urlopen):
@@ -179,6 +179,29 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 self.assertIn("Do not add a work_product wrapper", prompt)
                 self.assertNotIn("For Blueprint Lite work", prompt)
                 self.assertNotIn("For Growth Blueprint work", prompt)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_growth_blueprint_prompt_is_bounded_below_provider_output_limit(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"work_product":"SAFE draft"}'}],
+            }
+        )
+        for workflow_id in ("strategy_thesis_to_growth_blueprint", "research_to_growth_blueprint"):
+            with self.subTest(workflow_id=workflow_id):
+                contract = self._contract()
+                contract["target"] = {"workflow_context": {"workflow_id": workflow_id}}
+
+                build_claude_api_dispatcher(self._env())(contract)
+
+                sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+                prompt = sent["messages"][0]["content"]
+                self.assertIn("under 6,000 words", prompt)
+                self.assertIn("Return only the top-level fields named in TASK", prompt)
+                self.assertIn("do not reproduce source passages", prompt)
+                self.assertNotIn("For Blueprint Lite work", prompt)
 
     def test_growth_blueprint_output_budget_must_be_a_positive_integer(self):
         key = "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS"

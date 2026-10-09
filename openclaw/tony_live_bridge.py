@@ -18,6 +18,7 @@ from openclaw.tony_http_bridge import (
     TonyRuntimeComposition,
     build_app as build_base_app,
 )
+from openclaw.mission_control_web import MissionControlWebApplication
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
@@ -34,6 +35,7 @@ from runtime.media_control import (
     ProviderObjectMapping,
 )
 from runtime.media_provider_transports import build_configured_media_adapters
+from runtime.mission_control_operator import OperatorMissionControlProjector
 from runtime.meta_oauth import (
     META_PERMISSION_NAMES,
     META_REDIRECT_URI,
@@ -86,6 +88,7 @@ from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCo
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
+from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 from openclaw.telegram_output_policy import protect_telegram_output
 
@@ -209,6 +212,7 @@ class LeadAwareTonyApplication:
         media_control: MediaControlService | None = None,
         tiktok_oauth: TikTokOAuthService | None = None,
         meta_oauth: MetaOAuthService | None = None,
+        mission_control_web: MissionControlWebApplication | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -221,6 +225,7 @@ class LeadAwareTonyApplication:
         self.media_control = media_control
         self.tiktok_oauth = tiktok_oauth
         self.meta_oauth = meta_oauth
+        self.mission_control_web = mission_control_web
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -228,6 +233,10 @@ class LeadAwareTonyApplication:
     def __call__(self, environ, start_response):
         method = str(environ.get("REQUEST_METHOD", "")).upper()
         path = str(environ.get("PATH_INFO", "/")) or "/"
+        if path.startswith("/mission-control") and self.mission_control_web is not None:
+            response = self.mission_control_web.handle(environ, start_response)
+            if response is not None:
+                return response
         if method == "POST" and path == "/leads/ingest":
             return self._ingest(environ, start_response)
         if method == "POST" and path == "/telegram/inbound":
@@ -827,7 +836,7 @@ def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
     return records
 
 
-def build_app() -> LeadAwareTonyApplication:
+def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     live_dispatchers = build_http_dispatchers()
     app = build_base_app(dispatchers=live_dispatchers)
     if app.command_service is None:
@@ -938,11 +947,95 @@ def build_app() -> LeadAwareTonyApplication:
             notion_dispatcher=live_dispatchers.get("Notion"),
         ),
     )
+    if recover_workflows:
+        workflow_backend.recover()
     blueprint_lite_service.recover_pending()
     conversation_store = FileConversationWorkStore(
         Path(os.getenv("TONY_CONVERSATION_WORK_ROOT", str(REPOSITORY_ROOT / ".runtime" / "conversation-work"))).resolve()
     )
     conversation_ingress = TonyConversationIngress(conversation_store, workspace_id=workspace_id)
+    operator_projector = OperatorMissionControlProjector(
+        workflow_root=workflow_runtime_root,
+        workflow_workspace_id=(
+            composition.workflow_workspace_id
+            if isinstance(composition, TonyRuntimeComposition)
+            else workspace_id
+        ),
+        worker_timeout_seconds={
+            "strategic_reasoning": int(
+                os.getenv("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS")
+                or CLAUDE_DEFAULT_TIMEOUT_SECONDS
+            )
+        },
+    )
+
+    def load_operator_snapshot() -> dict[str, Any]:
+        system = (
+            composition.mission_control_loader().to_dict()
+            if isinstance(composition, TonyRuntimeComposition)
+            else {"status": "unknown", "connections": []}
+        )
+        latest_provider_evidence: dict[str, Any] = {}
+        try:
+            for record in media_control.journal.read_all():
+                metadata = record.metadata
+                provider = str(metadata.get("provider") or "").casefold()
+                if (
+                    record.action == "media.provider_interaction"
+                    and metadata.get("operation") == "certify_provider"
+                    and provider in {"google", "meta", "tiktok"}
+                ):
+                    latest_provider_evidence[provider] = record
+        except Exception:
+            latest_provider_evidence = {}
+        provider_labels = {"google": "Google Ads", "meta": "Meta Ads", "tiktok": "TikTok Ads"}
+        for provider in ("google", "meta", "tiktok"):
+            record = latest_provider_evidence.get(provider)
+            verified = bool(
+                record
+                and record.status == "completed"
+                and record.metadata.get("result") == "live_read_verified"
+            )
+            system.setdefault("connections", []).append(
+                {
+                    "name": provider_labels[provider],
+                    "state": "healthy_live" if verified else "unknown",
+                    "evidence": (
+                        f"Successful live read recorded at {record.occurred_at}"
+                        if verified
+                        else "No successful live provider read is recorded in the execution journal."
+                    ),
+                    "last_checked_at": record.occurred_at if record else None,
+                }
+            )
+        certification_reports = sorted(
+            (REPOSITORY_ROOT / ".runtime" / "golden-path-certification").glob("*/report.json"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        if certification_reports:
+            try:
+                report = json.loads(certification_reports[0].read_text(encoding="utf-8"))
+                if report.get("status") == "PASS" and report.get("certification_id"):
+                    system.setdefault("connections", []).append(
+                        {
+                            "name": "Golden Path",
+                            "state": "connected",
+                            "evidence": f"Certified: {report['certification_id']}",
+                        }
+                    )
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                pass
+        return operator_projector.project(
+            states=workflow_backend.list_states(),
+            leads=lead_store.read(),
+            system_snapshot=system,
+        )
+
+    mission_control_web = MissionControlWebApplication(
+        load_operator_snapshot,
+        workflow_root=workflow_runtime_root,
+    )
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -959,13 +1052,14 @@ def build_app() -> LeadAwareTonyApplication:
         media_control=media_control,
         tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
         meta_oauth=MetaOAuthService.from_environment(os.environ),
+        mission_control_web=mission_control_web,
     )
 
 
 def main() -> None:
     host = os.getenv("TONY_BRIDGE_HOST", "127.0.0.1")
     port = int(os.getenv("TONY_BRIDGE_PORT", "8790"))
-    with make_server(host, port, build_app(), server_class=ThreadingTonyServer) as server:
+    with make_server(host, port, build_app(recover_workflows=True), server_class=ThreadingTonyServer) as server:
         print(f"Tony bridge listening on http://{host}:{port}")
         server.serve_forever()
 

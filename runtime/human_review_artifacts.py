@@ -682,6 +682,33 @@ def _strategy_thesis_plan(company: str, output: Mapping[str, Any]) -> ReviewDocu
 
 
 def _growth_blueprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
+    directed = output.get("client_facing_blueprint")
+    if isinstance(directed, Mapping) and isinstance(directed.get("pages"), list):
+        pages = [page for page in directed["pages"] if isinstance(page, Mapping)]
+        sections = tuple(
+            ReviewSection(
+                _clean_text(page.get("headline")) or f"Page {page.get('page_number')}",
+                body=tuple(
+                    item for item in (
+                        _clean_text(page.get("body")),
+                        _clean_text(page.get("commercial_consequence")),
+                    ) if item
+                ),
+            )
+            for page in pages
+        )
+        if not sections:
+            raise HumanReviewArtifactError("Growth Blueprint review has no presentable pages")
+        return ReviewDocumentPlan(
+            product="Narratiive Growth Blueprint",
+            gate_label="PRODUCT REVIEW",
+            company=company,
+            subtitle=_clean_text(directed.get("central_argument")),
+            sections=sections,
+            focus_points=tuple(_clean_text(page.get("headline")) for page in pages[:3]),
+            decision_prompt="Decide whether the finished strategic product is ready for the next approved use, or request a bounded revision.",
+            next_if_approved="Tony will commission presentation production from this exact approved Blueprint Director version. Client release remains separately approval-gated.",
+        )
     sections: list[ReviewSection] = []
     mapping = (
         ("market_category_diagnosis", "Market and category diagnosis"),

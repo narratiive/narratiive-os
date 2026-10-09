@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.autonomy_planner import AutonomyAction, TonyAutonomyPlanner
+from runtime.blueprint_director import BlueprintDirectorCommissionBuilder
 from runtime.client_lifecycle import ClientLifecycleRecord
 from runtime.models import ArtifactRef, StageStatus, WorkflowState, WorkflowStatus
 from runtime.run_service import WorkflowRunService
@@ -168,6 +169,7 @@ class WorkflowExecutionCoordinator:
         artifacts: FileWorkflowArtifactStore,
         quality_validators: Mapping[str, QualityValidator] | None = None,
         planner: TonyAutonomyPlanner | None = None,
+        blueprint_director_commission: BlueprintDirectorCommissionBuilder | None = None,
     ) -> None:
         self.registry = registry
         self.workers = workers
@@ -175,6 +177,9 @@ class WorkflowExecutionCoordinator:
         self.artifacts = artifacts
         self.quality_validators = dict(quality_validators or {})
         self.planner = planner or TonyAutonomyPlanner()
+        self.blueprint_director_commission = (
+            blueprint_director_commission or BlueprintDirectorCommissionBuilder()
+        )
         self.lock_root = self.artifacts.root / ".locks"
         self.lock_root.mkdir(parents=True, exist_ok=True)
 
@@ -189,13 +194,20 @@ class WorkflowExecutionCoordinator:
     ) -> WorkflowState:
         with self._run_lock(run_id):
             definition = self.registry.resolve(workflow_id)
+            prepared_inputs = dict(inputs)
+            if workflow_id == "strategy_thesis_to_growth_blueprint":
+                prepared_inputs = self.blueprint_director_commission.enrich(
+                    prepared_inputs,
+                    workspace_id=self.runs.workspace_id,
+                    client_id=self.runs.client_id,
+                )
             return self.runs.create_or_load_run(
                 definition,
                 run_id,
-                inputs.keys(),
+                prepared_inputs.keys(),
                 entity_id=entity_id,
                 correlation_id=correlation_id,
-                input_payload=inputs,
+                input_payload=prepared_inputs,
             )
 
     def approve(
@@ -292,9 +304,45 @@ class WorkflowExecutionCoordinator:
                 )
                 return self._outcome(state, AutonomyAction.ESCALATE.value)
 
+            state = self.runs.reconcile_stage_outputs(
+                run_id,
+                stage.stage_id,
+                stage_definition.output_contract.required_fields,
+            )
+            stage = state.stage(stage.stage_id)
             self.runs.start_stage(run_id, stage.stage_id)
             idempotency_key = f"{state.run_id}:{stage.stage_id}:{len(stage.attempts) + 1}"
+            worker_metadata = worker.registration.metadata
+            self.runs.record_dispatch_started(
+                run_id,
+                stage.stage_id,
+                idempotency_key=idempotency_key,
+                worker_id=worker_metadata.worker_id,
+                provider=worker_metadata.provider,
+                model=worker_metadata.model,
+                timeout_seconds=worker_metadata.timeout_seconds,
+                worker_attempt=1,
+            )
             contract = self._worker_contract(state, stage_definition.input_contract.required_fields)
+            if stage.revision_count > 0:
+                latest_revision = next(
+                    (
+                        item
+                        for item in reversed(state.approval_history)
+                        if item.get("decision") == "request_revision"
+                        and item.get("owner_stage_id") == stage.stage_id
+                    ),
+                    {},
+                )
+                contract["revision_feedback"] = {
+                    "revision_count": stage.revision_count,
+                    "failed_checks": list((stage.quality_result or {}).get("failed_checks") or []),
+                    "reviewer_rationale": str(latest_revision.get("rationale") or ""),
+                    "instruction": (
+                        "Revise from the supplied authoritative inputs. Correct every failed check without "
+                        "inventing evidence, weakening uncertainty, or claiming approval."
+                    ),
+                }
             contract["workflow_context"] = {
                 "workflow_id": state.workflow_id,
                 "run_id": state.run_id,
@@ -305,7 +353,11 @@ class WorkflowExecutionCoordinator:
                 "client_id": state.client_id,
                 "idempotency_key": idempotency_key,
                 "side_effect_classification": stage.side_effect_classification,
-                "expected_outputs": list(stage.expected_outputs),
+                # The executable registry is authoritative for the current output
+                # contract. Persisted runs may predate a compatible contract
+                # expansion, so advertising their snapshot here can make the
+                # worker omit fields the current validator requires.
+                "expected_outputs": list(stage_definition.output_contract.required_fields),
                 "quality_contract": stage.quality_contract,
             }
             try:
@@ -346,7 +398,7 @@ class WorkflowExecutionCoordinator:
             else:
                 quality = {"passed": True, "failed_checks": []}
             if stage.quality_contract == "senior_strategist_review_quality_gate":
-                identity = state.input_payload.get("growth_blueprint_candidate_identity")
+                identity = state.input_payload.get("blueprint_director_output_identity")
                 expected = str(identity.get("checksum") or "") if isinstance(identity, Mapping) else ""
                 supplied = str(output.get("reviewed_blueprint_checksum") or "")
                 checks = dict(quality.get("checks") or {})
@@ -415,27 +467,25 @@ class WorkflowExecutionCoordinator:
                 ),
             )
             derived_inputs: dict[str, Any] = {}
-            if (
-                current.workflow_id == "strategy_thesis_to_growth_blueprint"
-                and stage.stage_id == "prepare_growth_blueprint"
-            ):
+            if current.workflow_id == "strategy_thesis_to_growth_blueprint" and stage.stage_id == "direct_growth_blueprint":
                 self.runs.record_stage_artifact_identity(
                     run_id,
                     stage_id=stage.stage_id,
-                    input_key="growth_blueprint_candidate_identity",
+                    input_key="blueprint_director_output_identity",
                     artifact=artifact,
                 )
-                derived_inputs["growth_blueprint_candidate_identity"] = True
+                derived_inputs["blueprint_director_output_identity"] = True
             durable_outputs = {
                 field: output[field]
                 for field in stage_definition.output_contract.required_fields
             }
             self.runs.promote_stage_outputs(run_id, stage.stage_id, durable_outputs)
+            available_inputs = self.runs.load_run(run_id).input_payload.keys()
             state = self.runs.complete_stage(
                 run_id,
                 stage.stage_id,
                 [artifact],
-                (*durable_outputs.keys(), *derived_inputs.keys()),
+                available_inputs,
             )
             if state.status is WorkflowStatus.AWAITING_APPROVAL or (
                 stage.step_approval_required and not external_action
@@ -589,7 +639,7 @@ class WorkflowExecutionCoordinator:
             "approval_status": approval_status,
             "external_action_taken": state.external_action_taken,
         }
-        reviewed = state.input_payload.get("growth_blueprint_candidate_identity")
+        reviewed = state.input_payload.get("blueprint_director_output_identity")
         if stage_id == "review_growth_blueprint" and isinstance(reviewed, Mapping):
             governance["reviewed_artifact_id"] = str(reviewed.get("artifact_id") or "")
             governance["reviewed_artifact_checksum"] = str(reviewed.get("checksum") or "")

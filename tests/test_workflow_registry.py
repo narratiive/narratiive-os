@@ -120,12 +120,17 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertEqual(thesis.next_workflow_id, blueprint.workflow_id)
         self.assertIn("approved_strategy_thesis", blueprint.stages[0].input_contract.required_fields)
         self.assertIn("strategy_thesis_identity", blueprint.stages[0].input_contract.required_fields)
-        self.assertEqual(blueprint.stages[1].capability, "strategic_quality_review")
+        director = blueprint.stages[1]
+        self.assertEqual(director.stage_id, "direct_growth_blueprint")
+        self.assertIn("canonical_blueprint_guidance", director.input_contract.required_fields)
+        self.assertIn("rave_calibre_reference", director.input_contract.required_fields)
+        self.assertEqual(director.output_contract.required_fields, ("client_facing_blueprint", "editorial_trace"))
+        self.assertEqual(blueprint.stages[2].capability, "strategic_quality_review")
         self.assertEqual(
-            blueprint.stages[1].quality_contract,
+            blueprint.stages[2].quality_contract,
             "senior_strategist_review_quality_gate",
         )
-        self.assertTrue(blueprint.stages[1].approval_policy.required)
+        self.assertTrue(blueprint.stages[2].approval_policy.required)
 
     def test_growth_blueprint_deliverable_is_a_separate_approval_gated_stage(self) -> None:
         definition = build_narratiive_workflow_registry().resolve("growth_blueprint_deliverable_production")

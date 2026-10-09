@@ -12,6 +12,7 @@ from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_workflow_quality import (
+    blueprint_director_output,
     campaign_world_candidates_output,
     campaign_identity,
     creative_bible_output,
@@ -96,7 +97,9 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.calls = []
         def claude(contract):
             self.calls.append(contract)
-            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            target = contract.get("target", {})
+            workflow_context = target.get("workflow_context", {})
+            workflow_id = workflow_context.get("workflow_id")
             if workflow_id == "blueprint_lite_to_discovery_preparation":
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
@@ -106,6 +109,11 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             if workflow_id == "strategic_synthesis_to_strategy_thesis":
                 return strategy_thesis_output()
             if workflow_id == "strategy_thesis_to_growth_blueprint":
+                if workflow_context.get("stage_id") == "direct_growth_blueprint":
+                    client = target.get("client_context", {})
+                    return blueprint_director_output(
+                        client_name=str(client.get("name") or client.get("company") or "SAFE Executive Workflow Test")
+                    )
                 return growth_blueprint_output()
             if workflow_id == "research_to_growth_blueprint":
                 return growth_blueprint_output()

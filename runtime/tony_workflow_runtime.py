@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from runtime.client_lifecycle import ClientLifecycleRecord
+from runtime.blueprint_director import BlueprintDirectorCommissionBuilder, BlueprintDirectorLearningStore
 from runtime.campaign_world_triage_worker import CampaignWorldTriageWorker
 from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.creative_bible_triage_worker import CreativeBibleTriageWorker
@@ -44,6 +45,7 @@ from runtime.workflow_quality import (
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
+    blueprint_director_quality_gate,
     growth_blueprint_quality_gate,
     growth_blueprint_deliverable_quality_gate,
     growth_sprint_proposal_quality_gate,
@@ -65,6 +67,7 @@ class TonyWorkflowRuntime:
     coordinator: WorkflowExecutionCoordinator
     runs: WorkflowRunService
     business_projection: WorkflowBusinessProjectionService | None = None
+    blueprint_director_learning: BlueprintDirectorLearningStore | None = None
 
     def enqueue(
         self,
@@ -99,12 +102,14 @@ class TonyWorkflowRuntime:
         rationale: str,
         approval_binding: Mapping[str, object] | None = None,
     ) -> dict[str, Any]:
+        current = self.runs.load_run(run_id)
         state = self.coordinator.approve(
             run_id,
             approver=approver,
             rationale=rationale,
             approval_binding=approval_binding,
         )
+        self._record_blueprint_learning(current, reviewer=approver, rationale=rationale, approved=True)
         self._project(state)
         return workflow_to_dict(state)
 
@@ -130,8 +135,56 @@ class TonyWorkflowRuntime:
                 rationale=rationale,
                 approval_binding=approval_binding,
             )
+        self._record_blueprint_learning(current, reviewer=reviewer, rationale=rationale, approved=False)
         self._project(state)
         return workflow_to_dict(state)
+
+    def _record_blueprint_learning(
+        self,
+        state: WorkflowState,
+        *,
+        reviewer: str,
+        rationale: str,
+        approved: bool,
+    ) -> None:
+        if self.blueprint_director_learning is None or state.workflow_id != "strategy_thesis_to_growth_blueprint":
+            return
+        reviewer_tokens = {
+            token for token in "".join(
+                character if character.isalnum() else " " for character in reviewer.casefold()
+            ).split()
+            if token
+        }
+        if "matt" not in reviewer_tokens:
+            return
+        director_stage = next(
+            (item for item in state.stages if item.stage_id == "direct_growth_blueprint"),
+            None,
+        )
+        review_stage = state.stage("review_growth_blueprint")
+        if director_stage is None or not director_stage.output_artifacts:
+            return
+        artefact = director_stage.output_artifacts[-1]
+        quality = dict(review_stage.quality_result or {})
+        axis_checks = dict(quality.get("axis_checks") or {})
+        accepted = [axis.replace("_", " ") for axis, passed in axis_checks.items() if passed is True]
+        rejected = [axis.replace("_", " ") for axis, passed in axis_checks.items() if passed is not True]
+        reference = {
+            "artifact_id": artefact.artifact_id,
+            "checksum": artefact.checksum,
+            "version": int(artefact.metadata.get("version") or 1),
+        }
+        self.blueprint_director_learning.record_review(
+            workspace_id=state.workspace_id,
+            client_id=state.client_id,
+            reviewer=reviewer,
+            accepted_strengths=accepted,
+            rejected_weaknesses=rejected,
+            revision_reason=rationale,
+            final_approved_artifact_reference=reference if approved else None,
+            quality_review_result=quality,
+            approved=approved,
+        )
 
     def resume(self, run_id: str) -> dict[str, Any]:
         state = self.runs.load_run(run_id)
@@ -349,11 +402,15 @@ class TonyWorkflowRuntime:
         artifacts = [artifact for stage in state.stages for artifact in stage.output_artifacts]
         if not artifacts:
             raise ValueError("workflow handoff requires a persisted artefact")
-        handoff_artifact = (
-            state.stage("prepare_growth_blueprint").output_artifacts[-1]
-            if state.workflow_id == "strategy_thesis_to_growth_blueprint"
-            else artifacts[-1]
-        )
+        if state.workflow_id == "strategy_thesis_to_growth_blueprint":
+            director_stage = next(
+                (item for item in state.stages if item.stage_id == "direct_growth_blueprint"),
+                None,
+            )
+            source_stage = director_stage or state.stage("prepare_growth_blueprint")
+            handoff_artifact = source_stage.output_artifacts[-1]
+        else:
+            handoff_artifact = artifacts[-1]
         output = self.coordinator.artifacts.root.joinpath(Path(handoff_artifact.location).name)
         try:
             value = json.loads(output.read_text(encoding="utf-8"))
@@ -620,6 +677,7 @@ def build_tony_workflow_runtime(
         "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
         "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
+        "blueprint_director_quality_gate": blueprint_director_quality_gate,
         "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,
@@ -634,6 +692,10 @@ def build_tony_workflow_runtime(
         "creative_bible_triage_quality_gate": creative_bible_triage_quality_gate,
     }
     validators.update(dict(quality_validators or {}))
+    blueprint_director_learning = BlueprintDirectorLearningStore(
+        scoped_root / "blueprint-director-learning.jsonl",
+        retrieval_limit=3,
+    )
     coordinator = WorkflowExecutionCoordinator(
         registry=build_narratiive_workflow_registry(),
         workers=build_tony_worker_registry(
@@ -664,12 +726,20 @@ def build_tony_workflow_runtime(
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
         quality_validators=validators,
+        blueprint_director_commission=BlueprintDirectorCommissionBuilder(
+            learning_store=blueprint_director_learning,
+        ),
     )
     projection = WorkflowBusinessProjectionService(
         scoped_root / "business-projection",
         dispatcher=configured_dispatchers.get("Notion"),
     )
-    return TonyWorkflowRuntime(coordinator=coordinator, runs=runs, business_projection=projection)
+    return TonyWorkflowRuntime(
+        coordinator=coordinator,
+        runs=runs,
+        business_projection=projection,
+        blueprint_director_learning=blueprint_director_learning,
+    )
 
 
 def _workflow_value_checksum(value: Any) -> str:

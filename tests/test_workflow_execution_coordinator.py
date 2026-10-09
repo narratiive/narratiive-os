@@ -177,6 +177,47 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         outcome = coordinator.advance("run-bounded-context", _lifecycle())
         self.assertEqual(outcome.status, "complete")
 
+    def test_worker_uses_current_registry_outputs_when_persisted_run_contract_is_older(self) -> None:
+        definition = WorkflowDefinition(
+            "schema-upgrade",
+            (_stage("draft", outputs=("original_output", "new_required_output")),),
+        )
+
+        def adapter(contract):
+            self.assertEqual(
+                contract["workflow_context"]["expected_outputs"],
+                ["original_output", "new_required_output"],
+            )
+            return {"original_output": "retained", "new_required_output": "present"}
+
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            "schema-upgrade",
+            "run-schema-upgrade",
+            {"brief": "safe"},
+            entity_id="entity",
+            correlation_id="corr",
+        )
+        persisted = self.runs.load_run("run-schema-upgrade")
+        persisted.stage("draft").expected_outputs = ("original_output",)
+        self.repository.save(persisted)
+
+        outcome = coordinator.advance("run-schema-upgrade", _lifecycle())
+
+        self.assertEqual(outcome.status, "complete")
+        state = self.runs.load_run("run-schema-upgrade")
+        self.assertEqual(
+            state.stage("draft").expected_outputs,
+            ("original_output", "new_required_output"),
+        )
+        reconciled = [
+            event
+            for event in self.events.read("run-schema-upgrade")
+            if event.event_type == "stage.contract_reconciled"
+        ]
+        self.assertEqual(len(reconciled), 1)
+        self.assertEqual(reconciled[0].payload["added_output_fields"], ["new_required_output"])
+
     def test_non_strategy_worker_keeps_existing_full_context(self) -> None:
         definition = WorkflowDefinition("ordinary-workflow", (_stage("draft"),))
 
@@ -305,6 +346,13 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual([item["revision"] for item in state.stage("draft").attempts], [0, 0, 1])
         self.assertEqual(state.stage("draft").attempts[0]["error_code"], "worker_execution_failed")
         self.assertEqual(state.approval_history[-1]["decision"], "request_revision")
+        self.assertEqual(calls[2]["revision_feedback"]["revision_count"], 1)
+        self.assertEqual(calls[2]["revision_feedback"]["failed_checks"], ["substantive_draft"])
+        self.assertEqual(
+            calls[2]["revision_feedback"]["reviewer_rationale"],
+            "Retry with the corrected worker contract",
+        )
+        self.assertNotIn("draft", calls[2]["revision_feedback"])
 
     def test_explicit_revision_reopens_worker_retry_exhaustion(self) -> None:
         calls = []
@@ -428,6 +476,38 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertEqual(restarted.advance("run-restart", _lifecycle()).status, "complete")
         self.assertEqual(restarted.advance("run-restart", _lifecycle()).status, "complete")
         self.assertEqual(len(calls), 1)
+
+    def test_interrupted_provider_call_records_dispatch_then_recovers_same_run(self) -> None:
+        definition = WorkflowDefinition("interrupted", (_stage("draft"),))
+
+        def interrupted(_contract):
+            raise KeyboardInterrupt("synthetic process termination")
+
+        coordinator = self._coordinator(definition, _worker(interrupted))
+        coordinator.enqueue("interrupted", "run-interrupted", {"brief": "safe"}, entity_id="e", correlation_id="c")
+
+        with self.assertRaises(KeyboardInterrupt):
+            coordinator.advance("run-interrupted", _lifecycle())
+
+        state = self.runs.load_run("run-interrupted")
+        self.assertEqual(state.stage("draft").status, StageStatus.RUNNING)
+        events = self.events.read("run-interrupted")
+        dispatched = [event for event in events if event.event_type == "stage.dispatch_started"]
+        self.assertEqual(len(dispatched), 1)
+        self.assertEqual(dispatched[0].payload["worker_id"], "test-worker")
+        self.assertEqual(dispatched[0].payload["provider"], "test")
+        self.assertEqual(dispatched[0].payload["timeout_seconds"], 90)
+        self.assertNotIn("brief", dispatched[0].payload)
+
+        self.assertEqual(coordinator.recover_pending(), 1)
+        recovered = self.runs.load_run("run-interrupted")
+        self.assertEqual(recovered.run_id, "run-interrupted")
+        self.assertEqual(recovered.stage("draft").status, StageStatus.READY)
+        self.assertEqual(recovered.stage("draft").retry_count, 1)
+        self.assertEqual(
+            [event.event_type for event in self.events.read("run-interrupted")][-1],
+            "stage.recovered",
+        )
 
     def test_duplicate_inbound_event_is_idempotent(self) -> None:
         calls = []

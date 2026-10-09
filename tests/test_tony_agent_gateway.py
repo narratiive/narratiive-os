@@ -254,6 +254,60 @@ class TonyAgentGatewayTests(unittest.TestCase):
             self.assertEqual(reply, "Recovered final result")
             request.assert_not_called()
 
+    def test_canonical_workflow_completion_is_delegation_evidence_without_subagent_duplication(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram:work:telegram-workflow"
+            self._write_work_session(
+                state_dir,
+                session_key,
+                [
+                    {
+                        "timestamp": "2026-10-04T13:23:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "toolUse",
+                            "content": [
+                                {
+                                    "type": "toolCall",
+                                    "id": "tool-workflow-1",
+                                    "name": "narratiive_workflow_control",
+                                    "arguments": {"operation": "continue", "reference": "safe-run"},
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "timestamp": "2026-10-04T13:24:00Z",
+                        "message": {
+                            "role": "toolResult",
+                            "toolCallId": "tool-workflow-1",
+                            "toolName": "narratiive_workflow_control",
+                            "isError": False,
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": json.dumps({"ok": True, "command": "continue", "data": {"run_id": "safe-run"}}),
+                                }
+                            ],
+                        },
+                    },
+                    {
+                        "timestamp": "2026-10-04T13:25:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "stop",
+                            "content": [{"type": "text", "text": "The governed workflow reached its review gate."}],
+                        },
+                    },
+                ],
+            )
+            gateway = TonyAgentGateway(TonyAgentGatewayConfig(state_dir=state_dir))
+            with mock.patch("openclaw.tony_agent_gateway.urlopen") as request:
+                reply = gateway.converse_for_work("Proceed with the workflow", "telegram-workflow")
+            self.assertEqual(reply, "The governed workflow reached its review gate.")
+            request.assert_not_called()
+
     def test_yield_receipt_stop_is_not_a_specialist_completion(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             state_dir = Path(temp_dir)

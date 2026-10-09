@@ -59,9 +59,40 @@ class SubstantiveConversationRouter:
         "strategy director",
         "creative director",
     )
+    _STATUS_MARKERS = (
+        "is it ready",
+        "is the ",
+        "is this ready",
+        "what is happening",
+        "what's happening",
+        "where is the",
+        "status of",
+        "status on",
+        "progress on",
+        "still running",
+        "ready for review",
+    )
+    _STATUS_TARGETS = (
+        "blueprint",
+        "workflow",
+        "artefact",
+        "artifact",
+        "research",
+        "strategy thesis",
+        "synthesis",
+    )
+
+    def is_status_enquiry(self, text: str) -> bool:
+        normalised = " ".join(str(text).casefold().split())
+        return (
+            any(marker in normalised for marker in self._STATUS_MARKERS)
+            and any(target in normalised for target in self._STATUS_TARGETS)
+        )
 
     def requires_durable_work(self, text: str) -> bool:
         normalised = " ".join(str(text).casefold().split())
+        if self.is_status_enquiry(normalised):
+            return False
         return any(marker in normalised for marker in self._WORK_MARKERS)
 
     @staticmethod
@@ -158,6 +189,32 @@ class FileConversationWorkStore:
     def get(self, work_id: str) -> dict[str, Any] | None:
         with self._locked():
             return self._read_unlocked(work_id)
+
+    def supersede_misrouted_status_enquiries(
+        self,
+        router: "SubstantiveConversationRouter",
+        *,
+        reason: str,
+    ) -> int:
+        """Close legacy queued status questions without replaying them as commissions."""
+        explanation = reason.strip()
+        if not explanation:
+            raise ConversationWorkError("supersession reason is required")
+        changed = 0
+        with self._locked():
+            for path in sorted(self.jobs.glob("*.json")):
+                record = self._read_path(path)
+                if record.get("state") not in {"queued", "running"}:
+                    continue
+                if not router.is_status_enquiry(str(record.get("request") or "")):
+                    continue
+                record["state"] = "superseded"
+                record["failure"] = explanation[:500]
+                record["lease_owner"] = ""
+                record["lease_expires_at"] = ""
+                self._transition_unlocked(record, "conversation_work.superseded")
+                changed += 1
+        return changed
 
     def claim_next(self, worker_id: str, *, lease_seconds: int) -> dict[str, Any] | None:
         if not worker_id.strip() or lease_seconds <= 0:
