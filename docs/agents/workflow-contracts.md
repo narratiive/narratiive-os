@@ -90,7 +90,18 @@ The author provides:
 - The author cannot approve their own work.
 - An AI agent cannot approve or merge its own work through another identity,
   session, or automation.
-- Review must come from a qualified party other than the author.
+- Review must come from a qualified party other than the author. Prefer a
+  qualified independent human reviewer.
+- Only when repository evidence confirms that no eligible independent human
+  collaborator exists may a fresh-context independent reviewer use the
+  solo-founder fallback defined in `ai-constitution.md`.
+- A fallback reviewer receives no hidden implementation conversation, reviews
+  the exact commit diff and applicable contracts, tests, and CI evidence, makes
+  no code changes, and records an explicit `PASS` or `REQUEST CHANGES` decision
+  with reasons against that commit SHA. The implementer's summary and green CI
+  are inputs, not substitutes for review.
+- `REQUEST CHANGES` requires an implementer revision followed by a new
+  fresh-context review. A reviewer who implements the repair cannot approve it.
 - Cross-stream changes require each affected stream owner.
 - Client-facing work requires an authorised human.
 - Constitutional, product-canon, or material architecture changes require Matt
