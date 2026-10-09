@@ -67,4 +67,26 @@ class TonyLiveBridgeTests(unittest.TestCase):
         base_app=mock.Mock(); base_app.command_service=None
         with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app):
             with self.assertRaisesRegex(RuntimeError,"not configured"): tony_live_bridge.build_app()
+
+    def test_production_startup_recovers_interrupted_canonical_workflows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with mock.patch.object(
+                tony_live_bridge.FileWorkflowCommandBackend,
+                "recover",
+                autospec=True,
+                return_value=0,
+            ) as recover:
+                self._build(
+                    tmp,
+                    {
+                        "TONY_WORKFLOW_RUNTIME_ROOT": str(Path(tmp) / "workflow-runtime"),
+                    },
+                )
+                self.assertFalse(recover.called)
+
+                base_app=mock.Mock(); base_app.command_service=mock.Mock(); base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
+                env={"TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads-2.json"),"TONY_WORKFLOW_RUNTIME_ROOT":str(Path(tmp)/"workflow-runtime-2")}
+                with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",env,clear=True):
+                    tony_live_bridge.build_app(recover_workflows=True)
+                self.assertEqual(recover.call_count, 1)
 if __name__=="__main__": unittest.main()

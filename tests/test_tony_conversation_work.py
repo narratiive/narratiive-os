@@ -40,6 +40,43 @@ class TonyConversationWorkTests(unittest.TestCase):
         self.assertFalse(router.requires_durable_work("Here is a long conversational observation " * 40))
         self.assertEqual(list((Path(self.temporary.name) / "jobs").glob("*.json")), [])
 
+    def test_workflow_status_enquiries_are_not_recommissioned_as_durable_work(self) -> None:
+        router = SubstantiveConversationRouter()
+        enquiries = (
+            "Is the KatKin Growth Blueprint ready for review, Tony?",
+            "What is happening with the KatKin Growth Blueprint?",
+            "Where is the Growth Blueprint?",
+            "Is it still running? The workflow is the KatKin Growth Blueprint.",
+        )
+        for enquiry in enquiries:
+            with self.subTest(enquiry=enquiry):
+                self.assertTrue(router.is_status_enquiry(enquiry))
+                self.assertFalse(router.requires_durable_work(enquiry))
+
+    def test_legacy_misrouted_status_work_is_superseded_without_deleting_evidence(self) -> None:
+        router = SubstantiveConversationRouter()
+        record, _ = self.store.submit(
+            workspace_id="narratiive",
+            chat_id="12345",
+            message_id="legacy-status",
+            update_id="legacy-update",
+            text="Is the KatKin Growth Blueprint ready for review?",
+            acknowledgement="I’m commissioning this now.",
+        )
+        self.store.claim_next("dead-worker", lease_seconds=60)
+
+        changed = self.store.supersede_misrouted_status_enquiries(
+            router,
+            reason="misrouted_status_enquiry",
+        )
+
+        self.assertEqual(changed, 1)
+        superseded = self.store.get(record["work_id"])
+        self.assertEqual(superseded["state"], "superseded")
+        self.assertFalse(superseded["external_action_taken"])
+        events = self.store.events_path.read_text(encoding="utf-8")
+        self.assertIn("conversation_work.superseded", events)
+
     def test_simulated_task_over_120_seconds_is_acknowledged_then_delivered(self) -> None:
         accepted = self.ingress.accept(
             self.request(),

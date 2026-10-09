@@ -61,6 +61,39 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("evidence_and_uncertainty must be a list of at least three", instruction)
         self.assertIn('recommendation must be the exact JSON string "advance"', instruction)
 
+    def test_strategy_thesis_growth_blueprint_contract_names_editorial_schema(self) -> None:
+        instruction = workflow_instruction(
+            "strategy_thesis_to_growth_blueprint",
+            "prepare_growth_blueprint",
+            ("editorial_judgement", "contradiction_resolution"),
+        )
+
+        self.assertIn(
+            "exact list-valued keys primary_emphasis, supporting_evidence and remove_or_deprioritise",
+            instruction,
+        )
+        self.assertIn(
+            "exact list-valued keys unresolved_material_contradictions and resolution_notes",
+            instruction,
+        )
+
+    def test_blueprint_director_contract_prioritises_editorial_product(self) -> None:
+        instruction = workflow_instruction(
+            "strategy_thesis_to_growth_blueprint",
+            "direct_growth_blueprint",
+            ("client_facing_blueprint", "editorial_trace"),
+        )
+
+        self.assertIn("one coherent argument", instruction)
+        self.assertIn("Compress, prioritise and delete", instruction)
+        self.assertIn("canonical_blueprint_guidance controls", instruction)
+        self.assertIn("never copy Rave", instruction)
+        self.assertIn("must not contain internal field names", instruction)
+        self.assertIn("number of ordered pages needed", instruction)
+        self.assertIn("guidance, not a fixed template or validity quota", instruction)
+        self.assertNotIn("exactly 30 ordered pages", instruction)
+        self.assertNotIn("use at least eight", instruction)
+
     def test_strategic_synthesis_contract_preserves_uncertainty(self) -> None:
         instruction = workflow_instruction(
             "research_to_strategic_synthesis",

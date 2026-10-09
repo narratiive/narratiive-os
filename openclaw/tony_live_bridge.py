@@ -88,6 +88,7 @@ from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCo
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
+from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 from openclaw.telegram_output_policy import protect_telegram_output
 
@@ -835,7 +836,7 @@ def load_friday_review_records(root: Path) -> list[dict[str, Any]]:
     return records
 
 
-def build_app() -> LeadAwareTonyApplication:
+def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     live_dispatchers = build_http_dispatchers()
     app = build_base_app(dispatchers=live_dispatchers)
     if app.command_service is None:
@@ -946,6 +947,8 @@ def build_app() -> LeadAwareTonyApplication:
             notion_dispatcher=live_dispatchers.get("Notion"),
         ),
     )
+    if recover_workflows:
+        workflow_backend.recover()
     blueprint_lite_service.recover_pending()
     conversation_store = FileConversationWorkStore(
         Path(os.getenv("TONY_CONVERSATION_WORK_ROOT", str(REPOSITORY_ROOT / ".runtime" / "conversation-work"))).resolve()
@@ -958,6 +961,12 @@ def build_app() -> LeadAwareTonyApplication:
             if isinstance(composition, TonyRuntimeComposition)
             else workspace_id
         ),
+        worker_timeout_seconds={
+            "strategic_reasoning": int(
+                os.getenv("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS")
+                or CLAUDE_DEFAULT_TIMEOUT_SECONDS
+            )
+        },
     )
 
     def load_operator_snapshot() -> dict[str, Any]:
@@ -1050,7 +1059,7 @@ def build_app() -> LeadAwareTonyApplication:
 def main() -> None:
     host = os.getenv("TONY_BRIDGE_HOST", "127.0.0.1")
     port = int(os.getenv("TONY_BRIDGE_PORT", "8790"))
-    with make_server(host, port, build_app(), server_class=ThreadingTonyServer) as server:
+    with make_server(host, port, build_app(recover_workflows=True), server_class=ThreadingTonyServer) as server:
         print(f"Tony bridge listening on http://{host}:{port}")
         server.serve_forever()
 

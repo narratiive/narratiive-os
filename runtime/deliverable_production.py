@@ -130,6 +130,55 @@ ARCHETYPE_LIBRARY = (
 )
 
 
+def build_blueprint_director_presentation_spec(
+    artifact: Mapping[str, Any], *, specification_id: str, source_blueprint_id: str,
+    source_blueprint_version: int, workspace_id: str, client_id: str, title: str,
+    brand_name: str,
+) -> PresentationSpecification:
+    """Render the approved Blueprint Director story without rewriting its argument."""
+    blueprint = artifact.get("client_facing_blueprint")
+    trace = artifact.get("editorial_trace")
+    if not isinstance(blueprint, Mapping) or not isinstance(blueprint.get("pages"), list):
+        raise ValueError("Blueprint Director source is incomplete")
+    trace_by_page = {
+        item.get("page_number"): item
+        for item in trace or []
+        if isinstance(item, Mapping)
+    }
+    slides = []
+    for page in blueprint["pages"]:
+        if not isinstance(page, Mapping):
+            raise ValueError("Blueprint Director pages must be objects")
+        number = int(page.get("page_number") or 0)
+        evidence = trace_by_page.get(number, {})
+        slides.append(PresentationSlideSpec(
+            slide_no=number,
+            title=_client_copy(page.get("headline"), 120),
+            takeaway=_client_copy(page.get("commercial_consequence"), 180),
+            body=_client_copy(page.get("body"), 420),
+            visual_treatment=_client_copy(page.get("visual_opportunity"), 120),
+            evidence_refs=tuple(str(ref) for ref in evidence.get("evidence_refs") or [] if str(ref).strip()),
+            source_notes=("Detailed evidence lineage is retained in the immutable Blueprint Director review record.",),
+            layout_type=str(page.get("visual_archetype") or ("cover" if number == 1 else "evidence_implication")),
+        ))
+    return PresentationSpecification(
+        specification_id=specification_id,
+        source_blueprint_id=source_blueprint_id,
+        source_blueprint_version=source_blueprint_version,
+        workspace_id=workspace_id,
+        client_id=client_id,
+        title=title,
+        status="ready_for_production",
+        template_source="Narratiive Blueprint Director editorial commission using the Rave benchmark as calibre only.",
+        slides=tuple(slides),
+        source_checksum=_checksum(artifact),
+        notes=(
+            "INTERNAL REVIEW DRAFT — HUMAN APPROVAL REQUIRED",
+            "Visible copy is the approved Blueprint Director output; evidence governance remains backstage.",
+        ),
+    )
+
+
 def _human_source_note(section: str) -> str:
     return f"Internal provenance retained for {section}; detailed evidence remains in the review record."
 
@@ -333,10 +382,16 @@ class VisualQAResult:
 def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
-    archetypes = {s.layout_type for s in specification.slides}
     return {
-        "variable_editorial_arc": 12 <= len(specification.slides) <= 40,
-        "layout_variety": len(archetypes) >= 8,
+        "editorial_arc_is_complete": (
+            bool(specification.slides)
+            and [slide.slide_no for slide in specification.slides]
+            == list(range(1, len(specification.slides) + 1))
+        ),
+        "visual_forms_are_intentional": all(
+            bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
+            for slide in specification.slides
+        ),
         "no_visible_machine_runtime_artefacts": not any(token.lower() in visible for token in ("ev_", "artifact-", "workflow_run", "evidence / source refs")),
         "conclusion_led_headlines": sum(bool(s.takeaway.strip()) for s in specification.slides) >= len(specification.slides) * 0.9,
         "source_provenance_retained": all(s.source_notes for s in specification.slides),
@@ -506,7 +561,17 @@ class FakePresentationRenderer:
         pdf = output_dir / "blueprint.pdf"
         pptx.write_bytes(b"PK\x03\x04 synthetic pptx")
         pdf.write_bytes(b"%PDF-1.7 synthetic pdf")
-        checks = {"pptx_exists": True, "pdf_exists": True, "slide_count": len(specification.slides) >= 12, "source_labels_present": True, "no_overflow_or_overlap": True}
+        checks = {
+            "pptx_exists": True,
+            "pdf_exists": True,
+            "slide_sequence_complete": (
+                bool(specification.slides)
+                and [slide.slide_no for slide in specification.slides]
+                == list(range(1, len(specification.slides) + 1))
+            ),
+            "source_labels_present": True,
+            "no_overflow_or_overlap": True,
+        }
         return pptx, pdf, VisualQAResult("passed", checks)
 
 

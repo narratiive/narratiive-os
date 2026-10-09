@@ -10,6 +10,7 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_tony_workflow_runtime import _blueprint_output
 from tests.test_workflow_quality import (
+    blueprint_director_output,
     discovery_output,
     growth_blueprint_output,
     proposal_output,
@@ -43,7 +44,9 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
         def claude(contract):
             nonlocal blueprint_attempts
             calls.append(contract)
-            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            target = contract.get("target", {})
+            workflow_context = target.get("workflow_context", {})
+            workflow_id = workflow_context.get("workflow_id")
             if workflow_id == "blueprint_lite_to_discovery_preparation":
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
@@ -53,6 +56,11 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             if workflow_id == "strategic_synthesis_to_strategy_thesis":
                 return strategy_thesis_output()
             if workflow_id == "strategy_thesis_to_growth_blueprint":
+                if workflow_context.get("stage_id") == "direct_growth_blueprint":
+                    client = target.get("client_context", {})
+                    return blueprint_director_output(
+                        client_name=str(client.get("name") or client.get("company") or "SAFE PRODUCTION OS FINAL E2E TEST ONLY")
+                    )
                 blueprint_attempts += 1
                 candidate = growth_blueprint_output()
                 if blueprint_attempts == 1:
@@ -242,10 +250,11 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             failed_candidate = blueprint_state.stage("prepare_growth_blueprint").attempts[0]["candidate_artifact"]
             self.assertNotEqual(failed_candidate["checksum"], candidate_versions[-1].checksum)
             self.assertEqual(candidate_versions[-1].metadata["version"], 2)
+            directed_blueprint = blueprint_state.stage("direct_growth_blueprint").output_artifacts[-1]
             review_artifact = blueprint_state.stage("review_growth_blueprint").output_artifacts[-1]
             self.assertEqual(
                 review_artifact.metadata["reviewed_artifact_checksum"],
-                candidate_versions[-1].checksum,
+                directed_blueprint.checksum,
             )
             self.assertEqual(
                 blueprint_state.input_payload["strategy_thesis_identity"]["artifact_id"],
@@ -279,7 +288,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             binding = approved_state.approval_history[-1]["approval_binding"]
             self.assertEqual(
                 binding["reviewed_artifact_checksum"],
-                candidate_versions[-1].checksum,
+                directed_blueprint.checksum,
             )
             self.assertGreaterEqual(len(calls), 5)
 
