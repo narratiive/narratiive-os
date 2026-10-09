@@ -53,6 +53,19 @@ class TonyConversationWorkTests(unittest.TestCase):
                 self.assertTrue(router.is_status_enquiry(enquiry))
                 self.assertFalse(router.requires_durable_work(enquiry))
 
+    def test_material_drafting_request_is_durable(self) -> None:
+        router = SubstantiveConversationRouter()
+        request = (
+            "I think it's pt.2 this will create a secondary revenue source that serves the long tail. "
+            "Could you create a draft for me? Also, that email to Khotso is excellent. Please send."
+        )
+
+        self.assertTrue(router.requires_durable_work(request))
+        accepted = self.ingress.accept(self.request("739"), request)
+
+        self.assertIn("come back here", accepted.acknowledgement)
+        self.assertEqual(self.store.get(accepted.work_id)["state"], "queued")
+
     def test_legacy_misrouted_status_work_is_superseded_without_deleting_evidence(self) -> None:
         router = SubstantiveConversationRouter()
         record, _ = self.store.submit(
