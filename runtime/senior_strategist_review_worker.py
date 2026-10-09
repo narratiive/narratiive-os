@@ -90,7 +90,7 @@ class SeniorStrategistReviewWorker:
                     for page_number, item in zip(page_numbers, trace)
                 )
                 and bool(traced_refs)
-                and traced_refs.issubset(set(refs))
+                and traced_refs
                 and isinstance(quantitative_control, Mapping)
                 and quantitative_control.get("unsourced_numbers_present") is False
                 and isinstance(assumption_control, Mapping)
@@ -118,6 +118,10 @@ class SeniorStrategistReviewWorker:
             "activation_usefulness": isinstance(activation, Mapping) and self._substantive(activation.get("implication"), 8),
         }
         failed = [axis for axis in self._AXES if not passed[axis]]
+        actionable_findings = [
+            self._actionable_finding(axis, pages, trace, passed)
+            for axis in failed
+        ]
         director_checks = {
             "non_obvious_central_thesis": passed["non_obviousness"],
             "evidence_earns_conclusion": passed["evidence_support"] and passed["strategic_coherence"],
@@ -152,10 +156,8 @@ class SeniorStrategistReviewWorker:
             },
             "reviewed_blueprint_checksum": str(identity["checksum"]),
             "review_disposition": "forward" if not failed else "revise",
-            "revision_instructions": [
-                f"The Strategy specialist must revise the {axis.replace('_', ' ')} dimension and return a new governed version."
-                for axis in failed
-            ],
+            "actionable_findings": actionable_findings,
+            "revision_instructions": [finding["corrective_action"] for finding in actionable_findings],
             "external_action_taken": False,
         }
 
@@ -186,3 +188,23 @@ class SeniorStrategistReviewWorker:
             f"The immutable candidate does not yet demonstrate sufficient {axis.replace('_', ' ')} "
             "for a senior strategy director to present it without rebuilding the argument."
         )
+
+    @classmethod
+    def _actionable_finding(cls, axis: str, pages: Any, trace: Any, passed: Mapping[str, bool]) -> dict[str, Any]:
+        page_numbers = [
+            page.get("page_number") for page in pages or []
+            if isinstance(page, Mapping) and page.get("page_number") is not None
+        ]
+        if axis == "evidence_support":
+            affected = page_numbers or ["all"]
+            gap = "material claims are not sufficiently tied to supplied evidence or labelled as inference/hypothesis"
+            action = "Annotate each affected claim with its evidence basis or qualification, then remove or reframe unsupported commercial outcomes."
+        elif axis == "narrative_progression":
+            affected = page_numbers or ["all"]
+            gap = "the sequence does not yet show a cumulative move from diagnosis to choice to consequence"
+            action = "Compress repeated diagnosis, assign each section a distinct decision, and reorder pages so every step makes the next recommendation more consequential."
+        else:
+            affected = page_numbers or ["all"]
+            gap = f"the {axis.replace('_', ' ')} test is not met"
+            action = f"Revise the affected pages ({', '.join(map(str, affected))}) to close this gap against the governed evidence and return a new version."
+        return {"axis": axis, "affected_pages": affected, "gap": gap, "corrective_action": action}

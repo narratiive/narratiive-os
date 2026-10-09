@@ -1,0 +1,29 @@
+{
+  "schema_version": "katkin-growth-blueprint.v2",
+  "output_id": "katkin-growth-blueprint-v2",
+  "output_version": 2,
+  "input_artifact_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
+  "input_artifact_path": "/Users/admin/Documents/narratiive-os/.runtime/workflow-runtime/ef8761045c7e949c8c5a0dc5/artifacts/artifact-96b831e2aefd67d3-f178c35f1e867c7a.json",
+  "input_artifact_checksum": "e132ba8e4d19c8e0d370207c0c87b4e27b3928b45c53620ea2cf506fb7ff887d",
+  "approved_strategy_thesis_artifact_id": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+  "approved_strategy_thesis_checksum": "92b790e0f4def86f35c013e2fff78ce7dbb4ac2bb7b28647eafc69f6d622508c",
+  "source_run_id": "katkin-live-acceptance-20260911-gate1-discovery_evidence_to_growth_sprint_proposal-growth_sprint_to_research_engine-rese-st-strategy_thesis_to_growth_blueprint-53df7bb2fa80df2c3523",
+  "canonical_revision": "fb20a4e66231539d646d5ca79a6ec9f99050ecea",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
+  "provider_message_id": "msg_011Cfs5V5A6cuWM5SJPi1w59",
+  "provider_calls": 1,
+  "generation_route": "Blueprint Director",
+  "client_id": "katkin-live-acceptance-20260911-gate1",
+  "workspace_id": null,
+  "human_approval_status": "pending_matt_review",
+  "external_action_taken": false,
+  "output_checksum": "aad99c7ded511fa9a8550045aa4063e51d75d151fcc67919d036cf944c9346c5",
+  "output_files": [
+    "/Users/admin/Documents/narratiive-os/outputs/katkin/katkin-growth-blueprint-v2.md",
+    "/Users/admin/Documents/narratiive-os/outputs/katkin/katkin-growth-blueprint-v2.json",
+    "/Users/admin/Documents/narratiive-os/outputs/katkin/katkin-growth-blueprint-v2-quality-review.json"
+  ],
+  "prior_blueprint": "katkin-growth-blueprint-v1",
+  "prior_review": "katkin-growth-blueprint-v1-quality-review.json"
+}
