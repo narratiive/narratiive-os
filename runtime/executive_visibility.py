@@ -34,6 +34,7 @@ class ExecutiveVisibilityPolicy:
             lead.lead_id.strip().casefold()
             for lead in leads
             if lead.disposition in HIDDEN_DISPOSITIONS
+            or lead.status.strip().casefold() in NO_ACTION_LEAD_STATUSES
         }
         return tuple(
             state
