@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import defaultdict
 from datetime import datetime, timezone
@@ -7,6 +8,8 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 
 from runtime.inbound_leads import InboundLead
+from runtime.executive_visibility import ExecutiveVisibilityPolicy
+from runtime.mission_control import VALID_CONNECTION_STATES
 from runtime.models import ArtifactRef, StageRecord, WorkflowState
 from runtime.repositories import WorkflowEvent
 from runtime.workflow_mission_control import workflow_state_name
@@ -78,6 +81,7 @@ class OperatorMissionControlProjector:
         self.workflow_root = Path(workflow_root).resolve()
         self.workflow_workspace_id = workflow_workspace_id
         self.evidence = FileWorkflowEvidenceReader(self.workflow_root)
+        self.visibility = ExecutiveVisibilityPolicy()
         self.worker_timeout_seconds = {
             str(capability): int(seconds)
             for capability, seconds in (worker_timeout_seconds or {}).items()
@@ -93,16 +97,27 @@ class OperatorMissionControlProjector:
         generated_at: str | None = None,
     ) -> dict[str, Any]:
         now = generated_at or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-        scoped = tuple(states)
-        if any(state.workspace_id != self.workflow_workspace_id for state in scoped):
+        all_states = tuple(states)
+        all_leads = tuple(leads)
+        if any(state.workspace_id != self.workflow_workspace_id for state in all_states):
             raise ValueError("workflow state workspace mismatch")
-        lead_by_id = {lead.lead_id: lead for lead in leads}
+        visible_leads = self.visibility.visible_leads(all_leads)
+        policy_states = self.visibility.visible_workflows(all_states, all_leads)
+        scoped = tuple(state for state in policy_states if not self._explicit_synthetic(state))
+        visible_keys = {
+            *(lead.lead_id for lead in visible_leads),
+            *(state.client_id or state.entity_id for state in scoped),
+        }
+        all_keys = {
+            *(lead.lead_id for lead in all_leads),
+            *(state.client_id or state.entity_id for state in all_states),
+        }
+        lead_by_id = {lead.lead_id: lead for lead in visible_leads}
         grouped: dict[str, list[WorkflowState]] = defaultdict(list)
         for state in scoped:
             grouped[state.client_id or state.entity_id].append(state)
-        for lead in leads:
-            if lead.disposition not in {"suppressed", "test", "archived"}:
-                grouped.setdefault(lead.lead_id, [])
+        for lead in visible_leads:
+            grouped.setdefault(lead.lead_id, [])
 
         opportunities = [self._opportunity(key, runs, lead_by_id.get(key), now) for key, runs in grouped.items()]
         opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
@@ -125,7 +140,7 @@ class OperatorMissionControlProjector:
                 "waiting_for_matt": len(needs_you),
                 "blocked": sum(item["attention_state"] == "blocked" for item in active),
                 "running_autonomously": running,
-                "synthetic_hidden": sum(item["synthetic"] for item in opportunities),
+                "synthetic_hidden": len(all_keys - visible_keys),
             },
             "system": {
                 "status": str((system_snapshot or {}).get("status") or "unknown"),
@@ -234,7 +249,7 @@ class OperatorMissionControlProjector:
 
     @staticmethod
     def _lead_is_synthetic(lead: InboundLead) -> bool:
-        if lead.disposition in {"suppressed", "test"}:
+        if lead.disposition in {"suppressed", "test", "archived"}:
             return True
         label = f"{lead.company} {lead.contact}".strip().casefold()
         return label.startswith(("safe ", "test ", "qa test ", "qa proposition "))
@@ -327,7 +342,7 @@ class OperatorMissionControlProjector:
                     location = Path(artifact.location)
                     if not location.is_absolute():
                         location = Path.cwd() / location
-                    safe = self._within_root(location)
+                    safe = self._within_scope(location, state)
                     items.append({
                         "artifact_id": artifact.artifact_id, "name": title, "type": artifact.artifact_type,
                         "version": version, "created_at": stage.completed_at or state.updated_at,
@@ -338,9 +353,13 @@ class OperatorMissionControlProjector:
                     })
         return items
 
-    def _within_root(self, path: Path) -> bool:
+    def _within_scope(self, path: Path, state: WorkflowState) -> bool:
+        scope = hashlib.sha256(
+            f"{state.workspace_id}:{state.client_id}".encode("utf-8")
+        ).hexdigest()[:24]
+        artifact_root = self.workflow_root / scope / "artifacts"
         try:
-            path.resolve().relative_to(self.workflow_root)
+            path.resolve().relative_to(artifact_root.resolve())
             return path.is_file()
         except (OSError, ValueError):
             return False
@@ -378,4 +397,12 @@ class OperatorMissionControlProjector:
 
     @staticmethod
     def _connections(snapshot: Mapping[str, Any]) -> list[dict[str, Any]]:
-        return [{"name": item.get("name"), "state": item.get("state", "unknown"), "evidence": item.get("evidence"), "last_checked_at": item.get("last_checked_at")} for item in snapshot.get("connections", []) if isinstance(item, Mapping)]
+        result = []
+        for item in snapshot.get("connections", []):
+            if not isinstance(item, Mapping):
+                continue
+            state = str(item.get("state", "unknown"))
+            if state not in VALID_CONNECTION_STATES:
+                state = "unknown"
+            result.append({"name": item.get("name"), "state": state, "evidence": item.get("evidence"), "last_checked_at": item.get("last_checked_at")})
+        return result
