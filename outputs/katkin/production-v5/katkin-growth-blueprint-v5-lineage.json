@@ -5,43 +5,51 @@
   "commercial_model_checksum": "13244e80c1f5427690116519436bc8075c9dedde7a9ed454c909c6e60d7cd20e",
   "deliverables": {
     "KatKin-Growth-Blueprint-v5.pdf": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pdf",
-      "sha256": "1a0594e3aaf832b4055fea199a9ca0cd538d083c0fa5d6964b4de406d10d8973"
+      "path": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pdf",
+      "sha256": "c51ab50d3db1b4dae41ca4e6b0b8b93313efabbae0dc93ecdcf4c1907ffd4606"
     },
     "KatKin-Growth-Blueprint-v5.pptx": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pptx",
-      "sha256": "4a734b43b58f9be8e43c09dcc65c59830eda9e994395ab86d2cbdb31926e4519"
+      "path": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pptx",
+      "sha256": "4db4639e404f2b8c9a1b414dc1b7e2f821fa358b2247b8074368bb53be6e1384"
     },
     "katkin-growth-blueprint-v5-commercial-model.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-commercial-model.json",
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-commercial-model.json",
       "sha256": "6146e2c6b18887f1b8b93e679ae4aa8955f9eab9d7df5ce078c3746702f4aeb5"
     },
     "katkin-growth-blueprint-v5-delivery-report.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-delivery-report.json",
-      "sha256": "a0dd04bbe8972f3d4c2467dc2f9686e48878b64b3ae798316b1706e83cc565d4"
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-delivery-report.json",
+      "sha256": "019c1dce558eb1600c1446198b41b8c6144bbcb35e28a7c3dbd5409064a73096"
     },
     "katkin-growth-blueprint-v5-execution-evidence.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-execution-evidence.json",
-      "sha256": "04c37b3c877b35d8256e8dedbeab653f5320cd04227eec7f8fcb1ac56653811b"
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-execution-evidence.json",
+      "sha256": "4120cf674bfa559bf0d851a091c476a56f9e9cad9b29dcc19e9465db40c17843"
+    },
+    "katkin-growth-blueprint-v5-presentation-specification.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-presentation-specification.json",
+      "sha256": "b2630e062127c67aac89864bd6085b87d4d6efd15c643b0063e148fb0c505ebe"
     },
     "katkin-growth-blueprint-v5-quality-review.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-quality-review.json",
-      "sha256": "48df57c5e616242a4674f5ca418d98bf59ae892ada9f2dfb8c119fe6ae0a80fc"
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-quality-review.json",
+      "sha256": "f7464ca85035613fd3a4491fb51590980aa52b360de6978852bf006a2df59ccc"
+    },
+    "katkin-growth-blueprint-v5-render-receipt.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-render-receipt.json",
+      "sha256": "0cd56a2db0d7508e5d91b94ccc11570c949207a3909a63da62e3869619a93732"
     },
     "katkin-growth-blueprint-v5-rendered-review.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-review.json",
-      "sha256": "4d4da236918e7e250712c16fef71e5a525f6ea93921c83431089526f1a28ffc0"
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-review.json",
+      "sha256": "79638dcf511be50b65f8f30efb7c11fe33047db6df6c9d7c4c5c7a7cfc40cbd3"
     },
     "katkin-growth-blueprint-v5-rendered-slide-ocr.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
-      "sha256": "f7492b285f46e3d5b5bf5a1110cced6c9769fb4f71eb75e2497f76bfd9269907"
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
+      "sha256": "7dd068983076151ca35d9ceff8d22f702ecd5a5d9abc9bd6b46676173a628483"
     },
     "katkin-growth-blueprint-v5-source-register.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-source-register.json",
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-source-register.json",
       "sha256": "81f34c31e78b87eebe76560416060e9ded75c9c368f86062bf06bd1d2a0ab0eb"
     },
     "katkin-growth-blueprint-v5.json": {
-      "path": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5.json",
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5.json",
       "sha256": "a579e70179de2111378c35f8363d46f6eae7570e13f8651f17c31c88fb36cfcc"
     }
   },
@@ -50,6 +58,10 @@
   "output_id": "katkin-growth-blueprint-v5",
   "output_version": 5,
   "prior_blueprint": "katkin-growth-blueprint-v4",
+  "production_output_artifact_id": "artifact-9a1f5dbe9c559026-393de308bad54f4e",
+  "production_output_parent_artifact_ids": [
+    "artifact-96b831e2aefd67d3-f178c35f1e867c7a"
+  ],
   "recovery_method": "Tony deterministic commercial modelling, source attribution, rendering and rendered-slide review",
   "schema_version": "katkin-growth-blueprint.v5",
   "source_artifact_checksum": "f178c35f1e867c7afc0f0e129492efef626c1f1bd416ad2176e8891f312ce486",

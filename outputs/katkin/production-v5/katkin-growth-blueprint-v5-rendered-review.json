@@ -43,9 +43,9 @@
   ],
   "duplicate_layout_pairs": [],
   "findings": [],
-  "ocr_output": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
-  "pdf_sha256": "1a0594e3aaf832b4055fea199a9ca0cd538d083c0fa5d6964b4de406d10d8973",
-  "pptx_sha256": "4a734b43b58f9be8e43c09dcc65c59830eda9e994395ab86d2cbdb31926e4519",
+  "ocr_output": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
+  "pdf_sha256": "c51ab50d3db1b4dae41ca4e6b0b8b93313efabbae0dc93ecdcf4c1907ffd4606",
+  "pptx_sha256": "4db4639e404f2b8c9a1b414dc1b7e2f821fa358b2247b8074368bb53be6e1384",
   "progression_terms_found": [
     "constraint",
     "proof",

@@ -76,7 +76,7 @@ def main() -> int:
     progression_hits = [term for term in progression_terms if term in combined]
     source_slides = [
         index + 1 for index, slide in enumerate(expected)
-        if isinstance(slide, dict) and slide.get("layout_type") == "source_register"
+        if isinstance(slide, dict) and bool((slide.get("content_data") or {}).get("source_register_entries"))
     ]
     model_slides = [
         index + 1 for index, slide in enumerate(expected)
@@ -103,7 +103,7 @@ def main() -> int:
         "no_near_duplicate_rendered_layouts": not duplicate_pairs,
         "rendered_citations_are_visible": len(citation_slides) >= max(1, len(slides) - 2),
         "rendered_source_register_is_present": bool(source_slides) and all(
-            slide_no <= len(ocr_text) and "source" in ocr_text[slide_no - 1].casefold()
+            slide_no <= len(ocr_text) and "source register" in ocr_text[slide_no - 1].casefold()
             for slide_no in source_slides
         ),
         "rendered_commercial_model_is_present": bool(model_slides) and all(

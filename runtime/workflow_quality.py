@@ -506,10 +506,25 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     execution = output.get("execution_evidence")
     presentation = output.get("presentation_specification")
     presentation_slides = presentation.get("slides") if isinstance(presentation, Mapping) else None
+    canonical_titles = (
+        "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
+        "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+        "The Market Gap", "Growth Constraint Diagnosis", "The Provocation", "Audience Reality",
+        "Audience Segments / Demand Pools", "Customer Evidence Board",
+        "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
+        "Positioning Problem", "Strategic Positioning", "Positioning Map", "Narrative Platform",
+        "Core Message Architecture", "Messaging Territories / Distinctive Assets", "Commercial Prize",
+        "Attention Strategy", "Channel Roles", "Content / Campaign System",
+        "Creative Direction / Next-Phase Hook", "Growth Priorities / 90-Day Activation Plan",
+        "Measurement Framework", "Strategic Principle / Closing Mandate",
+    )
     checks = {
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
         "full_blueprint_has_exactly_thirty_slides": isinstance(presentation_slides, list)
         and len(presentation_slides) == 30,
+        "canonical_schema_v3_slide_roles_are_preserved": isinstance(presentation_slides, list)
+        and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
+        == canonical_titles,
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
         "quantified_commercial_model_is_present": isinstance(model_scenarios, list)

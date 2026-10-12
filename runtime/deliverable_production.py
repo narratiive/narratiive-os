@@ -139,6 +139,19 @@ ARCHETYPE_LIBRARY = (
     "roadmap", "prioritisation", "measurement", "closing",
 )
 
+CANONICAL_BLUEPRINT_SLIDE_TITLES = (
+    "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
+    "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+    "The Market Gap", "Growth Constraint Diagnosis", "The Provocation",
+    "Audience Reality", "Audience Segments / Demand Pools", "Customer Evidence Board",
+    "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
+    "Positioning Problem", "Strategic Positioning", "Positioning Map", "Narrative Platform",
+    "Core Message Architecture", "Messaging Territories / Distinctive Assets",
+    "Commercial Prize", "Attention Strategy", "Channel Roles", "Content / Campaign System",
+    "Creative Direction / Next-Phase Hook", "Growth Priorities / 90-Day Activation Plan",
+    "Measurement Framework", "Strategic Principle / Closing Mandate",
+)
+
 
 def build_blueprint_director_presentation_spec(
     artifact: Mapping[str, Any], *, specification_id: str, source_blueprint_id: str,
@@ -315,10 +328,10 @@ def build_growth_blueprint_presentation_spec(
     uncertainty = lambda key: _text((sections[key].get("uncertainties") or [""])[0], 180)
 
     plan = [
-        ("Growth thesis", "The strategic answer is a bounded, testable opportunity rather than a forecast.", diag("growth_opportunity"), "thesis", "statement"),
-        ("Executive thesis", f"{brand}'s next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
-        ("The commercial question", f"Where could {brand}'s next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
-        ("Market reality", f"Category context creates pressure, but does not diagnose {brand} by itself.", diag("market_category_diagnosis"), "market", "comparison"),
+        ("Cover", "The strategic answer is a bounded, testable opportunity rather than a forecast.", diag("growth_opportunity"), "thesis", "statement"),
+        ("Executive Thesis", f"{brand}'s next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
+        ("The Commercial Question", f"Where could {brand}'s next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
+        ("Market Reality", f"Category context creates pressure, but does not diagnose {brand} by itself.", diag("market_category_diagnosis"), "market", "comparison"),
         ("Category growth dynamics", "Premiumisation and category polarisation make the middle harder to defend.", uncertainty("market_category_diagnosis"), "market", "framework"),
         ("Competitive landscape", f"Competitors own different trust and value cues; {brand}'s combination remains a hypothesis.", diag("source_of_difference"), "competition", "comparison"),
         ("The sea of sameness", f"{brand} needs a reason to be remembered, not another generic category claim.", implication("source_of_difference"), "competition", "comparison"),
@@ -337,7 +350,7 @@ def build_growth_blueprint_presentation_spec(
         ("Narrative platform", "A clearer progression could turn breadth of range into a guided reason to return.", diag("narrative"), "narrative", "framework"),
         ("Core message architecture", "One front door can make two subscription jobs easier to understand.", implication("narrative"), "narrative", "framework"),
         ("Messaging territories / distinctive assets", "Distinctiveness must be earned through proof, not asserted through tone.", uncertainty("narrative"), "narrative", "comparison"),
-        ("Commercial prize", "The commercial prize is better conversion and repeat behaviour, not activity for its own sake.", diag("growth_opportunity"), "commercial", "statement"),
+        ("Commercial Prize", "The commercial prize is better conversion and repeat behaviour, not activity for its own sake.", diag("growth_opportunity"), "commercial", "statement"),
         ("Attention strategy", "Attention should make the specific proposition easier to notice and remember.", diag("activation_implications"), "activation", "framework"),
         ("Channel roles", "Channels remain hypotheses until channel economics and conversion evidence are available.", uncertainty("activation_implications"), "activation", "comparison"),
         ("Content / campaign system", "Execution should test the proposition architecture, not multiply generic content.", implication("activation_implications"), "activation", "framework"),
@@ -349,7 +362,7 @@ def build_growth_blueprint_presentation_spec(
     slides = tuple(
         PresentationSlideSpec(
             slide_no=index,
-            title=title_text,
+            title=CANONICAL_BLUEPRINT_SLIDE_TITLES[index - 1],
             takeaway=takeaway,
             body=body or "The source artefact does not provide enough evidence for a stronger claim.",
             visual_treatment=visual,
@@ -359,6 +372,8 @@ def build_growth_blueprint_presentation_spec(
         )
         for index, (title_text, takeaway, body, visual, _section_name) in enumerate(plan, start=1)
     )
+    if tuple(slide.title for slide in slides) != CANONICAL_BLUEPRINT_SLIDE_TITLES:
+        raise ValueError("canonical Blueprint presentation plan no longer matches Schema v3")
     source_checksum = _checksum(artifact)
     return PresentationSpecification(
         specification_id=specification_id,
@@ -398,6 +413,11 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             and [slide.slide_no for slide in specification.slides]
             == list(range(1, len(specification.slides) + 1))
         ),
+        "canonical_schema_v3_slide_roles_are_preserved": (
+            len(specification.slides) == 30
+            and tuple(slide.title for slide in specification.slides)
+            == CANONICAL_BLUEPRINT_SLIDE_TITLES
+        ),
         "visual_forms_are_intentional": all(
             bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
             for slide in specification.slides
@@ -418,7 +438,7 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             for slide in specification.slides
         ),
         "source_register_present": any(
-            slide.layout_type == "source_register" and bool(slide.content_data.get("entries"))
+            bool(slide.content_data.get("source_register_entries"))
             for slide in specification.slides
         ),
         "strategic_source_unchanged": specification.strategic_source_unchanged,
@@ -560,7 +580,7 @@ def augment_specification_with_commercial_evidence(
     source_register: Mapping[str, Any],
     production_direction: Mapping[str, Any],
 ) -> PresentationSpecification:
-    """Add quantified opportunity, creative translation and readable sources."""
+    """Enrich the fixed Schema v3 story without moving or replacing its 30 slots."""
     raw_entries = source_register.get("entries")
     if not isinstance(raw_entries, list) or not raw_entries:
         raise ValueError("source register must contain readable source entries")
@@ -574,28 +594,9 @@ def augment_specification_with_commercial_evidence(
 
     brand_name = str(production_direction.get("brand_name") or "the client").strip()
     layout_content = production_direction.get("layout_content")
-    supporting_slides = production_direction.get("supporting_slides")
     creative = production_direction.get("creative_direction")
     if not isinstance(layout_content, Mapping) or not isinstance(creative, Mapping):
         raise ValueError("production direction requires layout content and creative direction")
-    if not isinstance(supporting_slides, list) or len(supporting_slides) != 7:
-        raise ValueError("full Blueprint production requires exactly seven supporting slides")
-
-    base = []
-    for slide in specification.slides[:16]:
-        labels = _source_labels_for_slide(slide, entries)
-        if slide.slide_no != 1 and not labels:
-            raise ValueError(f"slide {slide.slide_no} has no readable source mapping")
-        base.append(replace(
-            slide,
-            citation_labels=labels,
-            claim_status=_claim_status(labels, entries),
-            source_notes=tuple(
-                f"{entry['source_id']}: {entry['publisher']} — {entry['title']} ({entry.get('date') or 'date recorded in source'}), {entry['location']}"
-                for entry in entries if str(entry.get("source_id")) in labels
-            ) or slide.source_notes,
-            content_data=dict(layout_content.get(slide.layout_type) or {}),
-        ))
 
     scenarios = commercial_model.get("scenarios") or []
     model_sources = tuple(dict.fromkeys(
@@ -604,81 +605,88 @@ def augment_specification_with_commercial_evidence(
         if isinstance(item, Mapping)
         for source_id in item.get("source_ids") or []
     ))
-    base_scenario = next((item for item in scenarios if str(item.get("name")).casefold() == "base"), scenarios[1] if len(scenarios) > 1 else {})
-    share_gain = float(base_scenario.get("incremental_market_share_points") or 0)
-    base_revenue = int(base_scenario.get("incremental_annual_revenue") or 0)
-    additions = [
-        PresentationSlideSpec(
-            0, "The quantified opportunity", f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario.",
-            "The model sizes a market-share opportunity. It is not a company forecast.", "commercial scenario table",
-            source_notes=(f"Calculated from the sourced market-size estimate and {brand_name}'s reported market-share claim.",),
-            layout_type="commercial_model", citation_labels=model_sources,
-            claim_status="ESTIMATE + ASSUMPTION", content_data={"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
-        ),
-        PresentationSlideSpec(
-            0, "What the model can and cannot say", f"Revenue and contribution are scenario estimates; net value remains unavailable until {brand_name} supplies implementation cost and unit economics.",
-            "The model keeps sourced inputs separate from assumptions and refuses to invent missing company financials.", "evidence and assumption bridge",
-            source_notes=("Implementation cost, realised contribution margin, CAC and retention data were not supplied.",),
-            layout_type="commercial_assumptions", citation_labels=model_sources,
-            claim_status="ESTIMATE + EVIDENCE GAP", content_data=dict(commercial_model),
-        ),
-        PresentationSlideSpec(
-            0, str(creative.get("title") or "Creative direction"), str(creative.get("takeaway") or "The strategy translates into a distinctive, testable visual territory."),
-            str(creative.get("body") or "Creative direction remains a hypothesis until founder testing."), "creative territory board",
-            source_notes=("Creative direction translates the approved proof-led strategy; it is a proposed territory for founder testing.",),
-            layout_type="creative_direction", citation_labels=("T1", "S2"),
-            claim_status="PROPOSED CREATIVE TERRITORY", content_data=dict(creative),
-        ),
-    ]
-    for item in supporting_slides:
-        if not isinstance(item, Mapping) or not all(str(item.get(field) or "").strip() for field in ("title", "body", "takeaway", "layout_type")):
-            raise ValueError("supporting production slides are incomplete")
-        citations = tuple(str(value) for value in item.get("citation_labels") or ("T1",))
-        additions.append(PresentationSlideSpec(
-            0, str(item["title"]), str(item["body"]), str(item["takeaway"]),
-            str(item.get("visual_brief") or "editorial evidence frame"),
-            source_notes=("Derived from the approved strategy and supplied production direction.",),
-            layout_type=str(item["layout_type"]), citation_labels=citations,
-            claim_status=str(item.get("claim_status") or "PROPOSED EXECUTION"),
-            content_data=dict(item.get("content_data") or {}),
-        ))
     if len(entries) < 3:
         raise ValueError("source register requires at least three independently identified sources")
-    quotient, remainder = divmod(len(entries), 3)
-    chunks = []
-    cursor = 0
-    for chunk_index in range(3):
-        chunk_size = quotient + (1 if chunk_index < remainder else 0)
-        chunks.append(entries[cursor:cursor + chunk_size])
-        cursor += chunk_size
-    for chunk_index, chunk in enumerate(chunks):
-        additions.append(PresentationSlideSpec(
-            0,
-            "Source register" if chunk_index == 0 else "Source register continued",
-            "Original sources, recorded dates and evidence classifications for the material claims in this Blueprint.",
-            "Verified facts, estimates, interpretations and hypotheses remain visibly distinct.",
-            "source register table", source_notes=(f"Source metadata reproduced from the governed {brand_name} evidence record.",),
-            layout_type="source_register", citation_labels=tuple(str(entry["source_id"]) for entry in chunk),
-            claim_status="SOURCE REGISTER", content_data={"entries": chunk},
-        ))
 
-    closing = specification.slides[-1]
-    closing_labels = _source_labels_for_slide(closing, entries) or ("T1",)
-    ordered = [*base, *additions, replace(
-        closing,
-        citation_labels=closing_labels,
-        claim_status=_claim_status(closing_labels, entries),
-        content_data=dict(layout_content.get(closing.layout_type) or {}),
-    )]
-    if len(ordered) != 30:
-        raise ValueError(f"full Growth Blueprint must render exactly 30 slides, got {len(ordered)}")
-    renumbered = tuple(replace(slide, slide_no=index) for index, slide in enumerate(ordered, 1))
+    layout_by_slide = {
+        1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
+        4: "ecosystem_map_of_forces", 5: "evidence_ladder", 6: "tension_plus_journey_matrix",
+        7: "sameness_audit", 8: "commercial_opportunity_model", 9: "brand_diagnosis_scorecard",
+        10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
+        13: "sameness_audit", 14: "tension_plus_journey_matrix", 15: "demand_pool_cards",
+        16: "brand_diagnosis_scorecard", 17: "we_are_we_are_not_framework", 18: "single_thesis_page",
+        19: "tension_plus_journey_matrix", 20: "narrative_platform_framework", 21: "message_architecture",
+        22: "creative_principles", 23: "commercial_model", 24: "test_plan", 25: "channel_role_map",
+        26: "channel_applications", 27: "creative_direction", 28: "constraint_priority_roadmap",
+        29: "priority_matrix_plus_measurement_stack", 30: "closing_mandate",
+    }
+    content_key_by_slide = {
+        1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
+        4: "ecosystem_map_of_forces", 7: "sameness_audit", 9: "brand_diagnosis_scorecard",
+        10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
+        14: "tension_plus_journey_matrix", 16: "brand_diagnosis_scorecard",
+        17: "we_are_we_are_not_framework", 20: "narrative_platform_framework",
+        21: "message_architecture", 23: "commercial_opportunity_model", 25: "channel_role_map",
+        28: "constraint_priority_roadmap", 29: "priority_matrix_plus_measurement_stack",
+        30: "closing_mandate",
+    }
+    base_scenario = next(
+        (item for item in scenarios if str(item.get("name")).casefold() == "base"),
+        scenarios[1] if len(scenarios) > 1 else {},
+    )
+    share_gain = float(base_scenario.get("incremental_market_share_points") or 0)
+    base_revenue = int(base_scenario.get("incremental_annual_revenue") or 0)
+    overrides = {
+        23: {
+            "takeaway": f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario.",
+            "body": "Conservative, base and ambitious cases size a market-share opportunity; they are not company forecasts.",
+            "claim_status": "ESTIMATE + ASSUMPTION",
+            "citations": model_sources,
+            "content": {"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
+        },
+        27: {
+            "takeaway": str(creative.get("takeaway") or "The strategy translates into a distinctive, testable visual territory."),
+            "body": str(creative.get("body") or "Creative direction remains a hypothesis until founder testing."),
+            "claim_status": "PROPOSED CREATIVE TERRITORY",
+            "citations": ("T1", "S2"), "content": dict(creative),
+        },
+        29: {
+            "takeaway": f"Net value and payback remain unavailable until {brand_name} supplies actual margin, retention and implementation cost.",
+            "body": "Track recognition, shelf comprehension and earned search share before scaling; connect them to sell-through, CAC and retention once baselines exist.",
+            "claim_status": "PROPOSED MEASUREMENT + EVIDENCE GAP", "citations": ("T1",),
+        },
+    }
+    enriched = []
+    for slide in specification.slides:
+        labels = _source_labels_for_slide(slide, entries) or (("T1",) if slide.slide_no != 1 else ())
+        override = overrides.get(slide.slide_no, {})
+        labels = tuple(override.get("citations") or labels)
+        content = dict(layout_content.get(content_key_by_slide.get(slide.slide_no, "")) or {})
+        content.update(dict(override.get("content") or {}))
+        if slide.slide_no == 30:
+            content["source_register_entries"] = [dict(entry) for entry in entries]
+            content["source_register_summary"] = "SOURCE REGISTER / governed companion deliverable included"
+        enriched.append(replace(
+            slide,
+            takeaway=str(override.get("takeaway") or slide.takeaway),
+            body=str(override.get("body") or slide.body),
+            layout_type=layout_by_slide[slide.slide_no],
+            citation_labels=labels,
+            claim_status=str(override.get("claim_status") or _claim_status(labels, entries)),
+            source_notes=tuple(
+                f"{entry['source_id']}: {entry['publisher']} — {entry['title']} ({entry.get('date') or 'date recorded in source'}), {entry['location']}"
+                for entry in entries if str(entry.get("source_id")) in labels
+            ) or slide.source_notes,
+            content_data=content,
+        ))
+    if tuple(slide.title for slide in enriched) != CANONICAL_BLUEPRINT_SLIDE_TITLES:
+        raise ValueError("full Growth Blueprint must preserve every Schema v3 slide role")
     return replace(
         specification,
-        slides=renumbered,
+        slides=tuple(enriched),
         notes=specification.notes + (
             "Commercial scenarios are illustrative calculations from sourced inputs and explicit assumptions.",
-            "Readable slide citations resolve to the source register; detailed lineage remains in speaker notes.",
+            "Readable slide citations resolve to the governed companion source register; detailed lineage remains in speaker notes.",
         ),
     )
 

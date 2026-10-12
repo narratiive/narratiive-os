@@ -212,10 +212,11 @@ def main() -> int:
     runtime = build_tony_workflow_runtime(
         args.runtime_root.resolve(), workspace_id="narratiive", client_id="katkin"
     )
-    run_id = "katkin-growth-blueprint-deliverable-v5-governed-final"
+    run_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r2"
+    source_checksum = _checksum(governed)
     inputs = {
-        "quality_accepted_growth_blueprint": candidate,
-        "blueprint_identity": {"artifact_id": "katkin-growth-blueprint-v5", "version": 5, "checksum": candidate_checksum},
+        "quality_accepted_growth_blueprint": governed,
+        "blueprint_identity": {"artifact_id": SOURCE_ARTIFACT_ID, "version": 1, "checksum": source_checksum},
         "client_context": {"brand_name": "KatKin", "company_name": "KatKin"},
         "evidence_lineage": governed["evidence_lineage"],
         "blueprint_canon": {
@@ -226,6 +227,12 @@ def main() -> int:
         },
         "commercial_intelligence": commercial_inputs,
         "source_register": register,
+        "_lineage": {
+            "parent_workflow_id": "strategy_thesis_to_growth_blueprint",
+            "parent_run_id": SOURCE_RUN_ID,
+            "parent_artifact_ids": [SOURCE_ARTIFACT_ID],
+            "recovery_status": "immutable_quality_accepted_artifact_adoption",
+        },
     }
     if not runtime.runs.repository.exists(run_id):
         runtime.enqueue(
@@ -262,9 +269,9 @@ def main() -> int:
             approver=args.approver.strip(),
             rationale=args.approval_rationale.strip(),
             approval_binding={
-                "artifact_id": "katkin-growth-blueprint-v5",
-                "artifact_version": 5,
-                "artifact_checksum": candidate_checksum,
+                "artifact_id": SOURCE_ARTIFACT_ID,
+                "artifact_version": 1,
+                "artifact_checksum": source_checksum,
             },
         )
         runtime.advance(run_id, lifecycle)
@@ -273,6 +280,9 @@ def main() -> int:
     stage = state.stage("produce_growth_blueprint_deliverable")
     if not stage.output_artifacts:
         raise ValueError(f"Tony v5 production did not return a deliverable: {state.blocker or state.status.value}")
+    parent_ids = list(stage.output_artifacts[-1].metadata.get("parent_artifact_ids") or [])
+    if parent_ids != [SOURCE_ARTIFACT_ID]:
+        raise ValueError(f"Tony production output is not bound to the exact approved parent artefact: {parent_ids}")
     produced = read_object(Path(stage.output_artifacts[-1].location))
     if produced.get("visual_qa", {}).get("status") != "passed":
         raise ValueError(f"Tony rendered-slide review failed: {produced.get('visual_qa')}")
@@ -283,6 +293,7 @@ def main() -> int:
         Path(str(produced["review_pdf"])): output_dir / "KatKin-Growth-Blueprint-v5.pdf",
     }
     rendered_review = Path(str(produced["editable_pptx"])).parent / "rendered-review.json"
+    render_receipt = Path(str(produced["editable_pptx"])).parent / "render-receipt.json"
     for source, target in copies.items():
         if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(source.read_bytes()).hexdigest():
             raise ValueError(f"immutable deliverable already exists with different content: {target}")
@@ -299,7 +310,7 @@ def main() -> int:
         raise ValueError(f"immutable OCR evidence already exists with different content: {ocr_output}")
     if not ocr_output.exists():
         shutil.copy2(runtime_ocr, ocr_output)
-    rendered_review_record["ocr_output"] = str(ocr_output)
+    rendered_review_record["ocr_output"] = ocr_output.relative_to(root).as_posix()
     rendered_review_record["pptx_sha256"] = hashlib.sha256((output_dir / "KatKin-Growth-Blueprint-v5.pptx").read_bytes()).hexdigest()
     rendered_review_record["pdf_sha256"] = hashlib.sha256((output_dir / "KatKin-Growth-Blueprint-v5.pdf").read_bytes()).hexdigest()
     write_new(review_output, rendered_review_record)
@@ -328,6 +339,8 @@ def main() -> int:
         "recovery_method": "Tony deterministic commercial modelling, source attribution, rendering and rendered-slide review",
         "human_approval_status": "pending_founder_review",
         "external_action_taken": False,
+        "production_output_artifact_id": stage.output_artifacts[-1].artifact_id,
+        "production_output_parent_artifact_ids": list(stage.output_artifacts[-1].metadata.get("parent_artifact_ids") or []),
     }
     package = {"approved_blueprint": candidate, "commercial_model": model, "source_register": register}
     quality = {
@@ -344,11 +357,11 @@ def main() -> int:
         "workflow_status": state.status.value,
         "approval_status": state.approval_status,
         "all_quality_gates_passed": all((source_gate["passed"], director_gate["passed"], review_gate["passed"], all(model_checks.values()), stage.quality_result.get("passed") is True)),
-        "editable_pptx": str(output_dir / "KatKin-Growth-Blueprint-v5.pptx"),
-        "review_pdf": str(output_dir / "KatKin-Growth-Blueprint-v5.pdf"),
-        "commercial_model": str(output_dir / "katkin-growth-blueprint-v5-commercial-model.json"),
-        "source_register": str(output_dir / "katkin-growth-blueprint-v5-source-register.json"),
-        "execution_evidence": str(output_dir / "katkin-growth-blueprint-v5-execution-evidence.json"),
+        "editable_pptx": (output_dir / "KatKin-Growth-Blueprint-v5.pptx").relative_to(root).as_posix(),
+        "review_pdf": (output_dir / "KatKin-Growth-Blueprint-v5.pdf").relative_to(root).as_posix(),
+        "commercial_model": (output_dir / "katkin-growth-blueprint-v5-commercial-model.json").relative_to(root).as_posix(),
+        "source_register": (output_dir / "katkin-growth-blueprint-v5-source-register.json").relative_to(root).as_posix(),
+        "execution_evidence": (output_dir / "katkin-growth-blueprint-v5-execution-evidence.json").relative_to(root).as_posix(),
         "unresolved_evidence_gaps": model["implementation_cost"].get("missing_inputs", []) + [
             "actual contribution margin and channel-level unit economics",
             "trial-to-six-month retention and cancellation reasons",
@@ -363,20 +376,31 @@ def main() -> int:
     execution_path = output_dir / "katkin-growth-blueprint-v5-execution-evidence.json"
     quality_path = output_dir / "katkin-growth-blueprint-v5-quality-review.json"
     report_path = output_dir / "katkin-growth-blueprint-v5-delivery-report.json"
+    specification_path = output_dir / "katkin-growth-blueprint-v5-presentation-specification.json"
+    receipt_path = output_dir / "katkin-growth-blueprint-v5-render-receipt.json"
     write_new(package_path, package)
     write_new(model_path, model)
     write_new(register_path, register)
     write_new(execution_path, execution)
     write_new(quality_path, quality)
     write_new(report_path, report)
+    write_new(specification_path, produced["presentation_specification"])
+    receipt_record = read_object(render_receipt)
+    receipt_record.update({
+        "pptx": (output_dir / "KatKin-Growth-Blueprint-v5.pptx").relative_to(root).as_posix(),
+        "pdf": (output_dir / "KatKin-Growth-Blueprint-v5.pdf").relative_to(root).as_posix(),
+        "specification": specification_path.relative_to(root).as_posix(),
+    })
+    receipt_record.pop("validation", None)
+    write_new(receipt_path, receipt_record)
     bound_files = (
         output_dir / "KatKin-Growth-Blueprint-v5.pptx",
         output_dir / "KatKin-Growth-Blueprint-v5.pdf",
         package_path, model_path, register_path, execution_path, quality_path, report_path,
-        review_output, ocr_output,
+        review_output, ocr_output, specification_path, receipt_path,
     )
     lineage["deliverables"] = {
-        path.name: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        path.name: {"path": path.relative_to(root).as_posix(), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
         for path in bound_files
     }
     write_new(output_dir / "katkin-growth-blueprint-v5-lineage.json", lineage)

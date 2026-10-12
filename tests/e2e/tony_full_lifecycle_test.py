@@ -29,7 +29,7 @@ from runtime.worker_registry import (
     WorkerRegistration,
 )
 from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, WorkflowExecutionCoordinator
-from runtime.deliverable_production import _checksum
+from runtime.deliverable_production import CANONICAL_BLUEPRINT_SLIDE_TITLES, _checksum
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     blueprint_director_quality_gate,
@@ -154,7 +154,10 @@ def _deliverable_output() -> dict[str, Any]:
     return {
         "presentation_specification": {
             "title": f"{CLIENT_NAME} Growth Blueprint",
-            "slides": [{"slide_no": index} for index in range(1, 31)],
+            "slides": [
+                {"slide_no": index, "title": title}
+                for index, title in enumerate(CANONICAL_BLUEPRINT_SLIDE_TITLES, 1)
+            ],
         },
         "commercial_model": {
             "scenarios": [

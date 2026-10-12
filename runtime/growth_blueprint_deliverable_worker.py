@@ -16,8 +16,7 @@ from runtime.deliverable_production import (
     PresentationSpecification,
     _checksum,
     augment_specification_with_commercial_evidence,
-    build_blueprint_director_presentation_spec,
-    build_directed_growth_blueprint_presentation_spec,
+    build_growth_blueprint_presentation_spec,
     build_quantified_commercial_model,
     commercial_model_quality_checks,
 )
@@ -91,12 +90,7 @@ class GrowthBlueprintDeliverableWorker:
         stable_id = hashlib.sha256(
             f"{RENDERER_CONTRACT_VERSION}:{workspace_id}:{client_id}:{run_id}:{source_id}:{source_checksum}".encode("utf-8")
         ).hexdigest()[:20]
-        specification_builder = (
-            build_blueprint_director_presentation_spec
-            if isinstance(blueprint.get("client_facing_blueprint"), Mapping)
-            else build_directed_growth_blueprint_presentation_spec
-        )
-        specification = specification_builder(
+        specification = build_growth_blueprint_presentation_spec(
             blueprint,
             specification_id=f"blueprint-spec-{stable_id}",
             source_blueprint_id=source_id,

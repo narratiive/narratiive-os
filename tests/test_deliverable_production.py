@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 
 from runtime.deliverable_production import (
+    CANONICAL_BLUEPRINT_SLIDE_TITLES,
     DeliverableProductionService,
     FakePresentationRenderer,
     FileDeliverableStore,
@@ -114,7 +115,7 @@ class DeliverableProductionTests(unittest.TestCase):
 
     def test_augmented_specification_adds_model_sources_and_creative_direction(self) -> None:
         source = artifact()
-        spec = build_directed_growth_blueprint_presentation_spec(
+        spec = build_growth_blueprint_presentation_spec(
             source, specification_id="director-commercial", source_blueprint_id="blueprint-commercial",
             source_blueprint_version=1, workspace_id="workspace-safe", client_id="client-safe",
             title="Northstar Growth Blueprint", brand_name="Northstar",
@@ -128,8 +129,13 @@ class DeliverableProductionTests(unittest.TestCase):
         layouts = [slide.layout_type for slide in result.slides]
         self.assertIn("commercial_model", layouts)
         self.assertIn("creative_direction", layouts)
-        self.assertIn("source_register", layouts)
+        self.assertTrue(result.slides[-1].content_data["source_register_entries"])
         self.assertEqual(len(result.slides), 30)
+        self.assertEqual(result.slides[22].title, "Commercial Prize")
+        self.assertEqual(result.slides[26].title, "Creative Direction / Next-Phase Hook")
+        self.assertEqual(result.slides[27].title, "Growth Priorities / 90-Day Activation Plan")
+        self.assertEqual(result.slides[28].title, "Measurement Framework")
+        self.assertEqual(tuple(slide.title for slide in result.slides), CANONICAL_BLUEPRINT_SLIDE_TITLES)
         self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
         self.assertNotIn("katkin", json.dumps(result.to_dict()).casefold())
         self.assertNotIn("cat behaviour", json.dumps(result.to_dict()).casefold())
@@ -185,6 +191,7 @@ class DeliverableProductionTests(unittest.TestCase):
         self.assertEqual(len(spec.slides), 30)
         self.assertEqual(spec.slides[0].layout_type, "cover")
         self.assertEqual(spec.slides[-1].slide_no, 30)
+        self.assertEqual(tuple(slide.title for slide in spec.slides), CANONICAL_BLUEPRINT_SLIDE_TITLES)
         self.assertTrue(spec.strategic_source_unchanged)
         self.assertIn("native PPTX template not present", spec.template_source)
 
