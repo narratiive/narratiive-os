@@ -90,7 +90,7 @@ def main() -> int:
     visual_manifest = receipt.get("visualManifest") or []
     image_relevance = bool(visual_manifest) and all(
         isinstance(item, dict)
-        and item.get("asset") in {"hero-cat", "nutrition-science"}
+        and bool(str(item.get("asset") or "").strip())
         and item.get("role") in {"brand subject", "scientific proof"}
         and isinstance(item.get("slide"), int)
         for item in visual_manifest

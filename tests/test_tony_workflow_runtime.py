@@ -7,6 +7,7 @@ import unittest
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from tests.test_deliverable_production import commercial_intelligence, source_register
 from tests.test_workflow_quality import (
     campaign_world_output,
     campaign_world_candidates_output,
@@ -597,22 +598,8 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 "safe-growth-blueprint-run",
                 _lifecycle("safe-client"),
                 {
-                    "commercial_intelligence": {
-                        "market_size_gbp": 600_000_000,
-                        "current_market_share_percent": 2.0,
-                        "market_size_source_id": "safe-market-source",
-                        "market_share_source_id": "safe-share-source",
-                        "implementation_cost": {"status": "unavailable", "value": None},
-                    },
-                    "source_register": [
-                        {
-                            "source_id": "safe-source",
-                            "classification": "verified_fact",
-                            "publisher": "SAFE publisher",
-                            "title": "SAFE source",
-                            "location": "safe:test-source",
-                        }
-                    ],
+                    "commercial_intelligence": commercial_intelligence(),
+                    "source_register": source_register(),
                 },
             )
             downstream = runtime.runs.load_run(outcome.run_id)

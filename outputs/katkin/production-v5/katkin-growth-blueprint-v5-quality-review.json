@@ -45,6 +45,7 @@
     "checks": {
       "approval_is_pending": true,
       "editable_pptx_is_present": true,
+      "full_blueprint_has_exactly_thirty_slides": true,
       "no_external_action_taken": true,
       "presentation_specification_is_present": true,
       "quantified_commercial_model_is_present": true,

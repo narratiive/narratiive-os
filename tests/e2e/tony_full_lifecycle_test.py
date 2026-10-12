@@ -152,7 +152,10 @@ def _research_output() -> dict[str, Any]:
 
 def _deliverable_output() -> dict[str, Any]:
     return {
-        "presentation_specification": {"title": f"{CLIENT_NAME} Growth Blueprint", "slides": 30},
+        "presentation_specification": {
+            "title": f"{CLIENT_NAME} Growth Blueprint",
+            "slides": [{"slide_no": index} for index in range(1, 31)],
+        },
         "commercial_model": {
             "scenarios": [
                 {"name": name, "classification": "illustrative_scenario", "incremental_annual_revenue": revenue, "incremental_annual_contribution": contribution}

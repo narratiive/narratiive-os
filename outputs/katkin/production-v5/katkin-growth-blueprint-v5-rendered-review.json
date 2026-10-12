@@ -32,11 +32,20 @@
     20,
     21,
     22,
-    23
+    23,
+    24,
+    25,
+    26,
+    27,
+    28,
+    29,
+    30
   ],
   "duplicate_layout_pairs": [],
   "findings": [],
-  "ocr_output": "/Users/admin/Documents/narratiive-os/.runtime/workflow-runtime/29c52dcd11f0b1bbf0d6bb0e/deliverables/narratiive/katkin/growth-blueprint-dd13bd713c29172ca39d/rendered-slide-ocr.json",
+  "ocr_output": "/Users/admin/Documents/narratiive-os/outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
+  "pdf_sha256": "1a0594e3aaf832b4055fea199a9ca0cd538d083c0fa5d6964b4de406d10d8973",
+  "pptx_sha256": "4a734b43b58f9be8e43c09dcc65c59830eda9e994395ab86d2cbdb31926e4519",
   "progression_terms_found": [
     "constraint",
     "proof",

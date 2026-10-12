@@ -29,7 +29,7 @@ class GrowthBlueprintDeliverableWorkerError(RuntimeError):
     """Raised when a Blueprint deliverable cannot be produced truthfully."""
 
 
-RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v4"
+RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v6"
 
 
 class GrowthBlueprintDeliverableWorker:
@@ -115,6 +115,7 @@ class GrowthBlueprintDeliverableWorker:
                 specification,
                 commercial_model=commercial_model,
                 source_register=source_register,
+                production_direction=commercial_intelligence.get("production_direction") or {},
             )
         except ValueError as exc:
             raise GrowthBlueprintDeliverableWorkerError(str(exc)) from exc

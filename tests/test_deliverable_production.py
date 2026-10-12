@@ -41,6 +41,19 @@ def artifact() -> dict:
 
 
 def commercial_intelligence() -> dict:
+    supporting = [
+        {
+            "title": f"Synthetic supporting decision {index}",
+            "body": "A synthetic, client-neutral execution statement for contract testing.",
+            "takeaway": "The execution implication remains bounded and testable.",
+            "layout_type": layout,
+            "citation_labels": ["T1"],
+        }
+        for index, layout in enumerate((
+            "evidence_ladder", "commercial_sensitivity", "investment_unlock",
+            "creative_principles", "channel_applications", "test_plan", "founder_decisions",
+        ), 1)
+    ]
     return {
         "model_id": "test-commercial-model",
         "currency": "GBP",
@@ -55,6 +68,19 @@ def commercial_intelligence() -> dict:
             {"name": "Ambitious", "target_market_share_percent": 3.0, "contribution_margin_percent": 50},
         ],
         "implementation_cost": {"status": "unavailable", "value": None, "missing_inputs": ["delivery budget"]},
+        "production_direction": {
+            "brand_name": "Northstar Test Co",
+            "layout_content": {},
+            "creative_direction": {
+                "title": "Creative direction: make the advantage visible",
+                "body": "Translate the approved strategy into a recognisable visual system.",
+                "takeaway": "A distinctive territory makes the strategic advantage easier to recognise.",
+                "primary_phrase": "VISIBLE ADVANTAGE",
+                "secondary_phrase": "meets human relevance",
+                "principles": ["Observe", "Evidence", "Signal"],
+            },
+            "supporting_slides": supporting,
+        },
     }
 
 
@@ -97,12 +123,16 @@ class DeliverableProductionTests(unittest.TestCase):
             spec,
             commercial_model=build_quantified_commercial_model(commercial_intelligence()),
             source_register=source_register(),
+            production_direction=commercial_intelligence()["production_direction"],
         )
         layouts = [slide.layout_type for slide in result.slides]
         self.assertIn("commercial_model", layouts)
         self.assertIn("creative_direction", layouts)
         self.assertIn("source_register", layouts)
+        self.assertEqual(len(result.slides), 30)
         self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
+        self.assertNotIn("katkin", json.dumps(result.to_dict()).casefold())
+        self.assertNotIn("cat behaviour", json.dumps(result.to_dict()).casefold())
 
     def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
         source = {

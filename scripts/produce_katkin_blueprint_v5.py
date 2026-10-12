@@ -56,6 +56,15 @@ def write_new(path: Path, value: object) -> None:
 
 
 def commercial_intelligence() -> dict:
+    supporting_slides = [
+        {"title": "The proof has to travel in layers", "body": "Lead with one human-readable claim, reveal the published evidence behind it, then offer the full method for those who want to inspect it.", "takeaway": "Evidence becomes an acquisition asset only when it is both quick to grasp and deep enough to inspect.", "layout_type": "evidence_ladder", "citation_labels": ["S2", "T1"], "claim_status": "APPROVED STRATEGY"},
+        {"title": "Share gain, not storytelling optimism, drives the upside", "body": "Every 0.25 percentage-point move in a £600m market represents roughly £1.5m in annual revenue before contribution assumptions.", "takeaway": "The scenario model exposes the few assumptions founders should pressure-test, rather than hiding them in a forecast.", "layout_type": "commercial_sensitivity", "citation_labels": ["S8", "S1A"], "claim_status": "ESTIMATE + ASSUMPTION"},
+        {"title": "Three numbers unlock an investable business case", "body": "Actual contribution margin, the scoped implementation budget and observed retention are the missing inputs needed to calculate net value and payback.", "takeaway": "Do not approve scaled investment from gross revenue upside alone.", "layout_type": "investment_unlock", "citation_labels": ["T1"], "claim_status": "EVIDENCE GAP"},
+        {"title": "The creative system behaves like evidence", "body": "Observation draws the eye; an explicit evidence mark shows what was checked; one coral signal carries the proof across formats.", "takeaway": "Distinctiveness comes from a repeatable behaviour, not decorative variety.", "layout_type": "creative_principles", "citation_labels": ["S2", "T1"], "claim_status": "PROPOSED CREATIVE TERRITORY"},
+        {"title": "One proof, translated for each decision environment", "body": "Retail needs instant comprehension, CRM can reveal depth, earned media needs a citable point of view and paid social should create the first moment of intrigue.", "takeaway": "Channel consistency means a shared strategic signal, not identical executions.", "layout_type": "channel_applications", "citation_labels": ["S5", "S6", "T1"], "claim_status": "PROPOSED EXECUTION"},
+        {"title": "Test recognition before buying reach", "body": "Run a founder pressure-test, a retail comprehension test and a controlled CRM pilot before moving material media investment.", "takeaway": "Scale only after the proof-led idea improves leading indicators without weakening conversion.", "layout_type": "test_plan", "citation_labels": ["T1"], "claim_status": "PROPOSED TEST PLAN"},
+        {"title": "The founder decision is deliberately narrow", "body": "Approve the proof-led strategic territory, commission the missing unit-economics inputs and authorise a bounded retail-and-CRM validation programme.", "takeaway": "A clear decision now preserves options while creating the evidence for a larger commitment.", "layout_type": "founder_decisions", "citation_labels": ["T1"], "claim_status": "HUMAN DECISION REQUIRED"},
+    ]
     return {
         "model_id": "katkin-commercial-opportunity-v5",
         "currency": "GBP",
@@ -102,6 +111,38 @@ def commercial_intelligence() -> dict:
             "Contribution margins are sensitivity assumptions because KatKin margin data was not supplied.",
             "Net value and payback remain unavailable until implementation cost, CAC and retention inputs are supplied.",
         ],
+        "production_direction": {
+            "brand_name": "KatKin",
+            "layout_content": {
+                "single_thesis_page": {"signal": "PROOF", "support": "A claim competitors cannot copy in one ad cycle", "brand_name": "KatKin", "platform": "The science cats deserve", "subtitle": "From category claim to category authority", "asset_path": "katkin/hero-cat.png", "image_alt": "Black cat portrait, the KatKin brand subject"},
+                "question_frame": {"signal": "ONLY", "support": "Move from awareness as an input to authority as the outcome"},
+                "ecosystem_map_of_forces": {"items": [["SAMENESS", "Shared functional language"], ["DISCOVERY", "Organic and AI search shift"], ["ECONOMICS", "Paid creative pressure"], ["MANDATE", "Build a loved brand"]]},
+                "sameness_audit": {"eyebrow": "THE HARD PART IS ALREADY DONE", "asset_path": "katkin/nutrition-science.png", "image_alt": "Microscopic nutrition science, the evidential basis of the KatKin strategy"},
+                "provocation_page": {"left_label": "WHAT OWNERS SEE", "left_headline": "Confident claims", "left_detail": "Fresh. Real meat. Vet formulated.", "right_label": "WHAT KATKIN CAN PROVE", "right_headline": "Independent science"},
+                "audience_reality_split": {"labels": ["COMMITTED DTC", "RETAIL CONVERT", "MAINSTREAM OWNER"]},
+                "demand_pool_cards": {"labels": ["COMMITTED DTC", "RETAIL CONVERT", "MAINSTREAM OWNER"]},
+                "tension_plus_journey_matrix": {"labels": ["DISCOVERY", "DECISION", "REPEAT"]},
+                "we_are_we_are_not_framework": {"rows": [["POSITION", "Proof, not promise"], ["BENEFIT", "Confidence without self-audit"], ["PLATFORM", "The science cats deserve"], ["EXPRESSION", "Visible without personalisation"]]},
+                "brand_diagnosis_scorecard": {"rows": [["POSITION", "Proof, not promise"], ["BENEFIT", "Confidence without self-audit"], ["PLATFORM", "The science cats deserve"], ["EXPRESSION", "Visible without personalisation"]]},
+                "narrative_platform_framework": {"steps": [["TENSION", "The category asks owners to trust claims"], ["SHIFT", "KatKin makes proof the starting point"], ["RESOLUTION", "Independent science carries the decision"]], "banner": "THE SCIENCE CATS DESERVE"},
+                "message_architecture": {"master_message": "Nutrition proven, not promised", "proofs": [["PUBLISHED", "Peer-reviewed research"], ["FORMULATED", "Board-Certified Veterinary Nutritionist"], ["MADE", "Vertically integrated production"]]},
+                "commercial_opportunity_model": {"items": [["EARNED", "A citable point of view"], ["RETAIL", "Premium proof at shelf"], ["CRM", "Segmented confidence"], ["INVESTOR", "Earlier leading signals"]]},
+                "channel_role_map": {"rows": [["DTC QUIZ", "Discovery and education", "Personalised"], ["CRM", "Trust and retention", "First party"], ["RETAIL", "Conversion", "Unaided"], ["EARNED / SEARCH", "Scale discovery", "Citable"], ["PAID SOCIAL", "Volume", "Rebalanced"]]},
+                "constraint_priority_roadmap": {"phases": [["DAYS 1-30", "Foundation", "Founder pressure-test and evidence audit"], ["DAYS 31-60", "Prove", "Retail translation and CRM pilot"], ["DAYS 61-90", "Scale", "Shift spend only when leading signals move"]]},
+                "priority_matrix_plus_measurement_stack": {"rows": [["LEADING / 3-6 MONTHS", "Claim recognition, shelf comprehension, earned search share"], ["LAGGING", "Retail sell-through, blended CAC trend, subscriber retention"], ["COMMERCIAL", "Price realisation versus discount dependency"]]},
+                "closing_mandate": {"lines": ["Own the proof.", "Make it easy to feel.", "Then earn the right to scale."], "next_step": "Founder pressure-test and retail translation test"},
+            },
+            "creative_direction": {
+                "title": "Creative direction: make proof visible",
+                "body": "Use clinical precision against intimate cat behaviour: cropped observation, visible evidence marks and a single coral signal that draws the eye to proof.",
+                "takeaway": "A distinctive world turns the published science into a recognisable visual behaviour, not another nutrition claim.",
+                "primary_phrase": "CLINICAL PRECISION",
+                "secondary_phrase": "INTIMATE CAT BEHAVIOUR",
+                "bridge": "meets",
+                "principles": [["OBSERVATION", "Tight crops and watchful eyes"], ["EVIDENCE", "Visible marks that show what was checked"], ["SIGNAL", "One coral cue points to the proof"]],
+            },
+            "supporting_slides": supporting_slides,
+        },
     }
 
 
@@ -133,6 +174,8 @@ def main() -> int:
     parser.add_argument("--repository-root", type=Path, default=REPOSITORY_ROOT)
     parser.add_argument("--runtime-root", type=Path, default=REPOSITORY_ROOT / ".runtime" / "workflow-runtime")
     parser.add_argument("--output-dir", type=Path, default=REPOSITORY_ROOT / "outputs" / "katkin" / "production-v5")
+    parser.add_argument("--approver", default="", help="Authenticated operator identity authorising this exact internal-review render")
+    parser.add_argument("--approval-rationale", default="", help="Human-supplied rationale for the checksum-bound production gate")
     args = parser.parse_args()
 
     root = args.repository_root.resolve()
@@ -169,7 +212,7 @@ def main() -> int:
     runtime = build_tony_workflow_runtime(
         args.runtime_root.resolve(), workspace_id="narratiive", client_id="katkin"
     )
-    run_id = "katkin-growth-blueprint-deliverable-v5-final"
+    run_id = "katkin-growth-blueprint-deliverable-v5-governed-final"
     inputs = {
         "quality_accepted_growth_blueprint": candidate,
         "blueprint_identity": {"artifact_id": "katkin-growth-blueprint-v5", "version": 5, "checksum": candidate_checksum},
@@ -209,13 +252,15 @@ def main() -> int:
         state = runtime.runs.load_run(run_id)
         stage = state.stage("produce_growth_blueprint_deliverable")
     if state.status.value == "awaiting_approval" and not stage.output_artifacts:
+        if not args.approver.strip() or not args.approval_rationale.strip():
+            raise ValueError(
+                "Tony is awaiting an authenticated operator approval for the exact v5 candidate; "
+                "supply --approver and --approval-rationale through the authorised command boundary"
+            )
         runtime.approve(
             run_id,
-            approver="authorised-human:katkin-v5-production-mission",
-            rationale=(
-                "The explicit KatKin v5 mission authorises Tony to model and render the exact reviewed "
-                "Blueprint for founder review. External distribution remains prohibited."
-            ),
+            approver=args.approver.strip(),
+            rationale=args.approval_rationale.strip(),
             approval_binding={
                 "artifact_id": "katkin-growth-blueprint-v5",
                 "artifact_version": 5,
@@ -238,13 +283,26 @@ def main() -> int:
         Path(str(produced["review_pdf"])): output_dir / "KatKin-Growth-Blueprint-v5.pdf",
     }
     rendered_review = Path(str(produced["editable_pptx"])).parent / "rendered-review.json"
-    if rendered_review.is_file():
-        copies[rendered_review] = output_dir / "katkin-growth-blueprint-v5-rendered-review.json"
     for source, target in copies.items():
         if target.exists() and hashlib.sha256(target.read_bytes()).hexdigest() != hashlib.sha256(source.read_bytes()).hexdigest():
             raise ValueError(f"immutable deliverable already exists with different content: {target}")
         if not target.exists():
             shutil.copy2(source, target)
+
+    review_output = output_dir / "katkin-growth-blueprint-v5-rendered-review.json"
+    ocr_output = output_dir / "katkin-growth-blueprint-v5-rendered-slide-ocr.json"
+    rendered_review_record = read_object(rendered_review)
+    runtime_ocr = Path(str(rendered_review_record.get("ocr_output") or ""))
+    if not runtime_ocr.is_file():
+        raise ValueError("rendered review did not preserve its OCR evidence")
+    if ocr_output.exists() and hashlib.sha256(ocr_output.read_bytes()).hexdigest() != hashlib.sha256(runtime_ocr.read_bytes()).hexdigest():
+        raise ValueError(f"immutable OCR evidence already exists with different content: {ocr_output}")
+    if not ocr_output.exists():
+        shutil.copy2(runtime_ocr, ocr_output)
+    rendered_review_record["ocr_output"] = str(ocr_output)
+    rendered_review_record["pptx_sha256"] = hashlib.sha256((output_dir / "KatKin-Growth-Blueprint-v5.pptx").read_bytes()).hexdigest()
+    rendered_review_record["pdf_sha256"] = hashlib.sha256((output_dir / "KatKin-Growth-Blueprint-v5.pdf").read_bytes()).hexdigest()
+    write_new(review_output, rendered_review_record)
 
     execution = {
         **produced["execution_evidence"],
@@ -299,13 +357,29 @@ def main() -> int:
         "founder_review_required": True,
         "external_action_taken": False,
     }
-    write_new(output_dir / "katkin-growth-blueprint-v5.json", package)
-    write_new(output_dir / "katkin-growth-blueprint-v5-commercial-model.json", model)
-    write_new(output_dir / "katkin-growth-blueprint-v5-source-register.json", register)
-    write_new(output_dir / "katkin-growth-blueprint-v5-execution-evidence.json", execution)
+    package_path = output_dir / "katkin-growth-blueprint-v5.json"
+    model_path = output_dir / "katkin-growth-blueprint-v5-commercial-model.json"
+    register_path = output_dir / "katkin-growth-blueprint-v5-source-register.json"
+    execution_path = output_dir / "katkin-growth-blueprint-v5-execution-evidence.json"
+    quality_path = output_dir / "katkin-growth-blueprint-v5-quality-review.json"
+    report_path = output_dir / "katkin-growth-blueprint-v5-delivery-report.json"
+    write_new(package_path, package)
+    write_new(model_path, model)
+    write_new(register_path, register)
+    write_new(execution_path, execution)
+    write_new(quality_path, quality)
+    write_new(report_path, report)
+    bound_files = (
+        output_dir / "KatKin-Growth-Blueprint-v5.pptx",
+        output_dir / "KatKin-Growth-Blueprint-v5.pdf",
+        package_path, model_path, register_path, execution_path, quality_path, report_path,
+        review_output, ocr_output,
+    )
+    lineage["deliverables"] = {
+        path.name: {"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+        for path in bound_files
+    }
     write_new(output_dir / "katkin-growth-blueprint-v5-lineage.json", lineage)
-    write_new(output_dir / "katkin-growth-blueprint-v5-quality-review.json", quality)
-    write_new(output_dir / "katkin-growth-blueprint-v5-delivery-report.json", report)
     print(json.dumps(report, indent=2))
     return 0
 

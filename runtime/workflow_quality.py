@@ -504,8 +504,12 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     source_register = output.get("source_register")
     source_entries = source_register.get("entries") if isinstance(source_register, Mapping) else None
     execution = output.get("execution_evidence")
+    presentation = output.get("presentation_specification")
+    presentation_slides = presentation.get("slides") if isinstance(presentation, Mapping) else None
     checks = {
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
+        "full_blueprint_has_exactly_thirty_slides": isinstance(presentation_slides, list)
+        and len(presentation_slides) == 30,
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
         "quantified_commercial_model_is_present": isinstance(model_scenarios, list)

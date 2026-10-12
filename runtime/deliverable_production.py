@@ -558,6 +558,7 @@ def augment_specification_with_commercial_evidence(
     *,
     commercial_model: Mapping[str, Any],
     source_register: Mapping[str, Any],
+    production_direction: Mapping[str, Any],
 ) -> PresentationSpecification:
     """Add quantified opportunity, creative translation and readable sources."""
     raw_entries = source_register.get("entries")
@@ -571,8 +572,17 @@ def augment_specification_with_commercial_evidence(
     ):
         raise ValueError("source register entries are incomplete")
 
+    brand_name = str(production_direction.get("brand_name") or "the client").strip()
+    layout_content = production_direction.get("layout_content")
+    supporting_slides = production_direction.get("supporting_slides")
+    creative = production_direction.get("creative_direction")
+    if not isinstance(layout_content, Mapping) or not isinstance(creative, Mapping):
+        raise ValueError("production direction requires layout content and creative direction")
+    if not isinstance(supporting_slides, list) or len(supporting_slides) != 7:
+        raise ValueError("full Blueprint production requires exactly seven supporting slides")
+
     base = []
-    for slide in specification.slides[:-1]:
+    for slide in specification.slides[:16]:
         labels = _source_labels_for_slide(slide, entries)
         if slide.slide_no != 1 and not labels:
             raise ValueError(f"slide {slide.slide_no} has no readable source mapping")
@@ -584,6 +594,7 @@ def augment_specification_with_commercial_evidence(
                 f"{entry['source_id']}: {entry['publisher']} — {entry['title']} ({entry.get('date') or 'date recorded in source'}), {entry['location']}"
                 for entry in entries if str(entry.get("source_id")) in labels
             ) or slide.source_notes,
+            content_data=dict(layout_content.get(slide.layout_type) or {}),
         ))
 
     scenarios = commercial_model.get("scenarios") or []
@@ -593,37 +604,60 @@ def augment_specification_with_commercial_evidence(
         if isinstance(item, Mapping)
         for source_id in item.get("source_ids") or []
     ))
+    base_scenario = next((item for item in scenarios if str(item.get("name")).casefold() == "base"), scenarios[1] if len(scenarios) > 1 else {})
+    share_gain = float(base_scenario.get("incremental_market_share_points") or 0)
+    base_revenue = int(base_scenario.get("incremental_annual_revenue") or 0)
     additions = [
         PresentationSlideSpec(
-            0, "The quantified opportunity", "A 0.5-point share gain implies about £3.0m in incremental annual revenue in the base scenario.",
+            0, "The quantified opportunity", f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario.",
             "The model sizes a market-share opportunity. It is not a company forecast.", "commercial scenario table",
-            source_notes=("Calculated from the sourced market-size estimate and KatKin's reported market-share claim.",),
+            source_notes=(f"Calculated from the sourced market-size estimate and {brand_name}'s reported market-share claim.",),
             layout_type="commercial_model", citation_labels=model_sources,
             claim_status="ESTIMATE + ASSUMPTION", content_data={"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
         ),
         PresentationSlideSpec(
-            0, "What the model can and cannot say", "Revenue and contribution are scenario estimates; net value remains unavailable until KatKin supplies implementation cost and unit economics.",
+            0, "What the model can and cannot say", f"Revenue and contribution are scenario estimates; net value remains unavailable until {brand_name} supplies implementation cost and unit economics.",
             "The model keeps sourced inputs separate from assumptions and refuses to invent missing company financials.", "evidence and assumption bridge",
             source_notes=("Implementation cost, realised contribution margin, CAC and retention data were not supplied.",),
             layout_type="commercial_assumptions", citation_labels=model_sources,
             claim_status="ESTIMATE + EVIDENCE GAP", content_data=dict(commercial_model),
         ),
         PresentationSlideSpec(
-            0, "Creative direction: make proof visible", "A distinctive world turns the published science into a recognisable visual behaviour, not another nutrition claim.",
-            "Use clinical precision against intimate cat behaviour: cropped observation, visible evidence marks and a single coral signal that draws the eye to proof.", "creative territory board",
+            0, str(creative.get("title") or "Creative direction"), str(creative.get("takeaway") or "The strategy translates into a distinctive, testable visual territory."),
+            str(creative.get("body") or "Creative direction remains a hypothesis until founder testing."), "creative territory board",
             source_notes=("Creative direction translates the approved proof-led strategy; it is a proposed territory for founder testing.",),
             layout_type="creative_direction", citation_labels=("T1", "S2"),
-            claim_status="PROPOSED CREATIVE TERRITORY",
+            claim_status="PROPOSED CREATIVE TERRITORY", content_data=dict(creative),
         ),
     ]
-    for chunk_start in range(0, len(entries), 4):
-        chunk = entries[chunk_start:chunk_start + 4]
+    for item in supporting_slides:
+        if not isinstance(item, Mapping) or not all(str(item.get(field) or "").strip() for field in ("title", "body", "takeaway", "layout_type")):
+            raise ValueError("supporting production slides are incomplete")
+        citations = tuple(str(value) for value in item.get("citation_labels") or ("T1",))
+        additions.append(PresentationSlideSpec(
+            0, str(item["title"]), str(item["body"]), str(item["takeaway"]),
+            str(item.get("visual_brief") or "editorial evidence frame"),
+            source_notes=("Derived from the approved strategy and supplied production direction.",),
+            layout_type=str(item["layout_type"]), citation_labels=citations,
+            claim_status=str(item.get("claim_status") or "PROPOSED EXECUTION"),
+            content_data=dict(item.get("content_data") or {}),
+        ))
+    if len(entries) < 3:
+        raise ValueError("source register requires at least three independently identified sources")
+    quotient, remainder = divmod(len(entries), 3)
+    chunks = []
+    cursor = 0
+    for chunk_index in range(3):
+        chunk_size = quotient + (1 if chunk_index < remainder else 0)
+        chunks.append(entries[cursor:cursor + chunk_size])
+        cursor += chunk_size
+    for chunk_index, chunk in enumerate(chunks):
         additions.append(PresentationSlideSpec(
             0,
-            "Source register" if chunk_start == 0 else "Source register continued",
+            "Source register" if chunk_index == 0 else "Source register continued",
             "Original sources, recorded dates and evidence classifications for the material claims in this Blueprint.",
             "Verified facts, estimates, interpretations and hypotheses remain visibly distinct.",
-            "source register table", source_notes=("Source metadata reproduced from the governed KatKin evidence record.",),
+            "source register table", source_notes=(f"Source metadata reproduced from the governed {brand_name} evidence record.",),
             layout_type="source_register", citation_labels=tuple(str(entry["source_id"]) for entry in chunk),
             claim_status="SOURCE REGISTER", content_data={"entries": chunk},
         ))
@@ -634,7 +668,10 @@ def augment_specification_with_commercial_evidence(
         closing,
         citation_labels=closing_labels,
         claim_status=_claim_status(closing_labels, entries),
+        content_data=dict(layout_content.get(closing.layout_type) or {}),
     )]
+    if len(ordered) != 30:
+        raise ValueError(f"full Growth Blueprint must render exactly 30 slides, got {len(ordered)}")
     renumbered = tuple(replace(slide, slide_no=index) for index, slide in enumerate(ordered, 1))
     return replace(
         specification,
