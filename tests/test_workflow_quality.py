@@ -475,6 +475,12 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertIn("client copy excludes internal governance schema", result["failed_checks"])
 
+    def test_growth_opportunity_uses_commercial_consequence_as_its_implication(self) -> None:
+        output = growth_blueprint_output()
+        output["growth_opportunity"].pop("implication")
+        result = growth_blueprint_quality_gate(output)
+        self.assertTrue(result["passed"], result)
+
     def test_discovery_preparation_requires_substance_lineage_and_uncertainty(self) -> None:
         result = discovery_preparation_quality_gate(discovery_output())
         self.assertTrue(result["passed"], result)

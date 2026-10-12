@@ -334,6 +334,7 @@ STRATEGY_THESIS_TO_GROWTH_BLUEPRINT = _workflow(
             "review_growth_blueprint",
             capability="strategic_quality_review",
             inputs=(
+                "approved_strategy_thesis",
                 "client_facing_blueprint",
                 "editorial_trace",
                 "client_context",

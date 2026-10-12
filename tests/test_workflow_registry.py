@@ -126,6 +126,10 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertIn("rave_calibre_reference", director.input_contract.required_fields)
         self.assertEqual(director.output_contract.required_fields, ("client_facing_blueprint", "editorial_trace"))
         self.assertEqual(blueprint.stages[2].capability, "strategic_quality_review")
+        self.assertIn(
+            "approved_strategy_thesis",
+            blueprint.stages[2].input_contract.required_fields,
+        )
         self.assertEqual(
             blueprint.stages[2].quality_contract,
             "senior_strategist_review_quality_gate",

@@ -278,7 +278,12 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
         "positioning", "narrative", "growth_opportunity", "activation_implications",
     )
     checks = {
-        "all_strategic_questions_are_substantive": all(_strategic_section(output.get(field)) for field in strategic_fields),
+        "all_strategic_questions_are_substantive": all(
+            _growth_opportunity_section(output.get(field))
+            if field == "growth_opportunity"
+            else _strategic_section(output.get(field))
+            for field in strategic_fields
+        ),
         "audience_intelligence_exceeds_demographics": _mapping_fields(
             output.get("audience"),
             ("motivations", "tensions", "barriers", "triggers", "behaviours"),
@@ -1234,6 +1239,25 @@ def _strategic_section(value: Any) -> bool:
         and _substantive_text(value.get("diagnosis"), minimum_words=15)
         and _meaningful_list(value.get("evidence_refs"), minimum=1)
         and _substantive_text(value.get("implication"), minimum_words=8)
+        and isinstance(value.get("uncertainties"), list)
+    )
+
+
+def _growth_opportunity_section(value: Any) -> bool:
+    """Accept the canonical commercial consequence as the section implication.
+
+    Growth opportunity has a dedicated commercial consequence field in the
+    Blueprint contract. Requiring a duplicate generic implication string made
+    otherwise complete governed intelligence fail on shape rather than meaning.
+    """
+    return (
+        isinstance(value, Mapping)
+        and _substantive_text(value.get("diagnosis"), minimum_words=15)
+        and _meaningful_list(value.get("evidence_refs"), minimum=1)
+        and (
+            _substantive_text(value.get("implication"), minimum_words=8)
+            or _substantive_text(value.get("commercial_consequence"), minimum_words=8)
+        )
         and isinstance(value.get("uncertainties"), list)
     )
 
