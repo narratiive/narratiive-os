@@ -12,6 +12,9 @@ from runtime.deliverable_production import (
     build_blueprint_director_presentation_spec,
     build_growth_blueprint_presentation_spec,
     build_directed_growth_blueprint_presentation_spec,
+    build_quantified_commercial_model,
+    augment_specification_with_commercial_evidence,
+    commercial_model_quality_checks,
     presentation_quality_checks,
     _safe_rendered_path,
 )
@@ -37,7 +40,70 @@ def artifact() -> dict:
     }
 
 
+def commercial_intelligence() -> dict:
+    return {
+        "model_id": "test-commercial-model",
+        "currency": "GBP",
+        "period": "annual run-rate",
+        "inputs": [
+            {"input_id": "market_size", "label": "Addressable market estimate", "value": 600000000, "unit": "GBP", "status": "estimate", "source_ids": ["S1"]},
+            {"input_id": "current_market_share_percent", "label": "Reported current market share", "value": 2.0, "unit": "percent", "status": "reported_claim", "source_ids": ["S1"]},
+        ],
+        "scenario_assumptions": [
+            {"name": "Conservative", "target_market_share_percent": 2.25, "contribution_margin_percent": 30},
+            {"name": "Base", "target_market_share_percent": 2.5, "contribution_margin_percent": 40},
+            {"name": "Ambitious", "target_market_share_percent": 3.0, "contribution_margin_percent": 50},
+        ],
+        "implementation_cost": {"status": "unavailable", "value": None, "missing_inputs": ["delivery budget"]},
+    }
+
+
+def source_register() -> dict:
+    refs = [f"ev-{key}" for key in (
+        "market_category_diagnosis", "audience", "growth_barriers", "source_of_difference",
+        "positioning", "narrative", "growth_opportunity", "activation_implications",
+        "key_strategic_choices", "evidence_and_uncertainty",
+    )] + [f"ev-{index}" for index in range(1, 18)]
+    return {"entries": [
+        {"source_id": "S1", "title": "Synthetic source", "publisher": "Test Publisher", "date": "2026", "location": "https://example.test/source", "classification": "verified_fact", "evidence_refs": refs, "applies_to_pages": list(range(2, 31))},
+        {"source_id": "S2", "title": "Synthetic science", "publisher": "Test Journal", "date": "2026", "location": "https://example.test/science", "classification": "verified_fact", "evidence_refs": refs, "applies_to_pages": []},
+        {"source_id": "T1", "title": "Approved strategy thesis", "publisher": "Narratiive", "date": "2026", "location": "governed runtime artefact", "classification": "approved_strategy", "evidence_refs": ["thesis:thesis_statement"], "applies_to_pages": [1]},
+    ]}
+
+
 class DeliverableProductionTests(unittest.TestCase):
+    def test_commercial_model_calculates_scenarios_without_inventing_cost(self) -> None:
+        model = build_quantified_commercial_model(commercial_intelligence())
+        self.assertEqual(model["estimated_current_annual_revenue"], 12000000)
+        self.assertEqual(model["scenarios"][1]["incremental_annual_revenue"], 3000000)
+        self.assertEqual(model["scenarios"][1]["incremental_annual_contribution"], 1200000)
+        self.assertEqual(model["implementation_cost"]["status"], "unavailable")
+        self.assertTrue(all(commercial_model_quality_checks(model).values()))
+
+    def test_commercial_model_rejects_value_when_cost_is_unavailable(self) -> None:
+        intelligence = commercial_intelligence()
+        intelligence["implementation_cost"] = {"status": "unavailable", "value": 500000}
+        with self.assertRaisesRegex(ValueError, "cannot contain an invented value"):
+            build_quantified_commercial_model(intelligence)
+
+    def test_augmented_specification_adds_model_sources_and_creative_direction(self) -> None:
+        source = artifact()
+        spec = build_directed_growth_blueprint_presentation_spec(
+            source, specification_id="director-commercial", source_blueprint_id="blueprint-commercial",
+            source_blueprint_version=1, workspace_id="workspace-safe", client_id="client-safe",
+            title="Northstar Growth Blueprint", brand_name="Northstar",
+        )
+        result = augment_specification_with_commercial_evidence(
+            spec,
+            commercial_model=build_quantified_commercial_model(commercial_intelligence()),
+            source_register=source_register(),
+        )
+        layouts = [slide.layout_type for slide in result.slides]
+        self.assertIn("commercial_model", layouts)
+        self.assertIn("creative_direction", layouts)
+        self.assertIn("source_register", layouts)
+        self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
+
     def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
         source = {
             "client_facing_blueprint": {

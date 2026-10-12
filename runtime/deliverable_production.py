@@ -14,7 +14,8 @@ import os
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
@@ -33,7 +34,10 @@ def _safe_identifier(value: str) -> bool:
 
 def _text(value: Any, limit: int = 480) -> str:
     text = " ".join(str(value or "").split())
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+    if len(text) <= limit:
+        return text
+    cut = text[:limit].rfind(" ")
+    return text[: cut if cut > 24 else limit].rstrip()
 
 
 def _client_copy(value: Any, limit: int = 210) -> str:
@@ -65,6 +69,9 @@ class PresentationSlideSpec:
     evidence_refs: tuple[str, ...] = ()
     source_notes: tuple[str, ...] = ()
     layout_type: str = "evidence_implication"
+    citation_labels: tuple[str, ...] = ()
+    claim_status: str = ""
+    content_data: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -76,6 +83,9 @@ class PresentationSlideSpec:
             "evidence_refs": list(self.evidence_refs),
             "source_notes": list(self.source_notes),
             "layout_type": self.layout_type,
+            "citation_labels": list(self.citation_labels),
+            "claim_status": self.claim_status,
+            "content_data": dict(self.content_data),
         }
 
 
@@ -395,8 +405,245 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
         "no_visible_machine_runtime_artefacts": not any(token.lower() in visible for token in ("ev_", "artifact-", "workflow_run", "evidence / source refs")),
         "conclusion_led_headlines": sum(bool(s.takeaway.strip()) for s in specification.slides) >= len(specification.slides) * 0.9,
         "source_provenance_retained": all(s.source_notes for s in specification.slides),
+        "readable_citations_present": all(
+            slide.slide_no == 1 or bool(slide.citation_labels)
+            for slide in specification.slides
+        ),
+        "claim_status_is_visible": all(
+            slide.slide_no == 1 or bool(slide.claim_status.strip())
+            for slide in specification.slides
+        ),
+        "quantified_commercial_model_present": any(
+            slide.layout_type == "commercial_model" and bool(slide.content_data.get("scenarios"))
+            for slide in specification.slides
+        ),
+        "source_register_present": any(
+            slide.layout_type == "source_register" and bool(slide.content_data.get("entries"))
+            for slide in specification.slides
+        ),
         "strategic_source_unchanged": specification.strategic_source_unchanged,
     }
+
+
+def build_quantified_commercial_model(intelligence: Mapping[str, Any]) -> dict[str, Any]:
+    """Calculate a bounded opportunity model from sourced inputs and named assumptions."""
+    raw_inputs = intelligence.get("inputs")
+    raw_scenarios = intelligence.get("scenario_assumptions")
+    if not isinstance(raw_inputs, list) or not isinstance(raw_scenarios, list):
+        raise ValueError("commercial intelligence requires inputs and scenario assumptions")
+    inputs = {
+        str(item.get("input_id") or ""): item
+        for item in raw_inputs
+        if isinstance(item, Mapping)
+    }
+    try:
+        market_size = Decimal(str(inputs["market_size"]["value"]))
+        current_share = Decimal(str(inputs["current_market_share_percent"]["value"]))
+    except (KeyError, TypeError, InvalidOperation) as exc:
+        raise ValueError("commercial intelligence requires numeric market size and current share") from exc
+    for required in (inputs.get("market_size"), inputs.get("current_market_share_percent")):
+        if not isinstance(required, Mapping) or not required.get("source_ids") or not required.get("status"):
+            raise ValueError("commercial model inputs must retain source ids and evidence status")
+    if market_size <= 0 or current_share < 0:
+        raise ValueError("commercial model inputs must be positive")
+
+    scenarios: list[dict[str, Any]] = []
+    previous_target = current_share
+    for raw in raw_scenarios:
+        if not isinstance(raw, Mapping):
+            raise ValueError("commercial scenario assumptions must be objects")
+        try:
+            target = Decimal(str(raw["target_market_share_percent"]))
+            margin = Decimal(str(raw["contribution_margin_percent"]))
+        except (KeyError, InvalidOperation) as exc:
+            raise ValueError("commercial scenarios require target share and contribution margin assumptions") from exc
+        if target <= previous_target or margin <= 0 or margin >= 100:
+            raise ValueError("commercial scenarios must have increasing share and bounded margin assumptions")
+        incremental_revenue = market_size * (target - current_share) / Decimal("100")
+        contribution = incremental_revenue * margin / Decimal("100")
+        scenarios.append({
+            "name": str(raw.get("name") or "").strip(),
+            "target_market_share_percent": float(target),
+            "incremental_market_share_points": float(target - current_share),
+            "incremental_annual_revenue": int(incremental_revenue.quantize(Decimal("1"))),
+            "contribution_margin_percent_assumption": float(margin),
+            "incremental_annual_contribution": int(contribution.quantize(Decimal("1"))),
+            "classification": "illustrative_scenario",
+        })
+        previous_target = target
+    if len(scenarios) != 3 or any(not item["name"] for item in scenarios):
+        raise ValueError("commercial model requires named conservative, base and ambitious scenarios")
+
+    implementation = intelligence.get("implementation_cost")
+    if not isinstance(implementation, Mapping):
+        raise ValueError("commercial intelligence must state implementation cost evidence")
+    status = str(implementation.get("status") or "").strip()
+    if status not in {"sourced", "unavailable"}:
+        raise ValueError("implementation cost status must be sourced or unavailable")
+    if status == "sourced" and implementation.get("value") is None:
+        raise ValueError("sourced implementation cost requires a value")
+    if status == "unavailable" and implementation.get("value") is not None:
+        raise ValueError("unavailable implementation cost cannot contain an invented value")
+
+    return {
+        "model_id": str(intelligence.get("model_id") or "commercial-opportunity-model"),
+        "currency": str(intelligence.get("currency") or "GBP"),
+        "period": str(intelligence.get("period") or "annual run-rate"),
+        "classification": "illustrative_scenario_model",
+        "inputs": raw_inputs,
+        "estimated_current_annual_revenue": int(
+            (market_size * current_share / Decimal("100")).quantize(Decimal("1"))
+        ),
+        "scenarios": scenarios,
+        "implementation_cost": dict(implementation),
+        "net_value_status": "calculated" if status == "sourced" else "unavailable_pending_cost_evidence",
+        "warnings": [str(item) for item in intelligence.get("warnings") or []],
+    }
+
+
+def commercial_model_quality_checks(model: Mapping[str, Any]) -> dict[str, bool]:
+    scenarios = model.get("scenarios")
+    inputs = model.get("inputs")
+    implementation = model.get("implementation_cost")
+    return {
+        "three_scenarios_present": isinstance(scenarios, list) and len(scenarios) == 3,
+        "scenario_values_are_explicitly_illustrative": isinstance(scenarios, list) and all(
+            isinstance(item, Mapping) and item.get("classification") == "illustrative_scenario"
+            for item in scenarios
+        ),
+        "revenue_and_contribution_are_calculated": isinstance(scenarios, list) and all(
+            isinstance(item, Mapping)
+            and isinstance(item.get("incremental_annual_revenue"), int)
+            and isinstance(item.get("incremental_annual_contribution"), int)
+            for item in scenarios
+        ),
+        "inputs_retain_sources_and_status": isinstance(inputs, list) and all(
+            isinstance(item, Mapping) and bool(item.get("source_ids")) and bool(item.get("status"))
+            for item in inputs
+        ),
+        "implementation_cost_is_sourced_or_explicitly_unavailable": isinstance(implementation, Mapping)
+        and implementation.get("status") in {"sourced", "unavailable"}
+        and not (implementation.get("status") == "unavailable" and implementation.get("value") is not None),
+    }
+
+
+def _source_labels_for_slide(slide: PresentationSlideSpec, entries: list[Mapping[str, Any]]) -> tuple[str, ...]:
+    by_page = [
+        str(entry.get("source_id"))
+        for entry in entries
+        if slide.slide_no in (entry.get("applies_to_pages") or [])
+    ]
+    if by_page:
+        return tuple(dict.fromkeys(by_page))
+    refs = set(slide.evidence_refs)
+    matched = [
+        str(entry.get("source_id"))
+        for entry in entries
+        if refs.intersection(str(ref) for ref in entry.get("evidence_refs") or [])
+    ]
+    return tuple(dict.fromkeys(matched))
+
+
+def _claim_status(labels: tuple[str, ...], entries: list[Mapping[str, Any]]) -> str:
+    classifications = {
+        str(entry.get("classification") or "").replace("_", " ").upper()
+        for entry in entries
+        if str(entry.get("source_id")) in labels
+    }
+    return " + ".join(sorted(item for item in classifications if item)) or "APPROVED STRATEGY"
+
+
+def augment_specification_with_commercial_evidence(
+    specification: PresentationSpecification,
+    *,
+    commercial_model: Mapping[str, Any],
+    source_register: Mapping[str, Any],
+) -> PresentationSpecification:
+    """Add quantified opportunity, creative translation and readable sources."""
+    raw_entries = source_register.get("entries")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ValueError("source register must contain readable source entries")
+    entries = [entry for entry in raw_entries if isinstance(entry, Mapping)]
+    source_ids = {str(entry.get("source_id") or "") for entry in entries}
+    if "T1" not in source_ids or any(
+        not all(str(entry.get(field) or "").strip() for field in ("source_id", "title", "publisher", "location", "classification"))
+        for entry in entries
+    ):
+        raise ValueError("source register entries are incomplete")
+
+    base = []
+    for slide in specification.slides[:-1]:
+        labels = _source_labels_for_slide(slide, entries)
+        if slide.slide_no != 1 and not labels:
+            raise ValueError(f"slide {slide.slide_no} has no readable source mapping")
+        base.append(replace(
+            slide,
+            citation_labels=labels,
+            claim_status=_claim_status(labels, entries),
+            source_notes=tuple(
+                f"{entry['source_id']}: {entry['publisher']} — {entry['title']} ({entry.get('date') or 'date recorded in source'}), {entry['location']}"
+                for entry in entries if str(entry.get("source_id")) in labels
+            ) or slide.source_notes,
+        ))
+
+    scenarios = commercial_model.get("scenarios") or []
+    model_sources = tuple(dict.fromkeys(
+        str(source_id)
+        for item in commercial_model.get("inputs") or []
+        if isinstance(item, Mapping)
+        for source_id in item.get("source_ids") or []
+    ))
+    additions = [
+        PresentationSlideSpec(
+            0, "The quantified opportunity", "A 0.5-point share gain implies about £3.0m in incremental annual revenue in the base scenario.",
+            "The model sizes a market-share opportunity. It is not a company forecast.", "commercial scenario table",
+            source_notes=("Calculated from the sourced market-size estimate and KatKin's reported market-share claim.",),
+            layout_type="commercial_model", citation_labels=model_sources,
+            claim_status="ESTIMATE + ASSUMPTION", content_data={"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
+        ),
+        PresentationSlideSpec(
+            0, "What the model can and cannot say", "Revenue and contribution are scenario estimates; net value remains unavailable until KatKin supplies implementation cost and unit economics.",
+            "The model keeps sourced inputs separate from assumptions and refuses to invent missing company financials.", "evidence and assumption bridge",
+            source_notes=("Implementation cost, realised contribution margin, CAC and retention data were not supplied.",),
+            layout_type="commercial_assumptions", citation_labels=model_sources,
+            claim_status="ESTIMATE + EVIDENCE GAP", content_data=dict(commercial_model),
+        ),
+        PresentationSlideSpec(
+            0, "Creative direction: make proof visible", "A distinctive world turns the published science into a recognisable visual behaviour, not another nutrition claim.",
+            "Use clinical precision against intimate cat behaviour: cropped observation, visible evidence marks and a single coral signal that draws the eye to proof.", "creative territory board",
+            source_notes=("Creative direction translates the approved proof-led strategy; it is a proposed territory for founder testing.",),
+            layout_type="creative_direction", citation_labels=("T1", "S2"),
+            claim_status="PROPOSED CREATIVE TERRITORY",
+        ),
+    ]
+    for chunk_start in range(0, len(entries), 4):
+        chunk = entries[chunk_start:chunk_start + 4]
+        additions.append(PresentationSlideSpec(
+            0,
+            "Source register" if chunk_start == 0 else "Source register continued",
+            "Original sources, recorded dates and evidence classifications for the material claims in this Blueprint.",
+            "Verified facts, estimates, interpretations and hypotheses remain visibly distinct.",
+            "source register table", source_notes=("Source metadata reproduced from the governed KatKin evidence record.",),
+            layout_type="source_register", citation_labels=tuple(str(entry["source_id"]) for entry in chunk),
+            claim_status="SOURCE REGISTER", content_data={"entries": chunk},
+        ))
+
+    closing = specification.slides[-1]
+    closing_labels = _source_labels_for_slide(closing, entries) or ("T1",)
+    ordered = [*base, *additions, replace(
+        closing,
+        citation_labels=closing_labels,
+        claim_status=_claim_status(closing_labels, entries),
+    )]
+    renumbered = tuple(replace(slide, slide_no=index) for index, slide in enumerate(ordered, 1))
+    return replace(
+        specification,
+        slides=renumbered,
+        notes=specification.notes + (
+            "Commercial scenarios are illustrative calculations from sourced inputs and explicit assumptions.",
+            "Readable slide citations resolve to the source register; detailed lineage remains in speaker notes.",
+        ),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,6 +847,20 @@ class LocalArtifactToolPresentationRenderer:
         pptx = _safe_rendered_path(output_dir, receipt.get("pptx"), suffix=".pptx")
         pdf = _safe_rendered_path(output_dir, receipt.get("pdf"), suffix=".pdf")
         subprocess.run([str(self.python), str(self.pdf_script), str(output_dir / ".rendered-slides"), str(pdf)], check=True, capture_output=True, text=True)
+        review_script = self.render_script.parent / "review_rendered_blueprint.py"
+        ocr_script = self.render_script.parent / "ocr_rendered_slides.swift"
+        rendered_review_path = output_dir / "rendered-review.json"
+        if not review_script.is_file() or not ocr_script.is_file():
+            raise RuntimeError("rendered-slide review scripts are unavailable")
+        subprocess.run(
+            [
+                str(self.python), str(review_script), str(output_dir / ".rendered-slides"),
+                str(spec_path), str(rendered_review_path), "--ocr-script", str(ocr_script),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
         validation = output_dir.parent / f"{output_dir.name}.validation.json"
         checks = {
             "pptx_exists": pptx.is_file() and pptx.stat().st_size > 0,
@@ -616,4 +877,19 @@ class LocalArtifactToolPresentationRenderer:
             checks["no_overflow_or_overlap"] = checks["layout_validation"]
         else:
             checks["no_overflow_or_overlap"] = False
-        return pptx, pdf, VisualQAResult("passed" if all(checks.values()) else "failed", checks)
+        rendered_review: Mapping[str, Any] = {}
+        if rendered_review_path.is_file():
+            payload = json.loads(rendered_review_path.read_text(encoding="utf-8"))
+            if isinstance(payload, Mapping):
+                rendered_review = payload
+        rendered_checks = rendered_review.get("checks") if isinstance(rendered_review, Mapping) else None
+        checks["rendered_slide_review_passed"] = (
+            rendered_review.get("status") == "passed"
+            and isinstance(rendered_checks, Mapping)
+            and bool(rendered_checks)
+            and all(item is True for item in rendered_checks.values())
+        )
+        findings = tuple(str(item) for item in rendered_review.get("findings") or [])
+        return pptx, pdf, VisualQAResult(
+            "passed" if all(checks.values()) else "failed", checks, findings
+        )

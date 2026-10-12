@@ -494,11 +494,40 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     """Validate the presentation handoff without treating rendering as approval."""
     qa = output.get("visual_qa")
     qa_checks = qa.get("checks") if isinstance(qa, Mapping) else {}
+    commercial_model = output.get("commercial_model")
+    model_scenarios = commercial_model.get("scenarios") if isinstance(commercial_model, Mapping) else None
+    source_register = output.get("source_register")
+    source_entries = source_register.get("entries") if isinstance(source_register, Mapping) else None
+    execution = output.get("execution_evidence")
     checks = {
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
+        "quantified_commercial_model_is_present": isinstance(model_scenarios, list)
+        and len(model_scenarios) == 3
+        and all(
+            isinstance(item, Mapping)
+            and item.get("classification") == "illustrative_scenario"
+            and isinstance(item.get("incremental_annual_revenue"), int)
+            and isinstance(item.get("incremental_annual_contribution"), int)
+            for item in model_scenarios
+        ),
+        "source_register_is_present": isinstance(source_entries, list)
+        and bool(source_entries)
+        and all(
+            isinstance(item, Mapping)
+            and _meaningful(item.get("source_id"))
+            and _meaningful(item.get("title"))
+            and _meaningful(item.get("location"))
+            and _meaningful(item.get("classification"))
+            for item in source_entries
+        ),
         "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed" and bool(qa_checks) and all(bool(item) for item in qa_checks.values()),
+        "tony_execution_is_recorded": isinstance(execution, Mapping)
+        and execution.get("codex_dependency") is False
+        and isinstance(execution.get("elapsed_seconds"), (int, float))
+        and isinstance(execution.get("provider_calls"), int)
+        and isinstance(execution.get("estimated_provider_cost_gbp"), (int, float)),
         "approval_is_pending": str(output.get("approval_status") or "pending") == "pending",
         "no_external_action_taken": output.get("external_action_taken") is False,
     }

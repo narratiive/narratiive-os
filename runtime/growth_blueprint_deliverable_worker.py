@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import time
 from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
@@ -14,8 +15,11 @@ from runtime.deliverable_production import (
     LocalArtifactToolPresentationRenderer,
     PresentationSpecification,
     _checksum,
+    augment_specification_with_commercial_evidence,
     build_blueprint_director_presentation_spec,
     build_directed_growth_blueprint_presentation_spec,
+    build_quantified_commercial_model,
+    commercial_model_quality_checks,
 )
 
 WorkerAdapter = Callable[[dict[str, Any]], dict[str, Any]]
@@ -25,7 +29,7 @@ class GrowthBlueprintDeliverableWorkerError(RuntimeError):
     """Raised when a Blueprint deliverable cannot be produced truthfully."""
 
 
-RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v2"
+RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v3"
 
 
 class GrowthBlueprintDeliverableWorker:
@@ -43,6 +47,7 @@ class GrowthBlueprintDeliverableWorker:
         self.output_root = Path(output_root)
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
+        started = time.perf_counter()
         context = contract.get("workflow_context")
         if not isinstance(context, Mapping):
             raise GrowthBlueprintDeliverableWorkerError("document worker requires workflow context")
@@ -51,10 +56,16 @@ class GrowthBlueprintDeliverableWorker:
         blueprint = contract.get("quality_accepted_growth_blueprint")
         identity = contract.get("blueprint_identity")
         client_context = contract.get("client_context")
+        commercial_intelligence = contract.get("commercial_intelligence")
+        source_register = contract.get("source_register")
         if not isinstance(blueprint, Mapping) or not isinstance(identity, Mapping):
             raise GrowthBlueprintDeliverableWorkerError("document worker requires structured Blueprint evidence")
         if not isinstance(client_context, Mapping):
             raise GrowthBlueprintDeliverableWorkerError("document worker requires structured client context")
+        if not isinstance(commercial_intelligence, Mapping) or not isinstance(source_register, Mapping):
+            raise GrowthBlueprintDeliverableWorkerError(
+                "full Blueprint production requires commercial intelligence and a source register"
+            )
 
         workspace_id = str(context.get("workspace_id") or "").strip()
         client_id = str(context.get("client_id") or "").strip()
@@ -95,11 +106,27 @@ class GrowthBlueprintDeliverableWorker:
             title=f"Narratiive Growth Blueprint — {brand_name}",
             brand_name=brand_name,
         )
+        try:
+            commercial_model = build_quantified_commercial_model(commercial_intelligence)
+            model_checks = commercial_model_quality_checks(commercial_model)
+            if not all(model_checks.values()):
+                raise ValueError(f"commercial model quality failed: {model_checks}")
+            specification = augment_specification_with_commercial_evidence(
+                specification,
+                commercial_model=commercial_model,
+                source_register=source_register,
+            )
+        except ValueError as exc:
+            raise GrowthBlueprintDeliverableWorkerError(str(exc)) from exc
         deliverable_id = f"growth-blueprint-{stable_id}"
         existing = self.store.load(workspace_id, client_id, deliverable_id)
         if existing is not None:
             self._validate_existing(existing, specification)
-            return self._output(existing, specification, replay=True)
+            return self._output(
+                existing, specification, commercial_model=commercial_model,
+                source_register=source_register, replay=True,
+                elapsed_seconds=time.perf_counter() - started,
+            )
 
         output_dir = self.output_root / workspace_id / client_id / deliverable_id
         record = DeliverableProductionService(self.renderer, self.store).produce(
@@ -109,7 +136,11 @@ class GrowthBlueprintDeliverableWorker:
             output_dir=output_dir,
             created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         )
-        return self._output(record, specification, replay=False)
+        return self._output(
+            record, specification, commercial_model=commercial_model,
+            source_register=source_register, replay=False,
+            elapsed_seconds=time.perf_counter() - started,
+        )
 
     @staticmethod
     def _validate_existing(
@@ -130,13 +161,26 @@ class GrowthBlueprintDeliverableWorker:
         record: DeliverableProductionRecord,
         specification: PresentationSpecification,
         *,
+        commercial_model: Mapping[str, Any],
+        source_register: Mapping[str, Any],
         replay: bool,
+        elapsed_seconds: float,
     ) -> dict[str, Any]:
         return {
             "presentation_specification": specification.to_dict(),
+            "commercial_model": dict(commercial_model),
+            "source_register": dict(source_register),
             "editable_pptx": record.pptx_path,
             "review_pdf": record.pdf_path,
             "visual_qa": record.visual_qa.to_dict(),
+            "execution_evidence": {
+                "executor": "tony-local-artifact-tool",
+                "codex_dependency": False,
+                "elapsed_seconds": round(elapsed_seconds, 3),
+                "provider_calls": 0,
+                "estimated_provider_cost_gbp": 0.0,
+                "cost_basis": "Deterministic local modelling, rendering, PDF assembly and rendered-slide review; excludes local compute and sunk upstream research/generation cost.",
+            },
             "proposed_client_release": {
                 "status": "pending_human_approval",
                 "deliverable_id": record.deliverable_id,
