@@ -120,6 +120,12 @@ def main() -> int:
         findings.append(f"truncation markers detected on rendered slides: {truncated}")
     if duplicate_pairs:
         findings.append(f"near-duplicate rendered layouts detected: {duplicate_pairs}")
+    minimum_citation_slides = max(1, len(slides) - 2)
+    if len(citation_slides) < minimum_citation_slides:
+        findings.append(
+            "readable citations detected on "
+            f"{len(citation_slides)} of {len(slides)} slides; expected at least {minimum_citation_slides}"
+        )
     missing_progression = sorted(set(progression_terms) - set(progression_hits))
     if missing_progression:
         findings.append(f"rendered narrative stages not visible: {missing_progression}")

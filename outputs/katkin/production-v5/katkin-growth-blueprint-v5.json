@@ -1,0 +1,582 @@
+{
+  "approved_blueprint": {
+    "client_facing_blueprint": {
+      "central_argument": "KatKin's constraint is not demand, capital or creative volume — it is that its most defensible asset, independently published research, is being spoken in the most replicable language in the category. The decisive move is to re-anchor the brand in proof through four separate, disciplined decisions — what KatKin stands for, what the owner should feel, the story that carries it, and how it shows up unaided at shelf and in CRM — sequenced through existing first-party data with no new infrastructure, validated with the founder before final lock, and proven through leading indicators before revenue can confirm it.",
+      "pages": [
+        {
+          "act": "Act 1 — The Case for Change",
+          "body": "KatKin has raised $50M in Series C funding, delivered 100M+ meals, and hired its first-ever CMO to build a 'well-known, loved' brand. Yet its public claim — real meat, no fillers, vet-formulated — is now used almost verbatim by Untamed, a competitor operating on roughly a quarter of the funding with stronger organic and AI-search visibility. KatKin's one asset no rival can quickly copy — peer-reviewed, published research on nutrient degradation — is real but currently underused in brand communication. The decisive move is not more reach; it is re-anchoring the brand in proof, through four disciplined, separate decisions.",
+          "commercial_consequence": "Converts a funded, sunk research investment into a usable commercial asset instead of letting it depreciate behind shared category language.",
+          "headline": "KatKin's constraint is not demand, capital or creative volume — it's a defensible asset spoken in a replicable voice",
+          "page_number": 1,
+          "visual_archetype": "single_thesis_page",
+          "visual_opportunity": "Single bold assertion statement flanked by three proof props: funding scale, competitor search performance, underused research asset."
+        },
+        {
+          "act": "Act 1 — The Case for Change",
+          "body": "Wrong question: how to out-spend or out-create competitors on reach, given KatKin already runs 300+ active paid-social ads and ships roughly 114 new creatives a week. Right question: what can KatKin claim permanently that a funded rival cannot replicate in one ad cycle, and does that claim still work once personalisation disappears at retail. This Blueprint answers the diagnosis and activation sequencing; full creative execution is a recommended next-phase commission, not delivered here.",
+          "commercial_consequence": "Redirects the CMO mandate from spend-led awareness building toward asset-led differentiation, changing what gets resourced next quarter.",
+          "headline": "The brief isn't 'build more brand awareness' — it's 'find what only KatKin can prove'",
+          "page_number": 2,
+          "visual_archetype": "question_frame",
+          "visual_opportunity": "Wrong question / right question contrast frame, with the scope boundary of this Blueprint marked explicitly."
+        },
+        {
+          "act": "Act 1 — The Case for Change",
+          "body": "Category functional language has commoditised across DTC entrants. Discovery is shifting toward organic and AI search, where a lower-funded rival currently leads. Paid-social costs keep climbing under high creative volume. KatKin operates from a loss-making balance position that shortens the runway for experimentation. And a first CMO hire has set an explicit, unmet brand mandate. Root cause: message sameness has left paid media as the only lever, and that lever is getting more expensive — this is not a demand or product problem.",
+          "commercial_consequence": "Establishes urgency to act within the current planning cycle, directly tied to a loss-making position that shortens the decision window.",
+          "headline": "Five forces are closing the window, and none are solved by more paid reach",
+          "page_number": 3,
+          "visual_archetype": "ecosystem_map_of_forces",
+          "visual_opportunity": "Five-force ecosystem map weighted by urgency, overlaid on a simplified funding-and-loss timeline."
+        },
+        {
+          "act": "Act 2 — Market and Competitive Diagnosis",
+          "body": "Across DTC competitors, 'real meat, no fillers, vet-formulated' is now shared vocabulary — Untamed uses it near-verbatim on a fraction of KatKin's funding. No competitor has claimed independent, peer-reviewed proof as owned territory, because publishing research is slow and costly — which is exactly why it is defensible. This gap matters most to proof-seeking switchers and to investors assessing defensibility. Whether it persuades the much larger group of owners who have never questioned their current food is untested and should be treated as a hypothesis, not a fact.",
+          "commercial_consequence": "Converting this gap into owned territory could reduce reliance on functional-claim parity and support earned, not only paid, discovery — a mechanism, not a guaranteed outcome.",
+          "headline": "Every brand says the same thing; only one has the published proof to say something else",
+          "page_number": 4,
+          "visual_archetype": "sameness_audit",
+          "visual_opportunity": "Competitor claim grid showing repeated phrases, with a white-space map highlighting the empty 'independent proof' quadrant."
+        },
+        {
+          "act": "Act 2 — Market and Competitive Diagnosis",
+          "body": "The tension at the centre of this Blueprint: owners are shown assertion-led claims when KatKin's real edge is evidence-led. Whether consumers reward independently verified proof over confident assertion, at the speed of a retail glance or a six-second ad, is a validation-required hypothesis, not an established fact. If true, it changes what gets built next; if false, KatKin should stay on functional-claim parity and compete on spend and creative volume instead.",
+          "commercial_consequence": "Forces an explicit choice before committing production budget: build around proof (higher differentiation, higher validation risk) or stay on shared claims (lower risk, no new differentiation).",
+          "headline": "KatKin did the hard, expensive part of proof — and is marketing the easy, copyable part instead",
+          "page_number": 5,
+          "visual_archetype": "provocation_page",
+          "visual_opportunity": "Split provocation page contrasting 'claim' and 'proof' as two divergent paths, with a validation-checkpoint marker."
+        },
+        {
+          "act": "Act 3 — Audience and Demand Opportunity",
+          "body": "Current messaging centres the committed DTC subscriber who completes a quiz and receives a personalised plan — the audience already captured. Growth sits with two under-addressed pools: affluent retail converts who buy without quiz exposure, and mainstream owners who have never questioned their current food. Behavioural evidence exists only for DTC proxies (login behaviour, order cadence, proxy-income signals); no verified profile yet exists for either growth pool. This is an observed data gap, not a judgement about audience size.",
+          "commercial_consequence": "Prevents over-resourcing creative for an audience that is already converting, at the expense of the two pools carrying the real growth prize.",
+          "headline": "KatKin's loudest signal reaches the one audience it has already won",
+          "page_number": 6,
+          "visual_archetype": "audience_reality_split",
+          "visual_opportunity": "Split panel: DTC quiz journey (data-rich) versus retail/mainstream journey (data-poor), labelled by evidence confidence."
+        },
+        {
+          "act": "Act 3 — Audience and Demand Opportunity",
+          "body": "Committed DTC (observed): motivated by proof and a cat-as-family belief, already paying a premium. Affluent retail converts (partially observed): buy unaided at shelf, trust review volume and vet credibility, but face a multi-cat pricing ceiling. Mainstream prospective owners (hypothesis): likely price- and habit-anchored, lowest evidence confidence, no segment-specific data exists. Motivation, barrier and trigger differ materially by pool; treating them identically wastes the proof asset's leverage.",
+          "commercial_consequence": "Directs investment sequencing by evidence confidence, not assumed importance — the mainstream pool should be validated before media spend is committed to it.",
+          "headline": "Three growth pools need three different jobs from the same proof",
+          "page_number": 7,
+          "visual_archetype": "demand_pool_cards",
+          "visual_opportunity": "Three demand-pool cards, each tagged observed / partially observed / hypothesis."
+        },
+        {
+          "act": "Act 3 — Audience and Demand Opportunity",
+          "body": "Mapped by mechanism: discovery happens mostly through paid social and, for competitors, organic and AI search; consideration and trust-building happen through the quiz and CRM using existing first-party data; acquisition converts via trial-box discounting; retail conversion must happen unaided, without quiz or targeting, inside a few seconds of shelf attention; retention is threatened by documented palatability and packaging-transition friction. Each stage needs its own version of the proof claim — none of these mechanisms are interchangeable.",
+          "commercial_consequence": "Prevents a single creative asset being asked to do five different jobs; each stage gets its own measurable mechanism and owner.",
+          "headline": "The trust-builder that works in a DTC quiz cannot survive three seconds on a shelf",
+          "page_number": 8,
+          "visual_archetype": "tension_plus_journey_matrix",
+          "visual_opportunity": "Journey matrix across discovery, consideration, acquisition, retail conversion and retention, showing the trust signal available or missing at each stage."
+        },
+        {
+          "act": "Act 4 — Positioning and Narrative Answer",
+          "body": "We Are: the brand that proves what rigorous feline nutrition means, through independently published research and vet formulation. We Are Not: a fresher-sounding version of the same ingredient story every competitor tells. Because: cats deserve nutrition validated by independent science, not manufacturer assertion. This is a provisional decision, explicitly pending founder pressure-testing against competitive and customer evidence before it is finalised — it is not yet approved as final brand language. Mechanism: shifts the basis of differentiation from functional parity to proof scarcity. Next action: commission the founder pressure-test.",
+          "commercial_consequence": "Gives every team one falsifiable sentence to brief from, replacing today's message drift across paid, CRM and retail.",
+          "headline": "Decision one: what KatKin stands for — proof, not promise",
+          "page_number": 9,
+          "visual_archetype": "we_are_we_are_not_framework",
+          "visual_opportunity": "We Are / We Are Not / Because triptych with a visible 'pending founder validation' marker."
+        },
+        {
+          "act": "Act 4 — Positioning and Narrative Answer",
+          "body": "Positioning defines what KatKin stands for; this decision defines what the customer gets. The proposed benefit is confidence: the owner no longer has to evaluate marketing claims themselves, because an independent third party already did it. This differs from today's outcome-led benefit set (shinier coat, better digestion, reduced odour). Mechanism: confidence reduces decision friction at the point of switching. Evidence: outcome claims are documented in current marketing; a confidence-led benefit is not yet tested. What must be validated: whether confidence outperforms outcome-led testimonial content for the two growth pools specifically.",
+          "commercial_consequence": "If validated, shifts creative briefs from 'prove the food works' to 'prove you don't need to take our word for it' — a different commercial case for performance-marketing teams.",
+          "headline": "Decision two: what the owner should feel — confidence, not persuasion",
+          "page_number": 10,
+          "visual_archetype": "brand_diagnosis_scorecard",
+          "visual_opportunity": "Before/after benefit comparison: outcome-led claim versus confidence-led claim, side by side."
+        },
+        {
+          "act": "Act 4 — Positioning and Narrative Answer",
+          "body": "Tension: owners want proof; the category offers assertion. Shift: from trusting ingredient lists to trusting independent science. Resolution: KatKin's published research and vet formulation stand in for the owner's own due diligence. This creative-platform decision is distinct from the positioning statement and the consumer benefit, and must be tested for whether it reads identically in a DTC quiz, a CRM email and a three-second shelf glance. The shelf translation is the least tested, highest-risk part of this platform.",
+          "commercial_consequence": "One flexible story could reduce reliance on the current high-volume weekly creative production needed to sustain differentiation, if the shelf and CRM translations hold up under test.",
+          "headline": "Decision three: the story that carries it — 'The Science Cats Deserve'",
+          "page_number": 11,
+          "visual_archetype": "narrative_platform_framework",
+          "visual_opportunity": "Tension → shift → resolution → meaning arc, with an explicit 'untested' flag on the shelf-translation step."
+        },
+        {
+          "act": "Act 4 — Positioning and Narrative Answer",
+          "body": "Master message: nutrition proven, not promised. Proof layers: published in a peer-reviewed journal; formulated by a Board-Certified Veterinary Nutritionist; vertically integrated production. Objection to pre-empt: isn't all vet-formulated food the same? Answer: peer-reviewed means independently checked, not self-certified. Execution differs by context: the DTC quiz carries the full story; CRM sequences it using only existing login, order-cadence and proxy-income data, with no new infrastructure; retail carries a single compressed proof mark, since personalisation and targeting are unavailable at shelf.",
+          "commercial_consequence": "Equips CRM and retail teams with one shared brief instead of two diverging narratives, reducing coordination cost between DTC and retail functions.",
+          "headline": "Decision four: how it shows up unaided — one proof, three executions",
+          "page_number": 12,
+          "visual_archetype": "message_architecture",
+          "visual_opportunity": "Message architecture pyramid from master message down to the three distinct execution contexts."
+        },
+        {
+          "act": "Act 5 — The Growth System",
+          "body": "If the proof-led platform holds, four growth mechanisms follow: earned and organic-search lift reducing dependence on paid-creative volume; defensible premium retail pricing without discount-led trial; more efficient CRM spend from behavioural segmentation using only existing data; and earlier investor confidence from leading indicators ahead of lagging revenue. No revenue, margin or CAC figures are modelled here — KatKin's sales, AOV and margin data were not supplied, so sizing requires a dedicated commercial-modelling phase with real data access.",
+          "commercial_consequence": "Frames the shift in terms investors already track — pricing power and CAC — without asserting unverified numbers.",
+          "headline": "The prize is pricing power and cheaper growth — not simply more reach",
+          "page_number": 13,
+          "visual_archetype": "commercial_opportunity_model",
+          "visual_opportunity": "Illustrative value-driver diagram explicitly labelled 'illustrative, unmodelled, mechanism only.'"
+        },
+        {
+          "act": "Act 5 — The Growth System",
+          "body": "DTC quiz: discovery and education, fully personalised. CRM: trust-building and retention, built only from existing first-party data. Retail shelf: conversion, unaided by targeting or personalisation, carrying the compressed proof mark. Earned and organic search: scale discovery where a competitor currently outperforms KatKin on funding-adjusted terms. Paid social: volume driver, currently the most expensive and most exposed to sameness, to be rebalanced downward as earned channels prove out.",
+          "commercial_consequence": "Rebalances channel investment toward mechanisms that can compound without continuous paid spend, directly answering the rising-CAC constraint named earlier.",
+          "headline": "Retail has three seconds to do what CRM does in three emails",
+          "page_number": 14,
+          "visual_archetype": "channel_role_map",
+          "visual_opportunity": "Channel role map assigning a single strategic job per channel, with hand-offs shown between stages."
+        },
+        {
+          "act": "Act 6 — Implementation and Measurement",
+          "body": "Priority order, by commercial importance and evidence confidence: (1) founder pressure-test of the positioning against competitive and customer evidence — highest importance, lowest cost, must happen first; (2) build DTC/retail-convert/mainstream segmentation using only existing login, order-cadence and proxy-income data — high importance, high feasibility, data already exists; (3) retail-shelf translation test of the compressed proof mark — high importance, medium feasibility, requires retail cooperation; (4) draft the interim leading-indicator framework — medium-term, enables investor visibility. Days 1-30: items 1-2. Days 31-60: item 3. Days 61-90: roll validated narrative into CRM and earned content; hold wider rollout pending shelf-test results.",
+          "commercial_consequence": "Sequences spend so the cheapest, highest-confidence validation step happens before any retail or creative production investment is committed.",
+          "headline": "Validate before you commit — founder sign-off gates the final narrative lock",
+          "page_number": 15,
+          "visual_archetype": "constraint_priority_roadmap",
+          "visual_opportunity": "90-day roadmap with a visible founder-approval gate and a feasibility/importance priority key."
+        },
+        {
+          "act": "Act 6 — Implementation and Measurement",
+          "body": "Leading indicators (3-6 months): unaided claim recognition, shelf-test comprehension of the proof mark, organic/earned search share versus the leading competitor, CRM engagement on proof-led content. Lagging indicators: retail sell-through, blended CAC trend, subscriber retention. Commercial indicators: price realisation versus discount dependency. Decision rule: scale retail and earned investment where leading indicators move within the window; hold paid spend and re-test messaging if they do not.",
+          "commercial_consequence": "Gives the founder and investors a credible early read on strategy health ahead of the stated runway checkpoint, directly addressing the loss-making position named at the outset.",
+          "headline": "Prove the shift is working before revenue can show it",
+          "page_number": 16,
+          "visual_archetype": "priority_matrix_plus_measurement_stack",
+          "visual_opportunity": "Measurement pyramid with leading, lagging and commercial tiers and explicit scale/hold/stop triggers."
+        },
+        {
+          "act": "Act 6 — Implementation and Measurement",
+          "body": "KatKin's hardest-to-replicate asset is its science, not its freshness story. The required shift: four separate, disciplined decisions — what KatKin stands for, what the owner should feel, the story that carries it, and how it shows up unaided — validated with the founder and proven by leading indicators before revenue confirms it. Immediate next step: commission the founder pressure-test and the retail-shelf translation test in parallel.",
+          "commercial_consequence": "Converts an underused, already-funded credential into the next phase of defensible, less paid-dependent growth.",
+          "headline": "Stop competing on the claim anyone can copy. Compete on the proof no one else has.",
+          "page_number": 17,
+          "visual_archetype": "closing_mandate",
+          "visual_opportunity": "Single closing statement page with the four-decisions framework recapped as a simple iconography strip."
+        }
+      ],
+      "title": "The Narratiive Growth Blueprint — KatKin"
+    },
+    "editorial_trace": [
+      {
+        "evidence_refs": [
+          "thesis:thesis_statement",
+          "thesis:growth_opportunity",
+          "ev_5c64#s1",
+          "ev_5c64#s2",
+          "ev_5c64#s5"
+        ],
+        "page_number": 1
+      },
+      {
+        "evidence_refs": [
+          "thesis:commercial_ambition",
+          "ev_5c64#s5"
+        ],
+        "page_number": 2
+      },
+      {
+        "evidence_refs": [
+          "ev_5c64#s1",
+          "ev_5c64#s3",
+          "ev_5c64#s5",
+          "thesis:activation_principles"
+        ],
+        "page_number": 3
+      },
+      {
+        "evidence_refs": [
+          "ev_5c64#s2",
+          "ev_5c64#s3",
+          "thesis:category_choice",
+          "thesis:source_of_difference"
+        ],
+        "page_number": 4
+      },
+      {
+        "evidence_refs": [
+          "thesis:positioning_choice",
+          "ev_5c64#s2",
+          "ev_5c64#s3"
+        ],
+        "page_number": 5
+      },
+      {
+        "evidence_refs": [
+          "thesis:priority_audience",
+          "ev_5c64#s4"
+        ],
+        "page_number": 6
+      },
+      {
+        "evidence_refs": [
+          "thesis:priority_audience",
+          "ev_5c64#s4"
+        ],
+        "page_number": 7
+      },
+      {
+        "evidence_refs": [
+          "ev_5c64#s4",
+          "ev_5c64#s5",
+          "ev_5c64#s6",
+          "thesis:priority_audience"
+        ],
+        "page_number": 8
+      },
+      {
+        "evidence_refs": [
+          "thesis:positioning_choice",
+          "ev_5c64#s2",
+          "ev_5c64#s3"
+        ],
+        "page_number": 9
+      },
+      {
+        "evidence_refs": [
+          "thesis:positioning_choice",
+          "ev_5c64#s2"
+        ],
+        "page_number": 10
+      },
+      {
+        "evidence_refs": [
+          "thesis:narrative_platform",
+          "ev_5c64#s2"
+        ],
+        "page_number": 11
+      },
+      {
+        "evidence_refs": [
+          "thesis:narrative_platform",
+          "thesis:source_of_difference",
+          "ev_5c64#s2",
+          "thesis:activation_principles"
+        ],
+        "page_number": 12
+      },
+      {
+        "evidence_refs": [
+          "thesis:growth_opportunity",
+          "ev_5c64#s1",
+          "ev_5c64#s5"
+        ],
+        "page_number": 13
+      },
+      {
+        "evidence_refs": [
+          "thesis:activation_principles",
+          "ev_5c64#s3",
+          "ev_5c64#s5"
+        ],
+        "page_number": 14
+      },
+      {
+        "evidence_refs": [
+          "thesis:activation_principles",
+          "ev_5c64#s4"
+        ],
+        "page_number": 15
+      },
+      {
+        "evidence_refs": [
+          "ev_5c64#s1",
+          "ev_5c64#s5",
+          "ev_5c64#s6"
+        ],
+        "page_number": 16
+      },
+      {
+        "evidence_refs": [
+          "thesis:thesis_statement"
+        ],
+        "page_number": 17
+      }
+    ]
+  },
+  "commercial_model": {
+    "classification": "illustrative_scenario_model",
+    "currency": "GBP",
+    "estimated_current_annual_revenue": 12000000,
+    "implementation_cost": {
+      "missing_inputs": [
+        "approved implementation scope and delivery budget",
+        "media reallocation budget",
+        "retail production and test costs"
+      ],
+      "status": "unavailable",
+      "value": null
+    },
+    "inputs": [
+      {
+        "basis": "Existing Research Engine conversion of the Research & Markets USD 765.91m estimate to approximately GBP 600m.",
+        "input_id": "market_size",
+        "label": "Estimated UK cat food market",
+        "source_ids": [
+          "S8"
+        ],
+        "source_refs": [
+          "ev_5c64#s1"
+        ],
+        "status": "derived_estimate",
+        "unit": "GBP",
+        "value": 600000000
+      },
+      {
+        "basis": "The Grocer reporting of KatKin's Series C announcement, December 2025.",
+        "input_id": "current_market_share_percent",
+        "label": "KatKin reported UK cat food market share",
+        "source_ids": [
+          "S1A"
+        ],
+        "source_refs": [
+          "ev_5c64#s1"
+        ],
+        "status": "reported_claim",
+        "unit": "percent",
+        "value": 2.0
+      }
+    ],
+    "model_id": "katkin-commercial-opportunity-v5",
+    "net_value_status": "unavailable_pending_cost_evidence",
+    "period": "incremental annual run-rate at target share",
+    "scenarios": [
+      {
+        "classification": "illustrative_scenario",
+        "contribution_margin_percent_assumption": 30.0,
+        "incremental_annual_contribution": 450000,
+        "incremental_annual_revenue": 1500000,
+        "incremental_market_share_points": 0.25,
+        "name": "Conservative",
+        "target_market_share_percent": 2.25
+      },
+      {
+        "classification": "illustrative_scenario",
+        "contribution_margin_percent_assumption": 40.0,
+        "incremental_annual_contribution": 1200000,
+        "incremental_annual_revenue": 3000000,
+        "incremental_market_share_points": 0.5,
+        "name": "Base",
+        "target_market_share_percent": 2.5
+      },
+      {
+        "classification": "illustrative_scenario",
+        "contribution_margin_percent_assumption": 50.0,
+        "incremental_annual_contribution": 3000000,
+        "incremental_annual_revenue": 6000000,
+        "incremental_market_share_points": 1.0,
+        "name": "Ambitious",
+        "target_market_share_percent": 3.0
+      }
+    ],
+    "warnings": [
+      "This is a market-share scenario model, not a KatKin forecast.",
+      "The market size is a Research Engine estimate, not a filed KatKin figure.",
+      "Contribution margins are sensitivity assumptions because KatKin margin data was not supplied.",
+      "Net value and payback remain unavailable until implementation cost, CAC and retention inputs are supplied."
+    ]
+  },
+  "source_register": {
+    "entries": [
+      {
+        "applies_to_pages": [
+          1,
+          3,
+          13,
+          16
+        ],
+        "classification": "verified_fact",
+        "date": "December 2025",
+        "evidence_refs": [
+          "ev_5c64#s1"
+        ],
+        "location": "thegrocer.co.uk (Series C report)",
+        "publisher": "The Grocer",
+        "source_id": "S1A",
+        "title": "Series C, market share and 100m-meal scale report"
+      },
+      {
+        "applies_to_pages": [
+          3,
+          16
+        ],
+        "classification": "verified_fact",
+        "date": "FY2023",
+        "evidence_refs": [
+          "ev_5c64#s1"
+        ],
+        "location": "companieshouse.gov.uk; companiesintheuk.co.uk",
+        "publisher": "Companies House / Companies in the UK",
+        "source_id": "S1B",
+        "title": "Anikin Ltd statutory accounts and balance sheet"
+      },
+      {
+        "applies_to_pages": [
+          1,
+          3
+        ],
+        "classification": "verified_fact",
+        "date": "2025",
+        "evidence_refs": [
+          "ev_5c64#s1",
+          "ev_5c64#s5"
+        ],
+        "location": "marketingweek.com",
+        "publisher": "Marketing Week",
+        "source_id": "S1C",
+        "title": "Lloyd Page appointed first CMO"
+      },
+      {
+        "applies_to_pages": [
+          1,
+          4,
+          5,
+          9,
+          10,
+          11,
+          12,
+          13
+        ],
+        "classification": "verified_fact",
+        "date": "accessed 11 September 2026",
+        "evidence_refs": [
+          "ev_5c64#s2"
+        ],
+        "location": "katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
+        "publisher": "KatKin / Journal of Animal Science",
+        "source_id": "S2",
+        "title": "KatKin heat-damage study and peer-reviewed AGE research"
+      },
+      {
+        "applies_to_pages": [
+          1,
+          3,
+          4,
+          9
+        ],
+        "classification": "interpretation",
+        "date": "Q3 2025 to September 2026",
+        "evidence_refs": [
+          "ev_5c64#s3"
+        ],
+        "location": "untamed.com; bubblegumsearch.com",
+        "publisher": "Untamed / Bubblegum Search",
+        "source_id": "S3",
+        "title": "Competitor claims and organic-search comparison"
+      },
+      {
+        "applies_to_pages": [
+          6,
+          7,
+          8,
+          10,
+          15
+        ],
+        "classification": "mixed_fact_and_hypothesis",
+        "date": "accessed 11 September 2026",
+        "evidence_refs": [
+          "ev_5c64#s4"
+        ],
+        "location": "katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
+        "publisher": "KatKin / Trustpilot / Cats.com",
+        "source_id": "S4",
+        "title": "Pricing, reviews and customer-friction evidence"
+      },
+      {
+        "applies_to_pages": [
+          1,
+          2,
+          3,
+          13,
+          14
+        ],
+        "classification": "verified_fact",
+        "date": "accessed 11 September 2026",
+        "evidence_refs": [
+          "ev_5c64#s5"
+        ],
+        "location": "motionapp.com/library/katkin; marketingweek.com",
+        "publisher": "Motion / Marketing Week",
+        "source_id": "S5",
+        "title": "Paid-social volume and creative analysis"
+      },
+      {
+        "applies_to_pages": [
+          6,
+          8,
+          14,
+          15
+        ],
+        "classification": "verified_fact",
+        "date": "August 2025",
+        "evidence_refs": [
+          "ev_5c64#s6"
+        ],
+        "location": "petbusinessworld.co.uk",
+        "publisher": "Pet Business World",
+        "source_id": "S6",
+        "title": "Jollyes retail rollout across 80 stores"
+      },
+      {
+        "applies_to_pages": [
+          8,
+          14
+        ],
+        "classification": "verified_fact",
+        "date": "30 November 2023",
+        "evidence_refs": [
+          "ev_5c64#s7"
+        ],
+        "location": "active.partners",
+        "publisher": "Active Partners",
+        "source_id": "S7",
+        "title": "Series B strategy and retail partnership context"
+      },
+      {
+        "applies_to_pages": [
+          13
+        ],
+        "classification": "third_party_estimate",
+        "date": "2025 report",
+        "evidence_refs": [
+          "ev_5c64#s1"
+        ],
+        "location": "researchandmarkets.com",
+        "publisher": "Research & Markets",
+        "source_id": "S8",
+        "title": "UK cat food market estimate, USD 765.91m"
+      },
+      {
+        "applies_to_pages": [
+          1,
+          2,
+          9,
+          10,
+          11,
+          12,
+          17
+        ],
+        "classification": "approved_strategy",
+        "date": "September 2026",
+        "evidence_refs": [
+          "thesis:thesis_statement",
+          "thesis:growth_opportunity",
+          "thesis:commercial_ambition",
+          "thesis:activation_principles",
+          "thesis:category_choice",
+          "thesis:source_of_difference",
+          "thesis:positioning_choice",
+          "thesis:priority_audience",
+          "thesis:narrative_platform"
+        ],
+        "location": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+        "publisher": "Narratiive governed workflow",
+        "source_id": "T1",
+        "title": "Approved KatKin Strategy Thesis"
+      }
+    ],
+    "register_id": "katkin-source-register-v5"
+  }
+}

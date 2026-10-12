@@ -169,7 +169,7 @@ def main() -> int:
     runtime = build_tony_workflow_runtime(
         args.runtime_root.resolve(), workspace_id="narratiive", client_id="katkin"
     )
-    run_id = "katkin-growth-blueprint-deliverable-v5"
+    run_id = "katkin-growth-blueprint-deliverable-v5-final"
     inputs = {
         "quality_accepted_growth_blueprint": candidate,
         "blueprint_identity": {"artifact_id": "katkin-growth-blueprint-v5", "version": 5, "checksum": candidate_checksum},
@@ -196,6 +196,14 @@ def main() -> int:
     )
     state = runtime.runs.load_run(run_id)
     stage = state.stage("produce_growth_blueprint_deliverable")
+    if (
+        state.status.value == "blocked"
+        and str(stage.blocker or state.blocker or "").startswith("worker_unavailable:")
+        and not stage.output_artifacts
+    ):
+        runtime.resume(run_id)
+        state = runtime.runs.load_run(run_id)
+        stage = state.stage("produce_growth_blueprint_deliverable")
     if state.status.value == "active" and not stage.output_artifacts:
         runtime.advance(run_id, lifecycle)
         state = runtime.runs.load_run(run_id)

@@ -1,0 +1,13 @@
+{
+  "codex_dependency": false,
+  "cost_basis": "Deterministic local modelling, rendering, PDF assembly and rendered-slide review; excludes local compute and sunk upstream research/generation cost.",
+  "elapsed_seconds": 12.27,
+  "estimated_provider_cost_gbp": 0.0,
+  "executor": "tony-local-artifact-tool",
+  "provider_calls": 0,
+  "upstream_cost_treatment": "sunk prior generation; exact historical price unavailable",
+  "upstream_model": "claude-sonnet-5",
+  "upstream_provider": "anthropic",
+  "upstream_provider_calls_reused": 1,
+  "upstream_provider_message_id": "msg_011Cfs5V5A6cuWM5SJPi1w59"
+}

@@ -58,4 +58,3 @@ for url in slideURLs {
 
 let encoded = try JSONSerialization.data(withJSONObject: ["slides": results], options: [.prettyPrinted, .sortedKeys])
 try encoded.write(to: outputURL, options: .atomic)
-

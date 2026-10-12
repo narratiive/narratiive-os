@@ -1,0 +1,201 @@
+{
+  "entries": [
+    {
+      "applies_to_pages": [
+        1,
+        3,
+        13,
+        16
+      ],
+      "classification": "verified_fact",
+      "date": "December 2025",
+      "evidence_refs": [
+        "ev_5c64#s1"
+      ],
+      "location": "thegrocer.co.uk (Series C report)",
+      "publisher": "The Grocer",
+      "source_id": "S1A",
+      "title": "Series C, market share and 100m-meal scale report"
+    },
+    {
+      "applies_to_pages": [
+        3,
+        16
+      ],
+      "classification": "verified_fact",
+      "date": "FY2023",
+      "evidence_refs": [
+        "ev_5c64#s1"
+      ],
+      "location": "companieshouse.gov.uk; companiesintheuk.co.uk",
+      "publisher": "Companies House / Companies in the UK",
+      "source_id": "S1B",
+      "title": "Anikin Ltd statutory accounts and balance sheet"
+    },
+    {
+      "applies_to_pages": [
+        1,
+        3
+      ],
+      "classification": "verified_fact",
+      "date": "2025",
+      "evidence_refs": [
+        "ev_5c64#s1",
+        "ev_5c64#s5"
+      ],
+      "location": "marketingweek.com",
+      "publisher": "Marketing Week",
+      "source_id": "S1C",
+      "title": "Lloyd Page appointed first CMO"
+    },
+    {
+      "applies_to_pages": [
+        1,
+        4,
+        5,
+        9,
+        10,
+        11,
+        12,
+        13
+      ],
+      "classification": "verified_fact",
+      "date": "accessed 11 September 2026",
+      "evidence_refs": [
+        "ev_5c64#s2"
+      ],
+      "location": "katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
+      "publisher": "KatKin / Journal of Animal Science",
+      "source_id": "S2",
+      "title": "KatKin heat-damage study and peer-reviewed AGE research"
+    },
+    {
+      "applies_to_pages": [
+        1,
+        3,
+        4,
+        9
+      ],
+      "classification": "interpretation",
+      "date": "Q3 2025 to September 2026",
+      "evidence_refs": [
+        "ev_5c64#s3"
+      ],
+      "location": "untamed.com; bubblegumsearch.com",
+      "publisher": "Untamed / Bubblegum Search",
+      "source_id": "S3",
+      "title": "Competitor claims and organic-search comparison"
+    },
+    {
+      "applies_to_pages": [
+        6,
+        7,
+        8,
+        10,
+        15
+      ],
+      "classification": "mixed_fact_and_hypothesis",
+      "date": "accessed 11 September 2026",
+      "evidence_refs": [
+        "ev_5c64#s4"
+      ],
+      "location": "katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
+      "publisher": "KatKin / Trustpilot / Cats.com",
+      "source_id": "S4",
+      "title": "Pricing, reviews and customer-friction evidence"
+    },
+    {
+      "applies_to_pages": [
+        1,
+        2,
+        3,
+        13,
+        14
+      ],
+      "classification": "verified_fact",
+      "date": "accessed 11 September 2026",
+      "evidence_refs": [
+        "ev_5c64#s5"
+      ],
+      "location": "motionapp.com/library/katkin; marketingweek.com",
+      "publisher": "Motion / Marketing Week",
+      "source_id": "S5",
+      "title": "Paid-social volume and creative analysis"
+    },
+    {
+      "applies_to_pages": [
+        6,
+        8,
+        14,
+        15
+      ],
+      "classification": "verified_fact",
+      "date": "August 2025",
+      "evidence_refs": [
+        "ev_5c64#s6"
+      ],
+      "location": "petbusinessworld.co.uk",
+      "publisher": "Pet Business World",
+      "source_id": "S6",
+      "title": "Jollyes retail rollout across 80 stores"
+    },
+    {
+      "applies_to_pages": [
+        8,
+        14
+      ],
+      "classification": "verified_fact",
+      "date": "30 November 2023",
+      "evidence_refs": [
+        "ev_5c64#s7"
+      ],
+      "location": "active.partners",
+      "publisher": "Active Partners",
+      "source_id": "S7",
+      "title": "Series B strategy and retail partnership context"
+    },
+    {
+      "applies_to_pages": [
+        13
+      ],
+      "classification": "third_party_estimate",
+      "date": "2025 report",
+      "evidence_refs": [
+        "ev_5c64#s1"
+      ],
+      "location": "researchandmarkets.com",
+      "publisher": "Research & Markets",
+      "source_id": "S8",
+      "title": "UK cat food market estimate, USD 765.91m"
+    },
+    {
+      "applies_to_pages": [
+        1,
+        2,
+        9,
+        10,
+        11,
+        12,
+        17
+      ],
+      "classification": "approved_strategy",
+      "date": "September 2026",
+      "evidence_refs": [
+        "thesis:thesis_statement",
+        "thesis:growth_opportunity",
+        "thesis:commercial_ambition",
+        "thesis:activation_principles",
+        "thesis:category_choice",
+        "thesis:source_of_difference",
+        "thesis:positioning_choice",
+        "thesis:priority_audience",
+        "thesis:narrative_platform"
+      ],
+      "location": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+      "publisher": "Narratiive governed workflow",
+      "source_id": "T1",
+      "title": "Approved KatKin Strategy Thesis"
+    }
+  ],
+  "register_id": "katkin-source-register-v5"
+}

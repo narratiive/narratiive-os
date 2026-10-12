@@ -1,0 +1,119 @@
+{
+  "blueprint_director_quality_gate": {
+    "checks": {
+      "backstage_editorial_trace_preserves_evidence": true,
+      "client_copy_excludes_internal_governance_schema": true,
+      "client_facing_blueprint_is_a_complete_editorial_product": true,
+      "headlines_and_consequences_are_substantive": true,
+      "no_false_external_execution_claim": true,
+      "page_sequence_supports_coherent_pacing": true,
+      "visual_story_uses_purposeful_forms": true
+    },
+    "failed_checks": [],
+    "passed": true
+  },
+  "commercial_model_quality_checks": {
+    "implementation_cost_is_sourced_or_explicitly_unavailable": true,
+    "inputs_retain_sources_and_status": true,
+    "revenue_and_contribution_are_calculated": true,
+    "scenario_values_are_explicitly_illustrative": true,
+    "three_scenarios_present": true
+  },
+  "governed_intelligence_quality_gate": {
+    "checks": {
+      "all_strategic_questions_are_substantive": true,
+      "artefact_is_complete_and_not_truncated": true,
+      "audience_intelligence_exceeds_demographics": true,
+      "central_thesis_is_non_obvious_specific_and_evidence_linked": true,
+      "commercial_consequence_is_explicit": true,
+      "editorial_judgement_is_explicit": true,
+      "evidence_and_uncertainty_are_explicit": true,
+      "evidence_lineage_is_complete": true,
+      "fact_interpretation_hypothesis_lineage_is_complete": true,
+      "key_strategic_choices_are_explicit": true,
+      "material_contradictions_are_resolved": true,
+      "missing_evidence_is_not_silently_guessed": true,
+      "narrative_is_a_cumulative_argument": true,
+      "no_false_external_execution_claim": true,
+      "quantitative_evidence_is_honestly_labelled": true,
+      "recommendation_is_advance": true
+    },
+    "failed_checks": [],
+    "passed": true
+  },
+  "presentation_quality_gate": {
+    "checks": {
+      "approval_is_pending": true,
+      "editable_pptx_is_present": true,
+      "no_external_action_taken": true,
+      "presentation_specification_is_present": true,
+      "quantified_commercial_model_is_present": true,
+      "review_pdf_is_present": true,
+      "source_register_is_present": true,
+      "tony_execution_is_recorded": true,
+      "visual_qa_passed": true
+    },
+    "failed_checks": [],
+    "passed": true
+  },
+  "senior_strategist_review_quality_gate": {
+    "axis_checks": {
+      "activation_usefulness": true,
+      "audience_insight": true,
+      "client_specificity": true,
+      "commercial_consequence": true,
+      "editorial_judgement": true,
+      "evidence_support": true,
+      "narrative_progression": true,
+      "non_obviousness": true,
+      "strategic_coherence": true
+    },
+    "checks": {
+      "all_senior_strategy_axes_pass": true,
+      "all_strategy_director_questions_pass": true,
+      "no_false_external_execution_claim": true,
+      "no_revision_instructions_remain": true,
+      "reference_standard_is_rave_calibre_not_content": true,
+      "review_forwards_only_fully_accepted_work": true,
+      "review_is_exactly_checksum_bound": true
+    },
+    "director_checks": {
+      "commercial_consequence_clear": true,
+      "competitor_substitution_resisted": true,
+      "every_major_section_advances_argument": true,
+      "evidence_earns_conclusion": true,
+      "meaningfully_reframes_founder_problem": true,
+      "non_obvious_central_thesis": true,
+      "presentable_without_intellectual_rebuild": true,
+      "progressively_more_specific": true,
+      "removable_material_identified": true,
+      "worth_paying_for": true
+    },
+    "failed_checks": [],
+    "passed": true
+  },
+  "visual_qa": {
+    "checks": {
+      "claim_status_is_visible": true,
+      "conclusion_led_headlines": true,
+      "editorial_arc_is_complete": true,
+      "layout_validation": true,
+      "no_overflow_or_overlap": true,
+      "no_visible_machine_runtime_artefacts": true,
+      "package_integrity": true,
+      "pdf_exists": true,
+      "pptx_exists": true,
+      "quantified_commercial_model_present": true,
+      "readable_citations_present": true,
+      "rendered_slide_review_passed": true,
+      "slide_count": true,
+      "source_labels_present": true,
+      "source_provenance_retained": true,
+      "source_register_present": true,
+      "strategic_source_unchanged": true,
+      "visual_forms_are_intentional": true
+    },
+    "findings": [],
+    "status": "passed"
+  }
+}

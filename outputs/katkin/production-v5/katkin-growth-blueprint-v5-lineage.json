@@ -1,0 +1,17 @@
+{
+  "approved_strategy_thesis_artifact_id": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+  "approved_strategy_thesis_checksum": "92b790e0f4def86f35c013e2fff78ce7dbb4ac2bb7b28647eafc69f6d622508c",
+  "blueprint_director_candidate_checksum": "4e4a237773d0855fed5e72bb659ae7f358fc9dc9043228f6afdf66165f614b4e",
+  "commercial_model_checksum": "13244e80c1f5427690116519436bc8075c9dedde7a9ed454c909c6e60d7cd20e",
+  "external_action_taken": false,
+  "human_approval_status": "pending_founder_review",
+  "output_id": "katkin-growth-blueprint-v5",
+  "output_version": 5,
+  "prior_blueprint": "katkin-growth-blueprint-v4",
+  "recovery_method": "Tony deterministic commercial modelling, source attribution, rendering and rendered-slide review",
+  "schema_version": "katkin-growth-blueprint.v5",
+  "source_artifact_checksum": "f178c35f1e867c7afc0f0e129492efef626c1f1bd416ad2176e8891f312ce486",
+  "source_artifact_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
+  "source_register_checksum": "d8ec3dd1894eb8173dab06c6c6de6524a1f0ebc36a1f6e807d55dc1dc89cf3ef",
+  "source_run_id": "katkin-live-acceptance-20260911-gate1-discovery_evidence_to_growth_sprint_proposal-growth_sprint_to_research_engine-rese-st-strategy_thesis_to_growth_blueprint-53df7bb2fa80df2c3523"
+}
