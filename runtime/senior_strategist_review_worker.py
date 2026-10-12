@@ -21,6 +21,7 @@ class SeniorStrategistReviewWorker:
             raise ValueError("senior strategy review requires an immutable Blueprint Director checksum")
 
         lineage = contract.get("evidence_lineage")
+        approved_thesis = contract.get("approved_strategy_thesis")
         thesis = contract.get("central_thesis")
         audience = contract.get("audience")
         opportunity = contract.get("growth_opportunity")
@@ -56,6 +57,23 @@ class SeniorStrategistReviewWorker:
             for ref in item.get("source_refs") or []
             if str(ref).strip()
         }) or ["candidate:missing-evidence-reference"]
+        governed_refs = set(refs)
+        for section in (
+            contract.get("market_category_diagnosis"), audience,
+            contract.get("growth_barriers"), contract.get("source_of_difference"),
+            contract.get("positioning"), contract.get("narrative"), opportunity,
+            activation, thesis,
+        ):
+            if isinstance(section, Mapping):
+                governed_refs.update(
+                    str(ref) for ref in section.get("evidence_refs") or [] if str(ref).strip()
+                )
+        if isinstance(approved_thesis, Mapping):
+            governed_refs.update(
+                f"thesis:{field}"
+                for field, value in approved_thesis.items()
+                if str(value or "").strip()
+            )
         traced_refs = {
             str(ref)
             for item in trace or []
@@ -90,7 +108,7 @@ class SeniorStrategistReviewWorker:
                     for page_number, item in zip(page_numbers, trace)
                 )
                 and bool(traced_refs)
-                and traced_refs
+                and traced_refs.issubset(governed_refs)
                 and isinstance(quantitative_control, Mapping)
                 and quantitative_control.get("unsourced_numbers_present") is False
                 and isinstance(assumption_control, Mapping)
