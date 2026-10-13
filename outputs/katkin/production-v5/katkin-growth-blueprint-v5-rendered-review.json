@@ -2,8 +2,10 @@
   "checks": {
     "no_near_duplicate_rendered_layouts": true,
     "no_rendered_truncation_markers": true,
+    "rendered_canonical_roles_are_substantive": true,
     "rendered_citations_are_visible": true,
     "rendered_commercial_model_is_present": true,
+    "rendered_copy_is_client_safe_and_complete": true,
     "rendered_images_match_approved_roles": true,
     "rendered_narrative_progression_is_complete": true,
     "rendered_slide_count_matches_specification": true,
@@ -44,8 +46,8 @@
   "duplicate_layout_pairs": [],
   "findings": [],
   "ocr_output": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
-  "pdf_sha256": "c51ab50d3db1b4dae41ca4e6b0b8b93313efabbae0dc93ecdcf4c1907ffd4606",
-  "pptx_sha256": "4db4639e404f2b8c9a1b414dc1b7e2f821fa358b2247b8074368bb53be6e1384",
+  "pdf_sha256": "5de3a8ce13cb675ee2b39e21b74960f80233640515ea7978884348ecc680b690",
+  "pptx_sha256": "2245a8325654a70710cdf6c5fd9dac9f7eb96ae703869ba7948b64fd35205a8e",
   "progression_terms_found": [
     "constraint",
     "proof",

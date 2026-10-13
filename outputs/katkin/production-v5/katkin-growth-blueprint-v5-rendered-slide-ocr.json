@@ -320,6 +320,14 @@
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
+          "text" : "THE PRESSURE",
+          "width" : 0.0625,
+          "x" : 0.46874999992387811,
+          "y" : 0.59166666668447299
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
           "text" : "DISCOVERY",
           "width" : 0.048437497019767753,
           "x" : 0.084375002297407756,
@@ -332,14 +340,6 @@
           "width" : 0.18593750000000001,
           "x" : 0.084374998893229164,
           "y" : 0.39166666643518522
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.01388888888888884,
-          "text" : "THE PRESSURE",
-          "width" : 0.0625,
-          "x" : 0.46874999992387811,
-          "y" : 0.59166666668447299
         },
         {
           "confidence" : 1,
@@ -382,20 +382,28 @@
           "y" : 0.39166666628472235
         },
         {
+          "confidence" : 0.5,
+          "height" : 0.016666666666666607,
+          "text" : "JIC",
+          "width" : 0.03125,
+          "x" : 0.42031250039062495,
+          "y" : 0.33611111125000004
+        },
+        {
           "confidence" : 1,
           "height" : 0.016666666666666718,
           "text" : "matcher",
-          "width" : 0.051562500000000011,
-          "x" : 0.42187500085937496,
+          "width" : 0.053124999999999978,
+          "x" : 0.42187500088541663,
           "y" : 0.30555555564814807
         },
         {
           "confidence" : 1,
-          "height" : 0.022222222222222254,
-          "text" : "claims",
-          "width" : 0.049999999999999989,
-          "x" : 0.42343750062499996,
-          "y" : 0.26944444458333328
+          "height" : 0.019444444444444375,
+          "text" : "clalms w",
+          "width" : 0.060937500000000033,
+          "x" : 0.42500000076171868,
+          "y" : 0.27222222232638893
         },
         {
           "confidence" : 1,
@@ -478,7 +486,7 @@
           "y" : 0.02777777773148149
         }
       ],
-      "text" : "AСT1?THE CASE FOR CHANGE\nMarket Reality\nShared functional language\nDISCOVERY\nOrganic and Al search shift\nTHE PRESSURE\nUK fresh-frozen cat\nfood functional\nvocabulary (real meat,\nno fillers,\nvet-formulated') has\nmatcher\nclaims\nCOmmEnCIAL CONSEQUENCE\nCategory context creates pressure, but does not diagnose KatKin by itself.\nSOURCES: S2, S3\nNARRATIVE\nECONOMICS\nPaid creative pressure\nMANDATE\nBuild a loved brand\nINTERPRETATION + VERIFIED FACT\n04\/30"
+      "text" : "AСT1?THE CASE FOR CHANGE\nMarket Reality\nShared functional language\nTHE PRESSURE\nDISCOVERY\nOrganic and Al search shift\nUK fresh-frozen cat\nfood functional\nvocabulary (real meat,\nno fillers,\nvet-formulated') has\nJIC\nmatcher\nclalms w\nCOmmEnCIAL CONSEQUENCE\nCategory context creates pressure, but does not diagnose KatKin by itself.\nSOURCES: S2, S3\nNARRATIVE\nECONOMICS\nPaid creative pressure\nMANDATE\nBuild a loved brand\nINTERPRETATION + VERIFIED FACT\n04\/30"
     },
     {
       "file" : "slide-05.png",
@@ -525,11 +533,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.044907408290439044,
-          "text" : "beyond trade press reporting",
-          "width" : 0.26666665077209473,
-          "x" : 0.56666667128061943,
-          "y" : 0.56249999874659795
+          "height" : 0.044907408290439266,
+          "text" : "beyond trade press reporting.",
+          "width" : 0.27083332538604743,
+          "x" : 0.56666667402572624,
+          "y" : 0.56249999930215333
         },
         {
           "confidence" : 1,
@@ -596,7 +604,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACT 1\/ THE CASE FOR CHANGE\nCategory Growth Dynamics\n01 CLAIM\nNo independent verification of\nKatKin's claimed 2% market share\nbeyond trade press reporting\n02 PROOF\n03 METHOD\nCOMMEKCIAL CONSEQUENCE\nPremiumisation and category polarisation make the middle harder to defend.\nSOURCES: S2\nNARRATIVE\nVERIFIED FACT\n05 \/ 30"
+      "text" : "ACT 1\/ THE CASE FOR CHANGE\nCategory Growth Dynamics\n01 CLAIM\nNo independent verification of\nKatKin's claimed 2% market share\nbeyond trade press reporting.\n02 PROOF\n03 METHOD\nCOMMEKCIAL CONSEQUENCE\nPremiumisation and category polarisation make the middle harder to defend.\nSOURCES: S2\nNARRATIVE\nVERIFIED FACT\n05 \/ 30"
     },
     {
       "file" : "slide-06.png",
@@ -724,10 +732,10 @@
         {
           "confidence" : 1,
           "height" : 0.02777777777777779,
-          "text" : "Veterinary Nutritionist",
-          "width" : 0.13437499999999997,
-          "x" : 0.387499999875,
-          "y" : 0.36388888861111113
+          "text" : "Veterinary Nutritionist.",
+          "width" : 0.13750000000000001,
+          "x" : 0.38750000171874993,
+          "y" : 0.36388888895833327
         },
         {
           "confidence" : 1,
@@ -802,7 +810,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "Competitive Landscape\n01\nDISCOVERY\n02\nDECISION\n03\nREPEAT\nCompetitors own different trust\nand value cues; KatKin's\ncombination remains a\nhypothesis.\nKatKin's defensible proof points\nare its peer-reviewed, published\nAGE research (Journal of Animal\nScience), Board-Certified\nVeterinary Nutritionist\nCompetitors own different trust\nand value cues; KatKin's\ncombination remains a\nhypothesis.\nCompetitors own different trust and value cues; KatKin's combination remains a hypothesis.\nSOURCES: S4, S6\nNARRATIVE\nMIXED FACT AND HYPOTHESIS + VERIFIED FACT\n06 \/ 30"
+      "text" : "Competitive Landscape\n01\nDISCOVERY\n02\nDECISION\n03\nREPEAT\nCompetitors own different trust\nand value cues; KatKin's\ncombination remains a\nhypothesis.\nKatKin's defensible proof points\nare its peer-reviewed, published\nAGE research (Journal of Animal\nScience), Board-Certified\nVeterinary Nutritionist.\nCompetitors own different trust\nand value cues; KatKin's\ncombination remains a\nhypothesis.\nCompetitors own different trust and value cues; KatKin's combination remains a hypothesis.\nSOURCES: S4, S6\nNARRATIVE\nMIXED FACT AND HYPOTHESIS + VERIFIED FACT\n06 \/ 30"
     },
     {
       "file" : "slide-07.png",
@@ -927,14 +935,6 @@
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.011111110779974287,
-          "text" : "ACT 2 \/ MARKET + COMPETITIVE DIAGNOSIS",
-          "width" : 0.15468748807907104,
-          "x" : 0.059375009593276774,
-          "y" : 0.93055555583333327
-        },
-        {
-          "confidence" : 1,
           "height" : 0.044444444444444509,
           "text" : "The Market Gap",
           "width" : 0.18437500000000001,
@@ -943,107 +943,123 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666607,
-          "text" : "REACH",
-          "width" : 0.03125,
-          "x" : 0.082812500312499981,
-          "y" : 0.63055555583333334
+          "height" : 0.01388888888888884,
+          "text" : "BRAND AUTHORITY",
+          "width" : 0.0703125,
+          "x" : 0.082812501015624956,
+          "y" : 0.69444444467592592
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "CONVERT",
-          "width" : 0.043749999999999956,
-          "x" : 0.30625000054687501,
-          "y" : 0.62777777788194444
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "RETAIN",
-          "width" : 0.032812499999999911,
-          "x" : 0.53124999992578137,
-          "y" : 0.62777777782638888
+          "height" : 0.015072451697455524,
+          "text" : "THE GAP",
+          "width" : 0.037633022665977456,
+          "x" : 0.72493348860982021,
+          "y" : 0.66885266307852531
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
-          "text" : "LEARN",
-          "width" : 0.029687500000000089,
-          "x" : 0.75781249992621524,
-          "y" : 0.63055555559413579
+          "text" : "OWNABLE SPACE",
+          "width" : 0.078125,
+          "x" : 0.52187499869791676,
+          "y" : 0.60833333319444449
         },
         {
           "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "Create attention",
-          "width" : 0.12031249999999999,
-          "x" : 0.082812499484374996,
-          "y" : 0.52777777749999999
+          "height" : 0.013888888888888951,
+          "text" : "UNTAMED",
+          "width" : 0.037500000000000033,
+          "x" : 0.30625000021874993,
+          "y" : 0.48888888902777772
         },
         {
           "confidence" : 1,
-          "height" : 0.037037036154005221,
-          "text" : "Make value legible",
-          "width" : 0.14166666269302369,
-          "x" : 0.30833333709098809,
-          "y" : 0.52592592664521964
+          "height" : 0.033765840530395441,
+          "text" : "Independent",
+          "width" : 0.11566420793533327,
+          "x" : 0.7234178959284957,
+          "y" : 0.57478374612330208
         },
         {
           "confidence" : 1,
-          "height" : 0.029788125885857442,
-          "text" : "Reinforce",
-          "width" : 0.075227403640746981,
-          "x" : 0.53269879911760953,
-          "y" : 0.52677260376800561
+          "height" : 0.03805759880277837,
+          "text" : "science made easy",
+          "width" : 0.1724115133285522,
+          "x" : 0.72475317405945749,
+          "y" : 0.53289563926843442
         },
         {
           "confidence" : 1,
-          "height" : 0.034204294946458602,
-          "text" : "confidence",
-          "width" : 0.086043059825897217,
-          "x" : 0.53275972062381771,
-          "y" : 0.49400896374749359
+          "height" : 0.038888888888888973,
+          "text" : "to feel and easy to",
+          "width" : 0.16874999999999996,
+          "x" : 0.72343750084821434,
+          "y" : 0.49444444416666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038009264734056192,
+          "text" : "inspect",
+          "width" : 0.073725628852844172,
+          "x" : 0.72329343618719943,
+          "y" : 0.45460647893654427
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "CATEGORY",
+          "width" : 0.043750000000000011,
+          "x" : 0.23437499953125002,
+          "y" : 0.41388888861111106
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "CATEGORY CLAIM",
+          "width" : 0.065624999999999989,
+          "x" : 0.092187499179687521,
+          "y" : 0.32499999989583328
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "INDEPENDENT PROOF",
+          "width" : 0.079687499999999911,
+          "x" : 0.53906249867187506,
+          "y" : 0.32499999986111117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "COmmEnCIAL CONSEQUENCE",
+          "width" : 0.10624999999999998,
+          "x" : 0.059375000156249989,
+          "y" : 0.16666666678947029
         },
         {
           "confidence" : 1,
           "height" : 0.030555555555555558,
-          "text" : "Create leading",
-          "width" : 0.109375,
-          "x" : 0.75781250106249998,
-          "y" : 0.52499999969444444
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.031640762752956797,
-          "text" : "signals",
-          "width" : 0.056433504819869973,
-          "x" : 0.75772074746694074,
-          "y" : 0.49112406276001286
+          "text" : "KatKin can test an under-leveraged space where independent proof builds brand authority.",
+          "width" : 0.54218750000000004,
+          "x" : 0.22031250416015613,
+          "y" : 0.1583333337152778
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "COMMERCIAL CONSEQUENCE",
-          "width" : 0.10781250000000001,
-          "x" : 0.059374999973958342,
-          "y" : 0.16388888916666655
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.030555555555555558,
-          "text" : "The opportunity is a specific, reversible bet grounded in the evidence available.",
-          "width" : 0.47656249999999994,
-          "x" : 0.22031249657812496,
-          "y" : 0.1583333336388888
+          "text" : "SOURCES: S2, S3, T1",
+          "width" : 0.090625000000000011,
+          "x" : 0.059374998867187535,
+          "y" : 0.080555555416666702
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "SOURCES: S4, S6, S7",
-          "width" : 0.092187500000000006,
-          "x" : 0.059375001152343732,
-          "y" : 0.080555555694444392
+          "text" : "STRATEGIC INTERPRETATION",
+          "width" : 0.12656250000000002,
+          "x" : 0.73593749995285562,
+          "y" : 0.080555555569923332
         },
         {
           "confidence" : 1,
@@ -1055,22 +1071,14 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666607,
-          "text" : "MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
-          "width" : 0.20625000000000004,
-          "x" : 0.65625000218749996,
-          "y" : 0.080555555833333292
-        },
-        {
-          "confidence" : 1,
           "height" : 0.01388888888888884,
           "text" : "08\/30",
-          "width" : 0.0234375,
-          "x" : 0.91718749970703117,
-          "y" : 0.027777777673611115
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
         }
       ],
-      "text" : "ACT 2 \/ MARKET + COMPETITIVE DIAGNOSIS\nThe Market Gap\nREACH\nCONVERT\nRETAIN\nLEARN\nCreate attention\nMake value legible\nReinforce\nconfidence\nCreate leading\nsignals\nCOMMERCIAL CONSEQUENCE\nThe opportunity is a specific, reversible bet grounded in the evidence available.\nSOURCES: S4, S6, S7\nNARRATIVE\nMIXED FACT AND HYPOTHESIS + VERIFIED FACT\n08\/30"
+      "text" : "The Market Gap\nBRAND AUTHORITY\nTHE GAP\nOWNABLE SPACE\nUNTAMED\nIndependent\nscience made easy\nto feel and easy to\ninspect\nCATEGORY\nCATEGORY CLAIM\nINDEPENDENT PROOF\nCOmmEnCIAL CONSEQUENCE\nKatKin can test an under-leveraged space where independent proof builds brand authority.\nSOURCES: S2, S3, T1\nSTRATEGIC INTERPRETATION\nNARRATIVE\n08\/30"
     },
     {
       "file" : "slide-09.png",
@@ -1243,27 +1251,19 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.047222222222222165,
-          "text" : "Independent science",
-          "width" : 0.27656250000000004,
-          "x" : 0.62187500197544643,
-          "y" : 0.58888888902777781
-        },
-        {
-          "confidence" : 1,
           "height" : 0.033333333333333326,
           "text" : "THE",
-          "width" : 0.040624999999999967,
-          "x" : 0.47968749979687503,
-          "y" : 0.5722222220833334
+          "width" : 0.040625000000000022,
+          "x" : 0.47968749981250003,
+          "y" : 0.57222222188888894
         },
         {
           "confidence" : 1,
-          "height" : 0.036111111111111094,
+          "height" : 0.036111111111111205,
           "text" : "GAP",
-          "width" : 0.043750000000000011,
-          "x" : 0.47812499963541671,
-          "y" : 0.53055555539351851
+          "width" : 0.043750000000000067,
+          "x" : 0.47812500015624992,
+          "y" : 0.5305555558564814
         },
         {
           "confidence" : 1,
@@ -1275,56 +1275,48 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000133,
-          "text" : "An interim leading-indicator metrics framework",
-          "width" : 0.29375000000000007,
-          "x" : 0.62343749921875002,
-          "y" : 0.51111111079861105
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.029377712143792034,
-          "text" : "is required precisely because lagging",
-          "width" : 0.23463318347930917,
-          "x" : 0.62331317076358228,
-          "y" : 0.47908555365382532
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "financial\/churn data cannot demonstrate",
-          "width" : 0.25312500000000016,
-          "x" : 0.62343749746874999,
-          "y" : 0.45555555541666659
+          "height" : 0.052777777777777812,
+          "text" : "Independent science",
+          "width" : 0.27916665077209479,
+          "x" : 0.62083333662784168,
+          "y" : 0.58472222209876534
         },
         {
           "confidence" : 1,
           "height" : 0.025000000000000022,
-          "text" : "progress within the 18-month runway; this is a",
-          "width" : 0.28906250000000011,
-          "x" : 0.62343749638671886,
-          "y" : 0.41944444427083338
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "direct input to the growth_opportunity",
-          "width" : 0.23750000000000004,
-          "x" : 0.62187500296874987,
-          "y" : 0.38888888906249997
+          "text" : "The category asks owners to trust confident",
+          "width" : 0.27656249999999993,
+          "x" : 0.62343749654296876,
+          "y" : 0.5111111110069444
         },
         {
           "confidence" : 1,
           "height" : 0.024999999999999911,
+          "text" : "nutrition claims; Katkin can instead make",
+          "width" : 0.26093749999999993,
+          "x" : 0.62343749908854174,
+          "y" : 0.48055555513888892
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "independent evidence the starting point.",
+          "width" : 0.25468749999999996,
+          "x" : 0.62187500212239577,
+          "y" : 0.44722222231481479
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
           "text" : "A public trust contradiction can undermine a trust-dependent growth story.",
-          "width" : 0.44843750000000004,
-          "x" : 0.22343750560546863,
-          "y" : 0.16111111114583332
+          "width" : 0.44843749999999999,
+          "x" : 0.22343750497395815,
+          "y" : 0.16111111069444439
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
-          "text" : "SOURCES: S2, S4, T1",
+          "text" : "SOURCES: S2, S3, T1",
           "width" : 0.090625000000000011,
           "x" : 0.059374998867187535,
           "y" : 0.080555555451388927
@@ -1339,11 +1331,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666718,
-          "text" : "APPROVED STRATEGY + MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
-          "width" : 0.3125,
-          "x" : 0.55000000390624992,
-          "y" : 0.080555555694444392
+          "height" : 0.016666666666666607,
+          "text" : "STRATEGIC INTERPRETATION",
+          "width" : 0.12656250000000002,
+          "x" : 0.73593749996314861,
+          "y" : 0.080555555571278803
         },
         {
           "confidence" : 1,
@@ -1354,7 +1346,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "The Provocation\nWHAT OWNERS SEE\nWHAT KATKIN CAN PROVE\nConfident claims\nIndependent science\nTHE\nGAP\nFresh. Real meat. Vet formulated.\nAn interim leading-indicator metrics framework\nis required precisely because lagging\nfinancial\/churn data cannot demonstrate\nprogress within the 18-month runway; this is a\ndirect input to the growth_opportunity\nA public trust contradiction can undermine a trust-dependent growth story.\nSOURCES: S2, S4, T1\nNARRATIVE\nAPPROVED STRATEGY + MIXED FACT AND HYPOTHESIS + VERIFIED FACT\n10\/30"
+      "text" : "The Provocation\nWHAT OWNERS SEE\nWHAT KATKIN CAN PROVE\nConfident claims\nTHE\nGAP\nFresh. Real meat. Vet formulated.\nIndependent science\nThe category asks owners to trust confident\nnutrition claims; Katkin can instead make\nindependent evidence the starting point.\nA public trust contradiction can undermine a trust-dependent growth story.\nSOURCES: S2, S3, T1\nNARRATIVE\nSTRATEGIC INTERPRETATION\n10\/30"
     },
     {
       "file" : "slide-11.png",
@@ -1465,11 +1457,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "DTC early-adopter base,",
-          "width" : 0.14531250000000001,
-          "x" : 0.38906249854687508,
-          "y" : 0.38611111105555551
+          "height" : 0.025000000000000022,
+          "text" : "DTC early-adopter base.",
+          "width" : 0.14687499999999998,
+          "x" : 0.38906250244791651,
+          "y" : 0.38888888893518514
         },
         {
           "confidence" : 1,
@@ -1552,7 +1544,7 @@
           "y" : 0.027777777638888779
         }
       ],
-      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Reality\n01\n02\nCOMMITTED DTC\nRETAIL CONVERT\nOutside-in evidence cannot yet\nsupport confident buyer\nsegmentation.\nApproved priority audience is\naffluent retail converts and\nprospective mainstream owners,\nsequenced behind the committed\nDTC early-adopter base,\nOutside-in evidence cannot yet support confident buyer segmentation.\nSOURCES: S2, T1\nNARRATIVE\n03\nMAINSTREAM OWNER\nOutside-in evidence cannot yet\nsupport confident buyer\nsegmentation.\nAPPROVED STRATEGY + VERIFIED FACT\n11 \/ 30"
+      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Reality\n01\n02\nCOMMITTED DTC\nRETAIL CONVERT\nOutside-in evidence cannot yet\nsupport confident buyer\nsegmentation.\nApproved priority audience is\naffluent retail converts and\nprospective mainstream owners,\nsequenced behind the committed\nDTC early-adopter base.\nOutside-in evidence cannot yet support confident buyer segmentation.\nSOURCES: S2, T1\nNARRATIVE\n03\nMAINSTREAM OWNER\nOutside-in evidence cannot yet\nsupport confident buyer\nsegmentation.\nAPPROVED STRATEGY + VERIFIED FACT\n11 \/ 30"
     },
     {
       "file" : "slide-12.png",
@@ -1601,9 +1593,9 @@
           "confidence" : 1,
           "height" : 0.02777777777777779,
           "text" : "RETAIL CONVERT",
-          "width" : 0.14531250000000007,
-          "x" : 0.3875000018164062,
-          "y" : 0.57500000020833331
+          "width" : 0.14374999999999993,
+          "x" : 0.38749999880208341,
+          "y" : 0.57499999990740747
         },
         {
           "confidence" : 1,
@@ -1649,17 +1641,17 @@
           "confidence" : 1,
           "height" : 0.025000000000000022,
           "text" : "validate behavioural segmentation",
-          "width" : 0.20781250000000001,
-          "x" : 0.38749999653645845,
-          "y" : 0.44444444430555563
+          "width" : 0.20781249999999996,
+          "x" : 0.38749999736979179,
+          "y" : 0.44444444486111112
         },
         {
           "confidence" : 1,
           "height" : 0.025000000000000022,
-          "text" : "design",
-          "width" : 0.043750000000000011,
-          "x" : 0.387500000546875,
-          "y" : 0.41388888906249999
+          "text" : "design.",
+          "width" : 0.046875,
+          "x" : 0.38750000018749997,
+          "y" : 0.41388888863888884
         },
         {
           "confidence" : 1,
@@ -1695,11 +1687,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000133,
+          "height" : 0.024999999999999911,
           "text" : "MAINSTREAM OWNER",
-          "width" : 0.18125000000000013,
-          "x" : 0.69062499773437502,
-          "y" : 0.57777777767361105
+          "width" : 0.1796875,
+          "x" : 0.69218749887695308,
+          "y" : 0.57777777765625005
         },
         {
           "confidence" : 1,
@@ -1742,122 +1734,122 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Segments \/ Demand Pools\n01\n02\nCOMMITTED DTC\nRETAIL CONVERT\nPotential buyer jobs are a research\nquestion, not a settled segment\nmodel.\nNo first-party client data was\nsupplied in this evidence pack to\nvalidate behavioural segmentation\ndesign\nPotential buyer jobs are a research question, not a settled segment model.\nSOURCES: S2, T1\nNARRATIVE\n03\nMAINSTREAM OWNER\nPotential buyer jobs are a research\nquestion, not a settled segment\nmodel.\nAPPROVED STRATEGY + VERIFIED FACT\n12\/30"
+      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Segments \/ Demand Pools\n01\n02\nCOMMITTED DTC\nRETAIL CONVERT\nPotential buyer jobs are a research\nquestion, not a settled segment\nmodel.\nNo first-party client data was\nsupplied in this evidence pack to\nvalidate behavioural segmentation\ndesign.\nPotential buyer jobs are a research question, not a settled segment model.\nSOURCES: S2, T1\nNARRATIVE\n03\nMAINSTREAM OWNER\nPotential buyer jobs are a research\nquestion, not a settled segment\nmodel.\nAPPROVED STRATEGY + VERIFIED FACT\n12\/30"
     },
     {
       "file" : "slide-13.png",
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.0083333333333333037,
-          "text" : "ACI 3\/ AUDIENCE + DEMAND OPPOKEUNILY.",
-          "width" : 0.15624998807907103,
-          "x" : 0.059375005491714504,
-          "y" : 0.93055555567835913
-        },
-        {
-          "confidence" : 1,
           "height" : 0.038888888888888862,
           "text" : "Customer Evidence Board",
           "width" : 0.30312500000000003,
-          "x" : 0.060937501515624957,
-          "y" : 0.84444444458333334
+          "x" : 0.06093749848437504,
+          "y" : 0.84444444430555554
         },
         {
           "confidence" : 1,
           "height" : 0.013888888888888951,
-          "text" : "THE EVIDENCE",
-          "width" : 0.060937499999999978,
-          "x" : 0.54062500076171882,
-          "y" : 0.67500000010416661
+          "text" : "CUSTOMER SAYS",
+          "width" : 0.068749999999999992,
+          "x" : 0.081250001145833292,
+          "y" : 0.69722222236111109
         },
         {
           "confidence" : 1,
-          "height" : 0.036111111111111205,
-          "text" : "Approved priority audience is affluent",
-          "width" : 0.32656249999999987,
-          "x" : 0.54062500233258937,
-          "y" : 0.5888888890277777
+          "height" : 0.025000000000000133,
+          "text" : "Public reviews surface value and transition friction.",
+          "width" : 0.32656249999999998,
+          "x" : 0.081250003265624926,
+          "y" : 0.63888888891666662
         },
         {
           "confidence" : 1,
-          "height" : 0.033333333333333326,
-          "text" : "retail converts and prospective",
-          "width" : 0.26718750000000002,
-          "x" : 0.54062500166992178,
-          "y" : 0.5527777779166666
+          "height" : 0.01388888888888884,
+          "text" : "SEARCH SHOWS",
+          "width" : 0.067187499999999956,
+          "x" : 0.52500000083984377,
+          "y" : 0.69722222232638886
         },
         {
           "confidence" : 1,
-          "height" : 0.036111111111111205,
-          "text" : "mainstream owners, sequenced",
-          "width" : 0.27500000000000013,
-          "x" : 0.54062500274999992,
-          "y" : 0.51111111136111109
+          "height" : 0.027777777777777679,
+          "text" : "Competitors are gaining organic and Al-search visibility.",
+          "width" : 0.35781249999999998,
+          "x" : 0.52500000255580359,
+          "y" : 0.63611111119047625
         },
         {
           "confidence" : 1,
-          "height" : 0.030555555555555447,
-          "text" : "behind the committed DTC",
-          "width" : 0.22968749999999993,
-          "x" : 0.54062500143554693,
-          "y" : 0.47777777793402776
+          "height" : 0.01388888888888884,
+          "text" : "REVIEWS REVEAL",
+          "width" : 0.073437500000000003,
+          "x" : 0.079687498776041713,
+          "y" : 0.48055555541666672
         },
         {
           "confidence" : 1,
-          "height" : 0.038888888888888862,
-          "text" : "early-adopter base, using first-party",
-          "width" : 0.30781250000000004,
-          "x" : 0.54062500026562499,
-          "y" : 0.43333333294444443
+          "height" : 0.030555555555555558,
+          "text" : "Strong aggregate satisfaction coexists with price",
+          "width" : 0.31406250000000002,
+          "x" : 0.078124996074218828,
+          "y" : 0.41944444434027772
         },
         {
           "confidence" : 1,
-          "height" : 0.036111111111111094,
-          "text" : "behavioural and proxy-income",
-          "width" : 0.26249999999999996,
-          "x" : 0.54062500131250002,
-          "y" : 0.39722222258333328
+          "height" : 0.028277119000752804,
+          "text" : "pressure.",
+          "width" : 0.064130425453186021,
+          "x" : 0.079653536667087257,
+          "y" : 0.39141699571268207
         },
         {
           "confidence" : 1,
-          "height" : 0.044491095013088677,
-          "text" : "segmentation rather than new data",
-          "width" : 0.29894917011260991,
-          "x" : 0.5403713491244424,
-          "y" : 0.35533786255105593
+          "height" : 0.016666666666666718,
+          "text" : "SOCIAL SHOWS",
+          "width" : 0.064062500000000022,
+          "x" : 0.52500000085937493,
+          "y" : 0.48055555583333331
         },
         {
           "confidence" : 1,
-          "height" : 0.035644223954942489,
-          "text" : "infrastructure.",
-          "width" : 0.12740099430084229,
-          "x" : 0.53867697997545372,
-          "y" : 0.32183671738637087
+          "height" : 0.030555555555555558,
+          "text" : "High creative volume converges on familiar functional",
+          "width" : 0.34531250000000002,
+          "x" : 0.52499999572265632,
+          "y" : 0.41944444482638887
         },
         {
           "confidence" : 1,
-          "height" : 0.0083333333333333037,
-          "text" : "COmmEnCIAL CONSEQUENCE",
-          "width" : 0.10624999999999998,
-          "x" : 0.059375000156249989,
-          "y" : 0.16666666678947029
+          "height" : 0.025714763005574515,
+          "text" : "claims.",
+          "width" : 0.048552694916725092,
+          "x" : 0.52494240314692298,
+          "y" : 0.39408706298532348
         },
         {
           "confidence" : 1,
-          "height" : 0.024999999999999911,
-          "text" : "The available customer signal is directional, small and self-selected.",
-          "width" : 0.40781249999999997,
-          "x" : 0.22187500509765617,
-          "y" : 0.16111111114583332
+          "height" : 0.030555555555555558,
+          "text" : "The opportunity is directional: make proof easier to find without claiming first-party validation.",
+          "width" : 0.63437499999999991,
+          "x" : 0.17499999613281253,
+          "y" : 0.2638888892708332
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "SOURCES: S1A, S2, S5, S8",
-          "width" : 0.1125,
-          "x" : 0.059374999062500031,
-          "y" : 0.077777778101851935
+          "height" : 0.02777777777777779,
+          "text" : "Public customer, search and social signals support a direction, not a settled segment truth.",
+          "width" : 0.54531249999999998,
+          "x" : 0.22031250454427073,
+          "y" : 0.15833333342592593
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: S3, S4, S5",
+          "width" : 0.092187500000000006,
+          "x" : 0.059375001152343732,
+          "y" : 0.080555555694444392
         },
         {
           "confidence" : 1,
@@ -1870,10 +1862,10 @@
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "THIRD PARTY ESTIMATE + VERIFIED FACT",
-          "width" : 0.17812499999999998,
-          "x" : 0.68437500178124999,
-          "y" : 0.080555555666666723
+          "text" : "MIXED VERIFIED FACT + INTERPRETATION",
+          "width" : 0.17968749999999989,
+          "x" : 0.68281249775390629,
+          "y" : 0.080555555416666702
         },
         {
           "confidence" : 1,
@@ -1884,7 +1876,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACI 3\/ AUDIENCE + DEMAND OPPOKEUNILY.\nCustomer Evidence Board\nTHE EVIDENCE\nApproved priority audience is affluent\nretail converts and prospective\nmainstream owners, sequenced\nbehind the committed DTC\nearly-adopter base, using first-party\nbehavioural and proxy-income\nsegmentation rather than new data\ninfrastructure.\nCOmmEnCIAL CONSEQUENCE\nThe available customer signal is directional, small and self-selected.\nSOURCES: S1A, S2, S5, S8\nNARRATIVE\nTHIRD PARTY ESTIMATE + VERIFIED FACT\n13\/30"
+      "text" : "Customer Evidence Board\nCUSTOMER SAYS\nPublic reviews surface value and transition friction.\nSEARCH SHOWS\nCompetitors are gaining organic and Al-search visibility.\nREVIEWS REVEAL\nStrong aggregate satisfaction coexists with price\npressure.\nSOCIAL SHOWS\nHigh creative volume converges on familiar functional\nclaims.\nThe opportunity is directional: make proof easier to find without claiming first-party validation.\nPublic customer, search and social signals support a direction, not a settled segment truth.\nSOURCES: S3, S4, S5\nNARRATIVE\nMIXED VERIFIED FACT + INTERPRETATION\n13\/30"
     },
     {
       "file" : "slide-14.png",
@@ -2003,11 +1995,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.022222222222222143,
-          "text" : "distinct",
-          "width" : 0.048437499999999967,
-          "x" : 0.38750000048437505,
-          "y" : 0.34166666677777791
+          "height" : 0.022473351160685162,
+          "text" : "distinct.",
+          "width" : 0.050035125017166115,
+          "x" : 0.3874824379079348,
+          "y" : 0.34154110229212087
         },
         {
           "confidence" : 1,
@@ -2098,7 +2090,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Tensions \/ Decision Context\n01\nDISCOVERY\n02\nDECISION\nThe useful tension is between\nbreadth of appeal and clarity of\nchoice.\nSegmentation design must rely on\nexisting\nlogin\/order-cadence\/proxy-income\nsignals only, per activation\nprinciple, and must define a\ndistinct\nCOmmEnCIAL CONSEQUENCE\nThe useful tension is between breadth of appeal and clarity of choice.\nSOURCES: S5, S6, S7\nNARRATIVE\n03\nREPEAT\nThe useful tension is between\nbreadth of appeal and clarity of\nchoice.\nVERIFIED FACT\n14\/30"
+      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nAudience Tensions \/ Decision Context\n01\nDISCOVERY\n02\nDECISION\nThe useful tension is between\nbreadth of appeal and clarity of\nchoice.\nSegmentation design must rely on\nexisting\nlogin\/order-cadence\/proxy-income\nsignals only, per activation\nprinciple, and must define a\ndistinct.\nCOmmEnCIAL CONSEQUENCE\nThe useful tension is between breadth of appeal and clarity of choice.\nSOURCES: S5, S6, S7\nNARRATIVE\n03\nREPEAT\nThe useful tension is between\nbreadth of appeal and clarity of\nchoice.\nVERIFIED FACT\n14\/30"
     },
     {
       "file" : "slide-15.png",
@@ -2121,163 +2113,91 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444597,
+          "height" : 0.01388888888888884,
           "text" : "01",
-          "width" : 0.014062499999999992,
-          "x" : 0.08124999992187501,
-          "y" : 0.65277777788580238
+          "width" : 0.012499999999999997,
+          "x" : 0.082812500066964279,
+          "y" : 0.65555555545634925
         },
         {
           "confidence" : 1,
-          "height" : 0.034217548370361284,
-          "text" : "CORE",
-          "width" : 0.051741272211074815,
-          "x" : 0.082723114410969426,
-          "y" : 0.57455789263928714
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.016666666666666718,
+          "height" : 0.01388888888888884,
           "text" : "02",
-          "width" : 0.014062500000000033,
-          "x" : 0.38750000017578123,
-          "y" : 0.65555555569444435
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.025000000000000133,
-          "text" : "CONVERT",
-          "width" : 0.082812500000000011,
-          "x" : 0.38750000069010415,
-          "y" : 0.57777777793981477
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "03",
-          "width" : 0.014062499999999978,
-          "x" : 0.69062500011718753,
-          "y" : 0.65277777789351843
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.029117377599080285,
-          "text" : "EXPAND",
-          "width" : 0.070476102828979426,
-          "x" : 0.69210569800044486,
-          "y" : 0.5771079777170689
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "Different entry points may require",
-          "width" : 0.203125,
-          "x" : 0.082812502031249971,
-          "y" : 0.49444444458333325
+          "width" : 0.012500000000000011,
+          "x" : 0.387499999921875,
+          "y" : 0.65555555564236112
         },
         {
           "confidence" : 1,
           "height" : 0.030555555555555558,
-          "text" : "different proof and proposition",
-          "width" : 0.18750000000000003,
-          "x" : 0.081249997656250045,
-          "y" : 0.4666666665625
+          "text" : "HEALTH RESET",
+          "width" : 0.12812500000000002,
+          "x" : 0.082812499084821439,
+          "y" : 0.56944444430555563
         },
         {
           "confidence" : 1,
           "height" : 0.02777777777777779,
-          "text" : "jobs.",
-          "width" : 0.034375000000000003,
-          "x" : 0.081249999609374998,
-          "y" : 0.4416666670138889
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "Approved positioning moves",
-          "width" : 0.17499999999999999,
-          "x" : 0.38750000125,
-          "y" : 0.49444444458333325
+          "text" : "PROOF SEEKER",
+          "width" : 0.13124999999999998,
+          "x" : 0.38749999917968758,
+          "y" : 0.56944444430555563
         },
         {
           "confidence" : 1,
           "height" : 0.02777777777777779,
-          "text" : "KatKin from 'fresh food is better'",
-          "width" : 0.19687499999999997,
-          "x" : 0.38750000181249994,
-          "y" : 0.46944444472222224
+          "text" : "A health concern prompts active",
+          "width" : 0.18281249999999999,
+          "x" : 0.0812499977148438,
+          "y" : 0.49166666659722214
         },
         {
           "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "to the specific belief that cats",
-          "width" : 0.17968749999999994,
-          "x" : 0.38593750029687507,
-          "y" : 0.44166666694444434
+          "height" : 0.027777777777777679,
+          "text" : "nutrition discovery.",
+          "width" : 0.10625000000000001,
+          "x" : 0.082812499406250017,
+          "y" : 0.46666666694444447
         },
         {
           "confidence" : 1,
-          "height" : 0.02805520561006325,
-          "text" : "deserve nutrition validated by",
-          "width" : 0.17849520444869993,
-          "x" : 0.38889054770902598,
-          "y" : 0.41641284460126404
+          "height" : 0.022222222222222143,
+          "text" : "An owner compares claims and looks",
+          "width" : 0.20781249999999996,
+          "x" : 0.38906250207812498,
+          "y" : 0.49722222233333335
         },
         {
           "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "independent science,",
-          "width" : 0.13125000000000003,
-          "x" : 0.38750000213541663,
-          "y" : 0.38611111064814818
+          "height" : 0.022222222222222254,
+          "text" : "for credible evidence.",
+          "width" : 0.12187500000000001,
+          "x" : 0.38750000121875,
+          "y" : 0.4694444445
         },
         {
           "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "Different entry points may require",
-          "width" : 0.20312500000000011,
-          "x" : 0.69218749750000008,
-          "y" : 0.4944444447916666
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "different proof and proposition",
-          "width" : 0.18593749999999998,
-          "x" : 0.69218750154947917,
-          "y" : 0.46666666680555557
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.028812299834357402,
-          "text" : "jobs.",
-          "width" : 0.037738710641860962,
-          "x" : 0.68894314428545111,
-          "y" : 0.44114940597474572
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.0083333333333333037,
-          "text" : "COmmEnCIAL CONSEQUENCE",
-          "width" : 0.10624999999999998,
-          "x" : 0.059375000156249989,
-          "y" : 0.16666666678947029
+          "height" : 0.016666666666666718,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781250000000001,
+          "x" : 0.059374999973958342,
+          "y" : 0.16388888916666655
         },
         {
           "confidence" : 1,
           "height" : 0.02777777777777779,
           "text" : "Different entry points may require different proof and proposition jobs.",
           "width" : 0.42499999999999999,
-          "x" : 0.22031250424999999,
-          "y" : 0.15833333338888889
+          "x" : 0.22031250354166659,
+          "y" : 0.15833333337962974
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "SOURCES: S4, S6",
-          "width" : 0.076562499999999992,
-          "x" : 0.059375000957031229,
-          "y" : 0.080555555694444392
+          "text" : "SOURCES: S2, S4, S6, T1",
+          "width" : 0.10625,
+          "x" : 0.059375001770833255,
+          "y" : 0.080555555648148092
         },
         {
           "confidence" : 1,
@@ -2289,11 +2209,43 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666718,
-          "text" : "MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
-          "width" : 0.20624999999999993,
-          "x" : 0.65625000257812494,
-          "y" : 0.080555555694444392
+          "height" : 0.01388888888888884,
+          "text" : "03",
+          "width" : 0.012499999999999956,
+          "x" : 0.69218750006696439,
+          "y" : 0.65555555545634925
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "RETAIL TRIAL",
+          "width" : 0.11406249999999996,
+          "x" : 0.6921874991852679,
+          "y" : 0.56944444430555563
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Shelf communication must convert",
+          "width" : 0.19218749999999996,
+          "x" : 0.69375000240234375,
+          "y" : 0.50000000010416668
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "without a personal quiz.",
+          "width" : 0.13281249999999989,
+          "x" : 0.69218750166015619,
+          "y" : 0.46944444451388878
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "PROPOSED TEST",
+          "width" : 0.074999999999999956,
+          "x" : 0.78750000007291665,
+          "y" : 0.080555555540123502
         },
         {
           "confidence" : 1,
@@ -2304,7 +2256,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nCategory Entry Points\n01\nCORE\n02\nCONVERT\n03\nEXPAND\nDifferent entry points may require\ndifferent proof and proposition\njobs.\nApproved positioning moves\nKatKin from 'fresh food is better'\nto the specific belief that cats\ndeserve nutrition validated by\nindependent science,\nDifferent entry points may require\ndifferent proof and proposition\njobs.\nCOmmEnCIAL CONSEQUENCE\nDifferent entry points may require different proof and proposition jobs.\nSOURCES: S4, S6\nNARRATIVE\nMIXED FACT AND HYPOTHESIS + VERIFIED FACT\n15\/30"
+      "text" : "ACT 3\/ AUDIENCE + DEMAND OPPORTUNITYI\nCategory Entry Points\n01\n02\nHEALTH RESET\nPROOF SEEKER\nA health concern prompts active\nnutrition discovery.\nAn owner compares claims and looks\nfor credible evidence.\nCOMMERCIAL CONSEQUENCE\nDifferent entry points may require different proof and proposition jobs.\nSOURCES: S2, S4, S6, T1\nNARRATIVE\n03\nRETAIL TRIAL\nShelf communication must convert\nwithout a personal quiz.\nPROPOSED TEST\n15\/30"
     },
     {
       "file" : "slide-16.png",
@@ -2579,75 +2531,59 @@
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.044444444444444398,
-          "text" : "Strategic Positioning",
-          "width" : 0.24218750000000006,
-          "x" : 0.060937501345486103,
-          "y" : 0.83888888898148151
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.044907406965891461,
-          "text" : "Approved positioning moves KatKin from 'fresh food is",
-          "width" : 0.5625,
-          "x" : 0.058333342708333014,
-          "y" : 0.68148148305294276
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.05381365617116296,
-          "text" : "better' to the specific belief that cats deserve nutrition",
-          "width" : 0.54094200134277348,
-          "x" : 0.060760150556188067,
-          "y" : 0.63594932058586329
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.044907408290439155,
-          "text" : "validated by independent science, not manufacturer",
-          "width" : 0.52916665077209468,
-          "x" : 0.058333347895202482,
-          "y" : 0.59259259296296296
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.038888888888888862,
-          "text" : "assertion. This is explicitly provisional pending founder",
-          "width" : 0.56093749999999998,
-          "x" : 0.059374997484375046,
-          "y" : 0.55000000038888885
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.044907405641343878,
-          "text" : "pressure-testing against competitive and customer",
-          "width" : 0.51666665077209473,
-          "x" : 0.058333344718119219,
-          "y" : 0.50370370425925926
-        },
-        {
-          "confidence" : 1,
           "height" : 0.04166666666666663,
-          "text" : "evidence, per the approved",
-          "width" : 0.27500000000000002,
-          "x" : 0.059374997148437594,
-          "y" : 0.45555555607638887
+          "text" : "Strategic Positioning",
+          "width" : 0.24062499999999998,
+          "x" : 0.060937501503906241,
+          "y" : 0.83888888897569447
         },
         {
           "confidence" : 1,
-          "height" : 0.034884688589307933,
+          "height" : 0.044907408290439044,
+          "text" : "Move from the copyable claim that fresh food is better",
+          "width" : 0.55000000000000004,
+          "x" : 0.058333340208333161,
+          "y" : 0.68148148185185198
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.051851850085788298,
+          "text" : "to a provisional position: cats deserve nutrition",
+          "width" : 0.48333330154418941,
+          "x" : 0.058333348290405283,
+          "y" : 0.63703703856821692
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.050000000000000044,
+          "text" : "validated by independent science, not manufacturer",
+          "width" : 0.5234375,
+          "x" : 0.059374995578125048,
+          "y" : 0.5916666671666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.034208165274726143,
+          "text" : "assertion.",
+          "width" : 0.10321333408355714,
+          "x" : 0.059330833232774702,
+          "y" : 0.55234036222142269
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.034884688589308044,
           "text" : "DECISION",
-          "width" : 0.093920618295669556,
-          "x" : 0.74678969154138231,
-          "y" : 0.6020021004717222
+          "width" : 0.093920618295669445,
+          "x" : 0.74678969018171959,
+          "y" : 0.60200210000215859
         },
         {
           "confidence" : 1,
-          "height" : 0.028967610994974802,
+          "height" : 0.028604498174455428,
           "text" : "The approved",
-          "width" : 0.089177477359771773,
-          "x" : 0.74838001130331455,
-          "y" : 0.47996063866939598
+          "width" : 0.089142906665802046,
+          "x" : 0.74839729665065802,
+          "y" : 0.48014219441731398
         },
         {
           "confidence" : 1,
@@ -2669,8 +2605,8 @@
           "confidence" : 1,
           "height" : 0.030555555555555558,
           "text" : "hypothesis, not a",
-          "width" : 0.11249999999999993,
-          "x" : 0.73593749859375002,
+          "width" : 0.11406250000000007,
+          "x" : 0.73593749857421886,
           "y" : 0.39444444440972215
         },
         {
@@ -2683,35 +2619,35 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000022,
+          "height" : 0.024999999999999911,
           "text" : "The approved positioning is a testable strategic hypothesis, not a proven market fact.",
-          "width" : 0.51093750000000004,
-          "x" : 0.22187500851562464,
-          "y" : 0.16111111106481479
+          "width" : 0.50937500000000002,
+          "x" : 0.22187499363281268,
+          "y" : 0.16111111107638898
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
-          "text" : "SOURCES: S2, S3, T1|",
-          "width" : 0.090624994039535514,
-          "x" : 0.059375001469815628,
-          "y" : 0.080555555416666591
+          "text" : "SOURCES: S2, S3, T1",
+          "width" : 0.090625000000000011,
+          "x" : 0.059374998867187535,
+          "y" : 0.080555555451388927
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
           "text" : "NARRATIVE",
-          "width" : 0.045312497019767778,
-          "x" : 0.059375000734907812,
-          "y" : 0.027777777638888779
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "APPROVED STRATEGY + INTERPRETATION + VERIFIED FACT",
-          "width" : 0.25625000000000009,
-          "x" : 0.60625000320312483,
-          "y" : 0.080555555694444392
+          "text" : "PROPOSED POSITIONING",
+          "width" : 0.109375,
+          "x" : 0.75312499863281257,
+          "y" : 0.080555555416666702
         },
         {
           "confidence" : 1,
@@ -2722,18 +2658,18 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "Strategic Positioning\nApproved positioning moves KatKin from 'fresh food is\nbetter' to the specific belief that cats deserve nutrition\nvalidated by independent science, not manufacturer\nassertion. This is explicitly provisional pending founder\npressure-testing against competitive and customer\nevidence, per the approved\nDECISION\nThe approved\npositioning is a\ntestable strategic\nhypothesis, not a\nproven market fact\nThe approved positioning is a testable strategic hypothesis, not a proven market fact.\nSOURCES: S2, S3, T1|\nNARRATIVE\nAPPROVED STRATEGY + INTERPRETATION + VERIFIED FACT\n18\/30"
+      "text" : "Strategic Positioning\nMove from the copyable claim that fresh food is better\nto a provisional position: cats deserve nutrition\nvalidated by independent science, not manufacturer\nassertion.\nDECISION\nThe approved\npositioning is a\ntestable strategic\nhypothesis, not a\nproven market fact\nThe approved positioning is a testable strategic hypothesis, not a proven market fact.\nSOURCES: S2, S3, T1\nNARRATIVE\nPROPOSED POSITIONING\n18\/30"
     },
     {
       "file" : "slide-19.png",
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.0083333333333333037,
-          "text" : "ACT &\/ POSITIONING + NARRATIVE ANSWERI",
-          "width" : 0.15624998807907106,
-          "x" : 0.059375013772963704,
-          "y" : 0.93333333319444445
+          "height" : 0.0083333333333334147,
+          "text" : "ACT & POSITIONiNG + NARRATIVE ANSWER",
+          "width" : 0.15468748807907104,
+          "x" : 0.059375009671401767,
+          "y" : 0.93333333321052969
         },
         {
           "confidence" : 1,
@@ -2745,147 +2681,99 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "01",
-          "width" : 0.014062500000000006,
-          "x" : 0.081249999882812493,
-          "y" : 0.65277777766203693
+          "height" : 0.013888888888888951,
+          "text" : "AUTHORITY-BUILDING",
+          "width" : 0.079687499999999994,
+          "x" : 0.093750001328124943,
+          "y" : 0.70277777791666662
         },
         {
           "confidence" : 1,
-          "height" : 0.035490298271179221,
-          "text" : "DISCOVERY",
-          "width" : 0.10022037029266356,
-          "x" : 0.082702314021345341,
-          "y" : 0.57392151737420327
+          "height" : 0.013888888888888951,
+          "text" : "OWNABLE TERRITORY",
+          "width" : 0.0906249940395355,
+          "x" : 0.75625000449064894,
+          "y" : 0.65833333347222212
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666607,
-          "text" : "02",
-          "width" : 0.014062500000000033,
-          "x" : 0.38750000017578123,
-          "y" : 0.6333333334722222
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "03",
-          "width" : 0.014062500000000089,
-          "x" : 0.69062499992187498,
-          "y" : 0.60833333344135809
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.024999999999999911,
-          "text" : "DECISION",
-          "width" : 0.081249999999999989,
-          "x" : 0.38750000067708329,
-          "y" : 0.55555555571759263
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.026308772299024841,
-          "text" : "REPEAT",
-          "width" : 0.067337721586227417,
-          "x" : 0.69211238853419466,
-          "y" : 0.5326789470580432
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "KatKin should test ownable",
-          "width" : 0.16874999999999998,
-          "x" : 0.081249997890625064,
-          "y" : 0.49444444430555556
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "territory against real customer",
-          "width" : 0.18593749999999998,
-          "x" : 0.081250001328124988,
-          "y" : 0.46666666682539681
+          "height" : 0.01388888888888884,
+          "text" : "KATKIN FUTURE",
+          "width" : 0.059374999999999956,
+          "x" : 0.55312500074218751,
+          "y" : 0.6138888889930556
         },
         {
           "confidence" : 1,
           "height" : 0.030555555555555558,
-          "text" : "perception, not marketing copy",
-          "width" : 0.19062500000000002,
-          "x" : 0.081249997617187569,
-          "y" : 0.43888888878472221
+          "text" : "• KATKIN TODAY",
+          "width" : 0.079687500000000022,
+          "x" : 0.38281250079687501,
+          "y" : 0.50277777797222223
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "alone.",
-          "width" : 0.040624999999999994,
-          "x" : 0.082812500406250017,
-          "y" : 0.41666666674999997
+          "height" : 0.016666666666666718,
+          "text" : "UNTAMEd",
+          "width" : 0.037500000000000033,
+          "x" : 0.34218750036458329,
+          "y" : 0.47500000027777767
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "Founder pressure-test outcome is",
-          "width" : 0.203125,
-          "x" : 0.38906249666666681,
-          "y" : 0.47500000041666668
+          "height" : 0.034034686618381049,
+          "text" : "Nutrition",
+          "width" : 0.08914471864700324,
+          "x" : 0.75777139123287396,
+          "y" : 0.55520487902158289
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "unknown and is a named",
-          "width" : 0.14999999999999997,
-          "x" : 0.38906250149999994,
-          "y" : 0.45277777791666662
+          "height" : 0.041038934389750148,
+          "text" : "proven, not",
+          "width" : 0.11896681785583496,
+          "x" : 0.75614159187747387,
+          "y" : 0.50170275536603459
         },
         {
           "confidence" : 1,
-          "height" : 0.022222222222222254,
-          "text" : "downstream dependency",
-          "width" : 0.15156250000000004,
-          "x" : 0.38906250151562494,
-          "y" : 0.4222222223333334
+          "height" : 0.038913446002536323,
+          "text" : "promised",
+          "width" : 0.098974174261093117,
+          "x" : 0.75598825855340679,
+          "y" : 0.46079972795079749
         },
         {
           "confidence" : 1,
-          "height" : 0.022222222222222254,
-          "text" : "KatKin should test ownable",
-          "width" : 0.16718749999999993,
-          "x" : 0.6921875020898437,
-          "y" : 0.45277777784722217
+          "height" : 0.013888888888888951,
+          "text" : "CATEGORY",
+          "width" : 0.042187500000000044,
+          "x" : 0.257812499296875,
+          "y" : 0.40277777763888889
         },
         {
           "confidence" : 1,
-          "height" : 0.022222222222222143,
-          "text" : "territory against real customer",
-          "width" : 0.18437499999999996,
-          "x" : 0.69218749953125003,
-          "y" : 0.4277777780555555
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.02777777777777779,
-          "text" : "perception, not marketing copy",
-          "width" : 0.18906249999999991,
-          "x" : 0.69218749939453139,
-          "y" : 0.39444444409722224
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019747951295640775,
-          "text" : "alone.",
-          "width" : 0.037549439072608992,
-          "x" : 0.69372528083890517,
-          "y" : 0.37484824665469729
+          "height" : 0.016666666666666718,
+          "text" : "Positions are hypotheses.",
+          "width" : 0.098437499999999956,
+          "x" : 0.7562500012304687,
+          "y" : 0.35000000013888888
         },
         {
           "confidence" : 1,
           "height" : 0.030555555555555558,
-          "text" : "KatKin should test ownable territory against real customer perception, not marketing copy alone.",
-          "width" : 0.58125000000000004,
-          "x" : 0.22031249472656267,
+          "text" : "Move from familiar promise-led nutrition claims toward proof-led authority, subject to founder and customer",
+          "width" : 0.64687499999999998,
+          "x" : 0.2203124941796876,
           "y" : 0.1583333337152778
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "validation.",
+          "width" : 0.065624999999999989,
+          "x" : 0.22031249957031251,
+          "y" : 0.1361111114236111
         },
         {
           "confidence" : 1,
@@ -2897,19 +2785,19 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.01388888888888884,
-          "text" : "NARRATIVE",
-          "width" : 0.045312499999999992,
-          "x" : 0.05937499943359377,
-          "y" : 0.027777777673611115
+          "height" : 0.016666666666666607,
+          "text" : "POSITIONING HYPOTHESIS",
+          "width" : 0.11562499999999998,
+          "x" : 0.74687499884375019,
+          "y" : 0.080555555444444371
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666718,
-          "text" : "APPROVED STRATEGY + INTERPRETATION + VERIFIED FACT",
-          "width" : 0.25625000000000009,
-          "x" : 0.60625000320312483,
-          "y" : 0.080555555694444392
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
         },
         {
           "confidence" : 1,
@@ -2920,7 +2808,7 @@
           "y" : 0.027777777673611115
         }
       ],
-      "text" : "ACT &\/ POSITIONING + NARRATIVE ANSWERI\nPositioning Map\n01\nDISCOVERY\n02\n03\nDECISION\nREPEAT\nKatKin should test ownable\nterritory against real customer\nperception, not marketing copy\nalone.\nFounder pressure-test outcome is\nunknown and is a named\ndownstream dependency\nKatKin should test ownable\nterritory against real customer\nperception, not marketing copy\nalone.\nKatKin should test ownable territory against real customer perception, not marketing copy alone.\nSOURCES: S2, S3, T1\nNARRATIVE\nAPPROVED STRATEGY + INTERPRETATION + VERIFIED FACT\n19\/30"
+      "text" : "ACT & POSITIONiNG + NARRATIVE ANSWER\nPositioning Map\nAUTHORITY-BUILDING\nOWNABLE TERRITORY\nKATKIN FUTURE\n• KATKIN TODAY\nUNTAMEd\nNutrition\nproven, not\npromised\nCATEGORY\nPositions are hypotheses.\nMove from familiar promise-led nutrition claims toward proof-led authority, subject to founder and customer\nvalidation.\nSOURCES: S2, S3, T1\nPOSITIONING HYPOTHESIS\nNARRATIVE\n19\/30"
     },
     {
       "file" : "slide-20.png",
@@ -3235,155 +3123,243 @@
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.01388888888888884,
-          "text" : "ACT 4 \/ POSITIONING + NARRATIVE ANSWER",
-          "width" : 0.15625,
-          "x" : 0.059375000156249989,
-          "y" : 0.93055555558333336
+          "height" : 0.0083333333333333037,
+          "text" : "ACT &\/ POSITIONING + NARRATIVE ANSWERI",
+          "width" : 0.15624998807907106,
+          "x" : 0.059375013772963704,
+          "y" : 0.93333333319444445
         },
         {
           "confidence" : 1,
-          "height" : 0.051851850085788298,
+          "height" : 0.044444444444444398,
           "text" : "Messaging Territories \/ Distinctive Assets",
-          "width" : 0.48333330154418946,
-          "x" : 0.058333349783460789,
-          "y" : 0.83703703878426627
+          "width" : 0.47968749999999999,
+          "x" : 0.06093750299804683,
+          "y" : 0.83888888902777781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "01 \/ PROOF, NOT PROMISE",
+          "width" : 0.15156249999999999,
+          "x" : 0.079687499859374997,
+          "y" : 0.6749999997777778
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "02 \/ THE SCIENCE CATS DESERVE",
+          "width" : 0.19843749999999999,
+          "x" : 0.38124999801562504,
+          "y" : 0.67499999988888892
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "03 \/ VISIBLE CONFIDENCE",
+          "width" : 0.15312499999999984,
+          "x" : 0.68593749808593762,
+          "y" : 0.67499999986111114
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.011111111111111072,
+          "text" : "ROLE",
+          "width" : 0.020312499999999997,
+          "x" : 0.078124999921875007,
+          "y" : 0.59444444448717948
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000133,
+          "text" : "Credibility",
+          "width" : 0.051562499999999983,
+          "x" : 0.14687500048437499,
+          "y" : 0.58611111086111101
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ROLE",
+          "width" : 0.020312500000000011,
+          "x" : 0.3828124998697916,
+          "y" : 0.59166666643518517
         },
         {
           "confidence" : 1,
           "height" : 0.019444444444444486,
-          "text" : "01",
-          "width" : 0.015624999999999986,
-          "x" : 0.085937500156249999,
-          "y" : 0.63611111124999997
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "02",
-          "width" : 0.015624999999999944,
-          "x" : 0.39062499992187499,
-          "y" : 0.61111111120833339
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "03",
-          "width" : 0.015625,
-          "x" : 0.69531250015625001,
-          "y" : 0.58611111125000004
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.034512999322679372,
-          "text" : "OBSERVE",
-          "width" : 0.098561728000640877,
-          "x" : 0.087437885296118886,
-          "y" : 0.53552127800582472
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.033795852131313753,
-          "text" : "MARK",
-          "width" : 0.061017048358917247,
-          "x" : 0.39371022620173102,
-          "y" : 0.51087985184811591
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.035283435715569467,
-          "text" : "SIGNAL",
-          "width" : 0.076823723316192583,
-          "x" : 0.69674438872355549,
-          "y" : 0.4851360600686353
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "No evidence currently exists on",
-          "width" : 0.16562499999999997,
-          "x" : 0.087499997239583391,
-          "y" : 0.47499999995370368
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "whether the proof-led narrative is",
-          "width" : 0.17343749999999997,
-          "x" : 0.087499997109375102,
-          "y" : 0.44999999986111106
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "comprehensible or",
-          "width" : 0.099999994039535522,
-          "x" : 0.08750000131356564,
-          "y" : 0.42499999986111114
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "No evidence currently exists on",
-          "width" : 0.1640625,
-          "x" : 0.39375000205078126,
-          "y" : 0.45000000010416663
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.022222222222222254,
-          "text" : "whether the proof-led narrative is",
-          "width" : 0.17187499999999994,
-          "x" : 0.39375000046875003,
-          "y" : 0.42500000027777773
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "comprehensible or",
-          "width" : 0.098437500000000011,
-          "x" : 0.39375000098437496,
-          "y" : 0.40000000013888892
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444375,
-          "text" : "No evidence currently exists on",
-          "width" : 0.16562500000000002,
-          "x" : 0.69687499723958335,
-          "y" : 0.42499999995370374
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.019444444444444486,
-          "text" : "whether the proof-led narrative is",
-          "width" : 0.17343749999999991,
-          "x" : 0.696875001734375,
-          "y" : 0.40000000013888892
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.022222222222222254,
-          "text" : "comprehensible or",
-          "width" : 0.099999994039535522,
-          "x" : 0.69687500131356561,
-          "y" : 0.37222222212962963
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.024999999999999911,
-          "text" : "Distinctiveness must be earned through proof, not asserted through tone.",
-          "width" : 0.44062499999999993,
-          "x" : 0.22187500550781233,
-          "y" : 0.16111111114583332
+          "text" : "Emotional meaning",
+          "width" : 0.09375,
+          "x" : 0.45312499906250003,
+          "y" : 0.58888888880555557
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "SOURCES: S2, T1",
-          "width" : 0.074999999999999997,
-          "x" : 0.059375001249999962,
-          "y" : 0.080555555648148092
+          "text" : "ROLE",
+          "width" : 0.020312499999999956,
+          "x" : 0.68750000013020829,
+          "y" : 0.59166666694444436
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222365,
+          "text" : "Retail translation",
+          "width" : 0.087500000000000022,
+          "x" : 0.75468750109374994,
+          "y" : 0.58888888895833325
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TENSION",
+          "width" : 0.032812499999999994,
+          "x" : 0.076562499453125016,
+          "y" : 0.51388888875000005
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Distrust of category claims",
+          "width" : 0.13437499999999999,
+          "x" : 0.14531249832031254,
+          "y" : 0.50555555545138886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333326710595124,
+          "text" : "TENSION",
+          "width" : 0.031249997019767772,
+          "x" : 0.38125000305261592,
+          "y" : 0.5166666671366924
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Nutrition complexity",
+          "width" : 0.098437499999999956,
+          "x" : 0.4531250011914062,
+          "y" : 0.50833333309027784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TENSION",
+          "width" : 0.03125,
+          "x" : 0.68750000039062498,
+          "y" : 0.51388888899305551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Shelf-glance uncertainty",
+          "width" : 0.12343750000000009,
+          "x" : 0.75312499845703118,
+          "y" : 0.50555555545138886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "PROOF",
+          "width" : 0.024999998509883894,
+          "x" : 0.078125001005474717,
+          "y" : 0.43333333356481485
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Peer-reviewed research",
+          "width" : 0.11875000000000002,
+          "x" : 0.1453125008984375,
+          "y" : 0.42499999968750002
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Veterinary formulation",
+          "width" : 0.10937500000000006,
+          "x" : 0.45156249863281256,
+          "y" : 0.42777777767361114
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "PROOF",
+          "width" : 0.024999998509883881,
+          "x" : 0.6875000010054747,
+          "y" : 0.43333333356481485
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222221559948352,
+          "text" : "Layered source path",
+          "width" : 0.1015625,
+          "x" : 0.75624999950520821,
+          "y" : 0.4277777781481481
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ASSET",
+          "width" : 0.023437500000000014,
+          "x" : 0.078125000292968746,
+          "y" : 0.35277777788194442
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Coral evidence mark",
+          "width" : 0.10468749999999999,
+          "x" : 0.14531249869140628,
+          "y" : 0.34444444434027777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Clinical crop + warm line",
+          "width" : 0.12031249999999999,
+          "x" : 0.45312500001953121,
+          "y" : 0.34722222197916675
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ASSET",
+          "width" : 0.0234375,
+          "x" : 0.68750000029296876,
+          "y" : 0.35277777788194442
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Observe \/ mark \/ signal",
+          "width" : 0.11406249999999996,
+          "x" : 0.75781250142578127,
+          "y" : 0.34722222239583345
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Three territories let campaigns vary while one evidence behaviour compounds recognition.",
+          "width" : 0.54531249999999998,
+          "x" : 0.22031250455078108,
+          "y" : 0.1583333337152778
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: S2, S4, T1",
+          "width" : 0.090624994039535514,
+          "x" : 0.059375003553148883,
+          "y" : 0.077777777453703623
         },
         {
           "confidence" : 1,
@@ -3396,21 +3372,21 @@
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "APPROVED STRATEGY + VERIFIED FACT",
-          "width" : 0.17343749999999991,
-          "x" : 0.68906249710937506,
-          "y" : 0.080555555370370402
+          "text" : "PROPOSED MESSAGING SYSTEM",
+          "width" : 0.14375000000000004,
+          "x" : 0.71874999820312513,
+          "y" : 0.080555555416666702
         },
         {
           "confidence" : 1,
-          "height" : 0.01388888888888884,
+          "height" : 0.016666666666666607,
           "text" : "22 \/ 30",
-          "width" : 0.024999998509883881,
-          "x" : 0.91718750116172454,
-          "y" : 0.027777777916666802
+          "width" : 0.023437498509883858,
+          "x" : 0.91718750040651642,
+          "y" : 0.02777777805555548
         }
       ],
-      "text" : "ACT 4 \/ POSITIONING + NARRATIVE ANSWER\nMessaging Territories \/ Distinctive Assets\n01\n02\n03\nOBSERVE\nMARK\nSIGNAL\nNo evidence currently exists on\nwhether the proof-led narrative is\ncomprehensible or\nNo evidence currently exists on\nwhether the proof-led narrative is\ncomprehensible or\nNo evidence currently exists on\nwhether the proof-led narrative is\ncomprehensible or\nDistinctiveness must be earned through proof, not asserted through tone.\nSOURCES: S2, T1\nNARRATIVE\nAPPROVED STRATEGY + VERIFIED FACT\n22 \/ 30"
+      "text" : "ACT &\/ POSITIONING + NARRATIVE ANSWERI\nMessaging Territories \/ Distinctive Assets\n01 \/ PROOF, NOT PROMISE\n02 \/ THE SCIENCE CATS DESERVE\n03 \/ VISIBLE CONFIDENCE\nROLE\nCredibility\nROLE\nEmotional meaning\nROLE\nRetail translation\nTENSION\nDistrust of category claims\nTENSION\nNutrition complexity\nTENSION\nShelf-glance uncertainty\nPROOF\nPeer-reviewed research\nVeterinary formulation\nPROOF\nLayered source path\nASSET\nCoral evidence mark\nClinical crop + warm line\nASSET\nObserve \/ mark \/ signal\nCOMMERCIAL CONSEQUENCE\nThree territories let campaigns vary while one evidence behaviour compounds recognition.\nSOURCES: S2, S4, T1\nNARRATIVE\nPROPOSED MESSAGING SYSTEM\n22 \/ 30"
     },
     {
       "file" : "slide-23.png",
@@ -3655,99 +3631,155 @@
       "observations" : [
         {
           "confidence" : 1,
-          "height" : 0.044444444444444398,
+          "height" : 0.0083333333333334147,
+          "text" : "ACTS THE GROWTH SYSTEMI",
+          "width" : 0.10625000000000001,
+          "x" : 0.059375002421874878,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
           "text" : "Attention Strategy",
-          "width" : 0.21093750000000003,
-          "x" : 0.060937498828125027,
-          "y" : 0.83888888879629631
+          "width" : 0.2109375,
+          "x" : 0.060937501705729133,
+          "y" : 0.83611111071759259
         },
         {
           "confidence" : 1,
-          "height" : 0.030555555555555669,
-          "text" : "Approved activation principles constrain delivery: positioning must be",
-          "width" : 0.52499999999999991,
-          "x" : 0.23750000437499991,
-          "y" : 0.6916666667824074
+          "height" : 0.016666666666666607,
+          "text" : "NOTICE",
+          "width" : 0.032812499999999994,
+          "x" : 0.082812499628906272,
+          "y" : 0.63055555576388889
         },
         {
           "confidence" : 1,
-          "height" : 0.030555555555555669,
-          "text" : "validated against founder input before finalisation; segmentation must use",
-          "width" : 0.55624999999999991,
-          "x" : 0.2218750046354166,
-          "y" : 0.65833333344907397
+          "height" : 0.020430388715532044,
+          "text" : "REMEMBER",
+          "width" : 0.048559707403182995,
+          "x" : 0.30775139671010521,
+          "y" : 0.62728480587691404
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.021978035238054083,
+          "text" : "CONNECT",
+          "width" : 0.044084340333938599,
+          "x" : 0.53108282928325412,
+          "y" : 0.62651098223925472
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.014356035656399202,
+          "text" : "VERIFY",
+          "width" : 0.031314653158187933,
+          "x" : 0.75778017381102403,
+          "y" : 0.63032198228180891
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "One coral evidence",
+          "width" : 0.14531249999999998,
+          "x" : 0.08281249854687503,
+          "y" : 0.52777777766666667
         },
         {
           "confidence" : 1,
           "height" : 0.030555555555555558,
-          "text" : "existing first-party data without new",
-          "width" : 0.27031249999999996,
-          "x" : 0.36406249729687501,
-          "y" : 0.6249999998611111
+          "text" : "signal",
+          "width" : 0.048437499999999994,
+          "x" : 0.082812499953124979,
+          "y" : 0.49166666636111112
         },
         {
           "confidence" : 1,
-          "height" : 0.025000000000000133,
-          "text" : "2",
-          "width" : 0.012500000000000011,
-          "x" : 0.42031250012499999,
-          "y" : 0.53333333347222212
+          "height" : 0.030555555555555447,
+          "text" : "Proof before",
+          "width" : 0.096875000000000044,
+          "x" : 0.30781250060546872,
+          "y" : 0.52777777789930558
         },
         {
           "confidence" : 1,
-          "height" : 0.0172707319259644,
-          "text" : "FOUNDER",
-          "width" : 0.048502117395401001,
-          "x" : 0.14528019210993687,
-          "y" : 0.38303130078620029
+          "height" : 0.035035700268215675,
+          "text" : "promise",
+          "width" : 0.07056177854537965,
+          "x" : 0.30768786131177189,
+          "y" : 0.4908154833986057
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Science with",
+          "width" : 0.098437500000000067,
+          "x" : 0.5328124993847656,
+          "y" : 0.52777777765625
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033979760275946735,
+          "text" : "intimate cat",
+          "width" : 0.09382204413413997,
+          "x" : 0.53121397766559453,
+          "y" : 0.49412123121307883
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "behaviour",
+          "width" : 0.079687500000000022,
+          "x" : 0.53281250049804685,
+          "y" : 0.46111111121527781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "A readable path to",
+          "width" : 0.13749999999999996,
+          "x" : 0.75781250050000004,
+          "y" : 0.52499999969444444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "the source",
+          "width" : 0.082812499999999956,
+          "x" : 0.75624999917187508,
+          "y" : 0.49444444433333323
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Earn memory by repeating one visible evidence signal across every decision context.",
+          "width" : 0.51666665077209473,
+          "x" : 0.21666666815561947,
+          "y" : 0.15555555571929369
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "RETAIL",
-          "width" : 0.034374999999999989,
-          "x" : 0.40937499957031254,
-          "y" : 0.3833333331944444
-        },
-        {
-          "confidence" : 0.5,
-          "height" : 0.016666666666666607,
-          "text" : "CRM",
-          "width" : 0.0234375,
-          "x" : 0.67343750029296878,
-          "y" : 0.3833333334722222
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.025000000000000022,
-          "text" : "Attention should make the specific proposition easier to notice and remember.",
-          "width" : 0.46875,
-          "x" : 0.2234375078124998,
-          "y" : 0.16111111106481479
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.01388888888888884,
-          "text" : "SOURCES: T1",
-          "width" : 0.059375000000000011,
-          "x" : 0.059374999257812519,
-          "y" : 0.080555555451388927
-        },
-        {
-          "confidence" : 1,
-          "height" : 0.016666666666666718,
-          "text" : "APPROVED STRATEGY",
-          "width" : 0.0984374940395355,
-          "x" : 0.76406250133960718,
-          "y" : 0.080555555370370402
+          "text" : "SOURCES: S2, S5, T1",
+          "width" : 0.090625000000000011,
+          "x" : 0.059374998867187535,
+          "y" : 0.080555555416666702
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
           "text" : "NARRATIVE",
-          "width" : 0.045312497019767778,
-          "x" : 0.059375000734907812,
-          "y" : 0.027777777638888779
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "PROPOSED ATTENTION STRATEGY",
+          "width" : 0.14999999999999991,
+          "x" : 0.71249999992616764,
+          "y" : 0.080555555564713055
         },
         {
           "confidence" : 1,
@@ -3758,7 +3790,7 @@
           "y" : 0.02777777773148149
         }
       ],
-      "text" : "Attention Strategy\nApproved activation principles constrain delivery: positioning must be\nvalidated against founder input before finalisation; segmentation must use\nexisting first-party data without new\n2\nFOUNDER\nRETAIL\nCRM\nAttention should make the specific proposition easier to notice and remember.\nSOURCES: T1\nAPPROVED STRATEGY\nNARRATIVE\n24\/30"
+      "text" : "ACTS THE GROWTH SYSTEMI\nAttention Strategy\nNOTICE\nREMEMBER\nCONNECT\nVERIFY\nOne coral evidence\nsignal\nProof before\npromise\nScience with\nintimate cat\nbehaviour\nA readable path to\nthe source\nEarn memory by repeating one visible evidence signal across every decision context.\nSOURCES: S2, S5, T1\nNARRATIVE\nPROPOSED ATTENTION STRATEGY\n24\/30"
     },
     {
       "file" : "slide-25.png",

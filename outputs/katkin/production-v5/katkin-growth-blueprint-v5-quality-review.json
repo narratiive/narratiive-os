@@ -45,6 +45,7 @@
     "checks": {
       "approval_is_pending": true,
       "canonical_schema_v3_slide_roles_are_preserved": true,
+      "canonical_schema_v3_slide_roles_are_substantive": true,
       "editable_pptx_is_present": true,
       "full_blueprint_has_exactly_thirty_slides": true,
       "no_external_action_taken": true,
@@ -97,6 +98,7 @@
   "visual_qa": {
     "checks": {
       "canonical_schema_v3_slide_roles_are_preserved": true,
+      "canonical_schema_v3_slide_roles_are_substantive": true,
       "claim_status_is_visible": true,
       "conclusion_led_headlines": true,
       "editorial_arc_is_complete": true,

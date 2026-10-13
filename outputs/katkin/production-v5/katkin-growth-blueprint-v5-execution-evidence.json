@@ -1,7 +1,7 @@
 {
   "codex_dependency": false,
   "cost_basis": "Deterministic local modelling, rendering, PDF assembly and rendered-slide review; excludes local compute and sunk upstream research/generation cost.",
-  "elapsed_seconds": 13.168,
+  "elapsed_seconds": 12.926,
   "estimated_provider_cost_gbp": 0.0,
   "executor": "tony-local-artifact-tool",
   "provider_calls": 0,

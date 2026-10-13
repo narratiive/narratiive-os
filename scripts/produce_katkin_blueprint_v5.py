@@ -118,14 +118,45 @@ def commercial_intelligence() -> dict:
                 "question_frame": {"signal": "ONLY", "support": "Move from awareness as an input to authority as the outcome"},
                 "ecosystem_map_of_forces": {"items": [["SAMENESS", "Shared functional language"], ["DISCOVERY", "Organic and AI search shift"], ["ECONOMICS", "Paid creative pressure"], ["MANDATE", "Build a loved brand"]]},
                 "sameness_audit": {"eyebrow": "THE HARD PART IS ALREADY DONE", "asset_path": "katkin/nutrition-science.png", "image_alt": "Microscopic nutrition science, the evidential basis of the KatKin strategy"},
+                "market_gap_map": {
+                    "x_axis": ["CATEGORY CLAIM", "INDEPENDENT PROOF"],
+                    "y_axis": ["FUNCTIONAL FEEDING", "BRAND AUTHORITY"],
+                    "competitors": [["CATEGORY", 24, 28], ["UNTAMED", 39, 48]],
+                    "current_position": ["KATKIN TODAY", 51, 58],
+                    "future_position": ["OWNABLE SPACE", 82, 82],
+                    "market_gap": "Independent science made easy to feel and easy to inspect",
+                },
+                "customer_evidence_board": {
+                    "signals": [
+                        ["CUSTOMER SAYS", "Public reviews surface value and transition friction."],
+                        ["SEARCH SHOWS", "Competitors are gaining organic and AI-search visibility."],
+                        ["REVIEWS REVEAL", "Strong aggregate satisfaction coexists with price pressure."],
+                        ["SOCIAL SHOWS", "High creative volume converges on familiar functional claims."],
+                    ],
+                    "interpretation": "The opportunity is directional: make proof easier to find without claiming first-party validation.",
+                },
                 "provocation_page": {"left_label": "WHAT OWNERS SEE", "left_headline": "Confident claims", "left_detail": "Fresh. Real meat. Vet formulated.", "right_label": "WHAT KATKIN CAN PROVE", "right_headline": "Independent science"},
                 "audience_reality_split": {"labels": ["COMMITTED DTC", "RETAIL CONVERT", "MAINSTREAM OWNER"]},
                 "demand_pool_cards": {"labels": ["COMMITTED DTC", "RETAIL CONVERT", "MAINSTREAM OWNER"]},
                 "tension_plus_journey_matrix": {"labels": ["DISCOVERY", "DECISION", "REPEAT"]},
                 "we_are_we_are_not_framework": {"rows": [["POSITION", "Proof, not promise"], ["BENEFIT", "Confidence without self-audit"], ["PLATFORM", "The science cats deserve"], ["EXPRESSION", "Visible without personalisation"]]},
+                "positioning_map": {
+                    "x_axis": ["PROMISE-LED", "PROOF-LED"],
+                    "y_axis": ["TRANSACTIONAL", "AUTHORITY-BUILDING"],
+                    "positions": [["CATEGORY", 25, 30], ["UNTAMED", 42, 49], ["KATKIN TODAY", 55, 58], ["KATKIN FUTURE", 84, 84]],
+                    "territory": "Nutrition proven, not promised",
+                },
                 "brand_diagnosis_scorecard": {"rows": [["POSITION", "Proof, not promise"], ["BENEFIT", "Confidence without self-audit"], ["PLATFORM", "The science cats deserve"], ["EXPRESSION", "Visible without personalisation"]]},
                 "narrative_platform_framework": {"steps": [["TENSION", "The category asks owners to trust claims"], ["SHIFT", "KatKin makes proof the starting point"], ["RESOLUTION", "Independent science carries the decision"]], "banner": "THE SCIENCE CATS DESERVE"},
                 "message_architecture": {"master_message": "Nutrition proven, not promised", "proofs": [["PUBLISHED", "Peer-reviewed research"], ["FORMULATED", "Board-Certified Veterinary Nutritionist"], ["MADE", "Vertically integrated production"]]},
+                "messaging_territories": {
+                    "territories": [
+                        ["PROOF, NOT PROMISE", "Credibility", "Distrust of category claims", "Peer-reviewed research", "Coral evidence mark"],
+                        ["THE SCIENCE CATS DESERVE", "Emotional meaning", "Nutrition complexity", "Veterinary formulation", "Clinical crop + warm line"],
+                        ["VISIBLE CONFIDENCE", "Retail translation", "Shelf-glance uncertainty", "Layered source path", "Observe / mark / signal"],
+                    ]
+                },
+                "attention_strategy": {"items": [["NOTICE", "One coral evidence signal"], ["REMEMBER", "Proof before promise"], ["CONNECT", "Science with intimate cat behaviour"], ["VERIFY", "A readable path to the source"]]},
                 "commercial_opportunity_model": {"items": [["EARNED", "A citable point of view"], ["RETAIL", "Premium proof at shelf"], ["CRM", "Segmented confidence"], ["INVESTOR", "Earlier leading signals"]]},
                 "channel_role_map": {"rows": [["DTC QUIZ", "Discovery and education", "Personalised"], ["CRM", "Trust and retention", "First party"], ["RETAIL", "Conversion", "Unaided"], ["EARNED / SEARCH", "Scale discovery", "Citable"], ["PAID SOCIAL", "Volume", "Rebalanced"]]},
                 "constraint_priority_roadmap": {"phases": [["DAYS 1-30", "Foundation", "Founder pressure-test and evidence audit"], ["DAYS 31-60", "Prove", "Retail translation and CRM pilot"], ["DAYS 61-90", "Scale", "Shift spend only when leading signals move"]]},
@@ -140,6 +171,16 @@ def commercial_intelligence() -> dict:
                 "secondary_phrase": "INTIMATE CAT BEHAVIOUR",
                 "bridge": "meets",
                 "principles": [["OBSERVATION", "Tight crops and watchful eyes"], ["EVIDENCE", "Visible marks that show what was checked"], ["SIGNAL", "One coral cue points to the proof"]],
+            },
+            "slide_overrides": {
+                8: {"takeaway": "KatKin can test an under-leveraged space where independent proof builds brand authority.", "body": "The gap exists because familiar fresh-food claims are easy to copy, while peer-reviewed evidence is harder to reproduce and easier to verify.", "claim_status": "STRATEGIC INTERPRETATION", "citations": ["S2", "S3", "T1"]},
+                10: {"body": "The category asks owners to trust confident nutrition claims; KatKin can instead make independent evidence the starting point.", "claim_status": "STRATEGIC INTERPRETATION", "citations": ["S2", "S3", "T1"]},
+                13: {"takeaway": "Public customer, search and social signals support a direction, not a settled segment truth.", "body": "Reviews indicate satisfaction alongside price and transition friction; search and social evidence show a crowded field of similar functional claims.", "claim_status": "MIXED VERIFIED FACT + INTERPRETATION", "citations": ["S3", "S4", "S5"]},
+                15: {"body": "Three entry points merit testing: health-reset discovery, proof-led comparison and a retail trial that must work without personalisation.", "claim_status": "PROPOSED TEST", "citations": ["S2", "S4", "S6", "T1"], "content": {"items": [["HEALTH RESET", "A health concern prompts active nutrition discovery."], ["PROOF SEEKER", "An owner compares claims and looks for credible evidence."], ["RETAIL TRIAL", "Shelf communication must convert without a personal quiz."]]}},
+                18: {"body": "Move from the copyable claim that fresh food is better to a provisional position: cats deserve nutrition validated by independent science, not manufacturer assertion.", "claim_status": "PROPOSED POSITIONING", "citations": ["S2", "S3", "T1"]},
+                19: {"takeaway": "Move from familiar promise-led nutrition claims toward proof-led authority, subject to founder and customer validation.", "body": "The axes and plotted positions are strategic hypotheses derived from public competitor claims and KatKin's published evidence.", "claim_status": "POSITIONING HYPOTHESIS", "citations": ["S2", "S3", "T1"]},
+                22: {"takeaway": "Three territories let campaigns vary while one evidence behaviour compounds recognition.", "body": "Each territory connects an audience tension to a proof point and a repeatable visual or verbal asset.", "claim_status": "PROPOSED MESSAGING SYSTEM", "citations": ["S2", "S4", "T1"]},
+                24: {"takeaway": "Earn memory by repeating one visible evidence signal across every decision context.", "body": "Use a coral evidence mark to attract attention, pair clinical precision with intimate cat behaviour, and always provide a readable route to the source.", "claim_status": "PROPOSED ATTENTION STRATEGY", "citations": ["S2", "S5", "T1"]},
             },
             "supporting_slides": supporting_slides,
         },
@@ -212,7 +253,7 @@ def main() -> int:
     runtime = build_tony_workflow_runtime(
         args.runtime_root.resolve(), workspace_id="narratiive", client_id="katkin"
     )
-    run_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r2"
+    run_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r4"
     source_checksum = _checksum(governed)
     inputs = {
         "quality_accepted_growth_blueprint": governed,

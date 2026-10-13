@@ -36,16 +36,27 @@ def _text(value: Any, limit: int = 480) -> str:
     text = " ".join(str(value or "").split())
     if len(text) <= limit:
         return text
-    cut = text[:limit].rfind(" ")
-    return text[: cut if cut > 24 else limit].rstrip()
+    prefix = text[:limit]
+    sentence_ends = [match.end() for match in re.finditer(r"[.!?](?=\s|$)", prefix)]
+    if sentence_ends and sentence_ends[-1] >= min(80, limit // 2):
+        return prefix[:sentence_ends[-1]].rstrip()
+    cut = prefix.rfind(" ")
+    return text[: cut if cut > 24 else limit].rstrip(" ,;:") + "."
 
 
 def _client_copy(value: Any, limit: int = 210) -> str:
     """Remove implementation identifiers from visible presentation copy."""
     text = re.sub(r"\(?\s*(?:ev_[A-Za-z0-9_-]+|artifact-[A-Za-z0-9_-]+|workflow[_-][A-Za-z0-9_-]+)(?:\s*,\s*(?:ev_|artifact-|workflow[_-])[A-Za-z0-9_-]+)*\s*\)?", "", str(value or ""))
-    text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
+    text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|growth_opportunity|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
     text = " ".join(text.split()).strip(" ,;:")
     return _text(text, limit)
+
+
+def _complete_client_sentence(value: Any, limit: int) -> str:
+    text = _client_copy(value, limit).strip()
+    if text and not text.endswith((".", "?", "!")):
+        text += "."
+    return text
 
 
 def _safe_rendered_path(output_dir: Path, value: Any, *, suffix: str) -> Path:
@@ -407,6 +418,13 @@ class VisualQAResult:
 def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
+    by_number = {slide.slide_no: slide for slide in specification.slides}
+    substantive_roles = (
+        all(key in by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap"))
+        and len(by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data.get("signals") or []) >= 4
+        and all(key in by_number.get(19, PresentationSlideSpec(19, "", "", "", "")).content_data for key in ("x_axis", "y_axis", "positions", "territory"))
+        and len(by_number.get(22, PresentationSlideSpec(22, "", "", "", "")).content_data.get("territories") or []) >= 3
+    )
     return {
         "editorial_arc_is_complete": (
             bool(specification.slides)
@@ -418,6 +436,7 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             and tuple(slide.title for slide in specification.slides)
             == CANONICAL_BLUEPRINT_SLIDE_TITLES
         ),
+        "canonical_schema_v3_slide_roles_are_substantive": substantive_roles,
         "visual_forms_are_intentional": all(
             bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
             for slide in specification.slides
@@ -595,8 +614,11 @@ def augment_specification_with_commercial_evidence(
     brand_name = str(production_direction.get("brand_name") or "the client").strip()
     layout_content = production_direction.get("layout_content")
     creative = production_direction.get("creative_direction")
+    directed_overrides = production_direction.get("slide_overrides") or {}
     if not isinstance(layout_content, Mapping) or not isinstance(creative, Mapping):
         raise ValueError("production direction requires layout content and creative direction")
+    if not isinstance(directed_overrides, Mapping):
+        raise ValueError("production direction slide overrides must be a mapping")
 
     scenarios = commercial_model.get("scenarios") or []
     model_sources = tuple(dict.fromkeys(
@@ -611,22 +633,23 @@ def augment_specification_with_commercial_evidence(
     layout_by_slide = {
         1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
         4: "ecosystem_map_of_forces", 5: "evidence_ladder", 6: "tension_plus_journey_matrix",
-        7: "sameness_audit", 8: "commercial_opportunity_model", 9: "brand_diagnosis_scorecard",
+        7: "sameness_audit", 8: "market_gap_map", 9: "brand_diagnosis_scorecard",
         10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
-        13: "sameness_audit", 14: "tension_plus_journey_matrix", 15: "demand_pool_cards",
+        13: "customer_evidence_board", 14: "tension_plus_journey_matrix", 15: "category_entry_points",
         16: "brand_diagnosis_scorecard", 17: "we_are_we_are_not_framework", 18: "single_thesis_page",
-        19: "tension_plus_journey_matrix", 20: "narrative_platform_framework", 21: "message_architecture",
-        22: "creative_principles", 23: "commercial_model", 24: "test_plan", 25: "channel_role_map",
+        19: "positioning_map", 20: "narrative_platform_framework", 21: "message_architecture",
+        22: "messaging_territories", 23: "commercial_model", 24: "attention_strategy", 25: "channel_role_map",
         26: "channel_applications", 27: "creative_direction", 28: "constraint_priority_roadmap",
         29: "priority_matrix_plus_measurement_stack", 30: "closing_mandate",
     }
     content_key_by_slide = {
         1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
-        4: "ecosystem_map_of_forces", 7: "sameness_audit", 9: "brand_diagnosis_scorecard",
+        4: "ecosystem_map_of_forces", 7: "sameness_audit", 8: "market_gap_map", 9: "brand_diagnosis_scorecard",
         10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
-        14: "tension_plus_journey_matrix", 16: "brand_diagnosis_scorecard",
-        17: "we_are_we_are_not_framework", 20: "narrative_platform_framework",
-        21: "message_architecture", 23: "commercial_opportunity_model", 25: "channel_role_map",
+        13: "customer_evidence_board", 14: "tension_plus_journey_matrix", 16: "brand_diagnosis_scorecard",
+        17: "we_are_we_are_not_framework", 19: "positioning_map", 20: "narrative_platform_framework",
+        21: "message_architecture", 22: "messaging_territories", 23: "commercial_opportunity_model",
+        24: "attention_strategy", 25: "channel_role_map",
         28: "constraint_priority_roadmap", 29: "priority_matrix_plus_measurement_stack",
         30: "closing_mandate",
     }
@@ -656,6 +679,7 @@ def augment_specification_with_commercial_evidence(
             "claim_status": "PROPOSED MEASUREMENT + EVIDENCE GAP", "citations": ("T1",),
         },
     }
+    overrides.update({int(key): dict(value) for key, value in directed_overrides.items() if isinstance(value, Mapping)})
     enriched = []
     for slide in specification.slides:
         labels = _source_labels_for_slide(slide, entries) or (("T1",) if slide.slide_no != 1 else ())
@@ -668,8 +692,8 @@ def augment_specification_with_commercial_evidence(
             content["source_register_summary"] = "SOURCE REGISTER / governed companion deliverable included"
         enriched.append(replace(
             slide,
-            takeaway=str(override.get("takeaway") or slide.takeaway),
-            body=str(override.get("body") or slide.body),
+            takeaway=_complete_client_sentence(override.get("takeaway") or slide.takeaway, 240),
+            body=_complete_client_sentence(override.get("body") or slide.body, 420),
             layout_type=layout_by_slide[slide.slide_no],
             citation_labels=labels,
             claim_status=str(override.get("claim_status") or _claim_status(labels, entries)),

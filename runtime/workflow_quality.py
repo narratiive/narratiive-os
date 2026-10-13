@@ -506,6 +506,11 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     execution = output.get("execution_evidence")
     presentation = output.get("presentation_specification")
     presentation_slides = presentation.get("slides") if isinstance(presentation, Mapping) else None
+    slide_by_number = {
+        int(item.get("slide_no") or 0): item
+        for item in presentation_slides or []
+        if isinstance(item, Mapping)
+    }
     canonical_titles = (
         "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
         "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
@@ -525,6 +530,12 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         "canonical_schema_v3_slide_roles_are_preserved": isinstance(presentation_slides, list)
         and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
         == canonical_titles,
+        "canonical_schema_v3_slide_roles_are_substantive": (
+            all(key in (_mapping_value(slide_by_number.get(8), "content_data") or {}) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap"))
+            and len((_mapping_value(slide_by_number.get(13), "content_data") or {}).get("signals") or []) >= 4
+            and all(key in (_mapping_value(slide_by_number.get(19), "content_data") or {}) for key in ("x_axis", "y_axis", "positions", "territory"))
+            and len((_mapping_value(slide_by_number.get(22), "content_data") or {}).get("territories") or []) >= 3
+        ),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
         "quantified_commercial_model_is_present": isinstance(model_scenarios, list)

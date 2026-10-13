@@ -151,11 +151,17 @@ def _research_output() -> dict[str, Any]:
 
 
 def _deliverable_output() -> dict[str, Any]:
+    substantive_content = {
+        8: {"x_axis": [], "y_axis": [], "competitors": [], "current_position": [], "future_position": [], "market_gap": "Synthetic gap"},
+        13: {"signals": ["customer", "search", "reviews", "social"]},
+        19: {"x_axis": [], "y_axis": [], "positions": [], "territory": "Synthetic territory"},
+        22: {"territories": ["one", "two", "three"]},
+    }
     return {
         "presentation_specification": {
             "title": f"{CLIENT_NAME} Growth Blueprint",
             "slides": [
-                {"slide_no": index, "title": title}
+                {"slide_no": index, "title": title, "content_data": substantive_content.get(index, {})}
                 for index, title in enumerate(CANONICAL_BLUEPRINT_SLIDE_TITLES, 1)
             ],
         },

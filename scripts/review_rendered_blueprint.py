@@ -84,6 +84,32 @@ def main() -> int:
     ]
     citation_pattern = re.compile(r"\b(?:S\d+[A-Z]?|T1)\b")
     citation_slides = [index for index, content in enumerate(ocr_text, 1) if citation_pattern.search(content)]
+    backstage_pattern = re.compile(
+        r"\b(?:growth_opportunity|activation_implications|market_category_diagnosis|"
+        r"growth_barriers|source_of_difference|evidence_and_uncertainty|artifact-|workflow_run|ev_)\b",
+        re.IGNORECASE,
+    )
+    backstage_slides = [index for index, content in enumerate(ocr_text, 1) if backstage_pattern.search(content)]
+    expected_copy_complete = all(
+        isinstance(slide, dict)
+        and all(
+            str(slide.get(field) or "").strip().endswith((".", "?", "!"))
+            and not backstage_pattern.search(str(slide.get(field) or ""))
+            for field in ("body", "takeaway")
+        )
+        for slide in expected
+    )
+    role_terms = {
+        8: ("ownable space", "the gap"),
+        13: ("customer says", "search shows", "reviews reveal", "social shows"),
+        19: ("katkin future", "ownable territory"),
+        22: ("role", "tension", "proof", "asset"),
+    }
+    rendered_roles = all(
+        slide_no <= len(ocr_text)
+        and all(term in ocr_text[slide_no - 1].casefold() for term in terms)
+        for slide_no, terms in role_terms.items()
+    )
 
     receipt_path = args.slides_dir.parent / "render-receipt.json"
     receipt = load_object(receipt_path) if receipt_path.exists() else {}
@@ -99,6 +125,8 @@ def main() -> int:
     checks = {
         "rendered_slide_count_matches_specification": len(slides) == len(expected) == len(ocr_text),
         "rendered_text_is_legible": len(ocr_text) == len(slides) and all(len(text.strip()) >= 24 for text in ocr_text),
+        "rendered_copy_is_client_safe_and_complete": expected_copy_complete and not backstage_slides,
+        "rendered_canonical_roles_are_substantive": rendered_roles,
         "no_rendered_truncation_markers": not truncated,
         "no_near_duplicate_rendered_layouts": not duplicate_pairs,
         "rendered_citations_are_visible": len(citation_slides) >= max(1, len(slides) - 2),
@@ -120,6 +148,12 @@ def main() -> int:
         findings.append(f"truncation markers detected on rendered slides: {truncated}")
     if duplicate_pairs:
         findings.append(f"near-duplicate rendered layouts detected: {duplicate_pairs}")
+    if backstage_slides:
+        findings.append(f"backstage implementation labels detected on rendered slides: {backstage_slides}")
+    if not expected_copy_complete:
+        findings.append("presentation specification contains incomplete or backstage body/takeaway copy")
+    if not rendered_roles:
+        findings.append("rendered canonical role checks failed for slides 8, 13, 19 or 22")
     minimum_citation_slides = max(1, len(slides) - 2)
     if len(citation_slides) < minimum_citation_slides:
         findings.append(

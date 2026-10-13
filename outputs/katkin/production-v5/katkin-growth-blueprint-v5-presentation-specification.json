@@ -105,7 +105,7 @@
       "visual_treatment": "question"
     },
     {
-      "body": "UK fresh-frozen cat food functional vocabulary ('real meat, no fillers, vet-formulated') has commoditised across DTC entrants; Untamed matches near-identical claims with roughly a quarter of KatKin's funding and stronger organic/AI-search visibility, while KatKin leads on scale, capital (~$50M",
+      "body": "UK fresh-frozen cat food functional vocabulary ('real meat, no fillers, vet-formulated') has commoditised across DTC entrants; Untamed matches near-identical claims with roughly a quarter of KatKin's funding and stronger organic/AI-search visibility, while KatKin leads on scale, capital (~$50M.",
       "citation_labels": [
         "S2",
         "S3"
@@ -146,7 +146,7 @@
       "visual_treatment": "market"
     },
     {
-      "body": "No independent verification of KatKin's claimed 2% market share beyond trade press reporting",
+      "body": "No independent verification of KatKin's claimed 2% market share beyond trade press reporting.",
       "citation_labels": [
         "S2"
       ],
@@ -166,7 +166,7 @@
       "visual_treatment": "market"
     },
     {
-      "body": "KatKin's defensible proof points are its peer-reviewed, published AGE research (Journal of Animal Science), Board-Certified Veterinary Nutritionist formulation, vertically integrated production, and personalisation depth — assets category-standard ingredient language no longer communicates and that",
+      "body": "KatKin's defensible proof points are its peer-reviewed, published AGE research (Journal of Animal Science), Board-Certified Veterinary Nutritionist formulation, vertically integrated production, and personalisation depth — assets category-standard ingredient language no longer communicates and that.",
       "citation_labels": [
         "S4",
         "S6"
@@ -212,32 +212,64 @@
       "visual_treatment": "competition"
     },
     {
-      "body": "Deploy the underutilised peer-reviewed research asset as the anchor for a distinctive brand platform, closing the self-diagnosed awareness gap behind the first CMO hire, ahead of rising paid-social CAC and competitor SEO/AI-search gains eroding the DTC funnel.",
+      "body": "The gap exists because familiar fresh-food claims are easy to copy, while peer-reviewed evidence is harder to reproduce and easier to verify.",
       "citation_labels": [
-        "S4",
-        "S6",
-        "S7"
+        "S2",
+        "S3",
+        "T1"
       ],
-      "claim_status": "MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
-      "content_data": {},
+      "claim_status": "STRATEGIC INTERPRETATION",
+      "content_data": {
+        "competitors": [
+          [
+            "CATEGORY",
+            24,
+            28
+          ],
+          [
+            "UNTAMED",
+            39,
+            48
+          ]
+        ],
+        "current_position": [
+          "KATKIN TODAY",
+          51,
+          58
+        ],
+        "future_position": [
+          "OWNABLE SPACE",
+          82,
+          82
+        ],
+        "market_gap": "Independent science made easy to feel and easy to inspect",
+        "x_axis": [
+          "CATEGORY CLAIM",
+          "INDEPENDENT PROOF"
+        ],
+        "y_axis": [
+          "FUNCTIONAL FEEDING",
+          "BRAND AUTHORITY"
+        ]
+      },
       "evidence_refs": [
         "thesis:growth_opportunity",
         "ev_5c64#s5",
         "ev_5c64#s7"
       ],
-      "layout_type": "commercial_opportunity_model",
+      "layout_type": "market_gap_map",
       "slide_no": 8,
       "source_notes": [
-        "S4: KatKin / Trustpilot / Cats.com — Pricing, reviews and customer-friction evidence (accessed 11 September 2026), katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
-        "S6: Pet Business World — Jollyes retail rollout across 80 stores (August 2025), petbusinessworld.co.uk",
-        "S7: Active Partners — Series B strategy and retail partnership context (30 November 2023), active.partners"
+        "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
+        "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com",
+        "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
-      "takeaway": "The opportunity is a specific, reversible bet grounded in the evidence available.",
+      "takeaway": "KatKin can test an under-leveraged space where independent proof builds brand authority.",
       "title": "The Market Gap",
       "visual_treatment": "opportunity"
     },
     {
-      "body": "Structural constraints include a loss-making balance position (-£24.4M shareholders' funds, FY2023), rising paid-social CAC pressure (300+ active Meta ads, ~114 new creatives/week), comparatively weak organic search presence versus funding level, an unevidenced retail-to-DTC migration pathway, and",
+      "body": "Structural constraints include a loss-making balance position (-£24.4M shareholders' funds, FY2023), rising paid-social CAC pressure (300+ active Meta ads, ~114 new creatives/week), comparatively weak organic search presence versus funding level, an unevidenced retail-to-DTC migration pathway, and.",
       "citation_labels": [
         "S2",
         "S3",
@@ -281,13 +313,13 @@
       "visual_treatment": "constraint"
     },
     {
-      "body": "An interim leading-indicator metrics framework is required precisely because lagging financial/churn data cannot demonstrate progress within the 18-month runway; this is a direct input to the growth_opportunity",
+      "body": "The category asks owners to trust confident nutrition claims; KatKin can instead make independent evidence the starting point.",
       "citation_labels": [
         "S2",
-        "S4",
+        "S3",
         "T1"
       ],
-      "claim_status": "APPROVED STRATEGY + MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
+      "claim_status": "STRATEGIC INTERPRETATION",
       "content_data": {
         "left_detail": "Fresh. Real meat. Vet formulated.",
         "left_headline": "Confident claims",
@@ -304,7 +336,7 @@
       "slide_no": 10,
       "source_notes": [
         "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
-        "S4: KatKin / Trustpilot / Cats.com — Pricing, reviews and customer-friction evidence (accessed 11 September 2026), katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
+        "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com",
         "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
       "takeaway": "A public trust contradiction can undermine a trust-dependent growth story.",
@@ -340,7 +372,7 @@
       "visual_treatment": "audience"
     },
     {
-      "body": "No first-party client data was supplied in this evidence pack to validate behavioural segmentation design",
+      "body": "No first-party client data was supplied in this evidence pack to validate behavioural segmentation design.",
       "citation_labels": [
         "S2",
         "T1"
@@ -368,33 +400,51 @@
       "visual_treatment": "audience"
     },
     {
-      "body": "Approved priority audience is affluent retail converts and prospective mainstream owners, sequenced behind the committed DTC early-adopter base, using first-party behavioural and proxy-income segmentation rather than new data infrastructure.",
+      "body": "Reviews indicate satisfaction alongside price and transition friction; search and social evidence show a crowded field of similar functional claims.",
       "citation_labels": [
-        "S1A",
-        "S2",
-        "S5",
-        "S8"
+        "S3",
+        "S4",
+        "S5"
       ],
-      "claim_status": "THIRD PARTY ESTIMATE + VERIFIED FACT",
-      "content_data": {},
+      "claim_status": "MIXED VERIFIED FACT + INTERPRETATION",
+      "content_data": {
+        "interpretation": "The opportunity is directional: make proof easier to find without claiming first-party validation.",
+        "signals": [
+          [
+            "CUSTOMER SAYS",
+            "Public reviews surface value and transition friction."
+          ],
+          [
+            "SEARCH SHOWS",
+            "Competitors are gaining organic and AI-search visibility."
+          ],
+          [
+            "REVIEWS REVEAL",
+            "Strong aggregate satisfaction coexists with price pressure."
+          ],
+          [
+            "SOCIAL SHOWS",
+            "High creative volume converges on familiar functional claims."
+          ]
+        ]
+      },
       "evidence_refs": [
         "ev_5c64#s4",
         "thesis:priority_audience"
       ],
-      "layout_type": "sameness_audit",
+      "layout_type": "customer_evidence_board",
       "slide_no": 13,
       "source_notes": [
-        "S1A: The Grocer — Series C, market share and 100m-meal scale report (December 2025), thegrocer.co.uk (Series C report)",
-        "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
-        "S5: Motion / Marketing Week — Paid-social volume and creative analysis (accessed 11 September 2026), motionapp.com/library/katkin; marketingweek.com",
-        "S8: Research & Markets — UK cat food market estimate, USD 765.91m (2025 report), researchandmarkets.com"
+        "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com",
+        "S4: KatKin / Trustpilot / Cats.com — Pricing, reviews and customer-friction evidence (accessed 11 September 2026), katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
+        "S5: Motion / Marketing Week — Paid-social volume and creative analysis (accessed 11 September 2026), motionapp.com/library/katkin; marketingweek.com"
       ],
-      "takeaway": "The available customer signal is directional, small and self-selected.",
+      "takeaway": "Public customer, search and social signals support a direction, not a settled segment truth.",
       "title": "Customer Evidence Board",
       "visual_treatment": "audience"
     },
     {
-      "body": "Segmentation design must rely on existing login/order-cadence/proxy-income signals only, per activation principle, and must define a distinct mainstream-owner profile not yet captured by current DTC or retail-convert",
+      "body": "Segmentation design must rely on existing login/order-cadence/proxy-income signals only, per activation principle, and must define a distinct mainstream-owner profile not yet captured by current DTC or retail-convert.",
       "citation_labels": [
         "S5",
         "S6",
@@ -424,30 +474,49 @@
       "visual_treatment": "audience"
     },
     {
-      "body": "Approved positioning moves KatKin from 'fresh food is better' to the specific belief that cats deserve nutrition validated by independent science, not manufacturer assertion. This is explicitly provisional pending founder pressure-testing against competitive and customer evidence, per the approved",
+      "body": "Three entry points merit testing: health-reset discovery, proof-led comparison and a retail trial that must work without personalisation.",
       "citation_labels": [
+        "S2",
         "S4",
-        "S6"
+        "S6",
+        "T1"
       ],
-      "claim_status": "MIXED FACT AND HYPOTHESIS + VERIFIED FACT",
-      "content_data": {},
+      "claim_status": "PROPOSED TEST",
+      "content_data": {
+        "items": [
+          [
+            "HEALTH RESET",
+            "A health concern prompts active nutrition discovery."
+          ],
+          [
+            "PROOF SEEKER",
+            "An owner compares claims and looks for credible evidence."
+          ],
+          [
+            "RETAIL TRIAL",
+            "Shelf communication must convert without a personal quiz."
+          ]
+        ]
+      },
       "evidence_refs": [
         "thesis:positioning_choice",
         "ev_5c64#s2",
         "ev_5c64#s3"
       ],
-      "layout_type": "demand_pool_cards",
+      "layout_type": "category_entry_points",
       "slide_no": 15,
       "source_notes": [
+        "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
         "S4: KatKin / Trustpilot / Cats.com — Pricing, reviews and customer-friction evidence (accessed 11 September 2026), katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
-        "S6: Pet Business World — Jollyes retail rollout across 80 stores (August 2025), petbusinessworld.co.uk"
+        "S6: Pet Business World — Jollyes retail rollout across 80 stores (August 2025), petbusinessworld.co.uk",
+        "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
       "takeaway": "Different entry points may require different proof and proposition jobs.",
       "title": "Category Entry Points",
       "visual_treatment": "positioning"
     },
     {
-      "body": "KatKin's defensible proof points are its peer-reviewed, published AGE research (Journal of Animal Science), Board-Certified Veterinary Nutritionist formulation, vertically integrated production, and personalisation depth — assets category-standard ingredient language no longer communicates and that",
+      "body": "KatKin's defensible proof points are its peer-reviewed, published AGE research (Journal of Animal Science), Board-Certified Veterinary Nutritionist formulation, vertically integrated production, and personalisation depth — assets category-standard ingredient language no longer communicates and that.",
       "citation_labels": [
         "S1A",
         "S1B"
@@ -488,7 +557,7 @@
       "visual_treatment": "positioning"
     },
     {
-      "body": "Approved positioning moves KatKin from 'fresh food is better' to the specific belief that cats deserve nutrition validated by independent science, not manufacturer assertion. This is explicitly provisional pending founder pressure-testing against competitive and customer evidence, per the approved",
+      "body": "Approved positioning moves KatKin from 'fresh food is better' to the specific belief that cats deserve nutrition validated by independent science, not manufacturer assertion.",
       "citation_labels": [
         "T1"
       ],
@@ -528,13 +597,13 @@
       "visual_treatment": "positioning"
     },
     {
-      "body": "Approved positioning moves KatKin from 'fresh food is better' to the specific belief that cats deserve nutrition validated by independent science, not manufacturer assertion. This is explicitly provisional pending founder pressure-testing against competitive and customer evidence, per the approved",
+      "body": "Move from the copyable claim that fresh food is better to a provisional position: cats deserve nutrition validated by independent science, not manufacturer assertion.",
       "citation_labels": [
         "S2",
         "S3",
         "T1"
       ],
-      "claim_status": "APPROVED STRATEGY + INTERPRETATION + VERIFIED FACT",
+      "claim_status": "PROPOSED POSITIONING",
       "content_data": {},
       "evidence_refs": [
         "thesis:positioning_choice",
@@ -553,27 +622,59 @@
       "visual_treatment": "positioning"
     },
     {
-      "body": "Founder pressure-test outcome is unknown and is a named downstream dependency",
+      "body": "The axes and plotted positions are strategic hypotheses derived from public competitor claims and KatKin's published evidence.",
       "citation_labels": [
         "S2",
         "S3",
         "T1"
       ],
-      "claim_status": "APPROVED STRATEGY + INTERPRETATION + VERIFIED FACT",
-      "content_data": {},
+      "claim_status": "POSITIONING HYPOTHESIS",
+      "content_data": {
+        "positions": [
+          [
+            "CATEGORY",
+            25,
+            30
+          ],
+          [
+            "UNTAMED",
+            42,
+            49
+          ],
+          [
+            "KATKIN TODAY",
+            55,
+            58
+          ],
+          [
+            "KATKIN FUTURE",
+            84,
+            84
+          ]
+        ],
+        "territory": "Nutrition proven, not promised",
+        "x_axis": [
+          "PROMISE-LED",
+          "PROOF-LED"
+        ],
+        "y_axis": [
+          "TRANSACTIONAL",
+          "AUTHORITY-BUILDING"
+        ]
+      },
       "evidence_refs": [
         "thesis:positioning_choice",
         "ev_5c64#s2",
         "ev_5c64#s3"
       ],
-      "layout_type": "tension_plus_journey_matrix",
+      "layout_type": "positioning_map",
       "slide_no": 19,
       "source_notes": [
         "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
         "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com",
         "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
-      "takeaway": "KatKin should test ownable territory against real customer perception, not marketing copy alone.",
+      "takeaway": "Move from familiar promise-led nutrition claims toward proof-led authority, subject to founder and customer validation.",
       "title": "Positioning Map",
       "visual_treatment": "positioning"
     },
@@ -654,24 +755,50 @@
       "visual_treatment": "narrative"
     },
     {
-      "body": "No evidence currently exists on whether the proof-led narrative is comprehensible or persuasive within a retail glance-length exposure",
+      "body": "Each territory connects an audience tension to a proof point and a repeatable visual or verbal asset.",
       "citation_labels": [
         "S2",
+        "S4",
         "T1"
       ],
-      "claim_status": "APPROVED STRATEGY + VERIFIED FACT",
-      "content_data": {},
+      "claim_status": "PROPOSED MESSAGING SYSTEM",
+      "content_data": {
+        "territories": [
+          [
+            "PROOF, NOT PROMISE",
+            "Credibility",
+            "Distrust of category claims",
+            "Peer-reviewed research",
+            "Coral evidence mark"
+          ],
+          [
+            "THE SCIENCE CATS DESERVE",
+            "Emotional meaning",
+            "Nutrition complexity",
+            "Veterinary formulation",
+            "Clinical crop + warm line"
+          ],
+          [
+            "VISIBLE CONFIDENCE",
+            "Retail translation",
+            "Shelf-glance uncertainty",
+            "Layered source path",
+            "Observe / mark / signal"
+          ]
+        ]
+      },
       "evidence_refs": [
         "thesis:narrative_platform",
         "ev_5c64#s2"
       ],
-      "layout_type": "creative_principles",
+      "layout_type": "messaging_territories",
       "slide_no": 22,
       "source_notes": [
         "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
+        "S4: KatKin / Trustpilot / Cats.com — Pricing, reviews and customer-friction evidence (accessed 11 September 2026), katkin.com/our-pricing; uk.trustpilot.com/review/katkin.com; cats.com/katkin-cat-food-review",
         "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
-      "takeaway": "Distinctiveness must be earned through proof, not asserted through tone.",
+      "takeaway": "Three territories let campaigns vary while one evidence behaviour compounds recognition.",
       "title": "Messaging Territories / Distinctive Assets",
       "visual_treatment": "narrative"
     },
@@ -749,26 +876,49 @@
       "visual_treatment": "commercial"
     },
     {
-      "body": "Approved activation principles constrain delivery: positioning must be validated against founder input before finalisation; segmentation must use existing first-party data without new infrastructure; retail communication must convert without personalisation; leading indicators must be visible",
+      "body": "Use a coral evidence mark to attract attention, pair clinical precision with intimate cat behaviour, and always provide a readable route to the source.",
       "citation_labels": [
+        "S2",
+        "S5",
         "T1"
       ],
-      "claim_status": "APPROVED STRATEGY",
-      "content_data": {},
+      "claim_status": "PROPOSED ATTENTION STRATEGY",
+      "content_data": {
+        "items": [
+          [
+            "NOTICE",
+            "One coral evidence signal"
+          ],
+          [
+            "REMEMBER",
+            "Proof before promise"
+          ],
+          [
+            "CONNECT",
+            "Science with intimate cat behaviour"
+          ],
+          [
+            "VERIFY",
+            "A readable path to the source"
+          ]
+        ]
+      },
       "evidence_refs": [
         "thesis:activation_principles"
       ],
-      "layout_type": "test_plan",
+      "layout_type": "attention_strategy",
       "slide_no": 24,
       "source_notes": [
+        "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
+        "S5: Motion / Marketing Week — Paid-social volume and creative analysis (accessed 11 September 2026), motionapp.com/library/katkin; marketingweek.com",
         "T1: Narratiive governed workflow — Approved KatKin Strategy Thesis (September 2026), artifact-63f71c6bacf78fe6-92b790e0f4def86f"
       ],
-      "takeaway": "Attention should make the specific proposition easier to notice and remember.",
+      "takeaway": "Earn memory by repeating one visible evidence signal across every decision context.",
       "title": "Attention Strategy",
       "visual_treatment": "activation"
     },
     {
-      "body": "Feasibility of meaningful segmentation using only existing data without infrastructure change is unconfirmed",
+      "body": "Feasibility of meaningful segmentation using only existing data without infrastructure change is unconfirmed.",
       "citation_labels": [
         "T1"
       ],
@@ -815,7 +965,7 @@
       "visual_treatment": "activation"
     },
     {
-      "body": "Workstream sequencing should prioritise (a) founder pressure-test of positioning, (b) segmentation model built solely from existing login/order-cadence/proxy-income data, (c) retail-shelf translation test, (d) interim",
+      "body": "Workstream sequencing should prioritise (a) founder pressure-test of positioning, (b) segmentation model built solely from existing login/order-cadence/proxy-income data, (c) retail-shelf translation test, (d) interim.",
       "citation_labels": [
         "T1"
       ],
@@ -876,7 +1026,7 @@
       "visual_treatment": "activation"
     },
     {
-      "body": "Workstream sequencing should prioritise (a) founder pressure-test of positioning, (b) segmentation model built solely from existing login/order-cadence/proxy-income data, (c) retail-shelf translation test, (d) interim",
+      "body": "Workstream sequencing should prioritise (a) founder pressure-test of positioning, (b) segmentation model built solely from existing login/order-cadence/proxy-income data, (c) retail-shelf translation test, (d) interim.",
       "citation_labels": [
         "T1"
       ],
@@ -1175,7 +1325,7 @@
   "source_blueprint_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
   "source_blueprint_version": 1,
   "source_checksum": "f178c35f1e867c7afc0f0e129492efef626c1f1bd416ad2176e8891f312ce486",
-  "specification_id": "blueprint-spec-76421d7aff070fedc8b3",
+  "specification_id": "blueprint-spec-b883a247867eafa61947",
   "status": "ready_for_production",
   "strategic_source_unchanged": true,
   "template_source": "Narratiive Blueprint canon v1 visual framework library and visual intelligence system; native PPTX template not present in repository",

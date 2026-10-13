@@ -71,7 +71,13 @@ def commercial_intelligence() -> dict:
         "implementation_cost": {"status": "unavailable", "value": None, "missing_inputs": ["delivery budget"]},
         "production_direction": {
             "brand_name": "Northstar Test Co",
-            "layout_content": {},
+            "layout_content": {
+                "market_gap_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Functional", "Authority"], "competitors": [["Category", 25, 25]], "current_position": ["Today", 45, 45], "future_position": ["Opportunity", 80, 80], "market_gap": "A bounded synthetic market gap"},
+                "customer_evidence_board": {"signals": [["CUSTOMER SAYS", "Synthetic signal."], ["SEARCH SHOWS", "Synthetic signal."], ["REVIEWS REVEAL", "Synthetic signal."], ["SOCIAL SHOWS", "Synthetic signal."]], "interpretation": "Synthetic interpretation."},
+                "positioning_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Transactional", "Authority"], "positions": [["Today", 40, 40], ["Future", 80, 80]], "territory": "Synthetic territory"},
+                "messaging_territories": {"territories": [["Territory one", "Role", "Tension", "Proof", "Asset"], ["Territory two", "Role", "Tension", "Proof", "Asset"], ["Territory three", "Role", "Tension", "Proof", "Asset"]]},
+                "attention_strategy": {"items": [["NOTICE", "Signal"], ["REMEMBER", "Message"], ["CONNECT", "Context"], ["VERIFY", "Source"]]},
+            },
             "creative_direction": {
                 "title": "Creative direction: make the advantage visible",
                 "body": "Translate the approved strategy into a recognisable visual system.",
@@ -136,6 +142,10 @@ class DeliverableProductionTests(unittest.TestCase):
         self.assertEqual(result.slides[27].title, "Growth Priorities / 90-Day Activation Plan")
         self.assertEqual(result.slides[28].title, "Measurement Framework")
         self.assertEqual(tuple(slide.title for slide in result.slides), CANONICAL_BLUEPRINT_SLIDE_TITLES)
+        checks = presentation_quality_checks(result)
+        self.assertTrue(checks["canonical_schema_v3_slide_roles_are_substantive"])
+        self.assertTrue(all(slide.body.endswith((".", "?", "!")) for slide in result.slides))
+        self.assertTrue(all(slide.takeaway.endswith((".", "?", "!")) for slide in result.slides))
         self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
         self.assertNotIn("katkin", json.dumps(result.to_dict()).casefold())
         self.assertNotIn("cat behaviour", json.dumps(result.to_dict()).casefold())
