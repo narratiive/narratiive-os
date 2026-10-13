@@ -14,7 +14,8 @@ import os
 import re
 import subprocess
 import tempfile
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Mapping, Protocol
 
@@ -33,15 +34,29 @@ def _safe_identifier(value: str) -> bool:
 
 def _text(value: Any, limit: int = 480) -> str:
     text = " ".join(str(value or "").split())
-    return text if len(text) <= limit else text[: limit - 1].rstrip() + "…"
+    if len(text) <= limit:
+        return text
+    prefix = text[:limit]
+    sentence_ends = [match.end() for match in re.finditer(r"[.!?](?=\s|$)", prefix)]
+    if sentence_ends and sentence_ends[-1] >= min(80, limit // 2):
+        return prefix[:sentence_ends[-1]].rstrip()
+    cut = prefix.rfind(" ")
+    return text[: cut if cut > 24 else limit].rstrip(" ,;:") + "."
 
 
 def _client_copy(value: Any, limit: int = 210) -> str:
     """Remove implementation identifiers from visible presentation copy."""
     text = re.sub(r"\(?\s*(?:ev_[A-Za-z0-9_-]+|artifact-[A-Za-z0-9_-]+|workflow[_-][A-Za-z0-9_-]+)(?:\s*,\s*(?:ev_|artifact-|workflow[_-])[A-Za-z0-9_-]+)*\s*\)?", "", str(value or ""))
-    text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
+    text = re.sub(r"\b(?:activation_implications|market_category_diagnosis|growth_barriers|source_of_difference|growth_opportunity|evidence_and_uncertainty|key_strategic_choices|fact_interpretation_hypothesis_lineage)\b", "", text, flags=re.I)
     text = " ".join(text.split()).strip(" ,;:")
     return _text(text, limit)
+
+
+def _complete_client_sentence(value: Any, limit: int) -> str:
+    text = _client_copy(value, limit).strip()
+    if text and not text.endswith((".", "?", "!")):
+        text += "."
+    return text
 
 
 def _safe_rendered_path(output_dir: Path, value: Any, *, suffix: str) -> Path:
@@ -65,6 +80,9 @@ class PresentationSlideSpec:
     evidence_refs: tuple[str, ...] = ()
     source_notes: tuple[str, ...] = ()
     layout_type: str = "evidence_implication"
+    citation_labels: tuple[str, ...] = ()
+    claim_status: str = ""
+    content_data: Mapping[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -76,6 +94,9 @@ class PresentationSlideSpec:
             "evidence_refs": list(self.evidence_refs),
             "source_notes": list(self.source_notes),
             "layout_type": self.layout_type,
+            "citation_labels": list(self.citation_labels),
+            "claim_status": self.claim_status,
+            "content_data": dict(self.content_data),
         }
 
 
@@ -127,6 +148,19 @@ ARCHETYPE_LIBRARY = (
     "positioning", "positioning_map", "narrative", "message_architecture",
     "commercial_model", "flywheel", "channel_roles", "campaign_system",
     "roadmap", "prioritisation", "measurement", "closing",
+)
+
+CANONICAL_BLUEPRINT_SLIDE_TITLES = (
+    "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
+    "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+    "The Market Gap", "Growth Constraint Diagnosis", "The Provocation",
+    "Audience Reality", "Audience Segments / Demand Pools", "Customer Evidence Board",
+    "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
+    "Positioning Problem", "Strategic Positioning", "Positioning Map", "Narrative Platform",
+    "Core Message Architecture", "Messaging Territories / Distinctive Assets",
+    "Commercial Prize", "Attention Strategy", "Channel Roles", "Content / Campaign System",
+    "Creative Direction / Next-Phase Hook", "Growth Priorities / 90-Day Activation Plan",
+    "Measurement Framework", "Strategic Principle / Closing Mandate",
 )
 
 
@@ -305,10 +339,10 @@ def build_growth_blueprint_presentation_spec(
     uncertainty = lambda key: _text((sections[key].get("uncertainties") or [""])[0], 180)
 
     plan = [
-        ("Growth thesis", "The strategic answer is a bounded, testable opportunity rather than a forecast.", diag("growth_opportunity"), "thesis", "statement"),
-        ("Executive thesis", f"{brand}'s next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
-        ("The commercial question", f"Where could {brand}'s next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
-        ("Market reality", f"Category context creates pressure, but does not diagnose {brand} by itself.", diag("market_category_diagnosis"), "market", "comparison"),
+        ("Cover", "The strategic answer is a bounded, testable opportunity rather than a forecast.", diag("growth_opportunity"), "thesis", "statement"),
+        ("Executive Thesis", f"{brand}'s next growth question is about where existing strengths can compound.", diag("growth_opportunity"), "thesis", "statement"),
+        ("The Commercial Question", f"Where could {brand}'s next meaningful growth come from?", "This deck separates what outside-in evidence supports from what only company access can answer.", "question", "statement"),
+        ("Market Reality", f"Category context creates pressure, but does not diagnose {brand} by itself.", diag("market_category_diagnosis"), "market", "comparison"),
         ("Category growth dynamics", "Premiumisation and category polarisation make the middle harder to defend.", uncertainty("market_category_diagnosis"), "market", "framework"),
         ("Competitive landscape", f"Competitors own different trust and value cues; {brand}'s combination remains a hypothesis.", diag("source_of_difference"), "competition", "comparison"),
         ("The sea of sameness", f"{brand} needs a reason to be remembered, not another generic category claim.", implication("source_of_difference"), "competition", "comparison"),
@@ -327,7 +361,7 @@ def build_growth_blueprint_presentation_spec(
         ("Narrative platform", "A clearer progression could turn breadth of range into a guided reason to return.", diag("narrative"), "narrative", "framework"),
         ("Core message architecture", "One front door can make two subscription jobs easier to understand.", implication("narrative"), "narrative", "framework"),
         ("Messaging territories / distinctive assets", "Distinctiveness must be earned through proof, not asserted through tone.", uncertainty("narrative"), "narrative", "comparison"),
-        ("Commercial prize", "The commercial prize is better conversion and repeat behaviour, not activity for its own sake.", diag("growth_opportunity"), "commercial", "statement"),
+        ("Commercial Prize", "The commercial prize is better conversion and repeat behaviour, not activity for its own sake.", diag("growth_opportunity"), "commercial", "statement"),
         ("Attention strategy", "Attention should make the specific proposition easier to notice and remember.", diag("activation_implications"), "activation", "framework"),
         ("Channel roles", "Channels remain hypotheses until channel economics and conversion evidence are available.", uncertainty("activation_implications"), "activation", "comparison"),
         ("Content / campaign system", "Execution should test the proposition architecture, not multiply generic content.", implication("activation_implications"), "activation", "framework"),
@@ -339,7 +373,7 @@ def build_growth_blueprint_presentation_spec(
     slides = tuple(
         PresentationSlideSpec(
             slide_no=index,
-            title=title_text,
+            title=CANONICAL_BLUEPRINT_SLIDE_TITLES[index - 1],
             takeaway=takeaway,
             body=body or "The source artefact does not provide enough evidence for a stronger claim.",
             visual_treatment=visual,
@@ -349,6 +383,8 @@ def build_growth_blueprint_presentation_spec(
         )
         for index, (title_text, takeaway, body, visual, _section_name) in enumerate(plan, start=1)
     )
+    if tuple(slide.title for slide in slides) != CANONICAL_BLUEPRINT_SLIDE_TITLES:
+        raise ValueError("canonical Blueprint presentation plan no longer matches Schema v3")
     source_checksum = _checksum(artifact)
     return PresentationSpecification(
         specification_id=specification_id,
@@ -382,12 +418,31 @@ class VisualQAResult:
 def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
+    by_number = {slide.slide_no: slide for slide in specification.slides}
+    slide_8 = by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data
+    slide_13 = by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data
+    slide_22 = by_number.get(22, PresentationSlideSpec(22, "", "", "", "")).content_data
+    substantive_roles = (
+        all(bool(slide_8.get(key)) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap", "audience", "competitor_miss"))
+        and len(slide_13.get("signals") or []) >= 3
+        and len(slide_13.get("customer_language") or []) >= 2
+        and bool(slide_13.get("language_status"))
+        and all(key in by_number.get(19, PresentationSlideSpec(19, "", "", "", "")).content_data for key in ("x_axis", "y_axis", "positions", "territory"))
+        and len(slide_22.get("territories") or []) >= 3
+        and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
+    )
     return {
         "editorial_arc_is_complete": (
             bool(specification.slides)
             and [slide.slide_no for slide in specification.slides]
             == list(range(1, len(specification.slides) + 1))
         ),
+        "canonical_schema_v3_slide_roles_are_preserved": (
+            len(specification.slides) == 30
+            and tuple(slide.title for slide in specification.slides)
+            == CANONICAL_BLUEPRINT_SLIDE_TITLES
+        ),
+        "canonical_schema_v3_slide_roles_are_substantive": substantive_roles,
         "visual_forms_are_intentional": all(
             bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
             for slide in specification.slides
@@ -395,8 +450,306 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
         "no_visible_machine_runtime_artefacts": not any(token.lower() in visible for token in ("ev_", "artifact-", "workflow_run", "evidence / source refs")),
         "conclusion_led_headlines": sum(bool(s.takeaway.strip()) for s in specification.slides) >= len(specification.slides) * 0.9,
         "source_provenance_retained": all(s.source_notes for s in specification.slides),
+        "readable_citations_present": all(
+            slide.slide_no == 1 or bool(slide.citation_labels)
+            for slide in specification.slides
+        ),
+        "claim_status_is_visible": all(
+            slide.slide_no == 1 or bool(slide.claim_status.strip())
+            for slide in specification.slides
+        ),
+        "quantified_commercial_model_present": any(
+            slide.layout_type == "commercial_model" and bool(slide.content_data.get("scenarios"))
+            for slide in specification.slides
+        ),
+        "source_register_present": any(
+            bool(slide.content_data.get("source_register_entries"))
+            for slide in specification.slides
+        ),
         "strategic_source_unchanged": specification.strategic_source_unchanged,
     }
+
+
+def build_quantified_commercial_model(intelligence: Mapping[str, Any]) -> dict[str, Any]:
+    """Calculate a bounded opportunity model from sourced inputs and named assumptions."""
+    raw_inputs = intelligence.get("inputs")
+    raw_scenarios = intelligence.get("scenario_assumptions")
+    if not isinstance(raw_inputs, list) or not isinstance(raw_scenarios, list):
+        raise ValueError("commercial intelligence requires inputs and scenario assumptions")
+    inputs = {
+        str(item.get("input_id") or ""): item
+        for item in raw_inputs
+        if isinstance(item, Mapping)
+    }
+    try:
+        market_size = Decimal(str(inputs["market_size"]["value"]))
+        current_share = Decimal(str(inputs["current_market_share_percent"]["value"]))
+    except (KeyError, TypeError, InvalidOperation) as exc:
+        raise ValueError("commercial intelligence requires numeric market size and current share") from exc
+    for required in (inputs.get("market_size"), inputs.get("current_market_share_percent")):
+        if not isinstance(required, Mapping) or not required.get("source_ids") or not required.get("status"):
+            raise ValueError("commercial model inputs must retain source ids and evidence status")
+    if market_size <= 0 or current_share < 0:
+        raise ValueError("commercial model inputs must be positive")
+
+    scenarios: list[dict[str, Any]] = []
+    previous_target = current_share
+    for raw in raw_scenarios:
+        if not isinstance(raw, Mapping):
+            raise ValueError("commercial scenario assumptions must be objects")
+        try:
+            target = Decimal(str(raw["target_market_share_percent"]))
+            margin = Decimal(str(raw["contribution_margin_percent"]))
+        except (KeyError, InvalidOperation) as exc:
+            raise ValueError("commercial scenarios require target share and contribution margin assumptions") from exc
+        if target <= previous_target or margin <= 0 or margin >= 100:
+            raise ValueError("commercial scenarios must have increasing share and bounded margin assumptions")
+        incremental_revenue = market_size * (target - current_share) / Decimal("100")
+        contribution = incremental_revenue * margin / Decimal("100")
+        scenarios.append({
+            "name": str(raw.get("name") or "").strip(),
+            "target_market_share_percent": float(target),
+            "incremental_market_share_points": float(target - current_share),
+            "incremental_annual_revenue": int(incremental_revenue.quantize(Decimal("1"))),
+            "contribution_margin_percent_assumption": float(margin),
+            "incremental_annual_contribution": int(contribution.quantize(Decimal("1"))),
+            "classification": "illustrative_scenario",
+        })
+        previous_target = target
+    if len(scenarios) != 3 or any(not item["name"] for item in scenarios):
+        raise ValueError("commercial model requires named conservative, base and ambitious scenarios")
+
+    implementation = intelligence.get("implementation_cost")
+    if not isinstance(implementation, Mapping):
+        raise ValueError("commercial intelligence must state implementation cost evidence")
+    status = str(implementation.get("status") or "").strip()
+    if status not in {"sourced", "unavailable"}:
+        raise ValueError("implementation cost status must be sourced or unavailable")
+    if status == "sourced" and implementation.get("value") is None:
+        raise ValueError("sourced implementation cost requires a value")
+    if status == "unavailable" and implementation.get("value") is not None:
+        raise ValueError("unavailable implementation cost cannot contain an invented value")
+
+    return {
+        "model_id": str(intelligence.get("model_id") or "commercial-opportunity-model"),
+        "currency": str(intelligence.get("currency") or "GBP"),
+        "period": str(intelligence.get("period") or "annual run-rate"),
+        "classification": "illustrative_scenario_model",
+        "inputs": raw_inputs,
+        "estimated_current_annual_revenue": int(
+            (market_size * current_share / Decimal("100")).quantize(Decimal("1"))
+        ),
+        "scenarios": scenarios,
+        "implementation_cost": dict(implementation),
+        "net_value_status": "calculated" if status == "sourced" else "unavailable_pending_cost_evidence",
+        "warnings": [str(item) for item in intelligence.get("warnings") or []],
+    }
+
+
+def commercial_model_quality_checks(model: Mapping[str, Any]) -> dict[str, bool]:
+    scenarios = model.get("scenarios")
+    inputs = model.get("inputs")
+    implementation = model.get("implementation_cost")
+    return {
+        "three_scenarios_present": isinstance(scenarios, list) and len(scenarios) == 3,
+        "scenario_values_are_explicitly_illustrative": isinstance(scenarios, list) and all(
+            isinstance(item, Mapping) and item.get("classification") == "illustrative_scenario"
+            for item in scenarios
+        ),
+        "revenue_and_contribution_are_calculated": isinstance(scenarios, list) and all(
+            isinstance(item, Mapping)
+            and isinstance(item.get("incremental_annual_revenue"), int)
+            and isinstance(item.get("incremental_annual_contribution"), int)
+            for item in scenarios
+        ),
+        "inputs_retain_sources_and_status": isinstance(inputs, list) and all(
+            isinstance(item, Mapping) and bool(item.get("source_ids")) and bool(item.get("status"))
+            for item in inputs
+        ),
+        "implementation_cost_is_sourced_or_explicitly_unavailable": isinstance(implementation, Mapping)
+        and implementation.get("status") in {"sourced", "unavailable"}
+        and not (implementation.get("status") == "unavailable" and implementation.get("value") is not None),
+    }
+
+
+def _source_labels_for_slide(slide: PresentationSlideSpec, entries: list[Mapping[str, Any]]) -> tuple[str, ...]:
+    by_page = [
+        str(entry.get("source_id"))
+        for entry in entries
+        if slide.slide_no in (entry.get("applies_to_pages") or [])
+    ]
+    if by_page:
+        return tuple(dict.fromkeys(by_page))
+    refs = set(slide.evidence_refs)
+    matched = [
+        str(entry.get("source_id"))
+        for entry in entries
+        if refs.intersection(str(ref) for ref in entry.get("evidence_refs") or [])
+    ]
+    return tuple(dict.fromkeys(matched))
+
+
+def _claim_status(labels: tuple[str, ...], entries: list[Mapping[str, Any]]) -> str:
+    classifications = {
+        str(entry.get("classification") or "").replace("_", " ").upper()
+        for entry in entries
+        if str(entry.get("source_id")) in labels
+    }
+    return " + ".join(sorted(item for item in classifications if item)) or "APPROVED STRATEGY"
+
+
+def augment_specification_with_commercial_evidence(
+    specification: PresentationSpecification,
+    *,
+    commercial_model: Mapping[str, Any],
+    source_register: Mapping[str, Any],
+    production_direction: Mapping[str, Any],
+) -> PresentationSpecification:
+    """Enrich the fixed Schema v3 story without moving or replacing its 30 slots."""
+    raw_entries = source_register.get("entries")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ValueError("source register must contain readable source entries")
+    entries = [entry for entry in raw_entries if isinstance(entry, Mapping)]
+    source_ids = {str(entry.get("source_id") or "") for entry in entries}
+    if "T1" not in source_ids or any(
+        not all(str(entry.get(field) or "").strip() for field in ("source_id", "title", "publisher", "location", "classification"))
+        for entry in entries
+    ):
+        raise ValueError("source register entries are incomplete")
+
+    brand_name = str(production_direction.get("brand_name") or "the client").strip()
+    layout_content = production_direction.get("layout_content")
+    creative = production_direction.get("creative_direction")
+    directed_overrides = production_direction.get("slide_overrides") or {}
+    if not isinstance(layout_content, Mapping) or not isinstance(creative, Mapping):
+        raise ValueError("production direction requires layout content and creative direction")
+    if not isinstance(directed_overrides, Mapping):
+        raise ValueError("production direction slide overrides must be a mapping")
+
+    scenarios = commercial_model.get("scenarios") or []
+    model_sources = tuple(dict.fromkeys(
+        str(source_id)
+        for item in commercial_model.get("inputs") or []
+        if isinstance(item, Mapping)
+        for source_id in item.get("source_ids") or []
+    ))
+    if len(entries) < 3:
+        raise ValueError("source register requires at least three independently identified sources")
+
+    layout_by_slide = {
+        1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
+        4: "ecosystem_map_of_forces", 5: "evidence_ladder", 6: "tension_plus_journey_matrix",
+        7: "sameness_audit", 8: "market_gap_map", 9: "brand_diagnosis_scorecard",
+        10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
+        13: "customer_evidence_board", 14: "tension_plus_journey_matrix", 15: "category_entry_points",
+        16: "brand_diagnosis_scorecard", 17: "we_are_we_are_not_framework", 18: "single_thesis_page",
+        19: "positioning_map", 20: "narrative_platform_framework", 21: "message_architecture",
+        22: "messaging_territories", 23: "commercial_model", 24: "attention_strategy", 25: "channel_role_map",
+        26: "channel_applications", 27: "creative_direction", 28: "constraint_priority_roadmap",
+        29: "priority_matrix_plus_measurement_stack", 30: "closing_mandate",
+    }
+    content_key_by_slide = {
+        1: "single_thesis_page", 2: "single_thesis_page", 3: "question_frame",
+        4: "ecosystem_map_of_forces", 7: "sameness_audit", 8: "market_gap_map", 9: "brand_diagnosis_scorecard",
+        10: "provocation_page", 11: "audience_reality_split", 12: "demand_pool_cards",
+        13: "customer_evidence_board", 14: "tension_plus_journey_matrix", 16: "brand_diagnosis_scorecard",
+        17: "we_are_we_are_not_framework", 19: "positioning_map", 20: "narrative_platform_framework",
+        21: "message_architecture", 22: "messaging_territories", 23: "commercial_opportunity_model",
+        24: "attention_strategy", 25: "channel_role_map",
+        28: "constraint_priority_roadmap", 29: "priority_matrix_plus_measurement_stack",
+        30: "closing_mandate",
+    }
+    base_scenario = next(
+        (item for item in scenarios if str(item.get("name")).casefold() == "base"),
+        scenarios[1] if len(scenarios) > 1 else {},
+    )
+    share_gain = float(base_scenario.get("incremental_market_share_points") or 0)
+    base_revenue = int(base_scenario.get("incremental_annual_revenue") or 0)
+    overrides = {
+        23: {
+            "takeaway": f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario.",
+            "body": "Conservative, base and ambitious cases size a market-share opportunity; they are not company forecasts.",
+            "claim_status": "ESTIMATE + ASSUMPTION",
+            "citations": model_sources,
+            "content": {"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
+        },
+        27: {
+            "takeaway": str(creative.get("takeaway") or "The strategy translates into a distinctive, testable visual territory."),
+            "body": str(creative.get("body") or "Creative direction remains a hypothesis until founder testing."),
+            "claim_status": "PROPOSED CREATIVE TERRITORY",
+            "citations": ("T1", "S2"), "content": dict(creative),
+        },
+        29: {
+            "takeaway": f"Net value and payback remain unavailable until {brand_name} supplies actual margin, retention and implementation cost.",
+            "body": "Track recognition, shelf comprehension and earned search share before scaling; connect them to sell-through, CAC and retention once baselines exist.",
+            "claim_status": "PROPOSED MEASUREMENT + EVIDENCE GAP", "citations": ("T1",),
+        },
+    }
+    overrides.update({int(key): dict(value) for key, value in directed_overrides.items() if isinstance(value, Mapping)})
+    enriched = []
+    for slide in specification.slides:
+        labels = _source_labels_for_slide(slide, entries) or (("T1",) if slide.slide_no != 1 else ())
+        override = overrides.get(slide.slide_no, {})
+        labels = tuple(override.get("citations") or labels)
+        content = dict(layout_content.get(content_key_by_slide.get(slide.slide_no, "")) or {})
+        content.update(dict(override.get("content") or {}))
+        if slide.slide_no == 30:
+            content["source_register_entries"] = [dict(entry) for entry in entries]
+            content["source_register_summary"] = "SOURCE REGISTER / governed companion deliverable included"
+        enriched.append(replace(
+            slide,
+            takeaway=_complete_client_sentence(override.get("takeaway") or slide.takeaway, 240),
+            body=_complete_client_sentence(override.get("body") or slide.body, 420),
+            layout_type=layout_by_slide[slide.slide_no],
+            citation_labels=labels,
+            claim_status=str(override.get("claim_status") or _claim_status(labels, entries)),
+            source_notes=tuple(
+                f"{entry['source_id']}: {entry['publisher']} — {entry['title']} ({entry.get('date') or 'date recorded in source'}), {entry['location']}"
+                for entry in entries if str(entry.get("source_id")) in labels
+            ) or slide.source_notes,
+            content_data=content,
+        ))
+    if tuple(slide.title for slide in enriched) != CANONICAL_BLUEPRINT_SLIDE_TITLES:
+        raise ValueError("full Growth Blueprint must preserve every Schema v3 slide role")
+    return replace(
+        specification,
+        slides=tuple(enriched),
+        notes=specification.notes + (
+            "Commercial scenarios are illustrative calculations from sourced inputs and explicit assumptions.",
+            "Readable slide citations resolve to the governed companion source register; detailed lineage remains in speaker notes.",
+        ),
+    )
+
+
+def bind_source_register_to_specification(
+    specification: PresentationSpecification,
+    source_register: Mapping[str, Any],
+) -> tuple[PresentationSpecification, dict[str, Any]]:
+    """Make every visible citation and register page mapping agree exactly."""
+    raw_entries = source_register.get("entries")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ValueError("source register must contain readable source entries")
+    pages_by_source: dict[str, list[int]] = {}
+    for slide in specification.slides:
+        for source_id in slide.citation_labels:
+            pages_by_source.setdefault(str(source_id), []).append(slide.slide_no)
+    known_ids = {str(entry.get("source_id") or "") for entry in raw_entries if isinstance(entry, Mapping)}
+    unknown = sorted(set(pages_by_source) - known_ids)
+    if unknown:
+        raise ValueError(f"presentation cites sources missing from the source register: {unknown}")
+    bound_entries = [
+        {**dict(entry), "applies_to_pages": sorted(set(pages_by_source.get(str(entry.get("source_id") or ""), [])))}
+        for entry in raw_entries
+        if isinstance(entry, Mapping)
+    ]
+    bound_register = {**dict(source_register), "entries": bound_entries}
+    bound_slides = []
+    for slide in specification.slides:
+        content = dict(slide.content_data)
+        if slide.slide_no == 30:
+            content["source_register_entries"] = [dict(entry) for entry in bound_entries]
+        bound_slides.append(replace(slide, content_data=content))
+    return replace(specification, slides=tuple(bound_slides)), bound_register
 
 
 @dataclass(frozen=True, slots=True)
@@ -600,6 +953,20 @@ class LocalArtifactToolPresentationRenderer:
         pptx = _safe_rendered_path(output_dir, receipt.get("pptx"), suffix=".pptx")
         pdf = _safe_rendered_path(output_dir, receipt.get("pdf"), suffix=".pdf")
         subprocess.run([str(self.python), str(self.pdf_script), str(output_dir / ".rendered-slides"), str(pdf)], check=True, capture_output=True, text=True)
+        review_script = self.render_script.parent / "review_rendered_blueprint.py"
+        ocr_script = self.render_script.parent / "ocr_rendered_slides.swift"
+        rendered_review_path = output_dir / "rendered-review.json"
+        if not review_script.is_file() or not ocr_script.is_file():
+            raise RuntimeError("rendered-slide review scripts are unavailable")
+        subprocess.run(
+            [
+                str(self.python), str(review_script), str(output_dir / ".rendered-slides"),
+                str(spec_path), str(rendered_review_path), "--ocr-script", str(ocr_script),
+            ],
+            check=False,
+            capture_output=True,
+            text=True,
+        )
         validation = output_dir.parent / f"{output_dir.name}.validation.json"
         checks = {
             "pptx_exists": pptx.is_file() and pptx.stat().st_size > 0,
@@ -616,4 +983,19 @@ class LocalArtifactToolPresentationRenderer:
             checks["no_overflow_or_overlap"] = checks["layout_validation"]
         else:
             checks["no_overflow_or_overlap"] = False
-        return pptx, pdf, VisualQAResult("passed" if all(checks.values()) else "failed", checks)
+        rendered_review: Mapping[str, Any] = {}
+        if rendered_review_path.is_file():
+            payload = json.loads(rendered_review_path.read_text(encoding="utf-8"))
+            if isinstance(payload, Mapping):
+                rendered_review = payload
+        rendered_checks = rendered_review.get("checks") if isinstance(rendered_review, Mapping) else None
+        checks["rendered_slide_review_passed"] = (
+            rendered_review.get("status") == "passed"
+            and isinstance(rendered_checks, Mapping)
+            and bool(rendered_checks)
+            and all(item is True for item in rendered_checks.values())
+        )
+        findings = tuple(str(item) for item in rendered_review.get("findings") or [])
+        return pptx, pdf, VisualQAResult(
+            "passed" if all(checks.values()) else "failed", checks, findings
+        )

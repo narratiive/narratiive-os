@@ -1,0 +1,19 @@
+{
+  "brandVisuals": true,
+  "pdf": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pdf",
+  "pptx": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pptx",
+  "slideCount": 30,
+  "specification": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-presentation-specification.json",
+  "visualManifest": [
+    {
+      "asset": "hero-cat.png",
+      "role": "brand subject",
+      "slide": 1
+    },
+    {
+      "asset": "nutrition-science.png",
+      "role": "scientific proof",
+      "slide": 7
+    }
+  ]
+}

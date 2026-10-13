@@ -11,7 +11,7 @@ from runtime.growth_blueprint_deliverable_worker import (
     build_growth_blueprint_deliverable_worker,
 )
 from runtime.workflow_quality import growth_blueprint_deliverable_quality_gate
-from tests.test_deliverable_production import artifact
+from tests.test_deliverable_production import artifact, commercial_intelligence, source_register
 
 
 class CountingRenderer(FakePresentationRenderer):
@@ -32,6 +32,8 @@ def contract(source: dict, *, checksum: str | None = None) -> dict:
             "checksum": checksum or _checksum(source),
         },
         "client_context": {"name": "Northstar Test Co"},
+        "commercial_intelligence": commercial_intelligence(),
+        "source_register": source_register(),
         "workflow_context": {
             "workflow_id": "growth_blueprint_deliverable_production",
             "stage_id": "produce_growth_blueprint_deliverable",
@@ -66,6 +68,10 @@ class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
             self.assertEqual(renderer.calls, 1)
             self.assertTrue(Path(first["editable_pptx"]).is_file())
             self.assertTrue(Path(first["review_pdf"]).is_file())
+            self.assertEqual(len(first["commercial_model"]["scenarios"]), 3)
+            self.assertTrue(first["source_register"]["entries"])
+            self.assertFalse(first["execution_evidence"]["codex_dependency"])
+            self.assertEqual(first["execution_evidence"]["provider_calls"], 0)
 
     def test_rejects_blueprint_whose_content_no_longer_matches_approved_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

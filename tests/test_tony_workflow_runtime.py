@@ -7,6 +7,7 @@ import unittest
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from tests.test_deliverable_production import commercial_intelligence, source_register
 from tests.test_workflow_quality import (
     campaign_world_output,
     campaign_world_candidates_output,
@@ -593,7 +594,14 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 rationale="SAFE synthetic Blueprint approval",
             )
 
-            outcome = runtime.handoff("safe-growth-blueprint-run", _lifecycle("safe-client"))
+            outcome = runtime.handoff(
+                "safe-growth-blueprint-run",
+                _lifecycle("safe-client"),
+                {
+                    "commercial_intelligence": commercial_intelligence(),
+                    "source_register": source_register(),
+                },
+            )
             downstream = runtime.runs.load_run(outcome.run_id)
             source = runtime.runs.load_run("safe-growth-blueprint-run")
             source_ref = source.stages[0].output_artifacts[-1]

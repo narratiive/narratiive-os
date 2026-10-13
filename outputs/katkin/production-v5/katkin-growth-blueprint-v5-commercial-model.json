@@ -1,0 +1,82 @@
+{
+  "classification": "illustrative_scenario_model",
+  "currency": "GBP",
+  "estimated_current_annual_revenue": 12000000,
+  "implementation_cost": {
+    "missing_inputs": [
+      "approved implementation scope and delivery budget",
+      "media reallocation budget",
+      "retail production and test costs"
+    ],
+    "status": "unavailable",
+    "value": null
+  },
+  "inputs": [
+    {
+      "basis": "Existing Research Engine conversion of the Research & Markets USD 765.91m estimate to approximately GBP 600m.",
+      "input_id": "market_size",
+      "label": "Estimated UK cat food market",
+      "source_ids": [
+        "S8"
+      ],
+      "source_refs": [
+        "ev_5c64#s1"
+      ],
+      "status": "derived_estimate",
+      "unit": "GBP",
+      "value": 600000000
+    },
+    {
+      "basis": "The Grocer reporting of KatKin's Series C announcement, December 2025.",
+      "input_id": "current_market_share_percent",
+      "label": "KatKin reported UK cat food market share",
+      "source_ids": [
+        "S1A"
+      ],
+      "source_refs": [
+        "ev_5c64#s1"
+      ],
+      "status": "reported_claim",
+      "unit": "percent",
+      "value": 2.0
+    }
+  ],
+  "model_id": "katkin-commercial-opportunity-v5",
+  "net_value_status": "unavailable_pending_cost_evidence",
+  "period": "incremental annual run-rate at target share",
+  "scenarios": [
+    {
+      "classification": "illustrative_scenario",
+      "contribution_margin_percent_assumption": 30.0,
+      "incremental_annual_contribution": 450000,
+      "incremental_annual_revenue": 1500000,
+      "incremental_market_share_points": 0.25,
+      "name": "Conservative",
+      "target_market_share_percent": 2.25
+    },
+    {
+      "classification": "illustrative_scenario",
+      "contribution_margin_percent_assumption": 40.0,
+      "incremental_annual_contribution": 1200000,
+      "incremental_annual_revenue": 3000000,
+      "incremental_market_share_points": 0.5,
+      "name": "Base",
+      "target_market_share_percent": 2.5
+    },
+    {
+      "classification": "illustrative_scenario",
+      "contribution_margin_percent_assumption": 50.0,
+      "incremental_annual_contribution": 3000000,
+      "incremental_annual_revenue": 6000000,
+      "incremental_market_share_points": 1.0,
+      "name": "Ambitious",
+      "target_market_share_percent": 3.0
+    }
+  ],
+  "warnings": [
+    "This is a market-share scenario model, not a KatKin forecast.",
+    "The market size is a Research Engine estimate, not a filed KatKin figure.",
+    "Contribution margins are sensitivity assumptions because KatKin margin data was not supplied.",
+    "Net value and payback remain unavailable until implementation cost, CAC and retention inputs are supplied."
+  ]
+}

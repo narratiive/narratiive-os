@@ -499,11 +499,92 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     """Validate the presentation handoff without treating rendering as approval."""
     qa = output.get("visual_qa")
     qa_checks = qa.get("checks") if isinstance(qa, Mapping) else {}
+    commercial_model = output.get("commercial_model")
+    model_scenarios = commercial_model.get("scenarios") if isinstance(commercial_model, Mapping) else None
+    source_register = output.get("source_register")
+    source_entries = source_register.get("entries") if isinstance(source_register, Mapping) else None
+    execution = output.get("execution_evidence")
+    presentation = output.get("presentation_specification")
+    presentation_slides = presentation.get("slides") if isinstance(presentation, Mapping) else None
+    slide_by_number = {
+        int(item.get("slide_no") or 0): item
+        for item in presentation_slides or []
+        if isinstance(item, Mapping)
+    }
+    slide_8 = _mapping_value(slide_by_number.get(8), "content_data") or {}
+    slide_13 = _mapping_value(slide_by_number.get(13), "content_data") or {}
+    slide_22 = _mapping_value(slide_by_number.get(22), "content_data") or {}
+    registered_pages = {
+        str(entry.get("source_id") or ""): set(entry.get("applies_to_pages") or [])
+        for entry in source_entries or []
+        if isinstance(entry, Mapping)
+    }
+    citation_pages = {
+        str(source_id): {
+            int(slide.get("slide_no") or 0)
+            for slide in presentation_slides or []
+            if isinstance(slide, Mapping)
+            and str(source_id) in {str(label) for label in slide.get("citation_labels") or []}
+        }
+        for source_id in registered_pages
+    }
+    canonical_titles = (
+        "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
+        "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+        "The Market Gap", "Growth Constraint Diagnosis", "The Provocation", "Audience Reality",
+        "Audience Segments / Demand Pools", "Customer Evidence Board",
+        "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
+        "Positioning Problem", "Strategic Positioning", "Positioning Map", "Narrative Platform",
+        "Core Message Architecture", "Messaging Territories / Distinctive Assets", "Commercial Prize",
+        "Attention Strategy", "Channel Roles", "Content / Campaign System",
+        "Creative Direction / Next-Phase Hook", "Growth Priorities / 90-Day Activation Plan",
+        "Measurement Framework", "Strategic Principle / Closing Mandate",
+    )
     checks = {
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
+        "full_blueprint_has_exactly_thirty_slides": isinstance(presentation_slides, list)
+        and len(presentation_slides) == 30,
+        "canonical_schema_v3_slide_roles_are_preserved": isinstance(presentation_slides, list)
+        and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
+        == canonical_titles,
+        "canonical_schema_v3_slide_roles_are_substantive": (
+            all(bool(slide_8.get(key)) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap", "audience", "competitor_miss"))
+            and len(slide_13.get("signals") or []) >= 3
+            and len(slide_13.get("customer_language") or []) >= 2
+            and bool(slide_13.get("language_status"))
+            and all(key in (_mapping_value(slide_by_number.get(19), "content_data") or {}) for key in ("x_axis", "y_axis", "positions", "territory"))
+            and len(slide_22.get("territories") or []) >= 3
+            and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
+        ),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
+        "quantified_commercial_model_is_present": isinstance(model_scenarios, list)
+        and len(model_scenarios) == 3
+        and all(
+            isinstance(item, Mapping)
+            and item.get("classification") == "illustrative_scenario"
+            and isinstance(item.get("incremental_annual_revenue"), int)
+            and isinstance(item.get("incremental_annual_contribution"), int)
+            for item in model_scenarios
+        ),
+        "source_register_is_present": isinstance(source_entries, list)
+        and bool(source_entries)
+        and all(
+            isinstance(item, Mapping)
+            and _meaningful(item.get("source_id"))
+            and _meaningful(item.get("title"))
+            and _meaningful(item.get("location"))
+            and _meaningful(item.get("classification"))
+            for item in source_entries
+        ),
+        "source_register_page_mappings_match_visible_citations": bool(registered_pages)
+        and registered_pages == citation_pages,
         "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed" and bool(qa_checks) and all(bool(item) for item in qa_checks.values()),
+        "tony_execution_is_recorded": isinstance(execution, Mapping)
+        and execution.get("codex_dependency") is False
+        and isinstance(execution.get("elapsed_seconds"), (int, float))
+        and isinstance(execution.get("provider_calls"), int)
+        and isinstance(execution.get("estimated_provider_cost_gbp"), (int, float)),
         "approval_is_pending": str(output.get("approval_status") or "pending") == "pending",
         "no_external_action_taken": output.get("external_action_taken") is False,
     }

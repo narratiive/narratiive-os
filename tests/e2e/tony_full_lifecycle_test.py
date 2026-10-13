@@ -29,7 +29,7 @@ from runtime.worker_registry import (
     WorkerRegistration,
 )
 from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, WorkflowExecutionCoordinator
-from runtime.deliverable_production import _checksum
+from runtime.deliverable_production import CANONICAL_BLUEPRINT_SLIDE_TITLES, _checksum
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import (
     blueprint_director_quality_gate,
@@ -151,11 +151,34 @@ def _research_output() -> dict[str, Any]:
 
 
 def _deliverable_output() -> dict[str, Any]:
+    substantive_content = {
+        8: {"x_axis": ["familiar", "distinctive"], "y_axis": ["functional", "authority"], "competitors": ["category"], "current_position": ["today"], "future_position": ["future"], "market_gap": "Synthetic gap", "audience": "Synthetic audience", "competitor_miss": "Synthetic competitor miss"},
+        13: {"signals": ["search", "reviews", "social"], "customer_language": ["Synthetic phrase one", "Synthetic phrase two"], "language_status": "paraphrased"},
+        19: {"x_axis": [], "y_axis": [], "positions": [], "territory": "Synthetic territory"},
+        22: {"territories": ["one", "two", "three"], "verbal_assets": ["one", "two"], "tone_motion_cues": ["one", "two"], "recurring_formats": ["one", "two"]},
+    }
     return {
-        "presentation_specification": {"title": f"{CLIENT_NAME} Growth Blueprint", "slides": 30},
+        "presentation_specification": {
+            "title": f"{CLIENT_NAME} Growth Blueprint",
+            "slides": [
+                {"slide_no": index, "title": title, "content_data": substantive_content.get(index, {}), "citation_labels": ["T1" if index == 1 else "S1"]}
+                for index, title in enumerate(CANONICAL_BLUEPRINT_SLIDE_TITLES, 1)
+            ],
+        },
+        "commercial_model": {
+            "scenarios": [
+                {"name": name, "classification": "illustrative_scenario", "incremental_annual_revenue": revenue, "incremental_annual_contribution": contribution}
+                for name, revenue, contribution in (("Conservative", 1000000, 300000), ("Base", 2000000, 800000), ("Ambitious", 4000000, 2000000))
+            ]
+        },
+        "source_register": {"entries": [
+            {"source_id": "S1", "title": "Synthetic source", "location": "synthetic:northstar", "classification": "verified_fact", "applies_to_pages": list(range(2, 31))},
+            {"source_id": "T1", "title": "Synthetic thesis", "location": "synthetic:thesis", "classification": "approved_strategy", "applies_to_pages": [1]},
+        ]},
         "editable_pptx": "northstar-test-drive://growth-blueprint-v1.pptx",
         "review_pdf": "northstar-test-drive://growth-blueprint-v1.pdf",
         "visual_qa": {"status": "passed", "checks": {"fit": True, "legibility": True}},
+        "execution_evidence": {"codex_dependency": False, "elapsed_seconds": 1.0, "provider_calls": 0, "estimated_provider_cost_gbp": 0.0},
         "proposed_client_release": {"status": "pending_human_approval"},
         "approval_status": "pending",
         "external_action_taken": False,
@@ -515,6 +538,19 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             },
             "client_context": common_context,
             "blueprint_canon": {"bundle": "synthetic-test-only", "checksum": "northstar-test-canon"},
+            "commercial_intelligence": {
+                "inputs": [
+                    {"input_id": "market_size", "label": "Synthetic market", "value": 100000000, "status": "estimate", "source_ids": ["S1"]},
+                    {"input_id": "current_market_share_percent", "label": "Synthetic share", "value": 1, "status": "estimate", "source_ids": ["S1"]},
+                ],
+                "scenario_assumptions": [
+                    {"name": "Conservative", "target_market_share_percent": 1.25, "contribution_margin_percent": 30},
+                    {"name": "Base", "target_market_share_percent": 1.5, "contribution_margin_percent": 40},
+                    {"name": "Ambitious", "target_market_share_percent": 2, "contribution_margin_percent": 50},
+                ],
+                "implementation_cost": {"status": "unavailable", "value": None},
+            },
+            "source_register": {"entries": [{"source_id": "S1", "title": "Synthetic source", "publisher": "Test", "location": "synthetic:northstar", "classification": "verified_fact", "evidence_refs": ["northstar-test-evidence-1"], "applies_to_pages": list(range(2, 31))}, {"source_id": "S2", "title": "Synthetic science", "publisher": "Test", "location": "synthetic:science", "classification": "verified_fact", "evidence_refs": [], "applies_to_pages": []}, {"source_id": "T1", "title": "Approved strategy thesis", "publisher": "Narratiive", "location": "synthetic:thesis", "classification": "approved_strategy", "evidence_refs": [], "applies_to_pages": [1]}]},
         },
         "growth_blueprint_to_campaign_world": {
             "campaign_identity": _campaign_identity(),

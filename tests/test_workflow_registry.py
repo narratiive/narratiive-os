@@ -144,8 +144,12 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertTrue(stage.approval_policy.required)
         self.assertIn("blueprint_identity", stage.input_contract.required_fields)
         self.assertIn("client_context", stage.input_contract.required_fields)
+        self.assertIn("commercial_intelligence", stage.input_contract.required_fields)
+        self.assertIn("source_register", stage.input_contract.required_fields)
         self.assertIn("editable_pptx", stage.output_contract.required_fields)
         self.assertIn("review_pdf", stage.output_contract.required_fields)
+        self.assertIn("commercial_model", stage.output_contract.required_fields)
+        self.assertIn("execution_evidence", stage.output_contract.required_fields)
 
     def test_campaign_world_generation_and_tony_triage_are_separate_steps(self) -> None:
         definition = build_narratiive_workflow_registry().resolve("growth_blueprint_to_campaign_world")

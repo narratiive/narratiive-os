@@ -6,12 +6,17 @@ import unittest
 from pathlib import Path
 
 from runtime.deliverable_production import (
+    CANONICAL_BLUEPRINT_SLIDE_TITLES,
     DeliverableProductionService,
     FakePresentationRenderer,
     FileDeliverableStore,
     build_blueprint_director_presentation_spec,
     build_growth_blueprint_presentation_spec,
     build_directed_growth_blueprint_presentation_spec,
+    build_quantified_commercial_model,
+    augment_specification_with_commercial_evidence,
+    bind_source_register_to_specification,
+    commercial_model_quality_checks,
     presentation_quality_checks,
     _safe_rendered_path,
 )
@@ -37,7 +42,128 @@ def artifact() -> dict:
     }
 
 
+def commercial_intelligence() -> dict:
+    supporting = [
+        {
+            "title": f"Synthetic supporting decision {index}",
+            "body": "A synthetic, client-neutral execution statement for contract testing.",
+            "takeaway": "The execution implication remains bounded and testable.",
+            "layout_type": layout,
+            "citation_labels": ["T1"],
+        }
+        for index, layout in enumerate((
+            "evidence_ladder", "commercial_sensitivity", "investment_unlock",
+            "creative_principles", "channel_applications", "test_plan", "founder_decisions",
+        ), 1)
+    ]
+    return {
+        "model_id": "test-commercial-model",
+        "currency": "GBP",
+        "period": "annual run-rate",
+        "inputs": [
+            {"input_id": "market_size", "label": "Addressable market estimate", "value": 600000000, "unit": "GBP", "status": "estimate", "source_ids": ["S1"]},
+            {"input_id": "current_market_share_percent", "label": "Reported current market share", "value": 2.0, "unit": "percent", "status": "reported_claim", "source_ids": ["S1"]},
+        ],
+        "scenario_assumptions": [
+            {"name": "Conservative", "target_market_share_percent": 2.25, "contribution_margin_percent": 30},
+            {"name": "Base", "target_market_share_percent": 2.5, "contribution_margin_percent": 40},
+            {"name": "Ambitious", "target_market_share_percent": 3.0, "contribution_margin_percent": 50},
+        ],
+        "implementation_cost": {"status": "unavailable", "value": None, "missing_inputs": ["delivery budget"]},
+        "production_direction": {
+            "brand_name": "Northstar Test Co",
+            "layout_content": {
+                "market_gap_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Functional", "Authority"], "competitors": [["Category", 25, 25]], "current_position": ["Today", 45, 45], "future_position": ["Opportunity", 80, 80], "market_gap": "A bounded synthetic market gap", "audience": "Synthetic priority audience", "competitor_miss": "Synthetic competitor miss"},
+                "customer_evidence_board": {"language_status": "PARAPHRASED", "customer_language": ["Synthetic customer phrase one", "Synthetic customer phrase two"], "signals": [["SEARCH SHOWS", "Synthetic signal."], ["REVIEWS REVEAL", "Synthetic signal."], ["SOCIAL SHOWS", "Synthetic signal."]], "interpretation": "Synthetic interpretation."},
+                "positioning_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Transactional", "Authority"], "positions": [["Today", 40, 40], ["Future", 80, 80]], "territory": "Synthetic territory"},
+                "messaging_territories": {"territories": [["Territory one", "Role", "Tension", "Proof", "Asset"], ["Territory two", "Role", "Tension", "Proof", "Asset"], ["Territory three", "Role", "Tension", "Proof", "Asset"]], "verbal_assets": ["Asset one", "Asset two"], "tone_motion_cues": ["Cue one", "Cue two"], "recurring_formats": ["Format one", "Format two"]},
+                "attention_strategy": {"items": [["NOTICE", "Signal"], ["REMEMBER", "Message"], ["CONNECT", "Context"], ["VERIFY", "Source"]]},
+            },
+            "creative_direction": {
+                "title": "Creative direction: make the advantage visible",
+                "body": "Translate the approved strategy into a recognisable visual system.",
+                "takeaway": "A distinctive territory makes the strategic advantage easier to recognise.",
+                "primary_phrase": "VISIBLE ADVANTAGE",
+                "secondary_phrase": "meets human relevance",
+                "principles": ["Observe", "Evidence", "Signal"],
+            },
+            "supporting_slides": supporting,
+        },
+    }
+
+
+def source_register() -> dict:
+    refs = [f"ev-{key}" for key in (
+        "market_category_diagnosis", "audience", "growth_barriers", "source_of_difference",
+        "positioning", "narrative", "growth_opportunity", "activation_implications",
+        "key_strategic_choices", "evidence_and_uncertainty",
+    )] + [f"ev-{index}" for index in range(1, 18)]
+    return {"entries": [
+        {"source_id": "S1", "title": "Synthetic source", "publisher": "Test Publisher", "date": "2026", "location": "https://example.test/source", "classification": "verified_fact", "evidence_refs": refs, "applies_to_pages": list(range(2, 31))},
+        {"source_id": "S2", "title": "Synthetic science", "publisher": "Test Journal", "date": "2026", "location": "https://example.test/science", "classification": "verified_fact", "evidence_refs": refs, "applies_to_pages": []},
+        {"source_id": "T1", "title": "Approved strategy thesis", "publisher": "Narratiive", "date": "2026", "location": "governed runtime artefact", "classification": "approved_strategy", "evidence_refs": ["thesis:thesis_statement"], "applies_to_pages": [1]},
+    ]}
+
+
 class DeliverableProductionTests(unittest.TestCase):
+    def test_commercial_model_calculates_scenarios_without_inventing_cost(self) -> None:
+        model = build_quantified_commercial_model(commercial_intelligence())
+        self.assertEqual(model["estimated_current_annual_revenue"], 12000000)
+        self.assertEqual(model["scenarios"][1]["incremental_annual_revenue"], 3000000)
+        self.assertEqual(model["scenarios"][1]["incremental_annual_contribution"], 1200000)
+        self.assertEqual(model["implementation_cost"]["status"], "unavailable")
+        self.assertTrue(all(commercial_model_quality_checks(model).values()))
+
+    def test_commercial_model_rejects_value_when_cost_is_unavailable(self) -> None:
+        intelligence = commercial_intelligence()
+        intelligence["implementation_cost"] = {"status": "unavailable", "value": 500000}
+        with self.assertRaisesRegex(ValueError, "cannot contain an invented value"):
+            build_quantified_commercial_model(intelligence)
+
+    def test_augmented_specification_adds_model_sources_and_creative_direction(self) -> None:
+        source = artifact()
+        spec = build_growth_blueprint_presentation_spec(
+            source, specification_id="director-commercial", source_blueprint_id="blueprint-commercial",
+            source_blueprint_version=1, workspace_id="workspace-safe", client_id="client-safe",
+            title="Northstar Growth Blueprint", brand_name="Northstar",
+        )
+        result = augment_specification_with_commercial_evidence(
+            spec,
+            commercial_model=build_quantified_commercial_model(commercial_intelligence()),
+            source_register=source_register(),
+            production_direction=commercial_intelligence()["production_direction"],
+        )
+        layouts = [slide.layout_type for slide in result.slides]
+        self.assertIn("commercial_model", layouts)
+        self.assertIn("creative_direction", layouts)
+        self.assertTrue(result.slides[-1].content_data["source_register_entries"])
+        self.assertEqual(len(result.slides), 30)
+        self.assertEqual(result.slides[22].title, "Commercial Prize")
+        self.assertEqual(result.slides[26].title, "Creative Direction / Next-Phase Hook")
+        self.assertEqual(result.slides[27].title, "Growth Priorities / 90-Day Activation Plan")
+        self.assertEqual(result.slides[28].title, "Measurement Framework")
+        self.assertEqual(tuple(slide.title for slide in result.slides), CANONICAL_BLUEPRINT_SLIDE_TITLES)
+        checks = presentation_quality_checks(result)
+        self.assertTrue(checks["canonical_schema_v3_slide_roles_are_substantive"])
+        self.assertTrue(all(slide.body.endswith((".", "?", "!")) for slide in result.slides))
+        self.assertTrue(all(slide.takeaway.endswith((".", "?", "!")) for slide in result.slides))
+        self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
+        self.assertNotIn("katkin", json.dumps(result.to_dict()).casefold())
+        self.assertNotIn("cat behaviour", json.dumps(result.to_dict()).casefold())
+
+        bound, register = bind_source_register_to_specification(result, source_register())
+        expected_pages = {
+            source_id: {
+                slide.slide_no for slide in bound.slides if source_id in slide.citation_labels
+            }
+            for source_id in ("S1", "S2", "T1")
+        }
+        self.assertEqual(
+            {entry["source_id"]: set(entry["applies_to_pages"]) for entry in register["entries"]},
+            expected_pages,
+        )
+        self.assertEqual(bound.slides[-1].content_data["source_register_entries"], register["entries"])
+
     def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
         source = {
             "client_facing_blueprint": {
@@ -89,6 +215,7 @@ class DeliverableProductionTests(unittest.TestCase):
         self.assertEqual(len(spec.slides), 30)
         self.assertEqual(spec.slides[0].layout_type, "cover")
         self.assertEqual(spec.slides[-1].slide_no, 30)
+        self.assertEqual(tuple(slide.title for slide in spec.slides), CANONICAL_BLUEPRINT_SLIDE_TITLES)
         self.assertTrue(spec.strategic_source_unchanged)
         self.assertIn("native PPTX template not present", spec.template_source)
 

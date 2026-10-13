@@ -1,0 +1,71 @@
+{
+  "approved_strategy_thesis_artifact_id": "artifact-63f71c6bacf78fe6-92b790e0f4def86f",
+  "approved_strategy_thesis_checksum": "92b790e0f4def86f35c013e2fff78ce7dbb4ac2bb7b28647eafc69f6d622508c",
+  "blueprint_director_candidate_checksum": "4e4a237773d0855fed5e72bb659ae7f358fc9dc9043228f6afdf66165f614b4e",
+  "commercial_model_checksum": "13244e80c1f5427690116519436bc8075c9dedde7a9ed454c909c6e60d7cd20e",
+  "deliverables": {
+    "KatKin-Growth-Blueprint-v5.pdf": {
+      "path": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pdf",
+      "sha256": "eda69d40566be571b99ab38f51bf56c1c2161a2f6dd1899644cf59a13d3a7ea0"
+    },
+    "KatKin-Growth-Blueprint-v5.pptx": {
+      "path": "outputs/katkin/production-v5/KatKin-Growth-Blueprint-v5.pptx",
+      "sha256": "778e4b46b8d90bb7e4656e02c0b700c2a5a3de6c9f1b390194a8e1c26c5aec64"
+    },
+    "katkin-growth-blueprint-v5-commercial-model.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-commercial-model.json",
+      "sha256": "6146e2c6b18887f1b8b93e679ae4aa8955f9eab9d7df5ce078c3746702f4aeb5"
+    },
+    "katkin-growth-blueprint-v5-delivery-report.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-delivery-report.json",
+      "sha256": "d15a8a8e3b37bc9c471b3a1ebcc669109ae66527c638d7490f35a99b51b6588f"
+    },
+    "katkin-growth-blueprint-v5-execution-evidence.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-execution-evidence.json",
+      "sha256": "4b3266f646592404e868619c871eaa2efe87d14e6064a39d1b19d93e431fba66"
+    },
+    "katkin-growth-blueprint-v5-presentation-specification.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-presentation-specification.json",
+      "sha256": "ff3758cc8e0534aed0f308b266394978c5a93fd354fea6b5b3c87aef2cd32f61"
+    },
+    "katkin-growth-blueprint-v5-quality-review.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-quality-review.json",
+      "sha256": "855bfb9fd9024a6f7f4320d8209eae8c39ae3d634d229533c27c88ba9b4c011e"
+    },
+    "katkin-growth-blueprint-v5-render-receipt.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-render-receipt.json",
+      "sha256": "14133015467f9a3675e5fff1cbeeacb127a4c58707427e188868dd5a93f8716f"
+    },
+    "katkin-growth-blueprint-v5-rendered-review.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-review.json",
+      "sha256": "49cca8a21ffe306c6a0a2a4a0c7a1da5ef9895fae0d46fea9071e3a549b8f8b7"
+    },
+    "katkin-growth-blueprint-v5-rendered-slide-ocr.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
+      "sha256": "b98524a4258766cfa1fcd6abdd55dbc2c93da3bf230772092e788f36c3883829"
+    },
+    "katkin-growth-blueprint-v5-source-register.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-source-register.json",
+      "sha256": "b0217c9a6a2c11bea4c9203173a9ec6aba61ff54931faedef0562cd0745ece84"
+    },
+    "katkin-growth-blueprint-v5.json": {
+      "path": "outputs/katkin/production-v5/katkin-growth-blueprint-v5.json",
+      "sha256": "2a5365dead2ba4c7c82d111a518d8ec16f4b7d0485cfa30c7675ab4112beddcd"
+    }
+  },
+  "external_action_taken": false,
+  "human_approval_status": "pending_founder_review",
+  "output_id": "katkin-growth-blueprint-v5",
+  "output_version": 5,
+  "prior_blueprint": "katkin-growth-blueprint-v4",
+  "production_output_artifact_id": "artifact-eaed59f5e7e2e84b-3eab908f3b729b5f",
+  "production_output_parent_artifact_ids": [
+    "artifact-96b831e2aefd67d3-f178c35f1e867c7a"
+  ],
+  "recovery_method": "Tony deterministic commercial modelling, source attribution, rendering and rendered-slide review",
+  "schema_version": "katkin-growth-blueprint.v5",
+  "source_artifact_checksum": "f178c35f1e867c7afc0f0e129492efef626c1f1bd416ad2176e8891f312ce486",
+  "source_artifact_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
+  "source_register_checksum": "e05e44a43101903ab83d053eb94f4095d018f8bf3fa17794472b13ff820eb517",
+  "source_run_id": "katkin-live-acceptance-20260911-gate1-discovery_evidence_to_growth_sprint_proposal-growth_sprint_to_research_engine-rese-st-strategy_thesis_to_growth_blueprint-53df7bb2fa80df2c3523"
+}
