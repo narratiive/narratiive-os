@@ -125,10 +125,17 @@ def commercial_intelligence() -> dict:
                     "current_position": ["KATKIN TODAY", 51, 58],
                     "future_position": ["OWNABLE SPACE", 82, 82],
                     "market_gap": "Independent science made easy to feel and easy to inspect",
+                    "audience": "Committed DTC buyers and retail converts who need credible proof at a glance",
+                    "competitor_miss": "Fresh-food competitors converge on functional claims; independently published evidence is harder to replicate",
                 },
                 "customer_evidence_board": {
+                    "language_status": "PARAPHRASED REVIEW THEMES — NO VERBATIM CUSTOMER TRANSCRIPT WAS SUPPLIED",
+                    "customer_language": [
+                        "Too expensive for more than one cat",
+                        "Freezer space is a constraint",
+                        "Texture can take adjustment",
+                    ],
                     "signals": [
-                        ["CUSTOMER SAYS", "Public reviews surface value and transition friction."],
                         ["SEARCH SHOWS", "Competitors are gaining organic and AI-search visibility."],
                         ["REVIEWS REVEAL", "Strong aggregate satisfaction coexists with price pressure."],
                         ["SOCIAL SHOWS", "High creative volume converges on familiar functional claims."],
@@ -154,7 +161,10 @@ def commercial_intelligence() -> dict:
                         ["PROOF, NOT PROMISE", "Credibility", "Distrust of category claims", "Peer-reviewed research", "Coral evidence mark"],
                         ["THE SCIENCE CATS DESERVE", "Emotional meaning", "Nutrition complexity", "Veterinary formulation", "Clinical crop + warm line"],
                         ["VISIBLE CONFIDENCE", "Retail translation", "Shelf-glance uncertainty", "Layered source path", "Observe / mark / signal"],
-                    ]
+                    ],
+                    "verbal_assets": ["Proof, not promise", "The science cats deserve", "Show the evidence"],
+                    "tone_motion_cues": ["Precise and warm, never clinical-cold", "Measured reveals with one coral proof signal"],
+                    "recurring_formats": ["Claim / evidence / method", "Observation / mark / signal", "Shelf proof / deep source"],
                 },
                 "attention_strategy": {"items": [["NOTICE", "One coral evidence signal"], ["REMEMBER", "Proof before promise"], ["CONNECT", "Science with intimate cat behaviour"], ["VERIFY", "A readable path to the source"]]},
                 "commercial_opportunity_model": {"items": [["EARNED", "A citable point of view"], ["RETAIL", "Premium proof at shelf"], ["CRM", "Segmented confidence"], ["INVESTOR", "Earlier leading signals"]]},
@@ -173,6 +183,7 @@ def commercial_intelligence() -> dict:
                 "principles": [["OBSERVATION", "Tight crops and watchful eyes"], ["EVIDENCE", "Visible marks that show what was checked"], ["SIGNAL", "One coral cue points to the proof"]],
             },
             "slide_overrides": {
+                4: {"body": "Fresh-food rivals repeat real-meat, no-filler and vet-formulated claims; search makes that sameness costlier.", "claim_status": "INTERPRETATION + VERIFIED FACT", "citations": ["S2", "S3", "S5"]},
                 8: {"takeaway": "KatKin can test an under-leveraged space where independent proof builds brand authority.", "body": "The gap exists because familiar fresh-food claims are easy to copy, while peer-reviewed evidence is harder to reproduce and easier to verify.", "claim_status": "STRATEGIC INTERPRETATION", "citations": ["S2", "S3", "T1"]},
                 10: {"body": "The category asks owners to trust confident nutrition claims; KatKin can instead make independent evidence the starting point.", "claim_status": "STRATEGIC INTERPRETATION", "citations": ["S2", "S3", "T1"]},
                 13: {"takeaway": "Public customer, search and social signals support a direction, not a settled segment truth.", "body": "Reviews indicate satisfaction alongside price and transition friction; search and social evidence show a crowded field of similar functional claims.", "claim_status": "MIXED VERIFIED FACT + INTERPRETATION", "citations": ["S3", "S4", "S5"]},
@@ -253,7 +264,7 @@ def main() -> int:
     runtime = build_tony_workflow_runtime(
         args.runtime_root.resolve(), workspace_id="narratiive", client_id="katkin"
     )
-    run_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r4"
+    run_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r8"
     source_checksum = _checksum(governed)
     inputs = {
         "quality_accepted_growth_blueprint": governed,
@@ -327,6 +338,10 @@ def main() -> int:
     produced = read_object(Path(stage.output_artifacts[-1].location))
     if produced.get("visual_qa", {}).get("status") != "passed":
         raise ValueError(f"Tony rendered-slide review failed: {produced.get('visual_qa')}")
+    produced_register = produced.get("source_register")
+    if not isinstance(produced_register, dict):
+        raise ValueError("Tony production output did not preserve the citation-bound source register")
+    register = produced_register
 
     output_dir.mkdir(parents=True, exist_ok=True)
     copies = {

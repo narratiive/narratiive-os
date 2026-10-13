@@ -16,6 +16,7 @@ from runtime.deliverable_production import (
     PresentationSpecification,
     _checksum,
     augment_specification_with_commercial_evidence,
+    bind_source_register_to_specification,
     build_growth_blueprint_presentation_spec,
     build_quantified_commercial_model,
     commercial_model_quality_checks,
@@ -28,7 +29,7 @@ class GrowthBlueprintDeliverableWorkerError(RuntimeError):
     """Raised when a Blueprint deliverable cannot be produced truthfully."""
 
 
-RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v6"
+RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v10"
 
 
 class GrowthBlueprintDeliverableWorker:
@@ -110,6 +111,9 @@ class GrowthBlueprintDeliverableWorker:
                 commercial_model=commercial_model,
                 source_register=source_register,
                 production_direction=commercial_intelligence.get("production_direction") or {},
+            )
+            specification, source_register = bind_source_register_to_specification(
+                specification, source_register
             )
         except ValueError as exc:
             raise GrowthBlueprintDeliverableWorkerError(str(exc)) from exc

@@ -511,6 +511,23 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         for item in presentation_slides or []
         if isinstance(item, Mapping)
     }
+    slide_8 = _mapping_value(slide_by_number.get(8), "content_data") or {}
+    slide_13 = _mapping_value(slide_by_number.get(13), "content_data") or {}
+    slide_22 = _mapping_value(slide_by_number.get(22), "content_data") or {}
+    registered_pages = {
+        str(entry.get("source_id") or ""): set(entry.get("applies_to_pages") or [])
+        for entry in source_entries or []
+        if isinstance(entry, Mapping)
+    }
+    citation_pages = {
+        str(source_id): {
+            int(slide.get("slide_no") or 0)
+            for slide in presentation_slides or []
+            if isinstance(slide, Mapping)
+            and str(source_id) in {str(label) for label in slide.get("citation_labels") or []}
+        }
+        for source_id in registered_pages
+    }
     canonical_titles = (
         "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
         "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
@@ -531,10 +548,13 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
         == canonical_titles,
         "canonical_schema_v3_slide_roles_are_substantive": (
-            all(key in (_mapping_value(slide_by_number.get(8), "content_data") or {}) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap"))
-            and len((_mapping_value(slide_by_number.get(13), "content_data") or {}).get("signals") or []) >= 4
+            all(bool(slide_8.get(key)) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap", "audience", "competitor_miss"))
+            and len(slide_13.get("signals") or []) >= 3
+            and len(slide_13.get("customer_language") or []) >= 2
+            and bool(slide_13.get("language_status"))
             and all(key in (_mapping_value(slide_by_number.get(19), "content_data") or {}) for key in ("x_axis", "y_axis", "positions", "territory"))
-            and len((_mapping_value(slide_by_number.get(22), "content_data") or {}).get("territories") or []) >= 3
+            and len(slide_22.get("territories") or []) >= 3
+            and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
         ),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
@@ -557,6 +577,8 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
             and _meaningful(item.get("classification"))
             for item in source_entries
         ),
+        "source_register_page_mappings_match_visible_citations": bool(registered_pages)
+        and registered_pages == citation_pages,
         "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed" and bool(qa_checks) and all(bool(item) for item in qa_checks.values()),
         "tony_execution_is_recorded": isinstance(execution, Mapping)
         and execution.get("codex_dependency") is False

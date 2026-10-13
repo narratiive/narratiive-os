@@ -419,11 +419,17 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
     by_number = {slide.slide_no: slide for slide in specification.slides}
+    slide_8 = by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data
+    slide_13 = by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data
+    slide_22 = by_number.get(22, PresentationSlideSpec(22, "", "", "", "")).content_data
     substantive_roles = (
-        all(key in by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap"))
-        and len(by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data.get("signals") or []) >= 4
+        all(bool(slide_8.get(key)) for key in ("x_axis", "y_axis", "competitors", "current_position", "future_position", "market_gap", "audience", "competitor_miss"))
+        and len(slide_13.get("signals") or []) >= 3
+        and len(slide_13.get("customer_language") or []) >= 2
+        and bool(slide_13.get("language_status"))
         and all(key in by_number.get(19, PresentationSlideSpec(19, "", "", "", "")).content_data for key in ("x_axis", "y_axis", "positions", "territory"))
-        and len(by_number.get(22, PresentationSlideSpec(22, "", "", "", "")).content_data.get("territories") or []) >= 3
+        and len(slide_22.get("territories") or []) >= 3
+        and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
     )
     return {
         "editorial_arc_is_complete": (
@@ -713,6 +719,37 @@ def augment_specification_with_commercial_evidence(
             "Readable slide citations resolve to the governed companion source register; detailed lineage remains in speaker notes.",
         ),
     )
+
+
+def bind_source_register_to_specification(
+    specification: PresentationSpecification,
+    source_register: Mapping[str, Any],
+) -> tuple[PresentationSpecification, dict[str, Any]]:
+    """Make every visible citation and register page mapping agree exactly."""
+    raw_entries = source_register.get("entries")
+    if not isinstance(raw_entries, list) or not raw_entries:
+        raise ValueError("source register must contain readable source entries")
+    pages_by_source: dict[str, list[int]] = {}
+    for slide in specification.slides:
+        for source_id in slide.citation_labels:
+            pages_by_source.setdefault(str(source_id), []).append(slide.slide_no)
+    known_ids = {str(entry.get("source_id") or "") for entry in raw_entries if isinstance(entry, Mapping)}
+    unknown = sorted(set(pages_by_source) - known_ids)
+    if unknown:
+        raise ValueError(f"presentation cites sources missing from the source register: {unknown}")
+    bound_entries = [
+        {**dict(entry), "applies_to_pages": sorted(set(pages_by_source.get(str(entry.get("source_id") or ""), [])))}
+        for entry in raw_entries
+        if isinstance(entry, Mapping)
+    ]
+    bound_register = {**dict(source_register), "entries": bound_entries}
+    bound_slides = []
+    for slide in specification.slides:
+        content = dict(slide.content_data)
+        if slide.slide_no == 30:
+            content["source_register_entries"] = [dict(entry) for entry in bound_entries]
+        bound_slides.append(replace(slide, content_data=content))
+    return replace(specification, slides=tuple(bound_slides)), bound_register
 
 
 @dataclass(frozen=True, slots=True)

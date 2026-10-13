@@ -152,16 +152,16 @@ def _research_output() -> dict[str, Any]:
 
 def _deliverable_output() -> dict[str, Any]:
     substantive_content = {
-        8: {"x_axis": [], "y_axis": [], "competitors": [], "current_position": [], "future_position": [], "market_gap": "Synthetic gap"},
-        13: {"signals": ["customer", "search", "reviews", "social"]},
+        8: {"x_axis": ["familiar", "distinctive"], "y_axis": ["functional", "authority"], "competitors": ["category"], "current_position": ["today"], "future_position": ["future"], "market_gap": "Synthetic gap", "audience": "Synthetic audience", "competitor_miss": "Synthetic competitor miss"},
+        13: {"signals": ["search", "reviews", "social"], "customer_language": ["Synthetic phrase one", "Synthetic phrase two"], "language_status": "paraphrased"},
         19: {"x_axis": [], "y_axis": [], "positions": [], "territory": "Synthetic territory"},
-        22: {"territories": ["one", "two", "three"]},
+        22: {"territories": ["one", "two", "three"], "verbal_assets": ["one", "two"], "tone_motion_cues": ["one", "two"], "recurring_formats": ["one", "two"]},
     }
     return {
         "presentation_specification": {
             "title": f"{CLIENT_NAME} Growth Blueprint",
             "slides": [
-                {"slide_no": index, "title": title, "content_data": substantive_content.get(index, {})}
+                {"slide_no": index, "title": title, "content_data": substantive_content.get(index, {}), "citation_labels": ["T1" if index == 1 else "S1"]}
                 for index, title in enumerate(CANONICAL_BLUEPRINT_SLIDE_TITLES, 1)
             ],
         },
@@ -171,7 +171,10 @@ def _deliverable_output() -> dict[str, Any]:
                 for name, revenue, contribution in (("Conservative", 1000000, 300000), ("Base", 2000000, 800000), ("Ambitious", 4000000, 2000000))
             ]
         },
-        "source_register": {"entries": [{"source_id": "S1", "title": "Synthetic source", "location": "synthetic:northstar", "classification": "verified_fact"}]},
+        "source_register": {"entries": [
+            {"source_id": "S1", "title": "Synthetic source", "location": "synthetic:northstar", "classification": "verified_fact", "applies_to_pages": list(range(2, 31))},
+            {"source_id": "T1", "title": "Synthetic thesis", "location": "synthetic:thesis", "classification": "approved_strategy", "applies_to_pages": [1]},
+        ]},
         "editable_pptx": "northstar-test-drive://growth-blueprint-v1.pptx",
         "review_pdf": "northstar-test-drive://growth-blueprint-v1.pdf",
         "visual_qa": {"status": "passed", "checks": {"fit": True, "legibility": True}},

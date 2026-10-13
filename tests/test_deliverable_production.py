@@ -15,6 +15,7 @@ from runtime.deliverable_production import (
     build_directed_growth_blueprint_presentation_spec,
     build_quantified_commercial_model,
     augment_specification_with_commercial_evidence,
+    bind_source_register_to_specification,
     commercial_model_quality_checks,
     presentation_quality_checks,
     _safe_rendered_path,
@@ -72,10 +73,10 @@ def commercial_intelligence() -> dict:
         "production_direction": {
             "brand_name": "Northstar Test Co",
             "layout_content": {
-                "market_gap_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Functional", "Authority"], "competitors": [["Category", 25, 25]], "current_position": ["Today", 45, 45], "future_position": ["Opportunity", 80, 80], "market_gap": "A bounded synthetic market gap"},
-                "customer_evidence_board": {"signals": [["CUSTOMER SAYS", "Synthetic signal."], ["SEARCH SHOWS", "Synthetic signal."], ["REVIEWS REVEAL", "Synthetic signal."], ["SOCIAL SHOWS", "Synthetic signal."]], "interpretation": "Synthetic interpretation."},
+                "market_gap_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Functional", "Authority"], "competitors": [["Category", 25, 25]], "current_position": ["Today", 45, 45], "future_position": ["Opportunity", 80, 80], "market_gap": "A bounded synthetic market gap", "audience": "Synthetic priority audience", "competitor_miss": "Synthetic competitor miss"},
+                "customer_evidence_board": {"language_status": "PARAPHRASED", "customer_language": ["Synthetic customer phrase one", "Synthetic customer phrase two"], "signals": [["SEARCH SHOWS", "Synthetic signal."], ["REVIEWS REVEAL", "Synthetic signal."], ["SOCIAL SHOWS", "Synthetic signal."]], "interpretation": "Synthetic interpretation."},
                 "positioning_map": {"x_axis": ["Familiar", "Distinctive"], "y_axis": ["Transactional", "Authority"], "positions": [["Today", 40, 40], ["Future", 80, 80]], "territory": "Synthetic territory"},
-                "messaging_territories": {"territories": [["Territory one", "Role", "Tension", "Proof", "Asset"], ["Territory two", "Role", "Tension", "Proof", "Asset"], ["Territory three", "Role", "Tension", "Proof", "Asset"]]},
+                "messaging_territories": {"territories": [["Territory one", "Role", "Tension", "Proof", "Asset"], ["Territory two", "Role", "Tension", "Proof", "Asset"], ["Territory three", "Role", "Tension", "Proof", "Asset"]], "verbal_assets": ["Asset one", "Asset two"], "tone_motion_cues": ["Cue one", "Cue two"], "recurring_formats": ["Format one", "Format two"]},
                 "attention_strategy": {"items": [["NOTICE", "Signal"], ["REMEMBER", "Message"], ["CONNECT", "Context"], ["VERIFY", "Source"]]},
             },
             "creative_direction": {
@@ -149,6 +150,19 @@ class DeliverableProductionTests(unittest.TestCase):
         self.assertTrue(all(slide.slide_no == 1 or slide.citation_labels for slide in result.slides))
         self.assertNotIn("katkin", json.dumps(result.to_dict()).casefold())
         self.assertNotIn("cat behaviour", json.dumps(result.to_dict()).casefold())
+
+        bound, register = bind_source_register_to_specification(result, source_register())
+        expected_pages = {
+            source_id: {
+                slide.slide_no for slide in bound.slides if source_id in slide.citation_labels
+            }
+            for source_id in ("S1", "S2", "T1")
+        }
+        self.assertEqual(
+            {entry["source_id"]: set(entry["applies_to_pages"]) for entry in register["entries"]},
+            expected_pages,
+        )
+        self.assertEqual(bound.slides[-1].content_data["source_register_entries"], register["entries"])
 
     def test_blueprint_director_story_reaches_rendering_without_governance_copy(self) -> None:
         source = {

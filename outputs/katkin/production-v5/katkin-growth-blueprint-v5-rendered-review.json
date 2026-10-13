@@ -6,9 +6,11 @@
     "rendered_citations_are_visible": true,
     "rendered_commercial_model_is_present": true,
     "rendered_copy_is_client_safe_and_complete": true,
+    "rendered_expected_copy_is_visible": true,
     "rendered_images_match_approved_roles": true,
     "rendered_narrative_progression_is_complete": true,
     "rendered_slide_count_matches_specification": true,
+    "rendered_slide_dimensions_are_complete": true,
     "rendered_source_register_is_present": true,
     "rendered_text_is_legible": true
   },
@@ -46,8 +48,8 @@
   "duplicate_layout_pairs": [],
   "findings": [],
   "ocr_output": "outputs/katkin/production-v5/katkin-growth-blueprint-v5-rendered-slide-ocr.json",
-  "pdf_sha256": "5de3a8ce13cb675ee2b39e21b74960f80233640515ea7978884348ecc680b690",
-  "pptx_sha256": "2245a8325654a70710cdf6c5fd9dac9f7eb96ae703869ba7948b64fd35205a8e",
+  "pdf_sha256": "eda69d40566be571b99ab38f51bf56c1c2161a2f6dd1899644cf59a13d3a7ea0",
+  "pptx_sha256": "778e4b46b8d90bb7e4656e02c0b700c2a5a3de6c9f1b390194a8e1c26c5aec64",
   "progression_terms_found": [
     "constraint",
     "proof",
@@ -57,6 +59,129 @@
     "creative",
     "source",
     "mandate"
+  ],
+  "rendered_copy_gaps": [],
+  "rendered_slide_dimensions": [
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ]
   ],
   "review_basis": "rendered_png_pixels_and_macos_vision_ocr",
   "status": "passed",

@@ -105,10 +105,11 @@
       "visual_treatment": "question"
     },
     {
-      "body": "UK fresh-frozen cat food functional vocabulary ('real meat, no fillers, vet-formulated') has commoditised across DTC entrants; Untamed matches near-identical claims with roughly a quarter of KatKin's funding and stronger organic/AI-search visibility, while KatKin leads on scale, capital (~$50M.",
+      "body": "Fresh-food rivals repeat real-meat, no-filler and vet-formulated claims; search makes that sameness costlier.",
       "citation_labels": [
         "S2",
-        "S3"
+        "S3",
+        "S5"
       ],
       "claim_status": "INTERPRETATION + VERIFIED FACT",
       "content_data": {
@@ -139,7 +140,8 @@
       "slide_no": 4,
       "source_notes": [
         "S2: KatKin / Journal of Animal Science — KatKin heat-damage study and peer-reviewed AGE research (accessed 11 September 2026), katkin.com/articles/katkins-heat-damage-study; Journal of Animal Science",
-        "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com"
+        "S3: Untamed / Bubblegum Search — Competitor claims and organic-search comparison (Q3 2025 to September 2026), untamed.com; bubblegumsearch.com",
+        "S5: Motion / Marketing Week — Paid-social volume and creative analysis (accessed 11 September 2026), motionapp.com/library/katkin; marketingweek.com"
       ],
       "takeaway": "Category context creates pressure, but does not diagnose KatKin by itself.",
       "title": "Market Reality",
@@ -220,6 +222,8 @@
       ],
       "claim_status": "STRATEGIC INTERPRETATION",
       "content_data": {
+        "audience": "Committed DTC buyers and retail converts who need credible proof at a glance",
+        "competitor_miss": "Fresh-food competitors converge on functional claims; independently published evidence is harder to replicate",
         "competitors": [
           [
             "CATEGORY",
@@ -408,12 +412,14 @@
       ],
       "claim_status": "MIXED VERIFIED FACT + INTERPRETATION",
       "content_data": {
+        "customer_language": [
+          "Too expensive for more than one cat",
+          "Freezer space is a constraint",
+          "Texture can take adjustment"
+        ],
         "interpretation": "The opportunity is directional: make proof easier to find without claiming first-party validation.",
+        "language_status": "PARAPHRASED REVIEW THEMES — NO VERBATIM CUSTOMER TRANSCRIPT WAS SUPPLIED",
         "signals": [
-          [
-            "CUSTOMER SAYS",
-            "Public reviews surface value and transition friction."
-          ],
           [
             "SEARCH SHOWS",
             "Competitors are gaining organic and AI-search visibility."
@@ -763,6 +769,11 @@
       ],
       "claim_status": "PROPOSED MESSAGING SYSTEM",
       "content_data": {
+        "recurring_formats": [
+          "Claim / evidence / method",
+          "Observation / mark / signal",
+          "Shelf proof / deep source"
+        ],
         "territories": [
           [
             "PROOF, NOT PROMISE",
@@ -785,6 +796,15 @@
             "Layered source path",
             "Observe / mark / signal"
           ]
+        ],
+        "tone_motion_cues": [
+          "Precise and warm, never clinical-cold",
+          "Measured reveals with one coral proof signal"
+        ],
+        "verbal_assets": [
+          "Proof, not promise",
+          "The science cats deserve",
+          "Show the evidence"
         ]
       },
       "evidence_refs": [
@@ -1116,8 +1136,8 @@
             "applies_to_pages": [
               1,
               3,
-              13,
-              16
+              16,
+              23
             ],
             "classification": "verified_fact",
             "date": "December 2025",
@@ -1165,11 +1185,19 @@
               1,
               4,
               5,
+              8,
               9,
               10,
               11,
               12,
-              13
+              15,
+              18,
+              19,
+              20,
+              21,
+              22,
+              24,
+              27
             ],
             "classification": "verified_fact",
             "date": "accessed 11 September 2026",
@@ -1186,7 +1214,12 @@
               1,
               3,
               4,
-              9
+              8,
+              9,
+              10,
+              13,
+              18,
+              19
             ],
             "classification": "interpretation",
             "date": "Q3 2025 to September 2026",
@@ -1202,9 +1235,9 @@
             "applies_to_pages": [
               6,
               7,
-              8,
-              10,
-              15
+              13,
+              15,
+              22
             ],
             "classification": "mixed_fact_and_hypothesis",
             "date": "accessed 11 September 2026",
@@ -1221,8 +1254,10 @@
               1,
               2,
               3,
+              4,
               13,
-              14
+              14,
+              24
             ],
             "classification": "verified_fact",
             "date": "accessed 11 September 2026",
@@ -1237,7 +1272,6 @@
           {
             "applies_to_pages": [
               6,
-              8,
               14,
               15
             ],
@@ -1253,7 +1287,6 @@
           },
           {
             "applies_to_pages": [
-              8,
               14
             ],
             "classification": "verified_fact",
@@ -1268,7 +1301,7 @@
           },
           {
             "applies_to_pages": [
-              13
+              23
             ],
             "classification": "third_party_estimate",
             "date": "2025 report",
@@ -1284,11 +1317,25 @@
             "applies_to_pages": [
               1,
               2,
+              8,
               9,
               10,
               11,
               12,
-              17
+              15,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30
             ],
             "classification": "approved_strategy",
             "date": "September 2026",
@@ -1325,7 +1372,7 @@
   "source_blueprint_id": "artifact-96b831e2aefd67d3-f178c35f1e867c7a",
   "source_blueprint_version": 1,
   "source_checksum": "f178c35f1e867c7afc0f0e129492efef626c1f1bd416ad2176e8891f312ce486",
-  "specification_id": "blueprint-spec-b883a247867eafa61947",
+  "specification_id": "blueprint-spec-5c35ed20705e27d63ab5",
   "status": "ready_for_production",
   "strategic_source_unchanged": true,
   "template_source": "Narratiive Blueprint canon v1 visual framework library and visual intelligence system; native PPTX template not present in repository",

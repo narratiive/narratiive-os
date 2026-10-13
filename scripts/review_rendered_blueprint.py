@@ -9,8 +9,8 @@ import math
 import re
 import subprocess
 from pathlib import Path
+from typing import Sequence
 
-import numpy as np
 from PIL import Image, ImageFilter
 
 
@@ -21,19 +21,67 @@ def load_object(path: Path) -> dict:
     return value
 
 
-def layout_signature(path: Path) -> np.ndarray:
+def layout_signature(path: Path) -> tuple[float, ...]:
     image = Image.open(path).convert("L").resize((64, 36))
     edges = image.filter(ImageFilter.FIND_EDGES)
-    matrix = np.asarray(edges, dtype=np.float64)
-    matrix[:7, :] = 0
-    matrix[-5:, :] = 0
-    vector = matrix.reshape(-1)
-    norm = np.linalg.norm(vector)
-    return vector / norm if norm else vector
+    values = [float(value) for value in edges.getdata()]
+    for row in list(range(7)) + list(range(31, 36)):
+        values[row * 64:(row + 1) * 64] = [0.0] * 64
+    norm = math.sqrt(sum(value * value for value in values))
+    return tuple(value / norm for value in values) if norm else tuple(values)
 
 
-def similarity(left: np.ndarray, right: np.ndarray) -> float:
-    return float(np.dot(left, right))
+def similarity(left: Sequence[float], right: Sequence[float]) -> float:
+    return float(sum(a * b for a, b in zip(left, right)))
+
+
+def normalized_words(value: object) -> list[str]:
+    return re.findall(r"[a-z0-9£]+", str(value or "").casefold())
+
+
+def text_fragment(value: object, *, tail: bool = False, count: int = 5) -> str:
+    words = normalized_words(value)
+    selected = words[-count:] if tail else words[:count]
+    return " ".join(selected)
+
+
+def compact_copy(value: object, limit: int) -> str:
+    content = re.sub(r"\s+", " ", str(value or "").replace("—", " - ").replace("–", " - ")).strip()
+    if len(content) <= limit:
+        return content
+    prefix = content[:limit]
+    sentence = max(prefix.rfind(". "), prefix.rfind("? "), prefix.rfind("! "))
+    if sentence >= min(70, limit // 2):
+        return prefix[:sentence + 1].strip()
+    cut = prefix.rfind(" ")
+    return content[:cut if cut > 24 else limit].rstrip(" ,;:") + "."
+
+
+def rendered_copy_gaps(expected: list[dict], ocr_text: list[str]) -> list[dict]:
+    """Find copy that the renderer contract says must be visible in the pixels."""
+    body_layouts = {
+        "single_thesis_page": 430, "question_frame": 430, "ecosystem_map_of_forces": 190,
+        "sameness_audit": 330, "provocation_page": 245, "evidence_ladder": 300,
+        "creative_principles": 95, "test_plan": 190,
+    }
+    gaps: list[dict] = []
+    for index, slide in enumerate(expected, 1):
+        if index > len(ocr_text) or not isinstance(slide, dict):
+            gaps.append({"slide": index, "missing": ["rendered OCR"]})
+            continue
+        observed = " ".join(normalized_words(ocr_text[index - 1]))
+        required: list[tuple[str, str]] = []
+        if index != 1:
+            required.append(("title", text_fragment(slide.get("title"))))
+        if index not in (1, len(expected)):
+            required.append(("takeaway ending", text_fragment(compact_copy(slide.get("takeaway"), 210), tail=True)))
+        body_limit = body_layouts.get(str(slide.get("layout_type") or ""))
+        if index != 1 and body_limit:
+            required.append(("body ending", text_fragment(compact_copy(slide.get("body"), body_limit), tail=True)))
+        missing = [label for label, fragment in required if fragment and fragment not in observed]
+        if missing:
+            gaps.append({"slide": index, "missing": missing})
+    return gaps
 
 
 def main() -> int:
@@ -57,6 +105,8 @@ def main() -> int:
     )
     ocr = load_object(ocr_path).get("slides") or []
     ocr_text = [str(item.get("text") or "") for item in ocr if isinstance(item, dict)]
+    image_sizes = [Image.open(path).size for path in slides]
+    expected_size = image_sizes[0] if image_sizes else None
 
     signatures = [layout_signature(path) for path in slides]
     duplicate_pairs = []
@@ -99,15 +149,16 @@ def main() -> int:
         )
         for slide in expected
     )
+    copy_gaps = rendered_copy_gaps(expected, ocr_text)
     role_terms = {
-        8: ("ownable space", "the gap"),
-        13: ("customer says", "search shows", "reviews reveal", "social shows"),
+        8: ("ownable space", "the gap", "committed dtc buyers", "fresh food competitors"),
+        13: ("customer language", "paraphrased", "search shows", "reviews reveal", "social shows"),
         19: ("katkin future", "ownable territory"),
-        22: ("role", "tension", "proof", "asset"),
+        22: ("role", "tension", "proof", "asset", "verbal assets", "tone motion", "recurring formats"),
     }
     rendered_roles = all(
         slide_no <= len(ocr_text)
-        and all(term in ocr_text[slide_no - 1].casefold() for term in terms)
+        and all(term in " ".join(normalized_words(ocr_text[slide_no - 1])) for term in terms)
         for slide_no, terms in role_terms.items()
     )
 
@@ -125,7 +176,11 @@ def main() -> int:
     checks = {
         "rendered_slide_count_matches_specification": len(slides) == len(expected) == len(ocr_text),
         "rendered_text_is_legible": len(ocr_text) == len(slides) and all(len(text.strip()) >= 24 for text in ocr_text),
+        "rendered_slide_dimensions_are_complete": bool(expected_size)
+        and expected_size[0] > expected_size[1]
+        and all(size == expected_size for size in image_sizes),
         "rendered_copy_is_client_safe_and_complete": expected_copy_complete and not backstage_slides,
+        "rendered_expected_copy_is_visible": not copy_gaps,
         "rendered_canonical_roles_are_substantive": rendered_roles,
         "no_rendered_truncation_markers": not truncated,
         "no_near_duplicate_rendered_layouts": not duplicate_pairs,
@@ -152,6 +207,8 @@ def main() -> int:
         findings.append(f"backstage implementation labels detected on rendered slides: {backstage_slides}")
     if not expected_copy_complete:
         findings.append("presentation specification contains incomplete or backstage body/takeaway copy")
+    if copy_gaps:
+        findings.append(f"expected rendered copy is missing or clipped: {copy_gaps}")
     if not rendered_roles:
         findings.append("rendered canonical role checks failed for slides 8, 13, 19 or 22")
     minimum_citation_slides = max(1, len(slides) - 2)
@@ -170,6 +227,8 @@ def main() -> int:
         "findings": findings,
         "duplicate_layout_pairs": duplicate_pairs,
         "truncated_slides": truncated,
+        "rendered_copy_gaps": copy_gaps,
+        "rendered_slide_dimensions": [list(size) for size in image_sizes],
         "citation_slides": citation_slides,
         "progression_terms_found": progression_hits,
         "ocr_output": str(ocr_path),

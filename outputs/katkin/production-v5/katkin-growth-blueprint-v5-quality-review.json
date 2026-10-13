@@ -53,6 +53,7 @@
       "quantified_commercial_model_is_present": true,
       "review_pdf_is_present": true,
       "source_register_is_present": true,
+      "source_register_page_mappings_match_visible_citations": true,
       "tony_execution_is_recorded": true,
       "visual_qa_passed": true
     },
