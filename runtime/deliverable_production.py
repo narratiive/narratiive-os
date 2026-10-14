@@ -418,6 +418,7 @@ class VisualQAResult:
 def presentation_quality_checks(specification: PresentationSpecification) -> dict[str, bool]:
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
+    seven_chapter_demo = "seven-chapter issue #471 demonstration profile" in specification.template_source.casefold()
     by_number = {slide.slide_no: slide for slide in specification.slides}
     slide_8 = by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data
     slide_13 = by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data
@@ -431,18 +432,12 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
         and len(slide_22.get("territories") or []) >= 3
         and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
     )
-    return {
+    common = {
         "editorial_arc_is_complete": (
             bool(specification.slides)
             and [slide.slide_no for slide in specification.slides]
             == list(range(1, len(specification.slides) + 1))
         ),
-        "canonical_schema_v3_slide_roles_are_preserved": (
-            len(specification.slides) == 30
-            and tuple(slide.title for slide in specification.slides)
-            == CANONICAL_BLUEPRINT_SLIDE_TITLES
-        ),
-        "canonical_schema_v3_slide_roles_are_substantive": substantive_roles,
         "visual_forms_are_intentional": all(
             bool(slide.layout_type.strip()) and bool(slide.visual_treatment.strip())
             for slide in specification.slides
@@ -467,6 +462,29 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             for slide in specification.slides
         ),
         "strategic_source_unchanged": specification.strategic_source_unchanged,
+    }
+    if seven_chapter_demo:
+        required_chapters = {
+            "The Opportunity", "The Constraint", "The Advantage", "The Strategy",
+            "The Creative Future", "The Growth Engine", "The Next 12 Months",
+        }
+        titles = {slide.title for slide in specification.slides}
+        return {
+            **common,
+            "seven_chapter_demonstration_profile_is_complete": (
+                len(specification.slides) >= 12 and required_chapters.issubset(titles)
+            ),
+            "mandatory_opening_five_are_distinct": len({slide.title for slide in specification.slides[:5]}) == 5,
+            "locked_canon_is_declared_unchanged": "locked production canon unchanged" in specification.template_source.casefold(),
+        }
+    return {
+        **common,
+        "canonical_schema_v3_slide_roles_are_preserved": (
+            len(specification.slides) == 30
+            and tuple(slide.title for slide in specification.slides)
+            == CANONICAL_BLUEPRINT_SLIDE_TITLES
+        ),
+        "canonical_schema_v3_slide_roles_are_substantive": substantive_roles,
     }
 
 

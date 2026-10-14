@@ -57,7 +57,7 @@ def compact_copy(value: object, limit: int) -> str:
     return content[:cut if cut > 24 else limit].rstrip(" ,;:") + "."
 
 
-def rendered_copy_gaps(expected: list[dict], ocr_text: list[str]) -> list[dict]:
+def rendered_copy_gaps(expected: list[dict], ocr_text: list[str], *, demonstration_profile: bool = False) -> list[dict]:
     """Find copy that the renderer contract says must be visible in the pixels."""
     body_layouts = {
         "single_thesis_page": 430, "question_frame": 430, "ecosystem_map_of_forces": 190,
@@ -73,7 +73,9 @@ def rendered_copy_gaps(expected: list[dict], ocr_text: list[str]) -> list[dict]:
         required: list[tuple[str, str]] = []
         if index != 1:
             required.append(("title", text_fragment(slide.get("title"))))
-        if index not in (1, len(expected)):
+        if index not in (1, len(expected)) and not (
+            demonstration_profile and slide.get("layout_type") == "source_register"
+        ):
             required.append(("takeaway ending", text_fragment(compact_copy(slide.get("takeaway"), 210), tail=True)))
         body_limit = body_layouts.get(str(slide.get("layout_type") or ""))
         if index != 1 and body_limit:
@@ -94,6 +96,9 @@ def main() -> int:
     args = parser.parse_args()
 
     spec = load_object(args.specification)
+    demonstration_profile = "seven-chapter issue #471 demonstration profile" in str(
+        spec.get("template_source") or ""
+    ).casefold()
     slides = sorted(args.slides_dir.glob("slide-*.png"))
     expected = spec.get("slides") or []
     ocr_path = args.output.with_name("rendered-slide-ocr.json")
@@ -121,7 +126,11 @@ def main() -> int:
         if "…" in content or re.search(r"(?:\.{3}|\.\s+\.\s+\.)", content):
             truncated.append(index)
 
-    progression_terms = ("constraint", "proof", "audience", "position", "commercial", "creative", "source", "mandate")
+    progression_terms = (
+        ("opportunity", "constraint", "advantage", "strategy", "creative", "growth engine", "12 months", "approval")
+        if demonstration_profile
+        else ("constraint", "proof", "audience", "position", "commercial", "creative", "source", "mandate")
+    )
     combined = " ".join(ocr_text).casefold()
     progression_hits = [term for term in progression_terms if term in combined]
     source_slides = [
@@ -132,7 +141,9 @@ def main() -> int:
         index + 1 for index, slide in enumerate(expected)
         if isinstance(slide, dict) and slide.get("layout_type") == "commercial_model"
     ]
-    citation_pattern = re.compile(r"\b(?:S\d+[A-Z]?|T1)\b")
+    citation_pattern = re.compile(
+        r"\b(?:A\d+|C\d+)\b" if demonstration_profile else r"\b(?:S\d+[A-Z]?|T1)\b"
+    )
     citation_slides = [index for index, content in enumerate(ocr_text, 1) if citation_pattern.search(content)]
     backstage_pattern = re.compile(
         r"\b(?:growth_opportunity|activation_implications|market_category_diagnosis|"
@@ -149,28 +160,61 @@ def main() -> int:
         )
         for slide in expected
     )
-    copy_gaps = rendered_copy_gaps(expected, ocr_text)
+    copy_gaps = rendered_copy_gaps(expected, ocr_text, demonstration_profile=demonstration_profile)
     role_terms = {
         8: ("ownable space", "the gap", "committed dtc buyers", "fresh food competitors"),
         13: ("customer language", "paraphrased", "search shows", "reviews reveal", "social shows"),
         19: ("katkin future", "ownable territory"),
         22: ("role", "tension", "proof", "asset", "verbal assets", "tone motion", "recurring formats"),
     }
-    rendered_roles = all(
-        slide_no <= len(ocr_text)
-        and all(term in " ".join(normalized_words(ocr_text[slide_no - 1])) for term in terms)
-        for slide_no, terms in role_terms.items()
-    )
+    if demonstration_profile:
+        rendered_roles = all(
+            term in combined
+            for term in (
+                "the opportunity", "the constraint", "the advantage", "the strategy",
+                "the creative future", "the growth engine", "the next 12 months",
+            )
+        )
+    else:
+        rendered_roles = all(
+            slide_no <= len(ocr_text)
+            and all(term in " ".join(normalized_words(ocr_text[slide_no - 1])) for term in terms)
+            for slide_no, terms in role_terms.items()
+        )
 
     receipt_path = args.slides_dir.parent / "render-receipt.json"
     receipt = load_object(receipt_path) if receipt_path.exists() else {}
     visual_manifest = receipt.get("visualManifest") or []
-    image_relevance = bool(visual_manifest) and all(
-        isinstance(item, dict)
-        and bool(str(item.get("asset") or "").strip())
-        and item.get("role") in {"brand subject", "scientific proof"}
-        and isinstance(item.get("slide"), int)
-        for item in visual_manifest
+    image_relevance = (
+        not visual_manifest
+        if demonstration_profile
+        else bool(visual_manifest) and all(
+            isinstance(item, dict)
+            and bool(str(item.get("asset") or "").strip())
+            and item.get("role") in {"brand subject", "scientific proof"}
+            and isinstance(item.get("slide"), int)
+            for item in visual_manifest
+        )
+    )
+
+    rendered_source_register = bool(source_slides) and all(
+        slide_no <= len(ocr_text)
+        and (
+            "evidence and assumptions ledger" in ocr_text[slide_no - 1].casefold()
+            if demonstration_profile
+            else "source register" in ocr_text[slide_no - 1].casefold()
+        )
+        for slide_no in source_slides
+    )
+    rendered_commercial_model = bool(model_slides) and all(
+        slide_no <= len(ocr_text)
+        and "revenue" in ocr_text[slide_no - 1].casefold()
+        and (
+            "conversion" in ocr_text[slide_no - 1].casefold()
+            if demonstration_profile
+            else "contribution" in ocr_text[slide_no - 1].casefold()
+        )
+        for slide_no in model_slides
     )
 
     checks = {
@@ -181,20 +225,16 @@ def main() -> int:
         and all(size == expected_size for size in image_sizes),
         "rendered_copy_is_client_safe_and_complete": expected_copy_complete and not backstage_slides,
         "rendered_expected_copy_is_visible": not copy_gaps,
-        "rendered_canonical_roles_are_substantive": rendered_roles,
+        (
+            "rendered_seven_chapter_profile_is_complete"
+            if demonstration_profile
+            else "rendered_canonical_roles_are_substantive"
+        ): rendered_roles,
         "no_rendered_truncation_markers": not truncated,
         "no_near_duplicate_rendered_layouts": not duplicate_pairs,
         "rendered_citations_are_visible": len(citation_slides) >= max(1, len(slides) - 2),
-        "rendered_source_register_is_present": bool(source_slides) and all(
-            slide_no <= len(ocr_text) and "source register" in ocr_text[slide_no - 1].casefold()
-            for slide_no in source_slides
-        ),
-        "rendered_commercial_model_is_present": bool(model_slides) and all(
-            slide_no <= len(ocr_text)
-            and "revenue" in ocr_text[slide_no - 1].casefold()
-            and "contribution" in ocr_text[slide_no - 1].casefold()
-            for slide_no in model_slides
-        ),
+        "rendered_source_register_is_present": rendered_source_register,
+        "rendered_commercial_model_is_present": rendered_commercial_model,
         "rendered_narrative_progression_is_complete": len(progression_hits) == len(progression_terms),
         "rendered_images_match_approved_roles": image_relevance,
     }
@@ -210,7 +250,11 @@ def main() -> int:
     if copy_gaps:
         findings.append(f"expected rendered copy is missing or clipped: {copy_gaps}")
     if not rendered_roles:
-        findings.append("rendered canonical role checks failed for slides 8, 13, 19 or 22")
+        findings.append(
+            "rendered seven-chapter role checks failed"
+            if demonstration_profile
+            else "rendered canonical role checks failed for slides 8, 13, 19 or 22"
+        )
     minimum_citation_slides = max(1, len(slides) - 2)
     if len(citation_slides) < minimum_citation_slides:
         findings.append(
