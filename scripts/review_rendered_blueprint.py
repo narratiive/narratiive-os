@@ -99,6 +99,9 @@ def main() -> int:
     demonstration_profile = "seven-chapter issue #471 demonstration profile" in str(
         spec.get("template_source") or ""
     ).casefold()
+    founder_quality_profile = "issue #473 founder-quality controls" in str(
+        spec.get("template_source") or ""
+    ).casefold()
     slides = sorted(args.slides_dir.glob("slide-*.png"))
     expected = spec.get("slides") or []
     ocr_path = args.output.with_name("rendered-slide-ocr.json")
@@ -127,7 +130,12 @@ def main() -> int:
             truncated.append(index)
 
     progression_terms = (
-        ("opportunity", "constraint", "advantage", "strategy", "creative", "growth engine", "12 months", "approval")
+        (
+            "opportunity", "constraint", "advantage", "strategy", "creative",
+            "growth engine", "12 months", "founder decision",
+        )
+        if founder_quality_profile
+        else ("opportunity", "constraint", "advantage", "strategy", "creative", "growth engine", "12 months", "approval")
         if demonstration_profile
         else ("constraint", "proof", "audience", "position", "commercial", "creative", "source", "mandate")
     )
@@ -186,7 +194,21 @@ def main() -> int:
     receipt = load_object(receipt_path) if receipt_path.exists() else {}
     visual_manifest = receipt.get("visualManifest") or []
     image_relevance = (
-        not visual_manifest
+        any(
+            isinstance(item, dict) and item.get("role") == "creative illustration"
+            for item in visual_manifest
+        )
+        and all(
+            isinstance(item, dict)
+            and bool(str(item.get("asset") or "").strip())
+            and item.get("role") in {
+                "brand subject", "scientific proof", "creative illustration"
+            }
+            and isinstance(item.get("slide"), int)
+            for item in visual_manifest
+        )
+        if founder_quality_profile
+        else not visual_manifest
         if demonstration_profile
         else bool(visual_manifest) and all(
             isinstance(item, dict)

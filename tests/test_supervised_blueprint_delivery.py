@@ -22,7 +22,8 @@ from runtime.supervised_blueprint_delivery import (
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "fieldwork_supervised_blueprint.json"
+FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "fieldwork_supervised_blueprint_v2.json"
+LEGACY_FIXTURE = REPOSITORY_ROOT / "tests" / "fixtures" / "fieldwork_supervised_blueprint.json"
 
 
 class SupervisedBlueprintDeliveryTests(unittest.TestCase):
@@ -48,6 +49,8 @@ class SupervisedBlueprintDeliveryTests(unittest.TestCase):
         )
         self.assertEqual(len(package.presentation.slides), 20)
         self.assertEqual(len(package.presentation.slides[:5]), 5)
+        self.assertEqual(package.presentation.slides[4].layout_type, "creative_proof")
+        self.assertEqual(package.presentation.slides[-1].title, "The founder decision")
         self.assertEqual(package.qa_report["status"], "PASS_FOR_HUMAN_REVIEW")
         self.assertEqual(package.approval_checkpoint["status"], "pending")
         self.assertFalse(package.approval_checkpoint["release_authorised"])
@@ -65,7 +68,24 @@ class SupervisedBlueprintDeliveryTests(unittest.TestCase):
             sum(item["incremental_annual_revenue"] for item in model["base_scenario_bridge"]),
             690_000,
         )
+        self.assertEqual(model["investment_case"]["implementation_investment"], 85_000)
+        self.assertEqual(model["scenarios"][0]["year_one_net_after_investment"], -68_260)
+        self.assertEqual(model["scenarios"][1]["year_one_incremental_contribution"], 121_440)
+        self.assertEqual(model["scenarios"][1]["year_one_net_after_investment"], 36_440)
+        self.assertEqual(model["scenarios"][1]["illustrative_payback_months"], 8.4)
         self.assertTrue(all(item["scenario_not_forecast"] for item in model["scenarios"]))
+
+    def test_legacy_issue_471_fixture_remains_supported(self):
+        intake = json.loads(LEGACY_FIXTURE.read_text(encoding="utf-8"))
+        with tempfile.TemporaryDirectory() as temporary:
+            package = build_supervised_blueprint_package(
+                intake,
+                artifact_catalog=FileArtifactCatalog(
+                    Path(temporary), workspace_id=intake["identity"]["workspace_id"]
+                ),
+            )
+        self.assertEqual(package.commercial_model["investment_case"]["status"], "incomplete")
+        self.assertEqual(package.qa_report["status"], "PASS_FOR_HUMAN_REVIEW")
 
     def test_evidence_classes_are_strict_and_fictional_verified_claims_fail_closed(self):
         intake = self._intake()
