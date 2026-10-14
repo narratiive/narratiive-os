@@ -1,0 +1,82 @@
+{
+  "base_scenario_bridge": [
+    {
+      "incremental_annual_revenue": 300000,
+      "lever": "Traffic"
+    },
+    {
+      "incremental_annual_revenue": 300000,
+      "lever": "Conversion"
+    },
+    {
+      "incremental_annual_revenue": 90000,
+      "lever": "Average order value"
+    }
+  ],
+  "baseline": {
+    "annual_revenue": 1200000,
+    "annual_sessions": 600000,
+    "average_order_value": 100.0,
+    "classification": "MODELLED FROM ASSUMPTIONS",
+    "conversion_rate": 0.02
+  },
+  "classification": "MODELLED",
+  "currency": "GBP",
+  "input_evidence_ids": [
+    "A1",
+    "A2",
+    "A3"
+  ],
+  "investment_case": {
+    "missing_inputs": [
+      "Net contribution margin",
+      "Incremental acquisition cost",
+      "Implementation and production cost",
+      "Returns and fulfilment impact",
+      "Ramp timing and capacity constraints"
+    ],
+    "status": "incomplete",
+    "warning": "Incremental revenue does not establish incremental profit, return or payback."
+  },
+  "model_id": "fieldwork-fictional-ecommerce-opportunity-v1",
+  "model_type": "ecommerce",
+  "period": "annualised run-rate at scenario inputs",
+  "scenario_not_forecast": true,
+  "scenarios": [
+    {
+      "annual_revenue": 1349460,
+      "annual_sessions": 630000,
+      "average_order_value": 102.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.021,
+      "incremental_annual_revenue": 149460,
+      "name": "Downside",
+      "scenario_not_forecast": true
+    },
+    {
+      "annual_revenue": 1890000,
+      "annual_sessions": 750000,
+      "average_order_value": 105.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.024,
+      "incremental_annual_revenue": 690000,
+      "name": "Base",
+      "scenario_not_forecast": true
+    },
+    {
+      "annual_revenue": 2274480,
+      "annual_sessions": 810000,
+      "average_order_value": 108.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.026,
+      "incremental_annual_revenue": 1074480,
+      "name": "Upside",
+      "scenario_not_forecast": true
+    }
+  ],
+  "warnings": [
+    "Every input in this fictional demonstration is an ASSUMPTION.",
+    "These annualised scenarios are not forecasts, targets or promised results.",
+    "Company revenue impact depends on ramp, cannibalisation, returns, margin, capacity and investment."
+  ]
+}
