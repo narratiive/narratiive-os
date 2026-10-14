@@ -112,12 +112,24 @@ def _decimal(value: Any, name: str) -> Decimal:
     return number
 
 
+def _package_version(intake: Mapping[str, Any]) -> int:
+    raw = intake.get("identity") or {}
+    try:
+        version = int(raw.get("package_version") or 1)
+    except (TypeError, ValueError) as exc:
+        raise SupervisedBlueprintError("identity.package_version must be an integer") from exc
+    if version < 1:
+        raise SupervisedBlueprintError("identity.package_version must be positive")
+    return version
+
+
 def validate_intake(intake: Mapping[str, Any]) -> None:
     identity = _required_mapping(intake.get("identity"), "identity")
     for field in ("workspace_id", "client_id", "run_id", "company_name"):
         _required_text(identity.get(field), f"identity.{field}")
     if identity.get("fictional") is not True:
         raise SupervisedBlueprintError("demonstration intake must be explicitly fictional")
+    _package_version(intake)
 
     ledger = _required_list(intake.get("evidence_ledger"), "evidence_ledger")
     ids: set[str] = set()
@@ -152,6 +164,25 @@ def validate_intake(intake: Mapping[str, Any]) -> None:
             raise SupervisedBlueprintError(f"commercial model references unknown evidence: {ref}")
     if len(model["scenarios"]) != 3:
         raise SupervisedBlueprintError("commercial model requires downside, base and upside scenarios")
+    if model.get("economics") is not None:
+        economics = _required_mapping(model.get("economics"), "commercial_model.economics")
+        contribution_margin = _decimal(
+            economics.get("incremental_contribution_margin"),
+            "commercial_model.economics.incremental_contribution_margin",
+        )
+        if contribution_margin >= 1:
+            raise SupervisedBlueprintError("incremental_contribution_margin must be a decimal below 1")
+        _decimal(
+            economics.get("implementation_investment"),
+            "commercial_model.economics.implementation_investment",
+        )
+        for index, scenario in enumerate(model["scenarios"]):
+            realisation = _decimal(
+                scenario.get("year_one_realisation_rate"),
+                f"commercial_model.scenarios[{index}].year_one_realisation_rate",
+            )
+            if realisation > 1:
+                raise SupervisedBlueprintError("year_one_realisation_rate must not exceed 1")
 
     strategy = _required_mapping(intake.get("strategy"), "strategy")
     _required_mapping(strategy.get("constraint"), "strategy.constraint")
@@ -166,8 +197,9 @@ def validate_intake(intake: Mapping[str, Any]) -> None:
 def build_evidence_ledger(intake: Mapping[str, Any]) -> dict[str, Any]:
     validate_intake(intake)
     entries = [dict(item) for item in intake["evidence_ledger"]]
+    version = _package_version(intake)
     return {
-        "ledger_id": f"{intake['identity']['client_id']}-evidence-ledger-v1",
+        "ledger_id": f"{intake['identity']['client_id']}-evidence-ledger-v{version}",
         "workspace_id": intake["identity"]["workspace_id"],
         "client_id": intake["identity"]["client_id"],
         "fictional_demonstration": True,
@@ -199,6 +231,17 @@ def build_commercial_model(intake: Mapping[str, Any]) -> dict[str, Any]:
     if baseline_conversion >= 1:
         raise SupervisedBlueprintError("conversion_rate must be expressed as a decimal below 1")
     baseline_revenue = baseline_sessions * baseline_conversion * baseline_aov
+    economics = raw.get("economics")
+    contribution_margin = (
+        Decimal(str(economics["incremental_contribution_margin"]))
+        if isinstance(economics, Mapping)
+        else None
+    )
+    implementation_investment = (
+        Decimal(str(economics["implementation_investment"]))
+        if isinstance(economics, Mapping)
+        else None
+    )
     scenarios: list[dict[str, Any]] = []
     expected_names = ("Downside", "Base", "Upside")
     for expected, item in zip(expected_names, raw["scenarios"]):
@@ -210,18 +253,46 @@ def build_commercial_model(intake: Mapping[str, Any]) -> dict[str, Any]:
             raise SupervisedBlueprintError("conversion_rate must be expressed as a decimal below 1")
         revenue = sessions * conversion * aov
         incremental = revenue - baseline_revenue
-        scenarios.append(
-            {
-                "name": expected,
-                "annual_sessions": int(sessions),
-                "conversion_rate": float(conversion),
-                "average_order_value": float(aov),
-                "annual_revenue": int(revenue.quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
-                "incremental_annual_revenue": int(incremental.quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
-                "classification": "MODELLED",
-                "scenario_not_forecast": True,
-            }
-        )
+        scenario = {
+            "name": expected,
+            "annual_sessions": int(sessions),
+            "conversion_rate": float(conversion),
+            "average_order_value": float(aov),
+            "annual_revenue": int(revenue.quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "incremental_annual_revenue": int(incremental.quantize(Decimal("1"), rounding=ROUND_HALF_UP)),
+            "classification": "MODELLED",
+            "scenario_not_forecast": True,
+        }
+        if contribution_margin is not None and implementation_investment is not None:
+            realisation = Decimal(str(candidate["year_one_realisation_rate"]))
+            realised_revenue = incremental * realisation
+            contribution = realised_revenue * contribution_margin
+            net_after_investment = contribution - implementation_investment
+            monthly_contribution = contribution / Decimal("12")
+            scenario.update(
+                {
+                    "year_one_realisation_rate": float(realisation),
+                    "year_one_incremental_revenue": int(
+                        realised_revenue.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                    ),
+                    "year_one_incremental_contribution": int(
+                        contribution.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                    ),
+                    "year_one_net_after_investment": int(
+                        net_after_investment.quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+                    ),
+                    "illustrative_payback_months": (
+                        float(
+                            (implementation_investment / monthly_contribution).quantize(
+                                Decimal("0.1"), rounding=ROUND_HALF_UP
+                            )
+                        )
+                        if monthly_contribution > 0
+                        else None
+                    ),
+                }
+            )
+        scenarios.append(scenario)
     if [item["annual_revenue"] for item in scenarios] != sorted(item["annual_revenue"] for item in scenarios):
         raise SupervisedBlueprintError("scenario revenue must increase from downside to upside")
 
@@ -233,8 +304,28 @@ def build_commercial_model(intake: Mapping[str, Any]) -> dict[str, Any]:
     if int(bridge_total.quantize(Decimal("1"))) != base["incremental_annual_revenue"]:
         raise SupervisedBlueprintError("sequential commercial bridge does not reconcile")
 
+    investment_case = {
+        "status": "incomplete",
+        "missing_inputs": list(raw.get("missing_investment_inputs") or []),
+        "warning": "Incremental revenue does not establish incremental profit, return or payback.",
+    }
+    if contribution_margin is not None and implementation_investment is not None:
+        investment_case = {
+            "status": "illustrative_assumption_case",
+            "incremental_contribution_margin": float(contribution_margin),
+            "implementation_investment": int(implementation_investment),
+            "unresolved_inputs": list(raw.get("unresolved_inputs") or []),
+            "warning": (
+                "The contribution, investment and payback figures are MODELLED from ASSUMPTION inputs. "
+                "They are not profit forecasts or an approved investment case."
+            ),
+        }
+
     return {
-        "model_id": f"{intake['identity']['client_id']}-ecommerce-opportunity-v1",
+        "model_id": (
+            f"{intake['identity']['client_id']}-ecommerce-opportunity-"
+            f"v{_package_version(intake)}"
+        ),
         "model_type": "ecommerce",
         "currency": str(raw.get("currency") or "GBP"),
         "period": "annualised run-rate at scenario inputs",
@@ -254,11 +345,7 @@ def build_commercial_model(intake: Mapping[str, Any]) -> dict[str, Any]:
             {"lever": "Conversion", "incremental_annual_revenue": int(conversion_effect.quantize(Decimal("1")))},
             {"lever": "Average order value", "incremental_annual_revenue": int(aov_effect.quantize(Decimal("1")))},
         ],
-        "investment_case": {
-            "status": "incomplete",
-            "missing_inputs": list(raw.get("missing_investment_inputs") or []),
-            "warning": "Incremental revenue does not establish incremental profit, return or payback.",
-        },
+        "investment_case": investment_case,
         "warnings": [
             "Every input in this fictional demonstration is an ASSUMPTION.",
             "These annualised scenarios are not forecasts, targets or promised results.",
@@ -277,12 +364,19 @@ def build_blueprint(intake: Mapping[str, Any], model: Mapping[str, Any]) -> dict
     strategy = intake["strategy"]
     creative = intake["creative_territory"]
     base = model["scenarios"][1]
+    base_economics = ""
+    if "year_one_net_after_investment" in base:
+        base_economics = (
+            f" At the assumed ramp, contribution margin and £{model['investment_case']['implementation_investment']:,} "
+            f"investment, the first-year net contribution proxy is £{base['year_one_net_after_investment']:,}."
+        )
     chapters = [
         {
             "title": "The Opportunity",
             "argument": (
                 f"{company} could test an annualised ecommerce revenue scenario of "
                 f"£{base['annual_revenue']:,}, £{base['incremental_annual_revenue']:,} above the assumed baseline."
+                f"{base_economics}"
             ),
             "classification": "MODELLED",
             "evidence_ids": list(model["input_evidence_ids"]),
@@ -332,19 +426,25 @@ def build_blueprint(intake: Mapping[str, Any], model: Mapping[str, Any]) -> dict
             "argument": "A staged validation programme protects cash while the business replaces assumptions with evidence.",
             "classification": "ASSUMPTION",
             "evidence_ids": sorted({ref for item in intake["roadmap"] for ref in _evidence_refs(item)}),
-            "decision": "Matt approves the commercial recommendation and exact client-facing artefact before release.",
+            "decision": (
+                "Matt approves the exact client-facing artefact before release. The founder then decides whether "
+                "the verified economics justify the next bounded investment."
+            ),
             "phases": [dict(item) for item in intake["roadmap"]],
         },
     ]
     if tuple(item["title"] for item in chapters) != BLUEPRINT_CHAPTERS:
         raise SupervisedBlueprintError("Blueprint chapter contract is incomplete")
     return {
-        "blueprint_id": f"{intake['identity']['client_id']}-growth-blueprint-demo-v1",
+        "blueprint_id": (
+            f"{intake['identity']['client_id']}-growth-blueprint-demo-"
+            f"v{_package_version(intake)}"
+        ),
         "title": f"Narratiive Growth Blueprint - {company}",
         "status": "INTERNAL REVIEW DRAFT - HUMAN APPROVAL REQUIRED",
         "fictional_demonstration": True,
         "canon_relationship": (
-            "Additive Issue #471 demonstration profile. The checksum-locked 30-slide production canon remains unchanged."
+            "Additive Issue #471/#473 demonstration profile. The checksum-locked 30-slide production canon remains unchanged."
         ),
         "opening_slide_functions": list(OPENING_SLIDE_FUNCTIONS),
         "chapters": chapters,
@@ -374,24 +474,46 @@ def build_presentation_specification(
     creative = intake["creative_territory"]
     base = model["scenarios"][1]
     refs = tuple(model["input_evidence_ids"])
+    has_economics = "year_one_net_after_investment" in base
+    base_decision = (
+        f"The base case produces a £{base['year_one_net_after_investment']:,} first-year contribution proxy after "
+        f"£{model['investment_case']['implementation_investment']:,} of assumed investment. Verify every input before committing."
+        if has_economics
+        else "The revenue headroom needs contribution, investment and ramp evidence before it can support a decision."
+    )
     rows = [
         {
             "title": f"Where {company} could go",
-            "takeaway": "A stronger ecommerce engine could create meaningful headroom if the assumed inputs prove achievable.",
-            "body": f"The base scenario reaches £{base['annual_revenue']:,} in annualised online revenue. It remains a scenario, not a forecast.",
+            "takeaway": "FIELDWORK could own the mixed-use surface, turning one useful object into a repeatable customer relationship.",
+            "body": (
+                f"The base scenario reaches £{base['annual_revenue']:,} in annualised online revenue, but the strategic prize "
+                "is a defensible reason to choose and return. This is a scenario, not a forecast."
+            ),
             "layout": "single_thesis_page",
             "classification": "MODELLED",
             "refs": refs,
-            "content": {"brand_name": company, "platform": "A conditional 12-month opportunity", "subtitle": "Fictional demonstration. Human approval required."},
+            "content": {
+                "brand_name": company,
+                "platform": "Own the mixed-use surface",
+                "subtitle": "A conditional route from first object to repeat purchase",
+            },
         },
         {
             "title": "What the commercial opportunity looks like",
-            "takeaway": f"The base scenario adds £{base['incremental_annual_revenue']:,} in annualised revenue before cost, margin and ramp effects.",
-            "body": "Downside, base and upside cases make the assumptions visible. None represents promised performance.",
+            "takeaway": (
+                f"The base scenario adds £{base['incremental_annual_revenue']:,} of annualised revenue headroom. "
+                f"{base_decision}"
+            ),
+            "body": "The downside loses money after assumed investment. The base and upside only become investable if the ramp, contribution and cost assumptions survive verification.",
             "layout": "commercial_model",
             "classification": "MODELLED - SCENARIO, NOT FORECAST",
             "refs": refs,
-            "content": {"model_type": "ecommerce", "scenarios": model["scenarios"], "baseline": model["baseline"]},
+            "content": {
+                "model_type": "ecommerce",
+                "scenarios": model["scenarios"],
+                "baseline": model["baseline"],
+                "investment_case": model["investment_case"],
+            },
         },
         {
             "title": "What currently prevents growth",
@@ -400,12 +522,12 @@ def build_presentation_specification(
             "layout": "provocation_page",
             "classification": "ASSUMPTION",
             "refs": tuple(strategy["constraint"]["evidence_ids"]),
-            "content": {"left_label": "CURRENT PATTERN", "left_headline": "Broad but forgettable", "left_detail": "The proposition tries to serve every moment.", "right_label": "WORKING CONSTRAINT", "right_headline": "Weak reason to choose"},
+            "content": {"left_label": "CURRENT PATTERN", "left_headline": "Reach before reason", "left_detail": "A broad catalogue asks paid media to create the distinction.", "right_label": "WORKING CONSTRAINT", "right_headline": "No proven repeat path"},
         },
         {
             "title": "The strategic moves",
-            "takeaway": "Prioritise a sharper proposition, prove it in conversion and build repeat before scaling acquisition.",
-            "body": "Each move has a commercial lever, a validation test and a trade-off. Investment remains conditional on evidence.",
+            "takeaway": "Own the mixed-use surface, make usefulness visible, then earn the second object before scaling acquisition.",
+            "body": "Each move changes a customer decision and has a measurable commercial gate. Larger investment remains conditional on evidence.",
             "layout": "constraint_priority_roadmap",
             "classification": "ASSUMPTION",
             "refs": tuple(sorted({ref for item in strategy["recommendations"] for ref in item["evidence_ids"]})),
@@ -415,15 +537,23 @@ def build_presentation_specification(
             "title": "What the future could look like",
             "takeaway": creative["platform"],
             "body": creative["description"],
-            "layout": "creative_direction",
+            "layout": "creative_proof" if creative.get("asset_path") else "creative_direction",
             "classification": "CREATIVE ILLUSTRATION",
             "refs": tuple(creative["evidence_ids"]),
-            "content": {"primary_phrase": creative["primary_phrase"], "bridge": "made", "secondary_phrase": creative["secondary_phrase"], "principles": creative["principles"]},
+            "content": {
+                "asset_path": creative.get("asset_path"),
+                "image_alt": creative.get("asset_alt"),
+                "creative_line": creative["name"],
+                "primary_phrase": creative["primary_phrase"],
+                "bridge": "made",
+                "secondary_phrase": creative["secondary_phrase"],
+                "principles": creative["principles"],
+            },
         },
         {
             "title": "The Opportunity",
             "takeaway": chapters["The Opportunity"]["argument"],
-            "body": chapters["The Opportunity"]["decision"],
+            "body": base_decision,
             "layout": "single_thesis_page",
             "classification": "MODELLED",
             "refs": tuple(chapters["The Opportunity"]["evidence_ids"]),
@@ -449,7 +579,7 @@ def build_presentation_specification(
         },
         {
             "title": "What would disprove the diagnosis",
-            "takeaway": "The constraint changes if proposition clarity fails to improve qualified conversion in a controlled test.",
+            "takeaway": "The diagnosis fails if a specific mixed-use proposition does not improve net conversion or existing cohorts already repeat strongly.",
             "body": strategy["constraint"]["falsification_test"],
             "layout": "test_plan",
             "classification": "ASSUMPTION",
@@ -463,7 +593,7 @@ def build_presentation_specification(
             "layout": "market_gap_map",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Advantage"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "x_axis": ["GENERIC UTILITY", "OWNABLE POINT OF VIEW"], "y_axis": ["DECORATIVE", "BUILT FOR REAL WORK"], "competitors": [], "current_position": ["FIELDWORK TODAY", 42, 44], "future_position": ["TEST TERRITORY", 78, 80], "market_gap": "Design for real work and real homes", "audience": "People who refuse to choose between utility and identity", "competitor_miss": "Validation required. No competitor research is asserted in this fixture."},
+            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "x_axis": ["GENERIC ORGANISATION", "MIXED-USE SPECIFIC"], "y_axis": ["DECORATIVE", "PROVEN IN USE"], "competitors": [], "current_position": ["FIELDWORK TODAY", 42, 44], "future_position": ["TEST TERRITORY", 78, 80], "market_gap": "Modular objects for surfaces shared by work and life", "audience": "People whose home workspace disappears and reappears every day", "competitor_miss": "Validation required. No competitor position is asserted in this fictional fixture."},
         },
         {
             "title": "The advantage needs proof",
@@ -472,16 +602,16 @@ def build_presentation_specification(
             "layout": "customer_evidence_board",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Advantage"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "language_status": "NO CUSTOMER QUOTES OR RESEARCH SUPPLIED", "customer_language": ["Needs validation", "Needs validation", "Needs validation"], "signals": [["FOUNDER VIEW", "A proposed advantage"], ["CUSTOMER DATA", "Missing"], ["CHOICE TEST", "Required"]], "interpretation": "Treat the proposed advantage as a hypothesis until real preference and conversion evidence exists."},
+            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "language_status": "CUSTOMER EVIDENCE REQUIRED", "customer_language": ["Observe how shared surfaces are reset", "Test the mixed-use proposition", "Measure willingness to pay"], "signals": [["FOUNDER VIEW", "A proposed category to own"], ["CUSTOMER DATA", "Not yet supplied"], ["CHOICE TEST", "Required before selection"]], "interpretation": "The territory remains a hypothesis until observed behaviour and customer choice evidence support it."},
         },
         {
             "title": "The Strategy",
-            "takeaway": "Make modern work at home more useful and recognisable.",
+            "takeaway": strategy["thesis"],
             "body": chapters["The Strategy"]["decision"],
             "layout": "narrative_platform_framework",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Strategy"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 4 / THE STRATEGY", "steps": [["TENSION", "Useful products disappear into category sameness"], ["SHIFT", "Make real work the point of view"], ["RESOLUTION", "Prove the proposition before buying reach"]], "banner": "Make modern work at home more useful and recognisable."},
+            "content": {"chapter_label": "CHAPTER 4 / THE STRATEGY", "steps": [["TENSION", "Broad accessories compete on taste and paid attention"], ["SHIFT", "Own the mixed-use surface and show usefulness in context"], ["RESOLUTION", "Let the first object earn the second before buying reach"]], "banner": "Turn one useful object into a reason to return."},
         },
         {
             "title": "Three moves, three tests",
@@ -502,13 +632,13 @@ def build_presentation_specification(
             "content": {"chapter_label": "CHAPTER 5 / THE CREATIVE FUTURE", "primary_phrase": creative["primary_phrase"], "bridge": "meets", "secondary_phrase": creative["secondary_phrase"], "principles": creative["principles"]},
         },
         {
-            "title": "A tangible territory",
+            "title": "The campaign behaviour",
             "takeaway": creative["platform"],
             "body": creative["example_execution"],
             "layout": "creative_principles",
             "classification": "CREATIVE ILLUSTRATION",
             "refs": tuple(chapters["The Creative Future"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 5 / THE CREATIVE FUTURE"},
+            "content": {"chapter_label": "CHAPTER 5 / THE CREATIVE FUTURE", "principles": creative["principles"]},
         },
         {
             "title": "The Growth Engine",
@@ -531,7 +661,7 @@ def build_presentation_specification(
         {
             "title": "The Next 12 Months",
             "takeaway": chapters["The Next 12 Months"]["argument"],
-            "body": chapters["The Next 12 Months"]["decision"],
+            "body": "Start with a 12-week proof phase. Release the remaining roadmap only when baseline, contribution, customer choice and capacity evidence pass their gates.",
             "layout": "constraint_priority_roadmap",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Next 12 Months"]["evidence_ids"]),
@@ -544,16 +674,16 @@ def build_presentation_specification(
             "layout": "source_register",
             "classification": "EVIDENCE REGISTER",
             "refs": tuple(item["evidence_id"] for item in ledger["entries"]),
-            "content": {"chapter_label": "GOVERNANCE / EVIDENCE", "source_register_entries": ledger["entries"], "entries": ledger["entries"]},
+            "content": {"chapter_label": "GOVERNANCE / EVIDENCE", "source_register_entries": ledger["entries"], "entries": ledger["entries"], "ledger_profile": "founder"},
         },
         {
-            "title": "Human approval checkpoint",
-            "takeaway": "Quality review can recommend approval. Only Matt can approve the commercial recommendation and client-facing release.",
-            "body": "Current state: pending human approval. No external action, publication, presentation or delivery is authorised.",
+            "title": "The founder decision",
+            "takeaway": "Fund a bounded proof phase, not the £690,000 outcome.",
+            "body": "Before client release, Matt approves the exact artefact. The founder then decides whether to fund 12 weeks of verification against explicit stop and scale gates.",
             "layout": "closing_mandate",
             "classification": "HUMAN DECISION REQUIRED",
             "refs": tuple(item["evidence_id"] for item in ledger["entries"]),
-            "content": {"chapter_label": "GOVERNANCE / APPROVAL", "lines": ["Review the evidence.", "Challenge the economics.", "Approve the exact version."], "next_step": "Matt records approve, revise or block against this package checksum."},
+            "content": {"chapter_label": "DECISION / NEXT COMMITMENT", "lines": ["Fund proof,", "not scale.", "Release investment only as evidence improves."], "next_step": "Verify the baseline, cost the 12-week proof phase and approve only the first decision gate."},
         },
     ]
     slides: list[PresentationSlideSpec] = []
@@ -575,16 +705,24 @@ def build_presentation_specification(
             )
         )
     return PresentationSpecification(
-        specification_id=f"{intake['identity']['client_id']}-supervised-demo-presentation-v1",
+        specification_id=(
+            f"{intake['identity']['client_id']}-supervised-demo-presentation-"
+            f"v{_package_version(intake)}"
+        ),
         source_blueprint_id=blueprint["blueprint_id"],
-        source_blueprint_version=1,
+        source_blueprint_version=_package_version(intake),
         workspace_id=intake["identity"]["workspace_id"],
         client_id=intake["identity"]["client_id"],
         title=blueprint["title"],
         status="ready_for_production",
         template_source=(
             "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; "
-            "locked production canon unchanged."
+            + (
+                "Issue #473 founder-quality controls; "
+                if _package_version(intake) >= 2
+                else ""
+            )
+            + "locked production canon unchanged."
         ),
         slides=tuple(slides),
         source_checksum=_checksum(blueprint),
@@ -610,6 +748,24 @@ def run_independent_qa(
         for chapter in blueprint["chapters"]
         for ref in chapter.get("evidence_ids") or []
     }
+    version = _package_version(intake)
+    base = model["scenarios"][1]
+    economics_required = version >= 2
+    economics_complete = (
+        model["investment_case"].get("status") == "illustrative_assumption_case"
+        and all(
+            key in scenario
+            for scenario in model["scenarios"]
+            for key in (
+                "year_one_realisation_rate",
+                "year_one_incremental_contribution",
+                "year_one_net_after_investment",
+            )
+        )
+        and model["scenarios"][0].get("year_one_net_after_investment", 0) < 0
+        and base.get("year_one_net_after_investment", 0) > 0
+    )
+    creative_asset = str(intake["creative_territory"].get("asset_path") or "").strip()
     checks = {
         "fictional_status_is_explicit": intake["identity"].get("fictional") is True and blueprint.get("fictional_demonstration") is True,
         "evidence_classes_are_allowed": all(item["classification"] in EVIDENCE_CLASSIFICATIONS for item in ledger["entries"]),
@@ -618,17 +774,28 @@ def run_independent_qa(
         "three_scenarios_present": [item["name"] for item in model["scenarios"]] == ["Downside", "Base", "Upside"],
         "scenarios_are_not_forecasts": model.get("scenario_not_forecast") is True and all(item.get("scenario_not_forecast") is True for item in model["scenarios"]),
         "commercial_math_reconciles": sum(item["incremental_annual_revenue"] for item in model["base_scenario_bridge"]) == model["scenarios"][1]["incremental_annual_revenue"],
+        "investment_case_exposes_downside_and_first_year_net": (
+            economics_complete if economics_required else True
+        ),
         "seven_chapters_are_present_in_order": chapter_titles == BLUEPRINT_CHAPTERS,
         "opening_five_are_present": len(opening_titles) == 5,
         "opening_five_cover_required_functions": all(
             phrase in " ".join((presentation.slides[index].title, presentation.slides[index].takeaway)).casefold()
             for index, phrase in enumerate(("could go", "commercial opportunity", "prevents growth", "strategic moves", "future could look"))
         ),
-        "creative_territory_is_tangible": bool(intake["creative_territory"].get("example_execution")) and chapters_by_title(blueprint)["The Creative Future"]["classification"] == "CREATIVE ILLUSTRATION",
+        "creative_territory_is_tangible": (
+            bool(intake["creative_territory"].get("example_execution"))
+            and chapters_by_title(blueprint)["The Creative Future"]["classification"]
+            == "CREATIVE ILLUSTRATION"
+            and (bool(creative_asset) if version >= 2 else True)
+        ),
         "recommendations_link_to_levers_and_tests": all(item.get("lever") and item.get("test") and item.get("trade_off") for item in intake["strategy"]["recommendations"]),
         "approval_is_pending": blueprint.get("release_state") == "pending_human_approval",
         "external_action_is_false": blueprint.get("external_action_taken") is False,
         "presentation_has_evidence_register": any(slide.layout_type == "source_register" for slide in presentation.slides),
+        "presentation_ends_on_founder_decision": (
+            presentation.slides[-1].title == "The founder decision" if version >= 2 else True
+        ),
     }
     findings = []
     if not all(checks.values()):
@@ -636,13 +803,20 @@ def run_independent_qa(
     findings.extend(
         [
             "All commercial inputs are assumptions; replace them with authorised client evidence before real use.",
-            "Contribution margin, implementation cost, returns, ramp, capacity and cannibalisation remain unresolved.",
+            (
+                "Contribution margin, ramp and implementation investment are illustrative assumptions; "
+                "actual returns, capacity, cannibalisation and working-capital effects remain unresolved."
+                if economics_complete
+                else "Contribution margin, implementation cost, returns, ramp, capacity and cannibalisation remain unresolved."
+            ),
             "Constraint, advantage and creative territory require founder and customer validation.",
             "Rendered files remain internal review copies until Matt approves the exact checksum.",
         ]
     )
     return {
-        "review_id": f"{intake['identity']['client_id']}-independent-qa-v1",
+        "review_id": (
+            f"{intake['identity']['client_id']}-independent-qa-v{version}"
+        ),
         "reviewer_role": "Independent Quality Reviewer",
         "independence": "Deterministic adversarial checks run after specialist outputs; no content was silently repaired.",
         "status": "PASS_FOR_HUMAN_REVIEW" if all(checks.values()) else "REVISE",
@@ -824,15 +998,29 @@ def blueprint_markdown(package: SupervisedBlueprintPackage) -> str:
         [
             "## Commercial scenarios",
             "",
-            "| Scenario | Sessions | Conversion | AOV | Annual revenue | Increment vs baseline |",
-            "| --- | ---: | ---: | ---: | ---: | ---: |",
+            (
+                "| Scenario | Annual revenue | Increment vs baseline | First-year contribution | Net after investment |"
+                if "year_one_incremental_contribution" in model["scenarios"][0]
+                else "| Scenario | Sessions | Conversion | AOV | Annual revenue | Increment vs baseline |"
+            ),
+            (
+                "| --- | ---: | ---: | ---: | ---: |"
+                if "year_one_incremental_contribution" in model["scenarios"][0]
+                else "| --- | ---: | ---: | ---: | ---: | ---: |"
+            ),
         ]
     )
     for item in model["scenarios"]:
-        lines.append(
-            f"| {item['name']} | {item['annual_sessions']:,} | {item['conversion_rate']:.1%} | "
-            f"£{item['average_order_value']:,.0f} | £{item['annual_revenue']:,} | £{item['incremental_annual_revenue']:,} |"
-        )
+        if "year_one_incremental_contribution" in item:
+            lines.append(
+                f"| {item['name']} | £{item['annual_revenue']:,} | £{item['incremental_annual_revenue']:,} | "
+                f"£{item['year_one_incremental_contribution']:,} | £{item['year_one_net_after_investment']:,} |"
+            )
+        else:
+            lines.append(
+                f"| {item['name']} | {item['annual_sessions']:,} | {item['conversion_rate']:.1%} | "
+                f"£{item['average_order_value']:,.0f} | £{item['annual_revenue']:,} | £{item['incremental_annual_revenue']:,} |"
+            )
     lines.extend(
         [
             "",

@@ -419,6 +419,7 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
     """Deterministic editorial checks applied before human visual review."""
     visible = " ".join(f"{s.title} {s.takeaway} {s.body}" for s in specification.slides).lower()
     seven_chapter_demo = "seven-chapter issue #471 demonstration profile" in specification.template_source.casefold()
+    founder_quality_profile = "issue #473 founder-quality controls" in specification.template_source.casefold()
     by_number = {slide.slide_no: slide for slide in specification.slides}
     slide_8 = by_number.get(8, PresentationSlideSpec(8, "", "", "", "")).content_data
     slide_13 = by_number.get(13, PresentationSlideSpec(13, "", "", "", "")).content_data
@@ -469,7 +470,7 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             "The Creative Future", "The Growth Engine", "The Next 12 Months",
         }
         titles = {slide.title for slide in specification.slides}
-        return {
+        demonstration_checks = {
             **common,
             "seven_chapter_demonstration_profile_is_complete": (
                 len(specification.slides) >= 12 and required_chapters.issubset(titles)
@@ -477,6 +478,32 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
             "mandatory_opening_five_are_distinct": len({slide.title for slide in specification.slides[:5]}) == 5,
             "locked_canon_is_declared_unchanged": "locked production canon unchanged" in specification.template_source.casefold(),
         }
+        if founder_quality_profile:
+            commercial_slides = [
+                slide for slide in specification.slides
+                if slide.layout_type == "commercial_model"
+            ]
+            demonstration_checks.update(
+                {
+                    "founder_quality_commercial_case_includes_investment": (
+                        len(commercial_slides) == 1
+                        and bool(commercial_slides[0].content_data.get("investment_case"))
+                        and all(
+                            "year_one_net_after_investment" in scenario
+                            for scenario in commercial_slides[0].content_data.get("scenarios") or []
+                        )
+                    ),
+                    "founder_quality_creative_proof_is_present": any(
+                        slide.layout_type == "creative_proof"
+                        and bool(slide.content_data.get("asset_path"))
+                        for slide in specification.slides
+                    ),
+                    "founder_quality_close_asks_for_a_decision": (
+                        specification.slides[-1].title == "The founder decision"
+                    ),
+                }
+            )
+        return demonstration_checks
     return {
         **common,
         "canonical_schema_v3_slide_roles_are_preserved": (

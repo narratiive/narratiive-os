@@ -165,6 +165,7 @@ def main() -> int:
     intake = read_object(args.intake)
     identity = intake.get("identity") or {}
     workspace_id = str(identity.get("workspace_id") or "")
+    package_version = int(identity.get("package_version") or 1)
     catalog = FileArtifactCatalog(args.runtime_root / "artifacts", workspace_id=workspace_id)
     package = build_supervised_blueprint_package(intake, artifact_catalog=catalog)
     output_dir = args.output_dir.resolve()
@@ -179,7 +180,9 @@ def main() -> int:
         record = service.produce(
             package.blueprint,
             specification=package.presentation,
-            deliverable_id=f"{identity['client_id']}-supervised-blueprint-demo-v1",
+            deliverable_id=(
+                f"{identity['client_id']}-supervised-blueprint-demo-v{package_version}"
+            ),
             output_dir=output_dir,
             created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         )
