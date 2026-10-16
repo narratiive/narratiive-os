@@ -46,5 +46,4 @@ Every execution must include: a recognisable ordinary pause, the LOA bottle, an 
 
 ## Human gates
 
-Paul approves asset provenance/product accuracy. Strategy approves evidence lineage. Legal approves claims and rights. Matt approves the selected world, exact production brief, budget, final assets and any publication or media commitment.
-
+Strategy approves evidence lineage. Legal approves claims and rights. Matt confirms asset provenance/product accuracy and approves the selected world, exact production brief, budget, final assets and any publication or media commitment.

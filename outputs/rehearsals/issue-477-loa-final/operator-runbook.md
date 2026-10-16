@@ -18,7 +18,7 @@ Replace assumptions with authorised client evidence. Classify every material cla
 
 ## Creative production
 
-Start only from the approved strategy and Campaign World. Record asset provenance and distinguish generated illustration from real product/customer evidence. Paul approves creative provenance and product accuracy; Matt approves the exact brief, budget and final assets.
+Start only from the approved strategy and Campaign World. Record asset provenance and distinguish generated illustration from real product/customer evidence. Matt confirms provenance, product accuracy, the exact brief, budget and final assets.
 
 ## Release and activation
 
@@ -31,4 +31,3 @@ Independent QA must pass, then Matt approves the exact checksum. Client delivery
 - On delayed specialist work, wait for verified completion; never infer a result.
 - On missing credentials or authority, mark the stage BLOCKED and continue independent stages.
 - On any uncertain external write, verify provider state before retrying.
-

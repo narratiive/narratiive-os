@@ -62,8 +62,8 @@
     ]
   },
   "creative_territory": {
-    "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Paul's existing LOA asset library",
-    "asset_path": "loa/loa-hero-bottle-paul.png",
+    "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Claude's existing LOA asset work",
+    "asset_path": "loa/loa-hero-bottle-claude.png",
     "description": "Coral glass, gold cap and cream LOA lettering remain the visual anchor. Each execution starts in an ordinary low-energy moment, then the bottle, pour and shared serve introduce warmth, sound and appetite. This is an internal illustration, not evidence of a real product or campaign.",
     "evidence_ids": [
       "A5",
@@ -234,13 +234,13 @@
       "validation_step": "Check strategic fit, distinction, comprehension and legal availability."
     },
     {
-      "claim": "Paul's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
+      "claim": "Claude's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
       "classification": "CREATIVE ILLUSTRATION",
       "confidence": "illustrative",
       "evidence_id": "C2",
       "limitations": "Existing internal AI-generated assets do not depict real LOA products, stockists, customers or campaigns.",
       "observed_at": "2026-10-16",
-      "validation_step": "Paul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability."
+      "validation_step": "Matt must confirm source provenance, usage rights, product accuracy and client-facing suitability."
     }
   ],
   "growth_engine": {

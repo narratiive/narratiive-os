@@ -3,7 +3,7 @@
   "status": "internal creative illustration - approval required",
   "assets": [
     {
-      "filename": "loa-hero-bottle-paul.png",
+      "filename": "loa-hero-bottle-claude.png",
       "higgsfield_asset_id": "242857f8-fdc1-4399-955d-0a67a93b8efa",
       "created_at": "2026-10-09",
       "generator": "GPT Image 2.5 Flare high",
@@ -13,7 +13,7 @@
       "new_generation_for_issue_477": false
     },
     {
-      "filename": "loa-convenience-store-preview-paul.mp4",
+      "filename": "loa-convenience-store-preview-claude.mp4",
       "higgsfield_asset_id": "0c43ee06-09e1-44d5-bf6c-d9d246bc4de9",
       "created_at": "2026-10-14",
       "generator": "Seedance 2.5 draft 480p",
@@ -24,7 +24,7 @@
     }
   ],
   "required_approvals": [
-    "Paul confirms source provenance, usage rights and product accuracy",
+    "Matt confirms source provenance, usage rights and product accuracy",
     "Matt approves exact client-facing use",
     "Legal/claims review before publication"
   ]

@@ -1,12 +1,12 @@
 {
-  "byteCount": 4212958,
-  "finalSha256": "780c0b5754a8dbd050d4cfb73c2f18505f33665ea2a893130845dde44ed7686e",
+  "byteCount": 4212962,
+  "finalSha256": "2ca2848b09a1e0ff483ebcdb2bc1e98f77ccfff43ad0d57cbaddf6c0c876b2a9",
   "firstPartyImport": {
     "nodeExecutable": "bundled-workspace-runtime",
     "passed": true,
     "performed": true,
     "runtimeNodeModules": "bundled-workspace-runtime",
-    "sha256": "780c0b5754a8dbd050d4cfb73c2f18505f33665ea2a893130845dde44ed7686e",
+    "sha256": "2ca2848b09a1e0ff483ebcdb2bc1e98f77ccfff43ad0d57cbaddf6c0c876b2a9",
     "slideCount": 21
   },
   "fontSelection": {
@@ -36,7 +36,7 @@
     "native_powerpoint_verified": false,
     "passed": true,
     "performed": true,
-    "presentation_sha256": "780c0b5754a8dbd050d4cfb73c2f18505f33665ea2a893130845dde44ed7686e",
+    "presentation_sha256": "2ca2848b09a1e0ff483ebcdb2bc1e98f77ccfff43ad0d57cbaddf6c0c876b2a9",
     "schema_version": "presentation-native-chart-titles.v1",
     "slide_count": 21,
     "source_text_emitted": false,

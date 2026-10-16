@@ -159,11 +159,11 @@
     {
       "evidence_id": "C2",
       "classification": "CREATIVE ILLUSTRATION",
-      "claim": "Paul's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
+      "claim": "Claude's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
       "observed_at": "2026-10-16",
       "confidence": "illustrative",
       "limitations": "Existing internal AI-generated assets do not depict real LOA products, stockists, customers or campaigns.",
-      "validation_step": "Paul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability."
+      "validation_step": "Matt must confirm source provenance, usage rights, product accuracy and client-facing suitability."
     }
   ],
   "evidence_gaps": [
@@ -273,8 +273,8 @@
     "example_execution": "A six-second film opens on the flat hum of a convenience-store cooler. A coral LOA bottle is lifted, opened and poured beside a late lunch; the scene warms as the bubbles rise. End frame: POUR BRIGHTER. No performance, health, stockist or product claim is made.",
     "validation_test": "Test product recognition, occasion comprehension, brand attribution, appetite, distinctiveness and legal clearance before any external production.",
     "evidence_ids": ["A5", "C1", "C2"],
-    "asset_path": "loa/loa-hero-bottle-paul.png",
-    "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Paul's existing LOA asset library"
+    "asset_path": "loa/loa-hero-bottle-claude.png",
+    "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Claude's existing LOA asset work"
   },
   "growth_engine": {
     "thesis": "Use one city and a small number of food-led occasions to connect observed trial, DTC capture, replenishment and retailer sell-through before any national awareness spend.",

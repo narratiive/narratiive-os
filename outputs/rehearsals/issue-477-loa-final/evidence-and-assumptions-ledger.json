@@ -142,13 +142,13 @@
       "validation_step": "Check strategic fit, distinction, comprehension and legal availability."
     },
     {
-      "claim": "Paul's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
+      "claim": "Claude's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
       "classification": "CREATIVE ILLUSTRATION",
       "confidence": "illustrative",
       "evidence_id": "C2",
       "limitations": "Existing internal AI-generated assets do not depict real LOA products, stockists, customers or campaigns.",
       "observed_at": "2026-10-16",
-      "validation_step": "Paul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability."
+      "validation_step": "Matt must confirm source provenance, usage rights, product accuracy and client-facing suitability."
     }
   ],
   "fictional_demonstration": true,

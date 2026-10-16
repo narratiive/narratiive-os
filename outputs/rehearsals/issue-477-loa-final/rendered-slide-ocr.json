@@ -3591,35 +3591,35 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444486,
+          "height" : 0.019444444444444597,
           "text" : "AT",
           "width" : 0.014062500000000006,
-          "x" : 0.057812500039062506,
-          "y" : 0.57777777761574067
+          "x" : 0.057812500046874993,
+          "y" : 0.57777777758333326
         },
         {
           "confidence" : 1,
-          "height" : 0.020296903451283765,
+          "height" : 0.020475313398573114,
           "text" : "ASSUMPTION",
-          "width" : 0.051662081480026253,
-          "x" : 0.10307520969026178,
-          "y" : 0.58012932616076085
+          "width" : 0.051682382822036743,
+          "x" : 0.10306505901937493,
+          "y" : 0.58004012118562376
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444486,
+          "height" : 0.016666666666666718,
           "text" : "Incremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and",
-          "width" : 0.30312500000000003,
-          "x" : 0.2171874999479167,
-          "y" : 0.5805555558796297
+          "width" : 0.30312499999999998,
+          "x" : 0.21718750505208315,
+          "y" : 0.58055555574074069
         },
         {
           "confidence" : 1,
           "height" : 0.01388888888888884,
           "text" : "incremental media costs.",
-          "width" : 0.079687500000000022,
-          "x" : 0.21718750099609369,
-          "y" : 0.5694444445486111
+          "width" : 0.079687499999999994,
+          "x" : 0.21718749867187501,
+          "y" : 0.56944444430555563
         },
         {
           "confidence" : 1,
@@ -3671,11 +3671,11 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.017566221290164497,
+          "height" : 0.017509851190778969,
           "text" : "ASSUMPTION",
-          "width" : 0.050092399120330811,
-          "x" : 0.1046412998140753,
-          "y" : 0.44399466700506884
+          "width" : 0.050086754560470598,
+          "x" : 0.10464412209405113,
+          "y" : 0.44402285205405478
         },
         {
           "confidence" : 1,
@@ -3721,17 +3721,17 @@
           "confidence" : 1,
           "height" : 0.019444444444444486,
           "text" : "A Brighter Pour is an illustrative campaign territory for fictional LOA.",
-          "width" : 0.2109375,
-          "x" : 0.21875000130859368,
-          "y" : 0.37222222197916666
+          "width" : 0.21250000000000005,
+          "x" : 0.21718749645833343,
+          "y" : 0.37222222208333333
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666607,
+          "height" : 0.016666666666666718,
           "text" : "Check strategic fit, distinction, comprehension and legal availability.",
-          "width" : 0.2109375,
-          "x" : 0.57031250210937501,
-          "y" : 0.37222222233333346
+          "width" : 0.21250000000000002,
+          "x" : 0.56874999645833346,
+          "y" : 0.37222222212962963
         },
         {
           "confidence" : 0.5,
@@ -3751,27 +3751,27 @@
         },
         {
           "confidence" : 1,
-          "height" : 0.016666666666666718,
-          "text" : "Paul's existing LOA coral bottle hero and convenience-store film are reused as intemal creative illustrations.",
-          "width" : 0.33750000000000002,
-          "x" : 0.21718750421874988,
-          "y" : 0.3027777779166666
+          "height" : 0.030555555555555558,
+          "text" : "(laude existing LOA coral bottle hero and convenience-store film are reused as internal creative",
+          "width" : 0.30781249999999993,
+          "x" : 0.21718750384765614,
+          "y" : 0.29166666690972221
         },
         {
           "confidence" : 1,
           "height" : 0.016666666666666718,
-          "text" : "Paul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability",
-          "width" : 0.31093749999999987,
-          "x" : 0.57031250388671861,
+          "text" : "Matt must confirm source provenance, usage rights, product accuracy and client-facing suitability.",
+          "width" : 0.30625000000000013,
+          "x" : 0.56875000382812491,
           "y" : 0.3027777779166666
         },
         {
           "confidence" : 1,
-          "height" : 0.019444444444444486,
+          "height" : 0.019444444444444375,
           "text" : "No verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.",
-          "width" : 0.56093749999999987,
-          "x" : 0.059375005609374878,
-          "y" : 0.21111111124999993
+          "width" : 0.5625,
+          "x" : 0.059375009374999711,
+          "y" : 0.21111111115740744
         },
         {
           "confidence" : 1,
@@ -3806,7 +3806,7 @@
           "y" : 0.022222221944444565
         }
       ],
-      "text" : "GOVERNANCE \/EVIDENCE\nEvidence and assumptions ledger (2 of 2)\nID\nClass\nClaim in this Blueprint\nWhat would verify it\nA6\nASSUMPTION\nA city-led sampling, selective wholesale, DTC replenishment and CRM growth engine is operationally\nfeasible.\nObtain contribution, capacity, distribution and cohort data before any activation.\nAT\nASSUMPTION\nIncremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and\nincremental media costs.\nReconcile order-level net revenue and variable cost by product and channel.\nA8\nASSUMPTION\nLOA could realise 30% to 60% of annualised ecommerce scenario headroom during the first 12 months.\nBuild a monthly plan with test velocity, stock capacity and seasonality.\nA9\nASSUMPTION\nThe first 12 months require 265,000 of incremental implementation investment beyond the £5,000 Growth\nBlueprint fee.\nObtain a costed activation plan before approval.\nC1\nCREATIVE ILLUSTRATION\nA Brighter Pour is an illustrative campaign territory for fictional LOA.\nCheck strategic fit, distinction, comprehension and legal availability.\nC2\nCREATIVE ILLUSTRATION\nPaul's existing LOA coral bottle hero and convenience-store film are reused as intemal creative illustrations.\nPaul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability\nNo verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.\nSOURCES: A6, A7, A8, A9, C1, C2\nNARRATIVE\nEVIDENCE REGISTER\n20\/21"
+      "text" : "GOVERNANCE \/EVIDENCE\nEvidence and assumptions ledger (2 of 2)\nID\nClass\nClaim in this Blueprint\nWhat would verify it\nA6\nASSUMPTION\nA city-led sampling, selective wholesale, DTC replenishment and CRM growth engine is operationally\nfeasible.\nObtain contribution, capacity, distribution and cohort data before any activation.\nAT\nASSUMPTION\nIncremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and\nincremental media costs.\nReconcile order-level net revenue and variable cost by product and channel.\nA8\nASSUMPTION\nLOA could realise 30% to 60% of annualised ecommerce scenario headroom during the first 12 months.\nBuild a monthly plan with test velocity, stock capacity and seasonality.\nA9\nASSUMPTION\nThe first 12 months require 265,000 of incremental implementation investment beyond the £5,000 Growth\nBlueprint fee.\nObtain a costed activation plan before approval.\nC1\nCREATIVE ILLUSTRATION\nA Brighter Pour is an illustrative campaign territory for fictional LOA.\nCheck strategic fit, distinction, comprehension and legal availability.\nC2\nCREATIVE ILLUSTRATION\n(laude existing LOA coral bottle hero and convenience-store film are reused as internal creative\nMatt must confirm source provenance, usage rights, product accuracy and client-facing suitability.\nNo verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.\nSOURCES: A6, A7, A8, A9, C1, C2\nNARRATIVE\nEVIDENCE REGISTER\n20\/21"
     },
     {
       "file" : "slide-21.png",

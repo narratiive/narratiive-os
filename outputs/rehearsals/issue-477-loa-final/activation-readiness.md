@@ -10,5 +10,4 @@ Decision: **BLOCKED — no campaign may be created, published or funded.**
 | TikTok | Not configured | Blocked | Configure advertiser OAuth and confirm read-only account access |
 | CTV / The Trade Desk | No adapter or authorised account identified | Untested | Decide whether this channel is in scope, then provide an authorised sandbox/account and measurement requirements |
 
-Creative readiness is also conditional: Paul’s asset rights and product accuracy, claims review, real commercial inputs, a named owner, a capped budget and Matt’s exact approval are all required. This preflight created no campaign, published nothing and spent no money.
-
+Creative readiness is also conditional: source provenance, asset rights and product accuracy, claims review, real commercial inputs, a named owner, a capped budget and Matt’s exact approval are all required. This preflight created no campaign, published nothing and spent no money.

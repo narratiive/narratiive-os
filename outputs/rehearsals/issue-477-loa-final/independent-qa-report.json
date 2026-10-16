@@ -29,14 +29,14 @@
   "rendered_output": {
     "approval_status": "pending",
     "client_id": "loa-fictional",
-    "created_at": "2026-10-16T16:52:40.543992Z",
+    "created_at": "2026-10-16T17:01:54.778874Z",
     "deliverable_id": "loa-fictional-supervised-blueprint-demo-v2",
     "external_action_taken": false,
     "pdf_path": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pdf",
     "pptx_path": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pptx",
     "source_blueprint_id": "loa-fictional-growth-blueprint-demo-v2",
     "source_blueprint_version": 2,
-    "specification_checksum": "9da7c479d78db57d0589e62b2551ca058680a616f602a4dcbb7ad8401ab0b45b",
+    "specification_checksum": "b0244f57007ef62b5e5b8ee9bc57a4b876e412004309596d8bf877b67fb3e58c",
     "status": "awaiting_review",
     "template_source": "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; Issue #473 founder-quality controls; locked production canon unchanged.",
     "visual_qa": {

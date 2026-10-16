@@ -111,8 +111,8 @@
     "status": "PASS_FOR_HUMAN_REVIEW",
     "approval": "pending",
     "slide_count": 21,
-    "pptx_sha256": "780c0b5754a8dbd050d4cfb73c2f18505f33665ea2a893130845dde44ed7686e",
-    "pdf_sha256": "ec938d81d57ef1c9f688bf53ed097a19b878d08c6f8a61a45928be72b9d67f91",
+    "pptx_sha256": "2ca2848b09a1e0ff483ebcdb2bc1e98f77ccfff43ad0d57cbaddf6c0c876b2a9",
+    "pdf_sha256": "2ba65f47b477532f9c994910a06a247c0dea160be3502db6020019b893b323e8",
     "external_action_taken": false
   }
 }

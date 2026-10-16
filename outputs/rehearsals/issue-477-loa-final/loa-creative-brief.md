@@ -28,7 +28,7 @@ The bottle, coral colour and serve can form a repeatable mnemonic. Product taste
 
 ## 7. Distinctive assets
 
-Coral/pink glass bottle, gold cap, cream LOA lettering, tactile condensation, bright natural serve. Reuse Paul’s existing internal LOA assets subject to provenance, rights and product-accuracy approval.
+Coral/pink glass bottle, gold cap, cream LOA lettering, tactile condensation, bright natural serve. Reuse Claude’s existing internal LOA assets subject to Matt’s provenance, rights and product-accuracy approval.
 
 ## 8. Tone
 
@@ -53,4 +53,3 @@ Success requires brand attribution, occasion comprehension, qualified trial, ret
 ## Unresolved inputs
 
 Founder interview, product truth, authorised customer/category research, pack and formulation accuracy, usage rights, distribution availability, unit economics, budget, timing, legal review and named owners.
-
