@@ -1,0 +1,276 @@
+{
+  "blueprint_id": "loa-fictional-growth-blueprint-demo-v2",
+  "canon_relationship": "Additive Issue #471/#473 demonstration profile. The checksum-locked 30-slide production canon remains unchanged.",
+  "chapters": [
+    {
+      "argument": "LOA could test an annualised ecommerce revenue scenario of £547,200, £443,520 above the assumed baseline. At the assumed ramp, contribution margin and £65,000 investment, the first-year net contribution proxy is £1,528.",
+      "classification": "MODELLED",
+      "decision": "Validate the baseline and economics before treating the scenario as an investment case.",
+      "evidence_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A7",
+        "A8",
+        "A9"
+      ],
+      "title": "The Opportunity"
+    },
+    {
+      "argument": "LOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route from first taste to profitable repeat.",
+      "classification": "ASSUMPTION",
+      "decision": "Reject this diagnosis if founder, customer and cohort evidence already shows a clear occasion, strong unprompted proposition recall and profitable repeat without increased discounting.",
+      "evidence_ids": [
+        "A4"
+      ],
+      "title": "The Constraint"
+    },
+    {
+      "argument": "LOA could turn its coral bottle and optimistic visual language into a recognisable adult soft-drink ritual: a brighter pour for social pauses that deserve more than water and less than alcohol.",
+      "classification": "ASSUMPTION",
+      "decision": "Compare A Brighter Pour with taste-led, wellness-led and alcohol-alternative routes on relevance, distinctiveness, credibility, recall and willingness to pay.",
+      "evidence_ids": [
+        "A5",
+        "C2"
+      ],
+      "title": "The Advantage"
+    },
+    {
+      "argument": "Give LOA one ownable social job, make the bright-pour ritual unmistakable, then connect selective trial to measured repeat before buying reach.",
+      "classification": "ASSUMPTION",
+      "decision": "Approve only the next tests, not the modelled revenue outcome.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "C1",
+        "C2",
+        "E1",
+        "E2"
+      ],
+      "recommendations": [
+        {
+          "action": "Define and test LOA around the moments when adults want a vivid, grown-up soft drink without making an unverified health or alcohol-replacement claim.",
+          "evidence_ids": [
+            "A4",
+            "A5",
+            "E1",
+            "E2"
+          ],
+          "lever": "Qualified demand and conversion",
+          "name": "Own the brighter pause",
+          "owner": "Strategy Director",
+          "test": "Founder interview, occasion research and controlled proposition test",
+          "trade_off": "A sharper occasion excludes generic refreshment traffic and must earn credibility."
+        },
+        {
+          "action": "Use the bottle, serve, sound, colour and food pairing as recurring evidence of the occasion rather than relying on abstract lifestyle imagery.",
+          "evidence_ids": [
+            "A5",
+            "C1",
+            "C2"
+          ],
+          "lever": "Comprehension, trial and memorability",
+          "name": "Make the pour the proof",
+          "owner": "Creative Director",
+          "test": "Creative recognition, comprehension and qualified sample-to-site test",
+          "trade_off": "Product-centred work will reveal any weakness in taste, pack, serve or availability."
+        },
+        {
+          "action": "Concentrate sampling and selective wholesale where repeat can be observed, then use DTC mixed cases and CRM replenishment to measure second purchase.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "A8",
+            "A9"
+          ],
+          "lever": "Repeat and distribution productivity",
+          "name": "Turn trial into repeat",
+          "owner": "Growth Strategy Director",
+          "test": "One-city cohort test of repeat and retailer sell-through",
+          "trade_off": "Geographic focus slows broad awareness while protecting cash and learning quality."
+        }
+      ],
+      "title": "The Strategy"
+    },
+    {
+      "argument": "A Brighter Pour: Turn the small social pause into something vivid: an unmistakable LOA pour, served with food, colour and a little ceremony.",
+      "classification": "CREATIVE ILLUSTRATION",
+      "decision": "Test product recognition, occasion comprehension, brand attribution, appetite, distinctiveness and legal clearance before any external production.",
+      "evidence_ids": [
+        "A5",
+        "C1",
+        "C2"
+      ],
+      "territory": {
+        "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Paul's existing LOA asset library",
+        "asset_path": "loa/loa-hero-bottle-paul.png",
+        "description": "Coral glass, gold cap and cream LOA lettering remain the visual anchor. Each execution starts in an ordinary low-energy moment, then the bottle, pour and shared serve introduce warmth, sound and appetite. This is an internal illustration, not evidence of a real product or campaign.",
+        "evidence_ids": [
+          "A5",
+          "C1",
+          "C2"
+        ],
+        "example_execution": "A six-second film opens on the flat hum of a convenience-store cooler. A coral LOA bottle is lifted, opened and poured beside a late lunch; the scene warms as the bubbles rise. End frame: POUR BRIGHTER. No performance, health, stockist or product claim is made.",
+        "name": "A Brighter Pour",
+        "platform": "Turn the small social pause into something vivid: an unmistakable LOA pour, served with food, colour and a little ceremony.",
+        "primary_phrase": "POUR BRIGHTER",
+        "principles": [
+          [
+            "PRODUCT FIRST",
+            "Bottle, opening and pour are the mnemonic"
+          ],
+          [
+            "APPETITE",
+            "Food, glass, bubbles and condensation stay tactile"
+          ],
+          [
+            "ORDINARY TO VIVID",
+            "Colour arrives through the serve, not visual noise"
+          ]
+        ],
+        "secondary_phrase": "MAKE THE PAUSE MATTER",
+        "validation_test": "Test product recognition, occasion comprehension, brand attribution, appetite, distinctiveness and legal clearance before any external production."
+      },
+      "title": "The Creative Future"
+    },
+    {
+      "argument": "Use one city and a small number of food-led occasions to connect observed trial, DTC capture, replenishment and retailer sell-through before any national awareness spend.",
+      "channels": [
+        {
+          "channel": "Selective wholesale",
+          "gate": "Stockist economics, weekly sell-through and reorder",
+          "role": "Place LOA inside the target occasion and observe sell-through"
+        },
+        {
+          "channel": "Sampling and partnerships",
+          "gate": "Permission, sample-to-site capture, cost and product feedback",
+          "role": "Create qualified first taste around food, design and culture"
+        },
+        {
+          "channel": "Owned DTC and CRM",
+          "gate": "Net conversion, second purchase, opt-out and contribution",
+          "role": "Convert mixed-case trial into measured replenishment"
+        },
+        {
+          "channel": "Paid social",
+          "gate": "Incremental contribution after production and media cost",
+          "role": "Scale only the creative and occasions already linked to repeat"
+        }
+      ],
+      "classification": "ASSUMPTION",
+      "decision": "Release media or wider distribution only when a defined occasion improves trial quality and repeat contribution without unacceptable discounting, waste, stock risk or retailer churn.",
+      "evidence_ids": [
+        "A6",
+        "A7",
+        "A8",
+        "A9"
+      ],
+      "measurement": [
+        {
+          "level": "LEADING",
+          "metrics": "Brand attribution, occasion comprehension, qualified sample-to-site and retailer availability"
+        },
+        {
+          "level": "BEHAVIOURAL",
+          "metrics": "Net conversion, mixed-case uptake, second purchase, retailer sell-through and reorder"
+        },
+        {
+          "level": "COMMERCIAL",
+          "metrics": "Contribution after product, fulfilment, sampling, production, media and distribution"
+        }
+      ],
+      "title": "The Growth Engine"
+    },
+    {
+      "argument": "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+      "classification": "ASSUMPTION",
+      "decision": "Matt approves the exact client-facing artefact before release. The founder then decides whether the verified economics justify the next bounded investment.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "C1",
+        "C2",
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "phases": [
+        {
+          "decision_gate": "Matt approves one bounded proposition and evidence plan; no media or production spend is released.",
+          "evidence_ids": [
+            "A4",
+            "A5",
+            "E1",
+            "E2",
+            "E3"
+          ],
+          "name": "Establish the truth",
+          "outcome": "Verify unit economics, formulation and availability; interview founder, customers and trade; test three occasion propositions.",
+          "owner": "Research Analyst and Strategy Director",
+          "period": "Months 1-3"
+        },
+        {
+          "decision_gate": "Continue only if attribution, trial quality, repeat and unit contribution pass agreed thresholds.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "C1",
+            "C2"
+          ],
+          "name": "Prove the brighter pour",
+          "outcome": "Run controlled creative, sampling, DTC capture and one-city wholesale tests using approved claims and assets.",
+          "owner": "Creative Director and Growth Strategy Director",
+          "period": "Months 4-6"
+        },
+        {
+          "decision_gate": "Approve expansion only when stock, contribution, repeat and retailer economics support it.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "A8",
+            "A9"
+          ],
+          "name": "Build the repeat system",
+          "outcome": "Codify winning serve, content, CRM, replenishment and retailer reorder mechanics.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 7-9"
+        },
+        {
+          "decision_gate": "Matt approves every material commercial commitment and exact client-facing or public release.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "A8",
+            "A9"
+          ],
+          "name": "Scale selectively",
+          "outcome": "Expand only the verified occasions, postcodes, stockists and creative routes, with holdouts and stop rules.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 10-12"
+        }
+      ],
+      "title": "The Next 12 Months"
+    }
+  ],
+  "commercial_model_id": "loa-fictional-ecommerce-opportunity-v2",
+  "external_action_taken": false,
+  "fictional_demonstration": true,
+  "opening_slide_functions": [
+    "Where the business could go",
+    "What the commercial opportunity looks like",
+    "What currently prevents growth",
+    "What strategic moves are required",
+    "What the future could look like"
+  ],
+  "release_state": "pending_human_approval",
+  "status": "INTERNAL REVIEW DRAFT - HUMAN APPROVAL REQUIRED",
+  "title": "Narratiive Growth Blueprint - LOA"
+}

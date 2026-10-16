@@ -346,6 +346,8 @@ class GmailDispatcher(GoogleAdapter):
                 raise BusinessAdapterError("gmail_internal_review_scope_rejected")
         else:
             _require_write(contract)
+        if _text(payload.get("kind")) == "gmail_draft_create":
+            return self._create_draft(contract, payload, target)
         subject = _text(payload.get("subject") or payload.get("email_subject") or target.get("subject"))
         body = _text(payload.get("body") or payload.get("email_body") or target.get("body"))
         if not recipient or "@" not in recipient or not subject or not body:
@@ -402,6 +404,63 @@ class GmailDispatcher(GoogleAdapter):
         if not message_id:
             raise BusinessAdapterError("gmail_send_unverified")
         return {"verified": True, "sent": True, "mutation_count": 1, "message_id": message_id, "thread_id": _text(sent.get("threadId"))}
+
+    def _create_draft(
+        self,
+        contract: Mapping[str, Any],
+        payload: Mapping[str, Any],
+        target: Mapping[str, Any],
+    ) -> dict[str, Any]:
+        recipient = _text(payload.get("recipient_email") or target.get("recipient_email") or target.get("email"))
+        subject = _text(payload.get("subject") or payload.get("email_subject") or target.get("subject"))
+        body = _text(payload.get("body") or payload.get("email_body") or target.get("body"))
+        if not recipient or "@" not in recipient or not subject or not body:
+            raise BusinessAdapterError("gmail_draft_requires_exact_recipient_subject_and_body")
+        key = _text(contract.get("idempotency_key")) or hashlib.sha256(
+            f"draft\0{recipient}\0{subject}\0{body}".encode("utf-8")
+        ).hexdigest()
+        message_header = f"<narratiive-draft-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
+        query = parse.urlencode({"q": f"in:drafts rfc822msgid:{message_header}", "maxResults": "1"})
+        existing = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
+        matches = existing.get("messages", [])
+        if isinstance(matches, list) and matches:
+            prior = _mapping(matches[0])
+            return {
+                "verified": True,
+                "created": True,
+                "sent": False,
+                "mutation_count": 0,
+                "message_id": _text(prior.get("id")),
+                "thread_id": _text(prior.get("threadId")),
+                "duplicate_suppressed": True,
+            }
+        email = EmailMessage()
+        email["To"] = recipient
+        email["Subject"] = subject
+        email["Message-ID"] = message_header
+        email.set_content(body)
+        raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
+        created = self.client.call(
+            f"{self.api_base}/users/me/drafts",
+            method="POST",
+            headers=self._headers(),
+            body={"message": {"raw": raw}},
+        )
+        draft_id = _text(created.get("id"))
+        message = _mapping(created.get("message"))
+        message_id = _text(message.get("id"))
+        if not draft_id or not message_id:
+            raise BusinessAdapterError("gmail_draft_unverified")
+        return {
+            "verified": True,
+            "created": True,
+            "sent": False,
+            "mutation_count": 1,
+            "draft_id": draft_id,
+            "message_id": message_id,
+            "thread_id": _text(message.get("threadId")),
+            "duplicate_suppressed": False,
+        }
 
 
 class GoogleCalendarDispatcher(GoogleAdapter):

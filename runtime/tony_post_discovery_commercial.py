@@ -6,6 +6,7 @@ from typing import Any, Iterable, Mapping
 
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_command_service import CommandResponse
+from runtime.commercial_policy import fieldwork_pilot_policy
 
 
 class TonyPostDiscoveryCommercialCommandService:
@@ -30,7 +31,7 @@ class TonyPostDiscoveryCommercialCommandService:
     def _prepare(self,pending:dict[str,Any])->CommandResponse:
         claude=self.dispatchers.get("Claude")
         if claude is None: return CommandResponse("post_discovery_commercial","healthy","Proposal preparation is approved, but no live Claude dispatcher is configured. Nothing has been sent or changed externally.",{"execution_status":"proposal_preparation_dispatcher_unavailable","external_action_taken":False})
-        dispatch={"eligible":True,"state":"ready_for_autonomous_dispatch","worker":"Claude","instruction":"Prepare a concise Narratiive proposal grounded only in the verified discovery evidence and commercial review supplied. Include the diagnosed business problem, recommended scope, intended outcomes, assumptions/evidence gaps and a clear next step. Do not send the proposal, update Notion, create Calendar events or change any external state.","target":{"lead_id":pending.get("lead_id",""),"contact":pending.get("contact",""),"company":pending.get("company",""),"area":"commercial"},"execution_mode":"autonomous_prepare","approval_granted":True,"approval_scope":"post_discovery_proposal_preparation","expected_evidence":"evidence-grounded proposal draft for Tony review","return_to":"Tony","execution_truth":"not_dispatched","payload":{"kind":"post_discovery_proposal_prepare","meeting_evidence":pending.get("meeting_evidence",{}),"review_evidence":pending.get("review_evidence",{})}}
+        dispatch={"eligible":True,"state":"ready_for_autonomous_dispatch","worker":"Claude","instruction":"Prepare a concise Narratiive proposal grounded only in the verified discovery evidence, commercial review and exact approved commercial policy supplied. Include the diagnosed business problem, recommended scope, intended outcomes, assumptions/evidence gaps and a clear next step. State the commercial terms exactly; do not infer VAT status or include production or activation in the FIELDWORK pilot fee. Do not send the proposal, update Notion, create Calendar events or change any external state.","target":{"lead_id":pending.get("lead_id",""),"contact":pending.get("contact",""),"company":pending.get("company",""),"area":"commercial","commercial_policy":fieldwork_pilot_policy()},"execution_mode":"autonomous_prepare","approval_granted":True,"approval_scope":"post_discovery_proposal_preparation","expected_evidence":"evidence-grounded proposal draft for Tony review","return_to":"Tony","execution_truth":"not_dispatched","payload":{"kind":"post_discovery_proposal_prepare","meeting_evidence":pending.get("meeting_evidence",{}),"review_evidence":pending.get("review_evidence",{})}}
         try: evidence=claude(dict(dispatch))
         except Exception as exc: return CommandResponse("post_discovery_commercial","healthy",f"Claude could not prepare the approved proposal: {exc}. Nothing has been sent.",{"execution_status":"proposal_preparation_failed","external_action_taken":False})
         verified,reason=TonyAutonomousDispatchCommandService._verify_evidence(dispatch,evidence)

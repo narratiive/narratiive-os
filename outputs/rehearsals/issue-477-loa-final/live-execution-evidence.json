@@ -1,0 +1,118 @@
+{
+  "schema_version": 1,
+  "issue": 477,
+  "client": "LOA",
+  "client_is_fictional": true,
+  "generated_at": "2026-10-16T16:58:00Z",
+  "safeguards": {
+    "real_prospects_contacted": false,
+    "money_moved": false,
+    "advertising_published": false,
+    "media_spend": false,
+    "human_approval_bypassed": false,
+    "production_system_modified": false
+  },
+  "gmail_inbound": {
+    "status": "VERIFIED LIVE",
+    "marker": "ISSUE477-LOA-20261016T163748Z",
+    "message_id": "1a14593b011c3509",
+    "thread_id": "1a14593b011c3509",
+    "created_at": "2026-10-16T16:37:48Z",
+    "targeted_first_run": {"checked": 1, "alerted": 1, "candidates": 1, "ingested": 1},
+    "targeted_replay": {"checked": 1, "alerted": 0, "candidates": 0, "ingested": 0}
+  },
+  "n8n": {
+    "status": "VERIFIED LIVE",
+    "workflow_id": "l6TysPR86l5VAoXc",
+    "first_execution": {"id": 2990, "started_at": "2026-10-16T16:38:09.559Z", "finished_at": "2026-10-16T16:38:10.827Z", "result": "success"},
+    "replay_execution": {"id": 2991, "started_at": "2026-10-16T16:39:07.703Z", "finished_at": "2026-10-16T16:39:08.189Z", "result": "success", "deduplicated": true}
+  },
+  "notion_lead": {
+    "status": "VERIFIED LIVE",
+    "page_id": "3fb0c9cf-a8f2-812f-ad03-c616a90d5188",
+    "pipeline": "Email Enquiry",
+    "approval": "Needs Review"
+  },
+  "fireflies": {
+    "status": "VERIFIED LIVE",
+    "meeting_id": "01M52PY4BBJWFZAZ2WTJ1GA0G2",
+    "title": "Discussion with Matt",
+    "duration_minutes": 6.5500001907,
+    "sentences": 29,
+    "speakers": 1,
+    "participants": 2,
+    "summary_status": "processed",
+    "source_content_sha256": "f377848b536f2753245229fe4eba334496711458f3963608c5aa4f04caba52a7",
+    "mutation_count": 0
+  },
+  "claude_follow_up": {
+    "status": "VERIFIED LIVE",
+    "provider_message_id": "msg_011Cg6FNywrgEEQ4rV7NkSRS",
+    "decision_count": 0,
+    "action_item_count": 5,
+    "external_send": false
+  },
+  "gmail_follow_up_draft": {
+    "status": "VERIFIED LIVE VIA SUPERVISED UI",
+    "native_api_attempt": "FAILED 403 - current OAuth grant lacks draft-create scope",
+    "message_id": "1a145977e3daa29f",
+    "thread_id": "1a1459775f13d596",
+    "labels": ["DRAFT", "IMPORTANT"],
+    "sent_label_present": false
+  },
+  "calendar": {
+    "status": "VERIFIED LIVE AND CLEANED UP",
+    "event_id": "395aa2b55b8ee06d193d90b57fc0e9ca",
+    "attendees": 0,
+    "updates_sent": false,
+    "delete_http_status": 204,
+    "final_provider_status": "cancelled"
+  },
+  "commercial_policy": {
+    "status": "VERIFIED LIVE",
+    "version": "2026-10-16",
+    "fee_gbp": 5000,
+    "payment_split": "50/50",
+    "revision_rounds": 1,
+    "vat": "conditional",
+    "production_scope": "separate",
+    "activation_scope": "separate",
+    "decision_history_block_id": "3fb0c9cf-a8f2-81c2-895c-d876ad111f23",
+    "verified_block_hashes": {
+      "1f7": "0b503",
+      "79de": "5a565",
+      "9283": "1a11",
+      "a89": "9d6d"
+    }
+  },
+  "proposal": {
+    "status": "VERIFIED LIVE PREPARATION",
+    "provider_message_id": "msg_011Cg6FZemFKgJyU8BkMmZiP",
+    "client_send": false
+  },
+  "tony_acceptance": {
+    "status": "PARTIAL - RETRY RECOVERED CHILD RESULTS",
+    "configured_model": "anthropic/claude-sonnet-4-6",
+    "runtime_fleet_ready": true,
+    "scenario_count": 13,
+    "passed": 11,
+    "failed": ["business_and_specialist_status", "contextual_action"],
+    "retry": "Strategy completed first; Creative Director and Production later completed with transcript-backed mission results. Operator polling was required because Tony did not automatically resume the original answer.",
+    "execution_truth_response": "Nothing was sent; no verified external change."
+  },
+  "activation_readiness": {
+    "observed_at": "2026-10-16T16:53:25.856351Z",
+    "google_ads": {"status": "VERIFIED LIVE READ", "accounts": 1, "campaigns": 0},
+    "meta": {"status": "PARTIAL", "permissions": 10, "accounts": 0, "businesses": 0, "campaign_read": "HTTP 400"},
+    "tiktok": {"status": "BLOCKED", "configured": false},
+    "ctv_ttd": {"status": "UNTESTED", "reason": "no configured provider adapter or authorised account identified"}
+  },
+  "rendered_blueprint": {
+    "status": "PASS_FOR_HUMAN_REVIEW",
+    "approval": "pending",
+    "slide_count": 21,
+    "pptx_sha256": "780c0b5754a8dbd050d4cfb73c2f18505f33665ea2a893130845dde44ed7686e",
+    "pdf_sha256": "ec938d81d57ef1c9f688bf53ed097a19b878d08c6f8a61a45928be72b9d67f91",
+    "external_action_taken": false
+  }
+}

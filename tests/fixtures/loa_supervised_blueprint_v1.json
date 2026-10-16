@@ -1,0 +1,312 @@
+{
+  "identity": {
+    "workspace_id": "demo-loa",
+    "client_id": "loa-fictional",
+    "run_id": "issue-477-loa-v1",
+    "company_name": "LOA",
+    "founder_name": "Fictional Founder",
+    "fictional": true,
+    "intake_date": "2026-10-16",
+    "package_version": 2,
+    "permission_scope": "controlled synthetic journey only"
+  },
+  "business_context": {
+    "ambition": "Establish LOA as a distinctive adult soft drink for bright social occasions, then prove a repeatable route from trial to repeat purchase before scaling media or distribution.",
+    "business_model": "Fictional founder-led premium low-sugar soft drinks brand, with direct-to-consumer and selective wholesale routes",
+    "geography": "United Kingdom",
+    "stage": "Fictional early growth FMCG business",
+    "known_constraints": [
+      "No real LOA client analytics, accounts or retailer sell-through supplied",
+      "No verified customer, category or competitor research specific to LOA supplied",
+      "No approved production, distribution or media budget supplied",
+      "All LOA commercial inputs are assumptions; real external evidence only describes market context"
+    ]
+  },
+  "evidence_ledger": [
+    {
+      "evidence_id": "E1",
+      "classification": "VERIFIED EXTERNAL",
+      "claim": "The UK government announced that the lower Soft Drinks Industry Levy sugar threshold will reduce from 5g to 4.5g per 100ml from January 2028.",
+      "observed_at": "2026-10-16",
+      "confidence": "high",
+      "publisher": "HM Treasury and HM Revenue & Customs",
+      "source_url": "https://www.gov.uk/government/publications/changes-to-the-soft-drinks-industry-levy",
+      "limitations": "This is category regulation, not evidence of LOA formulation, demand or performance.",
+      "validation_step": "Confirm the final legislation and verify LOA recipes independently before making any formulation claim."
+    },
+    {
+      "evidence_id": "E2",
+      "classification": "VERIFIED EXTERNAL",
+      "claim": "The UK government reported a 46% average reduction in sugar content in in-scope soft drinks between 2015 and 2020.",
+      "observed_at": "2026-10-16",
+      "confidence": "high",
+      "publisher": "HM Treasury and HM Revenue & Customs",
+      "source_url": "https://www.gov.uk/government/publications/soft-drinks-industry-levy-review/hmt-hmrc-soft-drinks-industry-levy-review",
+      "limitations": "Historical category reformulation does not establish consumer demand for LOA or any individual brand.",
+      "validation_step": "Use the latest official category data and obtain product-level evidence before commercial use."
+    },
+    {
+      "evidence_id": "E3",
+      "classification": "VERIFIED EXTERNAL",
+      "claim": "The British Soft Drinks Association's 2025 annual report states that more than seven in ten UK soft drinks sold are low or no sugar.",
+      "observed_at": "2026-10-16",
+      "confidence": "medium",
+      "publisher": "British Soft Drinks Association",
+      "source_url": "https://www.britishsoftdrinks.com/media/nbnlowyc/bsda-annual-report-2025.pdf",
+      "limitations": "This is an industry-body category statistic and does not verify LOA's market, audience or sales potential.",
+      "validation_step": "Recheck the original report and triangulate with independent retail and customer evidence."
+    },
+    {
+      "evidence_id": "A1",
+      "classification": "ASSUMPTION",
+      "claim": "LOA receives 180,000 ecommerce sessions per year.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "value": 180000,
+      "unit": "annual sessions",
+      "limitations": "No authorised analytics export exists for this fictional company.",
+      "validation_step": "Reconcile an authorised GA4 export to ecommerce sessions and orders."
+    },
+    {
+      "evidence_id": "A2",
+      "classification": "ASSUMPTION",
+      "claim": "LOA converts 1.8% of ecommerce sessions to orders.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "value": 0.018,
+      "unit": "session conversion rate",
+      "limitations": "No analytics or order export exists for this fictional company.",
+      "validation_step": "Agree the denominator and reconcile sessions to completed non-refunded orders."
+    },
+    {
+      "evidence_id": "A3",
+      "classification": "ASSUMPTION",
+      "claim": "LOA has a £32 average ecommerce order value before returns, discounts and VAT treatment.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "value": 32,
+      "unit": "GBP per order",
+      "limitations": "No transaction export or pack architecture has been supplied.",
+      "validation_step": "Calculate realised order value from an authorised transaction export."
+    },
+    {
+      "evidence_id": "A4",
+      "classification": "ASSUMPTION",
+      "claim": "LOA's principal growth constraint is an attractive visual identity without a sufficiently specific occasion, proposition or trial-to-repeat system.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "limitations": "No founder interview, customer research, funnel data or retailer evidence supports this diagnosis.",
+      "validation_step": "Run founder interviews, occasion research, proposition testing and a controlled conversion test."
+    },
+    {
+      "evidence_id": "A5",
+      "classification": "ASSUMPTION",
+      "claim": "LOA could build an advantage by pairing its distinctive bottle with a clear role as the bright adult soft drink for social pauses.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "limitations": "Distinctiveness, relevance, ownability and willingness to pay are untested.",
+      "validation_step": "Test the territory against category alternatives with target customers and trade buyers."
+    },
+    {
+      "evidence_id": "A6",
+      "classification": "ASSUMPTION",
+      "claim": "A city-led sampling, selective wholesale, DTC replenishment and CRM growth engine is operationally feasible.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "limitations": "No distribution terms, stock capacity, cohort data, media economics or sampling costs exist.",
+      "validation_step": "Obtain contribution, capacity, distribution and cohort data before any activation."
+    },
+    {
+      "evidence_id": "A7",
+      "classification": "ASSUMPTION",
+      "claim": "Incremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and incremental media costs.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "value": 0.3,
+      "unit": "incremental contribution margin",
+      "limitations": "No channel or product contribution data exists for this fictional company.",
+      "validation_step": "Reconcile order-level net revenue and variable cost by product and channel."
+    },
+    {
+      "evidence_id": "A8",
+      "classification": "ASSUMPTION",
+      "claim": "LOA could realise 30% to 60% of annualised ecommerce scenario headroom during the first 12 months.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "limitations": "No launch cadence, seasonality, stock or distribution plan supports this range.",
+      "validation_step": "Build a monthly plan with test velocity, stock capacity and seasonality."
+    },
+    {
+      "evidence_id": "A9",
+      "classification": "ASSUMPTION",
+      "claim": "The first 12 months require £65,000 of incremental implementation investment beyond the £5,000 Growth Blueprint fee.",
+      "observed_at": "2026-10-16",
+      "confidence": "low",
+      "value": 65000,
+      "unit": "GBP",
+      "limitations": "No supplier, production, sampling, distribution or media quotes exist.",
+      "validation_step": "Obtain a costed activation plan before approval."
+    },
+    {
+      "evidence_id": "C1",
+      "classification": "CREATIVE ILLUSTRATION",
+      "claim": "A Brighter Pour is an illustrative campaign territory for fictional LOA.",
+      "observed_at": "2026-10-16",
+      "confidence": "illustrative",
+      "limitations": "It has not been approved by a client, tested with customers or cleared legally.",
+      "validation_step": "Check strategic fit, distinction, comprehension and legal availability."
+    },
+    {
+      "evidence_id": "C2",
+      "classification": "CREATIVE ILLUSTRATION",
+      "claim": "Paul's existing LOA coral bottle hero and convenience-store film are reused as internal creative illustrations.",
+      "observed_at": "2026-10-16",
+      "confidence": "illustrative",
+      "limitations": "Existing internal AI-generated assets do not depict real LOA products, stockists, customers or campaigns.",
+      "validation_step": "Paul and Matt must confirm provenance, usage rights, product accuracy and client-facing suitability."
+    }
+  ],
+  "evidence_gaps": [
+    "Founder-authorised revenue, units, channel mix, tax, returns, discounts and contribution",
+    "Product formulation, claims substantiation and regulatory review",
+    "Customer occasions, preference, repeat, willingness to pay and audience definition",
+    "Retailer sell-through, distribution terms, stock capacity and production lead time",
+    "Competitor positioning, price architecture, share of shelf and creative activity",
+    "Quoted activation production, sampling, media and measurement cost"
+  ],
+  "commercial_model": {
+    "model_type": "ecommerce",
+    "currency": "GBP",
+    "baseline": {
+      "annual_sessions": 180000,
+      "conversion_rate": 0.018,
+      "average_order_value": 32
+    },
+    "scenarios": [
+      {
+        "name": "Downside",
+        "annual_sessions": 195000,
+        "conversion_rate": 0.0185,
+        "average_order_value": 32,
+        "year_one_realisation_rate": 0.3
+      },
+      {
+        "name": "Base",
+        "annual_sessions": 600000,
+        "conversion_rate": 0.024,
+        "average_order_value": 38,
+        "year_one_realisation_rate": 0.5
+      },
+      {
+        "name": "Upside",
+        "annual_sessions": 850000,
+        "conversion_rate": 0.026,
+        "average_order_value": 40,
+        "year_one_realisation_rate": 0.6
+      }
+    ],
+    "economics": {
+      "incremental_contribution_margin": 0.3,
+      "implementation_investment": 65000
+    },
+    "input_evidence_ids": ["A1", "A2", "A3", "A7", "A8", "A9"],
+    "unresolved_inputs": [
+      "Actual net contribution by SKU and channel",
+      "Wholesale and DTC cannibalisation",
+      "Sampling, production, distribution and media cost",
+      "Monthly ramp, seasonality, stock and working capital"
+    ]
+  },
+  "strategy": {
+    "constraint": {
+      "statement": "LOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route from first taste to profitable repeat.",
+      "evidence_ids": ["A4"],
+      "falsification_test": "Reject this diagnosis if founder, customer and cohort evidence already shows a clear occasion, strong unprompted proposition recall and profitable repeat without increased discounting."
+    },
+    "advantage": {
+      "statement": "LOA could turn its coral bottle and optimistic visual language into a recognisable adult soft-drink ritual: a brighter pour for social pauses that deserve more than water and less than alcohol.",
+      "evidence_ids": ["A5", "C2"],
+      "validation_test": "Compare A Brighter Pour with taste-led, wellness-led and alcohol-alternative routes on relevance, distinctiveness, credibility, recall and willingness to pay."
+    },
+    "thesis": "Give LOA one ownable social job, make the bright-pour ritual unmistakable, then connect selective trial to measured repeat before buying reach.",
+    "recommendations": [
+      {
+        "name": "Own the brighter pause",
+        "action": "Define and test LOA around the moments when adults want a vivid, grown-up soft drink without making an unverified health or alcohol-replacement claim.",
+        "lever": "Qualified demand and conversion",
+        "test": "Founder interview, occasion research and controlled proposition test",
+        "trade_off": "A sharper occasion excludes generic refreshment traffic and must earn credibility.",
+        "owner": "Strategy Director",
+        "evidence_ids": ["A4", "A5", "E1", "E2"]
+      },
+      {
+        "name": "Make the pour the proof",
+        "action": "Use the bottle, serve, sound, colour and food pairing as recurring evidence of the occasion rather than relying on abstract lifestyle imagery.",
+        "lever": "Comprehension, trial and memorability",
+        "test": "Creative recognition, comprehension and qualified sample-to-site test",
+        "trade_off": "Product-centred work will reveal any weakness in taste, pack, serve or availability.",
+        "owner": "Creative Director",
+        "evidence_ids": ["A5", "C1", "C2"]
+      },
+      {
+        "name": "Turn trial into repeat",
+        "action": "Concentrate sampling and selective wholesale where repeat can be observed, then use DTC mixed cases and CRM replenishment to measure second purchase.",
+        "lever": "Repeat and distribution productivity",
+        "test": "One-city cohort test of repeat and retailer sell-through",
+        "trade_off": "Geographic focus slows broad awareness while protecting cash and learning quality.",
+        "owner": "Growth Strategy Director",
+        "evidence_ids": ["A6", "A7", "A8", "A9"]
+      }
+    ]
+  },
+  "creative_territory": {
+    "name": "A Brighter Pour",
+    "platform": "Turn the small social pause into something vivid: an unmistakable LOA pour, served with food, colour and a little ceremony.",
+    "description": "Coral glass, gold cap and cream LOA lettering remain the visual anchor. Each execution starts in an ordinary low-energy moment, then the bottle, pour and shared serve introduce warmth, sound and appetite. This is an internal illustration, not evidence of a real product or campaign.",
+    "primary_phrase": "POUR BRIGHTER",
+    "secondary_phrase": "MAKE THE PAUSE MATTER",
+    "principles": [
+      ["PRODUCT FIRST", "Bottle, opening and pour are the mnemonic"],
+      ["APPETITE", "Food, glass, bubbles and condensation stay tactile"],
+      ["ORDINARY TO VIVID", "Colour arrives through the serve, not visual noise"]
+    ],
+    "example_execution": "A six-second film opens on the flat hum of a convenience-store cooler. A coral LOA bottle is lifted, opened and poured beside a late lunch; the scene warms as the bubbles rise. End frame: POUR BRIGHTER. No performance, health, stockist or product claim is made.",
+    "validation_test": "Test product recognition, occasion comprehension, brand attribution, appetite, distinctiveness and legal clearance before any external production.",
+    "evidence_ids": ["A5", "C1", "C2"],
+    "asset_path": "loa/loa-hero-bottle-paul.png",
+    "asset_alt": "Internal AI-generated coral LOA bottle with gold cap and cream lettering, supplied through Paul's existing LOA asset library"
+  },
+  "growth_engine": {
+    "thesis": "Use one city and a small number of food-led occasions to connect observed trial, DTC capture, replenishment and retailer sell-through before any national awareness spend.",
+    "channels": [
+      {"channel": "Selective wholesale", "role": "Place LOA inside the target occasion and observe sell-through", "gate": "Stockist economics, weekly sell-through and reorder"},
+      {"channel": "Sampling and partnerships", "role": "Create qualified first taste around food, design and culture", "gate": "Permission, sample-to-site capture, cost and product feedback"},
+      {"channel": "Owned DTC and CRM", "role": "Convert mixed-case trial into measured replenishment", "gate": "Net conversion, second purchase, opt-out and contribution"},
+      {"channel": "Paid social", "role": "Scale only the creative and occasions already linked to repeat", "gate": "Incremental contribution after production and media cost"}
+    ],
+    "measurement": [
+      {"level": "LEADING", "metrics": "Brand attribution, occasion comprehension, qualified sample-to-site and retailer availability"},
+      {"level": "BEHAVIOURAL", "metrics": "Net conversion, mixed-case uptake, second purchase, retailer sell-through and reorder"},
+      {"level": "COMMERCIAL", "metrics": "Contribution after product, fulfilment, sampling, production, media and distribution"}
+    ],
+    "scale_gate": "Release media or wider distribution only when a defined occasion improves trial quality and repeat contribution without unacceptable discounting, waste, stock risk or retailer churn.",
+    "evidence_ids": ["A6", "A7", "A8", "A9"]
+  },
+  "roadmap": [
+    {"period": "Months 1-3", "name": "Establish the truth", "outcome": "Verify unit economics, formulation and availability; interview founder, customers and trade; test three occasion propositions.", "owner": "Research Analyst and Strategy Director", "decision_gate": "Matt approves one bounded proposition and evidence plan; no media or production spend is released.", "evidence_ids": ["A4", "A5", "E1", "E2", "E3"]},
+    {"period": "Months 4-6", "name": "Prove the brighter pour", "outcome": "Run controlled creative, sampling, DTC capture and one-city wholesale tests using approved claims and assets.", "owner": "Creative Director and Growth Strategy Director", "decision_gate": "Continue only if attribution, trial quality, repeat and unit contribution pass agreed thresholds.", "evidence_ids": ["A6", "A7", "C1", "C2"]},
+    {"period": "Months 7-9", "name": "Build the repeat system", "outcome": "Codify winning serve, content, CRM, replenishment and retailer reorder mechanics.", "owner": "Tony coordinating responsible specialists", "decision_gate": "Approve expansion only when stock, contribution, repeat and retailer economics support it.", "evidence_ids": ["A6", "A7", "A8", "A9"]},
+    {"period": "Months 10-12", "name": "Scale selectively", "outcome": "Expand only the verified occasions, postcodes, stockists and creative routes, with holdouts and stop rules.", "owner": "Tony coordinating responsible specialists", "decision_gate": "Matt approves every material commercial commitment and exact client-facing or public release.", "evidence_ids": ["A6", "A7", "A8", "A9"]}
+  ],
+  "presentation": {
+    "destination_takeaway": "LOA could become the vivid adult soft drink for social pauses, if one ownable occasion can turn first taste into profitable repeat.",
+    "platform": "Own the brighter pause",
+    "subtitle": "A conditional route from distinctive bottle to repeatable demand",
+    "strategic_moves_takeaway": "Own the brighter pause, make the pour the proof, then turn concentrated trial into measured repeat.",
+    "falsification_takeaway": "The diagnosis fails if LOA already owns a clear occasion and existing cohorts repeat profitably without heavier discounting.",
+    "constraint_content": {"left_label": "CURRENT ASSET", "left_headline": "A bottle people may notice", "left_detail": "Distinctive visual assets are useful, but not proof of demand or repeat.", "right_label": "WORKING CONSTRAINT", "right_headline": "No proven repeat path"},
+    "market_gap_content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "x_axis": ["GENERIC REFRESHMENT", "OCCASION SPECIFIC"], "y_axis": ["VISUAL ONLY", "PROVEN RITUAL"], "competitors": [], "current_position": ["LOA TODAY", 50, 42], "future_position": ["A BRIGHTER POUR", 80, 78], "market_gap": "A vivid adult soft-drink ritual for everyday social pauses", "audience": "Adults seeking a grown-up soft option; definition requires research", "competitor_miss": "No competitor position is asserted until research is completed."},
+    "customer_evidence_content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "language_status": "CUSTOMER EVIDENCE REQUIRED", "customer_language": ["Map real social pauses", "Test the bright-pour proposition", "Measure trial and repeat"], "signals": [["BRAND ASSET", "A distinctive bottle illustration"], ["CUSTOMER DATA", "Not yet supplied"], ["CHOICE TEST", "Required before selection"]], "interpretation": "The territory remains a hypothesis until customer choice and repeat evidence support it."},
+    "strategy_framework_content": {"chapter_label": "CHAPTER 4 / THE STRATEGY", "steps": [["TENSION", "A memorable bottle without a proven buying occasion"], ["SHIFT", "Make the LOA pour the recognisable ritual"], ["RESOLUTION", "Link concentrated trial to measured repeat before reach"]], "banner": "Give LOA one social job, then make the pour earn the next purchase."}
+  }
+}

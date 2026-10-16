@@ -1,0 +1,16 @@
+{
+  "approver_role": "Matt",
+  "bound_blueprint_checksum": "4effa213d533ff807df47d7c2183af872422a8f65a15dad6804f646d4213e7b6",
+  "bound_presentation_specification_checksum": "9da7c479d78db57d0589e62b2551ca058680a616f602a4dcbb7ad8401ab0b45b",
+  "bound_qa_checksum": "70eb343d3303d4aba0927cfada89dea78471fb33a4922c239bedf8b0fbf1fe33",
+  "checkpoint_id": "issue-477-loa-v1-matt-approval",
+  "decision_options": [
+    "approve",
+    "request_revision",
+    "block"
+  ],
+  "external_action_taken": false,
+  "instruction": "Record an authenticated human decision against these exact checksums before client-facing release.",
+  "release_authorised": false,
+  "status": "pending"
+}

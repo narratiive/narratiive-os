@@ -1,0 +1,215 @@
+{
+  "approval_status": "pending",
+  "blueprint_checksum": "4effa213d533ff807df47d7c2183af872422a8f65a15dad6804f646d4213e7b6",
+  "commercial_model_checksum": "522623480c1be2a5bd275f74197cabfd6c012f013ae64f2093a3cb436f167036",
+  "evidence_ledger_checksum": "6c9f56c08dc830ee32b1f5f54891314659bad37579b247423015aff345e00d28",
+  "external_action_taken": false,
+  "fictional_demonstration": true,
+  "lineage": [
+    {
+      "artifact": {
+        "artifact_id": "art-2f7f3950fd30d726b464b03d0c1d519e7556a42e60ed83b81b7e220a025721c1",
+        "artifact_type": "structured_client_intake",
+        "checksum": "2f7f3950fd30d726b464b03d0c1d519e7556a42e60ed83b81b7e220a025721c1",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/2f7f3950fd30d726b464b03d0c1d519e7556a42e60ed83b81b7e220a025721c1.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.536437+00:00",
+      "parent_artifact_ids": [],
+      "producer": "Research Analyst",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "research_analyst",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-c6746ff52a024ea8583a679211c80598faa7cc4545938f5b7944afbca48243cf",
+        "artifact_type": "evidence_ledger",
+        "checksum": "c6746ff52a024ea8583a679211c80598faa7cc4545938f5b7944afbca48243cf",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/c6746ff52a024ea8583a679211c80598faa7cc4545938f5b7944afbca48243cf.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.537804+00:00",
+      "parent_artifact_ids": [
+        "art-2f7f3950fd30d726b464b03d0c1d519e7556a42e60ed83b81b7e220a025721c1"
+      ],
+      "producer": "Research Analyst",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "research_analyst",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-92abf4cf76d9ddb25bc862498200f54d50b19305e17fd45cfc23773b58bb9de3",
+        "artifact_type": "commercial_opportunity_model",
+        "checksum": "92abf4cf76d9ddb25bc862498200f54d50b19305e17fd45cfc23773b58bb9de3",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/92abf4cf76d9ddb25bc862498200f54d50b19305e17fd45cfc23773b58bb9de3.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.538701+00:00",
+      "parent_artifact_ids": [
+        "art-c6746ff52a024ea8583a679211c80598faa7cc4545938f5b7944afbca48243cf"
+      ],
+      "producer": "Strategy Director",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "strategy_director",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-84db1c436f680bee309134483492891b8637e21c17a6fc0c9b102b72b13683bd",
+        "artifact_type": "seven_chapter_growth_blueprint",
+        "checksum": "84db1c436f680bee309134483492891b8637e21c17a6fc0c9b102b72b13683bd",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/84db1c436f680bee309134483492891b8637e21c17a6fc0c9b102b72b13683bd.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.539767+00:00",
+      "parent_artifact_ids": [
+        "art-c6746ff52a024ea8583a679211c80598faa7cc4545938f5b7944afbca48243cf",
+        "art-92abf4cf76d9ddb25bc862498200f54d50b19305e17fd45cfc23773b58bb9de3"
+      ],
+      "producer": "Strategy Director",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "strategy_director",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-0257d044ba3fa1b39a36e5b7d1b650a5732b1bcf7f6e69942adb8df4ccb809a2",
+        "artifact_type": "creative_territory",
+        "checksum": "0257d044ba3fa1b39a36e5b7d1b650a5732b1bcf7f6e69942adb8df4ccb809a2",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/0257d044ba3fa1b39a36e5b7d1b650a5732b1bcf7f6e69942adb8df4ccb809a2.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.540622+00:00",
+      "parent_artifact_ids": [
+        "art-84db1c436f680bee309134483492891b8637e21c17a6fc0c9b102b72b13683bd"
+      ],
+      "producer": "Campaign World Generator",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "campaign_world_generator",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-ac795a7913b5d96a4529724dcd9d2d22f94d59674895fa628fb2c2831d75fb8f",
+        "artifact_type": "blueprint_presentation_specification",
+        "checksum": "ac795a7913b5d96a4529724dcd9d2d22f94d59674895fa628fb2c2831d75fb8f",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/ac795a7913b5d96a4529724dcd9d2d22f94d59674895fa628fb2c2831d75fb8f.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.542410+00:00",
+      "parent_artifact_ids": [
+        "art-84db1c436f680bee309134483492891b8637e21c17a6fc0c9b102b72b13683bd",
+        "art-0257d044ba3fa1b39a36e5b7d1b650a5732b1bcf7f6e69942adb8df4ccb809a2"
+      ],
+      "producer": "Creative Director",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "creative_director",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-a41ae6c324c90ef6b980ad74df30befe39150a557c2f5084776db1deaff3feac",
+        "artifact_type": "independent_quality_review",
+        "checksum": "a41ae6c324c90ef6b980ad74df30befe39150a557c2f5084776db1deaff3feac",
+        "location": ".runtime/issue-477-loa-fieldwork-final-v3/artifacts/content/a41ae6c324c90ef6b980ad74df30befe39150a557c2f5084776db1deaff3feac.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-loa"
+        }
+      },
+      "created_at": "2026-10-16T16:52:40.543310+00:00",
+      "parent_artifact_ids": [
+        "art-ac795a7913b5d96a4529724dcd9d2d22f94d59674895fa628fb2c2831d75fb8f"
+      ],
+      "producer": "Quality Reviewer",
+      "run_id": "issue-477-loa-v1",
+      "stage_id": "quality_reviewer",
+      "version": 1,
+      "workspace_id": "demo-loa"
+    }
+  ],
+  "package_id": "loa-fictional-growth-blueprint-demo-v2",
+  "presentation_specification_checksum": "9da7c479d78db57d0589e62b2551ca058680a616f602a4dcbb7ad8401ab0b45b",
+  "qa_report_checksum": "70eb343d3303d4aba0927cfada89dea78471fb33a4922c239bedf8b0fbf1fe33",
+  "release_authorised": false,
+  "rendered_deliverable": {
+    "approval_status": "pending",
+    "client_id": "loa-fictional",
+    "created_at": "2026-10-16T16:52:40.543992Z",
+    "deliverable_id": "loa-fictional-supervised-blueprint-demo-v2",
+    "external_action_taken": false,
+    "pdf_path": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pdf",
+    "pptx_path": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pptx",
+    "source_blueprint_id": "loa-fictional-growth-blueprint-demo-v2",
+    "source_blueprint_version": 2,
+    "specification_checksum": "9da7c479d78db57d0589e62b2551ca058680a616f602a4dcbb7ad8401ab0b45b",
+    "status": "awaiting_review",
+    "template_source": "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; Issue #473 founder-quality controls; locked production canon unchanged.",
+    "visual_qa": {
+      "checks": {
+        "claim_status_is_visible": true,
+        "conclusion_led_headlines": true,
+        "editorial_arc_is_complete": true,
+        "founder_quality_close_asks_for_a_decision": true,
+        "founder_quality_commercial_case_includes_investment": true,
+        "founder_quality_creative_proof_is_present": true,
+        "layout_validation": true,
+        "locked_canon_is_declared_unchanged": true,
+        "mandatory_opening_five_are_distinct": true,
+        "no_overflow_or_overlap": true,
+        "no_visible_machine_runtime_artefacts": true,
+        "package_integrity": true,
+        "pdf_exists": true,
+        "pptx_exists": true,
+        "quantified_commercial_model_present": true,
+        "readable_citations_present": true,
+        "rendered_slide_review_passed": true,
+        "seven_chapter_demonstration_profile_is_complete": true,
+        "slide_count": true,
+        "source_labels_present": true,
+        "source_provenance_retained": true,
+        "source_register_present": true,
+        "strategic_source_unchanged": true,
+        "visual_forms_are_intentional": true
+      },
+      "findings": [],
+      "status": "passed"
+    },
+    "workspace_id": "demo-loa"
+  },
+  "source_intake_checksum": "0e4e7f9b8f8f2d190b18284deeaa04a4098e08b745a7df27f71fdd8e712bffef",
+  "status": "awaiting_human_approval"
+}

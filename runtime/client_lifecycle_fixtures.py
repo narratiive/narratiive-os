@@ -22,7 +22,7 @@ def deterministic_test_clients() -> tuple[ClientLifecycleRecord, ...]:
             owner="Tony",
             next_action="Complete the audience opportunity synthesis.",
             evidence=("delivery:fieldwork:research-complete",),
-            value_gbp=4500,
+            value_gbp=5000,
         ),
         ClientLifecycleRecord(
             client_id="signal-house",

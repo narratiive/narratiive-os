@@ -72,6 +72,8 @@ def main() -> int:
             item,
             os.getenv("NARRATIIVE_INBOUND_WEBHOOK_URL", "http://127.0.0.1:5678/webhook/diagnostic-lead"),
         ),
+        synthetic_test_marker=os.getenv("NARRATIIVE_SYNTHETIC_INBOX_MARKER", ""),
+        query=os.getenv("NARRATIIVE_GMAIL_WATCH_QUERY", "in:inbox newer_than:7d"),
     )
     try:
         result = service.run()

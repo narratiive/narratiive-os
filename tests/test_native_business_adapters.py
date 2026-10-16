@@ -246,6 +246,27 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
 
+    def test_gmail_approved_draft_is_created_without_sending(self):
+        router = Router([
+            {"messages": []},
+            {"id": "draft-1", "message": {"id": "message-1", "threadId": "thread-1"}},
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter(approved_contract({
+            "kind": "gmail_draft_create",
+            "recipient_email": "hello@narratiive.com",
+            "subject": "SAFE follow-up",
+            "body": "Prepared for human approval.",
+        }))
+
+        self.assertTrue(result["verified"])
+        self.assertTrue(result["created"])
+        self.assertFalse(result["sent"])
+        self.assertEqual(result["draft_id"], "draft-1")
+        self.assertEqual(result["mutation_count"], 1)
+        self.assertTrue(router.requests[1].full_url.endswith("/users/me/drafts"))
+
     def test_gmail_internal_review_exception_is_exact_and_supports_attachment(self):
         contract = {
             "execution_mode": "authorised_internal_review_write",
