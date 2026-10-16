@@ -1,0 +1,16 @@
+{
+  "evidence_recorded_at": "2026-10-16T22:49:37Z",
+  "classification": "VERIFIED LIVE",
+  "label": "com.narratiive.gmail-inbox-watch",
+  "loaded": true,
+  "state": "not running",
+  "runs_since_current_load": 0,
+  "last_exit": "never exited",
+  "run_at_load": true,
+  "start_interval_seconds": 900,
+  "keep_alive": false,
+  "canonical_checkout": "/Users/admin/Documents/narratiive-os",
+  "production_change_made": false,
+  "approval_required_before_reload": true,
+  "retained_log_observation": "Two older no_new_actionable_mail results exist, but they do not prove execution under the current load."
+}

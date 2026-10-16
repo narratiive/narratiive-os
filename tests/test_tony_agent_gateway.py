@@ -5,6 +5,7 @@ import tempfile
 import threading
 import time
 import unittest
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest import mock
 
@@ -253,6 +254,164 @@ class TonyAgentGatewayTests(unittest.TestCase):
                 reply = gateway.converse_for_work("Research this", "telegram-abc")
             self.assertEqual(reply, "Recovered final result")
             request.assert_not_called()
+
+    def test_ordinary_conversation_waits_for_pushed_specialist_completion(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram"
+            now = datetime.now(timezone.utc)
+            yielded_entry = {
+                "timestamp": (now + timedelta(seconds=1)).isoformat(),
+                "message": {
+                    "role": "assistant",
+                    "stopReason": "toolUse",
+                    "content": [
+                        {"type": "text", "text": "The specialist is working."},
+                        {"type": "toolCall", "name": "sessions_yield"},
+                    ],
+                },
+            }
+            yield_context_entry = {
+                "timestamp": (now + timedelta(seconds=1, milliseconds=1)).isoformat(),
+                "type": "custom_message",
+                "customType": "openclaw.sessions_yield",
+                "content": "Waiting for the specialist.",
+            }
+            transcript = self._write_work_session(
+                state_dir,
+                session_key,
+                [yielded_entry, yield_context_entry],
+            )
+
+            def finish_after_yield():
+                time.sleep(0.03)
+                entries = [
+                    yielded_entry,
+                    {
+                        "timestamp": (now + timedelta(seconds=2)).isoformat(),
+                        "message": {
+                            "role": "user",
+                            "content": "[Internal task completion event] specialist finished",
+                        },
+                    },
+                    {
+                        "timestamp": (now + timedelta(seconds=3)).isoformat(),
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "stop",
+                            "content": [{"type": "text", "text": "Reviewed specialist result."}],
+                        },
+                    },
+                ]
+                transcript.write_text(
+                    "".join(json.dumps(entry) + "\n" for entry in entries),
+                    encoding="utf-8",
+                )
+
+            gateway = TonyAgentGateway(
+                TonyAgentGatewayConfig(
+                    state_dir=state_dir,
+                    session_key=session_key,
+                    work_timeout_seconds=1,
+                    work_poll_seconds=0.01,
+                )
+            )
+            thread = threading.Thread(target=finish_after_yield)
+            thread.start()
+            with mock.patch(
+                "openclaw.tony_agent_gateway.urlopen",
+                return_value=_Response({"output_text": "The specialist is working."}),
+            ):
+                reply = gateway.converse("Sort that out using the specialist.")
+            thread.join()
+            self.assertEqual(reply, "Reviewed specialist result.")
+
+    def test_ordinary_conversation_accepts_direct_resume_after_yield(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram"
+            now = datetime.now(timezone.utc)
+            yielded_entry = {
+                "timestamp": (now + timedelta(seconds=1)).isoformat(),
+                "message": {
+                    "role": "assistant",
+                    "stopReason": "toolUse",
+                    "content": [{"type": "toolCall", "name": "sessions_yield"}],
+                },
+            }
+            yield_context_entry = {
+                "timestamp": (now + timedelta(seconds=1, milliseconds=1)).isoformat(),
+                "type": "custom_message",
+                "customType": "openclaw.sessions_yield",
+                "content": "Waiting for the specialist.",
+            }
+            transcript = self._write_work_session(
+                state_dir,
+                session_key,
+                [yielded_entry, yield_context_entry],
+            )
+
+            def finish_after_yield():
+                time.sleep(0.03)
+                with transcript.open("a", encoding="utf-8") as handle:
+                    handle.write(
+                        json.dumps(
+                            {
+                                "timestamp": (now + timedelta(seconds=2)).isoformat(),
+                                "message": {
+                                    "role": "assistant",
+                                    "stopReason": "stop",
+                                    "content": [{"type": "text", "text": "Directly resumed result."}],
+                                },
+                            }
+                        )
+                        + "\n"
+                    )
+
+            gateway = TonyAgentGateway(
+                TonyAgentGatewayConfig(
+                    state_dir=state_dir,
+                    session_key=session_key,
+                    work_timeout_seconds=1,
+                    work_poll_seconds=0.01,
+                )
+            )
+            thread = threading.Thread(target=finish_after_yield)
+            thread.start()
+            with mock.patch(
+                "openclaw.tony_agent_gateway.urlopen",
+                return_value=_Response({"output_text": "The specialist is working."}),
+            ):
+                reply = gateway.converse("Sort that out using the specialist.")
+            thread.join()
+            self.assertEqual(reply, "Directly resumed result.")
+
+    def test_ordinary_conversation_ignores_historical_yield(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_dir = Path(temp_dir)
+            session_key = "narratiive:tony:telegram"
+            self._write_work_session(
+                state_dir,
+                session_key,
+                [
+                    {
+                        "timestamp": "2026-01-01T00:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "stopReason": "toolUse",
+                            "content": [{"type": "toolCall", "name": "sessions_yield"}],
+                        },
+                    }
+                ],
+            )
+            gateway = TonyAgentGateway(
+                TonyAgentGatewayConfig(state_dir=state_dir, session_key=session_key)
+            )
+            with mock.patch(
+                "openclaw.tony_agent_gateway.urlopen",
+                return_value=_Response({"output_text": "Current direct answer."}),
+            ):
+                self.assertEqual(gateway.converse("What changed?"), "Current direct answer.")
 
     def test_canonical_workflow_completion_is_delegation_evidence_without_subagent_duplication(self):
         with tempfile.TemporaryDirectory() as temp_dir:

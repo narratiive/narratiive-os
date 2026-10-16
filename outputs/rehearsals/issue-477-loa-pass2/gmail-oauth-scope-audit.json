@@ -1,0 +1,20 @@
+{
+  "evidence_recorded_at": "2026-10-16T22:49:37Z",
+  "classification": "VERIFIED LIVE",
+  "grant": {
+    "expires_in_seconds": 3599,
+    "scopes": [
+      "https://www.googleapis.com/auth/calendar.calendars.readonly",
+      "https://www.googleapis.com/auth/calendar.events",
+      "https://www.googleapis.com/auth/calendar.events.freebusy",
+      "https://www.googleapis.com/auth/drive.file",
+      "https://www.googleapis.com/auth/gmail.readonly",
+      "https://www.googleapis.com/auth/gmail.send"
+    ],
+    "token_type": "Bearer"
+  },
+  "required_addition": "https://www.googleapis.com/auth/gmail.compose",
+  "draft_creation_ready": false,
+  "reason": "The live grant lacks gmail.compose or another scope accepted by users.drafts.create.",
+  "secrets_recorded": false
+}
