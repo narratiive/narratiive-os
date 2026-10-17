@@ -1,6 +1,11 @@
 # Gmail draft OAuth reauthorisation
 
-## Decision required
+## Approval and remaining interactive step
+
+Matt approved the minimum restricted-scope expansion in Issue #477 on
+16 October 2026. Reauthorisation still requires the Narratiive mailbox holder to
+complete Google's interactive password/MFA challenge and consent screen; the
+credential must not be supplied to Codex or recorded in repository evidence.
 
 The live Google grant was audited on 16 October 2026. It currently contains:
 
@@ -33,9 +38,9 @@ Official references:
 
 ## Reauthorisation procedure
 
-1. Matt approves the restricted-scope expansion and confirms whether the Google
-   Cloud OAuth app is internal-only. If it is external, review the app's current
-   verification status before requesting the new restricted scope.
+1. Confirm whether the Google Cloud OAuth app is internal-only. If it is external,
+   review the app's current verification status before requesting the new
+   restricted scope. Matt's scope approval is already recorded in Issue #477.
 2. In the existing Google Cloud project, add only
    `https://www.googleapis.com/auth/gmail.compose` to the OAuth consent screen.
    Do not remove the six currently granted scopes.
@@ -69,4 +74,3 @@ Official references:
   mutation.
 - Revoke the old refresh token after the replacement grant is verified and the
   rollback window has closed.
-

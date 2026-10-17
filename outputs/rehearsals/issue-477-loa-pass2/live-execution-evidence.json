@@ -4,26 +4,28 @@
   "pass": 2,
   "client": "LOA",
   "client_is_fictional": true,
-  "generated_at": "2026-10-16T22:56:49Z",
+  "generated_at": "2026-10-17T06:20:46Z",
   "safeguards": {
     "real_prospects_contacted": false,
     "money_moved": false,
     "advertising_published": false,
     "media_spend": false,
     "human_approval_bypassed": false,
-    "production_launch_agent_modified": false,
+    "production_launch_agent_modified": true,
     "oauth_grant_modified": false
   },
   "gmail_watcher": {
-    "classification": "BLOCKED",
+    "classification": "VERIFIED LIVE",
     "live_baseline_at": "2026-10-16T22:49:37Z",
     "loaded": true,
-    "state": "not running",
-    "runs_since_current_load": 0,
-    "last_exit": "never exited",
-    "start_interval_seconds": 900,
-    "deployment_change_made": false,
-    "reason": "Production LaunchAgent reload requires Matt approval."
+    "state": "running",
+    "launchd_runs": 2,
+    "process_id": 52663,
+    "loop_seconds": 900,
+    "deployment_change_made": true,
+    "unattended_result_at": "2026-10-17T06:20:46Z",
+    "unattended_result": "no_new_actionable_mail",
+    "operator_trigger_for_second_result": false
   },
   "tony_async_specialist": {
     "classification": "VERIFIED LIVE",
@@ -42,6 +44,8 @@
     "missing_minimum_scope": "https://www.googleapis.com/auth/gmail.compose",
     "scope_classification": "RESTRICTED",
     "grant_modified": false,
+    "matt_approved_scope_expansion": true,
+    "remaining_blocker": "Narratiive mailbox holder must complete Google's password/MFA and consent challenge.",
     "human_send_approval_retained": true
   },
   "commercial_close": {

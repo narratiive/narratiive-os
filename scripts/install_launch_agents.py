@@ -19,6 +19,7 @@ class AgentSpec:
     start_interval: int | None = None
     start_calendar_interval: dict[str, int] | None = None
     run_at_load: bool = True
+    process_type: str = "Background"
 
 
 LEGACY_AGENT_LABELS = (
@@ -76,10 +77,18 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
         ),
         AgentSpec(
             "com.narratiive.gmail-inbox-watch",
-            (str(python_path), str(launcher), str(env_file), str(python_path), str(gmail_inbox_watch)),
-            False,
-            start_interval=900,
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(gmail_inbox_watch),
+                "--loop-seconds",
+                "900",
+            ),
+            True,
             run_at_load=True,
+            process_type="Standard",
         ),
         AgentSpec(
             "com.narratiive.proactive-morning",
@@ -125,7 +134,7 @@ def render_plist(spec: AgentSpec, repo_root: Path, log_dir: Path) -> bytes:
         "WorkingDirectory": str(repo_root),
         "RunAtLoad": spec.run_at_load,
         "KeepAlive": spec.keep_alive,
-        "ProcessType": "Background",
+        "ProcessType": spec.process_type,
         "StandardOutPath": str(log_dir / f"{spec.label}.out.log"),
         "StandardErrorPath": str(log_dir / f"{spec.label}.err.log"),
     }

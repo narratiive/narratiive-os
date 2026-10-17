@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import sys
+import time
 from email.utils import parseaddr
 from pathlib import Path
 from urllib import request
@@ -47,6 +49,16 @@ def ingest_email_candidate(item: dict[str, object], webhook_url: str) -> bool:
 
 
 def main() -> int:
+    parser = argparse.ArgumentParser(description="Run the Gmail inbox watcher")
+    parser.add_argument(
+        "--loop-seconds",
+        type=float,
+        default=0,
+        help="Keep the process alive and repeat after this interval; zero runs once.",
+    )
+    args = parser.parse_args()
+    if args.loop_seconds < 0:
+        parser.error("--loop-seconds must be zero or greater")
     gmail = build_http_dispatchers().get("Gmail")
     if gmail is None:
         print(json.dumps({"status": "gmail_dispatcher_unavailable"}))
@@ -75,13 +87,18 @@ def main() -> int:
         synthetic_test_marker=os.getenv("NARRATIIVE_SYNTHETIC_INBOX_MARKER", ""),
         query=os.getenv("NARRATIIVE_GMAIL_WATCH_QUERY", "in:inbox newer_than:7d"),
     )
-    try:
-        result = service.run()
-    except Exception as exc:
-        print(json.dumps({"status": "inbox_watch_failed", "error": str(exc)}))
-        return 1
-    print(json.dumps(result.to_dict(), sort_keys=True))
-    return 0 if result.status != "unverified_read" else 1
+    while True:
+        try:
+            result = service.run()
+        except Exception as exc:
+            print(json.dumps({"status": "inbox_watch_failed", "error": str(exc)}), flush=True)
+            return 1
+        print(json.dumps(result.to_dict(), sort_keys=True), flush=True)
+        if result.status == "unverified_read":
+            return 1
+        if args.loop_seconds == 0:
+            return 0
+        time.sleep(max(1.0, args.loop_seconds))
 
 
 if __name__ == "__main__":
