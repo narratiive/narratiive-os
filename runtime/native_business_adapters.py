@@ -4,7 +4,9 @@ import base64
 import hashlib
 import html
 import json
+import os
 import re
+import tempfile
 import time
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
@@ -193,6 +195,60 @@ class GoogleAdapter:
 class GmailDispatcher(GoogleAdapter):
     api_base = "https://gmail.googleapis.com/gmail/v1"
 
+    def __init__(
+        self,
+        oauth: GoogleOAuthConfig,
+        *,
+        opener: OpenUrl = request.urlopen,
+        receipt_store: str | Path | None = None,
+    ) -> None:
+        super().__init__(oauth, opener=opener)
+        # Gmail search is eventually consistent. Keep the authoritative receipt
+        # returned by a successful mutation so an immediate replay in the same
+        # long-lived dispatcher cannot create a duplicate before search catches up.
+        self.receipt_store = Path(receipt_store).expanduser() if receipt_store else None
+        self._write_receipts = self._load_write_receipts()
+
+    @staticmethod
+    def _receipt_key(operation: str, idempotency_key: str) -> str:
+        return hashlib.sha256(f"{operation}\0{idempotency_key}".encode("utf-8")).hexdigest()
+
+    def _load_write_receipts(self) -> dict[str, dict[str, Any]]:
+        if self.receipt_store is None or not self.receipt_store.is_file():
+            return {}
+        try:
+            payload = json.loads(self.receipt_store.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return {}
+        receipts = payload.get("receipts") if isinstance(payload, Mapping) else None
+        if not isinstance(receipts, Mapping):
+            return {}
+        return {
+            str(key): dict(value)
+            for key, value in list(receipts.items())[-1000:]
+            if isinstance(value, Mapping)
+        }
+
+    def _remember_write_receipt(self, key: str, receipt: Mapping[str, Any]) -> None:
+        self._write_receipts[key] = dict(receipt)
+        if self.receipt_store is None:
+            return
+        self.receipt_store.parent.mkdir(parents=True, exist_ok=True)
+        fd, temporary = tempfile.mkstemp(
+            prefix=f".{self.receipt_store.name}.",
+            dir=self.receipt_store.parent,
+        )
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump({"version": 1, "receipts": self._write_receipts}, handle, sort_keys=True)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.chmod(temporary, 0o600)
+            os.replace(temporary, self.receipt_store)
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+
     def probe(self) -> dict[str, Any]:
         self.client.call(f"{self.api_base}/users/me/profile", headers=self._headers())
         return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "gmail:profile"}
@@ -355,13 +411,20 @@ class GmailDispatcher(GoogleAdapter):
         key = _text(contract.get("idempotency_key")) or hashlib.sha256(
             f"{recipient}\0{subject}\0{body}".encode("utf-8")
         ).hexdigest()
+        receipt_key = self._receipt_key("send", key)
+        if receipt_key in self._write_receipts:
+            return {
+                **self._write_receipts[receipt_key],
+                "mutation_count": 0,
+                "duplicate_suppressed": True,
+            }
         message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
         query = parse.urlencode({"q": f"in:sent rfc822msgid:{message_header}", "maxResults": "1"})
         existing = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
         matches = existing.get("messages", [])
         if isinstance(matches, list) and matches:
             prior = _mapping(matches[0])
-            return {
+            receipt = {
                 "verified": True,
                 "sent": True,
                 "mutation_count": 0,
@@ -369,6 +432,8 @@ class GmailDispatcher(GoogleAdapter):
                 "thread_id": _text(prior.get("threadId")),
                 "duplicate_suppressed": True,
             }
+            self._remember_write_receipt(receipt_key, receipt)
+            return receipt
         email = EmailMessage()
         email["To"] = recipient
         email["Subject"] = subject
@@ -403,7 +468,9 @@ class GmailDispatcher(GoogleAdapter):
         message_id = _text(sent.get("id"))
         if not message_id:
             raise BusinessAdapterError("gmail_send_unverified")
-        return {"verified": True, "sent": True, "mutation_count": 1, "message_id": message_id, "thread_id": _text(sent.get("threadId"))}
+        receipt = {"verified": True, "sent": True, "mutation_count": 1, "message_id": message_id, "thread_id": _text(sent.get("threadId")), "duplicate_suppressed": False}
+        self._remember_write_receipt(receipt_key, receipt)
+        return receipt
 
     def _create_draft(
         self,
@@ -419,13 +486,20 @@ class GmailDispatcher(GoogleAdapter):
         key = _text(contract.get("idempotency_key")) or hashlib.sha256(
             f"draft\0{recipient}\0{subject}\0{body}".encode("utf-8")
         ).hexdigest()
+        receipt_key = self._receipt_key("draft", key)
+        if receipt_key in self._write_receipts:
+            return {
+                **self._write_receipts[receipt_key],
+                "mutation_count": 0,
+                "duplicate_suppressed": True,
+            }
         message_header = f"<narratiive-draft-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
         query = parse.urlencode({"q": f"in:drafts rfc822msgid:{message_header}", "maxResults": "1"})
         existing = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
         matches = existing.get("messages", [])
         if isinstance(matches, list) and matches:
             prior = _mapping(matches[0])
-            return {
+            receipt = {
                 "verified": True,
                 "created": True,
                 "sent": False,
@@ -434,6 +508,8 @@ class GmailDispatcher(GoogleAdapter):
                 "thread_id": _text(prior.get("threadId")),
                 "duplicate_suppressed": True,
             }
+            self._remember_write_receipt(receipt_key, receipt)
+            return receipt
         email = EmailMessage()
         email["To"] = recipient
         email["Subject"] = subject
@@ -451,7 +527,7 @@ class GmailDispatcher(GoogleAdapter):
         message_id = _text(message.get("id"))
         if not draft_id or not message_id:
             raise BusinessAdapterError("gmail_draft_unverified")
-        return {
+        receipt = {
             "verified": True,
             "created": True,
             "sent": False,
@@ -461,6 +537,8 @@ class GmailDispatcher(GoogleAdapter):
             "thread_id": _text(message.get("threadId")),
             "duplicate_suppressed": False,
         }
+        self._remember_write_receipt(receipt_key, receipt)
+        return receipt
 
 
 class GoogleCalendarDispatcher(GoogleAdapter):

@@ -1,0 +1,99 @@
+{
+  "schema_version": 1,
+  "issue": 477,
+  "client": "LOA",
+  "client_is_fictional": true,
+  "generated_at": "2026-10-17T06:46:00Z",
+  "classification": "VERIFIED LIVE CONTROLLED INTERNAL REHEARSAL",
+  "corrected_marker": "ISSUE477-LOA-PASS3R-20261017T0646Z",
+  "gmail": {
+    "recipient": "hello@narratiive.com",
+    "real_prospect": false,
+    "message_id": "1a1489bd864b69ea",
+    "first_mutation_count": 1,
+    "replay_after_dispatcher_restart_mutation_count": 0,
+    "duplicate_suppressed": true,
+    "receipt_store_sha256": "2f098cf5627177a9bc0f894aa93892c19d067f96b0466922f03a482675b0035f"
+  },
+  "targeted_watcher": {
+    "classification": "SUPERVISED LIVE; not the unattended proof",
+    "first_run": {
+      "checked": 1,
+      "alerted": 1,
+      "candidates": 1,
+      "ingested": 1,
+      "message_ids": ["1a1489bd864b69ea"]
+    },
+    "replay": {
+      "checked": 1,
+      "alerted": 0,
+      "candidates": 0,
+      "ingested": 0
+    }
+  },
+  "n8n": {
+    "workflow_id": "l6TysPR86l5VAoXc",
+    "execution_id": 3009,
+    "started_at": "2026-10-17T06:45:39.881Z",
+    "stopped_at": "2026-10-17T06:45:40.795Z",
+    "status": "success",
+    "additional_execution_on_watcher_replay": false
+  },
+  "notion": {
+    "page_id": "3fc0c9cf-a8f2-81e7-aeea-cdd7cdc8ab16",
+    "live_read_verified": true,
+    "matching_record_count": 1,
+    "mutation_count_for_verification": 0
+  },
+  "tony": {
+    "http_sync_ok": true,
+    "synchronised": true,
+    "message": "Inbound lead stored in Notion and synchronized to Tony."
+  },
+  "telegram": {
+    "live_ui_observed": true,
+    "chat": "Tony@narratiive",
+    "message_id": 1114,
+    "marker_visible": true,
+    "observed_local_time": "07:45"
+  },
+  "unattended_watcher": {
+    "classification": "VERIFIED LIVE",
+    "process_id": 52663,
+    "launchd_runs": 2,
+    "process_started_at": "2026-10-17T06:05:33Z",
+    "latest_unattended_result_at": "2026-10-17T06:35:39Z",
+    "latest_status": "no_new_actionable_mail",
+    "manual_trigger_for_latest_result": false
+  },
+  "fireflies": {
+    "classification": "VERIFIED LIVE READ",
+    "transcript_id": "01M52PY4BBJWFZAZ2WTJ1GA0G2",
+    "sentence_count": 29,
+    "participant_count": 2,
+    "summary_present": true,
+    "mutation_count": 0,
+    "loa_customer_evidence": false
+  },
+  "safeguards": {
+    "real_prospects_contacted": false,
+    "client_facing_email_sent": false,
+    "money_moved": false,
+    "advertising_created_or_published": false,
+    "media_spend": false,
+    "human_approval_bypassed": false
+  },
+  "discovered_failure": {
+    "marker": "ISSUE477-LOA-PASS3-20261017T0644Z",
+    "cause": "Gmail rewrote the supplied Message-ID and provider search could not suppress immediate replay.",
+    "gmail_messages_created": 3,
+    "n8n_executions_before_repair": [3007, 3008],
+    "notion_pages_before_repair": [
+      "3fc0c9cf-a8f2-81b5-b75a-d3f865a526c7",
+      "3fc0c9cf-a8f2-81aa-8692-c59a92ecdbac"
+    ],
+    "repair": "Persist a hashed idempotency key and authoritative Gmail mutation receipt in a mode-600 atomic ledger; load it on dispatcher restart.",
+    "cleanup_performed": false,
+    "cleanup_requires_approval": true
+  }
+}
