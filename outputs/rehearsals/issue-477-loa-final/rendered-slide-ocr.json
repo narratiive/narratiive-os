@@ -1,0 +1,3906 @@
+{
+  "slides" : [
+    {
+      "file" : "slide-01.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "NARRATIIVE",
+          "width" : 0.073437499999999989,
+          "x" : 0.070312500611979162,
+          "y" : 0.8750000001388889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "GROWTH BLUEPRINT \/ 2026",
+          "width" : 0.109375,
+          "x" : 0.070312498177083377,
+          "y" : 0.8305555554166667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.077777777777777724,
+          "text" : "LOA",
+          "width" : 0.11093750000000001,
+          "x" : 0.073437500462239583,
+          "y" : 0.56111111125000002
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "Own the brighter pause",
+          "width" : 0.24687499999999998,
+          "x" : 0.073437502057291631,
+          "y" : 0.46944444458333323
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "A conditional route from distinctive bottle to repeatable demand",
+          "width" : 0.39531249999999996,
+          "x" : 0.071875001890624984,
+          "y" : 0.38611111083333338
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "INTERNAL FICTIONAL DEMONSTRATION - HUMAN APPROVAL REQUIRED",
+          "width" : 0.25312499999999999,
+          "x" : 0.071874995781250117,
+          "y" : 0.086111110972222127
+        }
+      ],
+      "text" : "NARRATIIVE\nGROWTH BLUEPRINT \/ 2026\nLOA\nOwn the brighter pause\nA conditional route from distinctive bottle to repeatable demand\nINTERNAL FICTIONAL DEMONSTRATION - HUMAN APPROVAL REQUIRED"
+    },
+    {
+      "file" : "slide-02.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "ACT11 THE CASE FOR CHANGE",
+          "width" : 0.11250000000000002,
+          "x" : 0.059375002578124871,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
+          "text" : "What the commercial opportunity looks like",
+          "width" : 0.50312499999999993,
+          "x" : 0.060937502187500006,
+          "y" : 0.83611111071759259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019682414001888637,
+          "text" : "Scenario",
+          "width" : 0.050029110908508298,
+          "x" : 0.060922945045869578,
+          "y" : 0.69432545974667503
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Annual revenue",
+          "width" : 0.090624999999999983,
+          "x" : 0.23749999909375,
+          "y" : 0.69166666649999997
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Conversion",
+          "width" : 0.065624999999999989,
+          "x" : 0.41875000082031255,
+          "y" : 0.6944444445486111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "Year 1 contribution",
+          "width" : 0.109375,
+          "x" : 0.59531249937500008,
+          "y" : 0.68888888923611113
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Net after investment",
+          "width" : 0.11562500000000009,
+          "x" : 0.77499999807291675,
+          "y" : 0.69444444439814812
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025270364019605807,
+          "text" : "Downside",
+          "width" : 0.062534040212631217,
+          "x" : 0.057795479112389206,
+          "y" : 0.59708704018107772
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025575404696994375,
+          "text" : "£115k",
+          "width" : 0.039177846908569347,
+          "x" : 0.23587982690391102,
+          "y" : 0.59693451961843202
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "1.8%",
+          "width" : 0.034375000000000044,
+          "x" : 0.4156249996875,
+          "y" : 0.59722222252777779
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.025000000000000022,
+          "text" : "£1k",
+          "width" : 0.0234375,
+          "x" : 0.59531250025390625,
+          "y" : 0.59722222190972218
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "-£64k",
+          "width" : 0.035937499999999956,
+          "x" : 0.77343750041015624,
+          "y" : 0.59722222190972218
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Base",
+          "width" : 0.032812500000000008,
+          "x" : 0.059375000273437492,
+          "y" : 0.50555555567129629
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025205341974894102,
+          "text" : "£547k",
+          "width" : 0.037543159723281871,
+          "x" : 0.23747841990377455,
+          "y" : 0.5054528844478654
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "2.4%",
+          "width" : 0.034374999999999989,
+          "x" : 0.41562499975446432,
+          "y" : 0.5055555553968254
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "£67k",
+          "width" : 0.032812499999999911,
+          "x" : 0.59374999958984387,
+          "y" : 0.50555555545138886
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.02777777777777779,
+          "text" : "£2k",
+          "width" : 0.026562500000000044,
+          "x" : 0.77343750018973212,
+          "y" : 0.5055555556746032
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.031009795930650452,
+          "text" : "Upside",
+          "width" : 0.046968081593513476,
+          "x" : 0.057765958734756019,
+          "y" : 0.41088399083568461
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.029144334793090754,
+          "text" : "£884k",
+          "width" : 0.039363569021225009,
+          "x" : 0.23578696523167214,
+          "y" : 0.41042783226521806
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "2.6%",
+          "width" : 0.034374999999999989,
+          "x" : 0.41562499978515621,
+          "y" : 0.41111111095486108
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "£140k",
+          "width" : 0.037499999999999978,
+          "x" : 0.59531250026785709,
+          "y" : 0.41388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030788808398776513,
+          "text" : "£75k",
+          "width" : 0.032881036400794983,
+          "x" : 0.77340323159479962,
+          "y" : 0.41099448456651444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "30% CONTRIBUTION, £65k INVESTMENT AND SCENARIO RAMP ARE ASSUMPTIONS. NOT A PROFIT FORECAST.",
+          "width" : 0.42656250000000007,
+          "x" : 0.059375005332031126,
+          "y" : 0.3027777779166666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "The base scenario adds £443,520 of annualised revenue headroom. The base case produces a £1,528 first-year",
+          "width" : 0.66093749999999996,
+          "x" : 0.220312501796875,
+          "y" : 0.15833333366666658
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "contribution proxy after £65,000 of assumed investment. Verify every input before committing.",
+          "width" : 0.5625,
+          "x" : 0.22031250703124988,
+          "y" : 0.13333333322916685
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A1, A2, A3, A7, A8, A9",
+          "width" : 0.140625,
+          "x" : 0.059374998242187525,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017599756187862803,
+          "text" : "NARRATIVE",
+          "width" : 0.045418176054954532,
+          "x" : 0.059322161407060606,
+          "y" : 0.027311232866622626
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "MODELLED - SCENARIO, NOT FORECAST",
+          "width" : 0.17500000000000004,
+          "x" : 0.6875000005729166,
+          "y" : 0.077777777453703623
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "02\/21",
+          "width" : 0.025000000000000022,
+          "x" : 0.91562499968750011,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "ACT11 THE CASE FOR CHANGE\nWhat the commercial opportunity looks like\nScenario\nAnnual revenue\nConversion\nYear 1 contribution\nNet after investment\nDownside\n£115k\n1.8%\n£1k\n-£64k\nBase\n£547k\n2.4%\n£67k\n£2k\nUpside\n£884k\n2.6%\n£140k\n£75k\n30% CONTRIBUTION, £65k INVESTMENT AND SCENARIO RAMP ARE ASSUMPTIONS. NOT A PROFIT FORECAST.\nCOMMERCIAL CONSEQUENCE\nThe base scenario adds £443,520 of annualised revenue headroom. The base case produces a £1,528 first-year\ncontribution proxy after £65,000 of assumed investment. Verify every input before committing.\nSOURCES: A1, A2, A3, A7, A8, A9\nNARRATIVE\nMODELLED - SCENARIO, NOT FORECAST\n02\/21"
+    },
+    {
+      "file" : "slide-03.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "What currently prevents growth",
+          "width" : 0.36562500000000003,
+          "x" : 0.060937497388392894,
+          "y" : 0.83888888880952384
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "CURRENT ASSET",
+          "width" : 0.067187499999999997,
+          "x" : 0.071875000839843731,
+          "y" : 0.70000000010416663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "WORKING CONSTRAINT",
+          "width" : 0.096875000000000044,
+          "x" : 0.62343750121093744,
+          "y" : 0.70000000010416663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.049999999999999933,
+          "text" : "A bottle people may",
+          "width" : 0.26093749999999999,
+          "x" : 0.071875002515624953,
+          "y" : 0.5861111106111111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.039416416486104278,
+          "text" : "notice",
+          "width" : 0.081329387426376354,
+          "x" : 0.071835306313519393,
+          "y" : 0.53862512541418395
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Distinctive visual assets are useful, but not",
+          "width" : 0.31093749999999998,
+          "x" : 0.071875001679687411,
+          "y" : 0.50277777752314812
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "proof of demand or repeat.",
+          "width" : 0.19687499999999997,
+          "x" : 0.070312497773437552,
+          "y" : 0.46666666624999997
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333437,
+          "text" : "THE",
+          "width" : 0.042187500000000044,
+          "x" : 0.47968750035156249,
+          "y" : 0.57222222240740739
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "GAP",
+          "width" : 0.042187500000000044,
+          "x" : 0.47968749987723214,
+          "y" : 0.53055555529761911
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.049999999999999933,
+          "text" : "No proven repeat path",
+          "width" : 0.29531249999999998,
+          "x" : 0.62187499829687509,
+          "y" : 0.5861111106111111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Working diagnosis only. Falsify it by: Reject",
+          "width" : 0.27656250000000004,
+          "x" : 0.62187500345703106,
+          "y" : 0.50555555572916666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "this diagnosis if founder, customer and cohort",
+          "width" : 0.28593749999999996,
+          "x" : 0.62343750039062495,
+          "y" : 0.48055555513888892
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.03238559828864207,
+          "text" : "evidence already shows a clear occasion,",
+          "width" : 0.26590201854705819,
+          "x" : 0.62330780379499184,
+          "y" : 0.44607078353796237
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "strong unprompted proposition recall and",
+          "width" : 0.25937500000000002,
+          "x" : 0.62343749567708351,
+          "y" : 0.41944444430555561
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "profitable repeat without increased",
+          "width" : 0.22031249999999991,
+          "x" : 0.62187499751953124,
+          "y" : 0.38611111072916671
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0285368124643961,
+          "text" : "discounting.",
+          "width" : 0.081331026554107622,
+          "x" : 0.6218344859101288,
+          "y" : 0.35795381588650865
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "LOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route",
+          "width" : 0.64999999999999991,
+          "x" : 0.22187499427083351,
+          "y" : 0.1611111115740741
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "from first taste to profitable repeat.",
+          "width" : 0.20937500000000001,
+          "x" : 0.22031250149553569,
+          "y" : 0.13333333345238096
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "SOURCES: A4",
+          "width" : 0.060937499999999992,
+          "x" : 0.060937501015624965,
+          "y" : 0.080555555694444503
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312497019767778,
+          "x" : 0.059375000734907812,
+          "y" : 0.027777777638888779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSUMPTION",
+          "width" : 0.059375000000000067,
+          "x" : 0.80312499901041678,
+          "y" : 0.080555555416666591
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "03\/21",
+          "width" : 0.023437498509883969,
+          "x" : 0.91562500035443306,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "What currently prevents growth\nCURRENT ASSET\nWORKING CONSTRAINT\nA bottle people may\nnotice\nDistinctive visual assets are useful, but not\nproof of demand or repeat.\nTHE\nGAP\nNo proven repeat path\nWorking diagnosis only. Falsify it by: Reject\nthis diagnosis if founder, customer and cohort\nevidence already shows a clear occasion,\nstrong unprompted proposition recall and\nprofitable repeat without increased\ndiscounting.\nLOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route\nfrom first taste to profitable repeat.\nSOURCES: A4\nNARRATIVE\nASSUMPTION\n03\/21"
+    },
+    {
+      "file" : "slide-04.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "AСT1?THE CASE FOR CHANGE",
+          "width" : 0.11250000000000002,
+          "x" : 0.059375002578124871,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The strategic moves",
+          "width" : 0.23749999999999999,
+          "x" : 0.059375002374999972,
+          "y" : 0.83888888905555559
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "OWN THE BRIGHTER PAUSE",
+          "width" : 0.109375,
+          "x" : 0.082812499921875005,
+          "y" : 0.66666666667658736
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "MAKE THE POUR THE PROOF",
+          "width" : 0.11562500000000003,
+          "x" : 0.38281249973958331,
+          "y" : 0.66388888861111117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "TURN TRIAL INTO REPEAT",
+          "width" : 0.10468750000000004,
+          "x" : 0.6843750017447916,
+          "y" : 0.66666666680555564
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Qualified demand and",
+          "width" : 0.20625000000000002,
+          "x" : 0.081249998281250041,
+          "y" : 0.5666666665509259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "conversion",
+          "width" : 0.10624999999999998,
+          "x" : 0.081250000437499997,
+          "y" : 0.52500000030555549
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888973,
+          "text" : "Comprehension, trial",
+          "width" : 0.19843750000000004,
+          "x" : 0.38281250138671874,
+          "y" : 0.5583333328472222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111205,
+          "text" : "and memorability",
+          "width" : 0.1640625,
+          "x" : 0.38281250164062497,
+          "y" : 0.51944444452777772
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Founder interview, occasion",
+          "width" : 0.16562499999999999,
+          "x" : 0.08281250207031246,
+          "y" : 0.45000000013888886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "research and controlled proposition",
+          "width" : 0.20937500000000003,
+          "x" : 0.081250001744791647,
+          "y" : 0.42222222236111107
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "test",
+          "width" : 0.026562500000000003,
+          "x" : 0.079687499921875002,
+          "y" : 0.39444444450163396
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Creative recognition,",
+          "width" : 0.12343749999999998,
+          "x" : 0.38437500154296866,
+          "y" : 0.44999999999999996
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "comprehension and qualified",
+          "width" : 0.171875,
+          "x" : 0.38281249713541676,
+          "y" : 0.42222222208333338
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "sample-to-site test",
+          "width" : 0.11249999999999999,
+          "x" : 0.38281249812500012,
+          "y" : 0.39444444425925929
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.03689413335588243,
+          "text" : "Repeat and",
+          "width" : 0.10633332729339595,
+          "x" : 0.68433333606754809,
+          "y" : 0.56071959968569018
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333437,
+          "text" : "distribution",
+          "width" : 0.11093750000000002,
+          "x" : 0.68437500079241076,
+          "y" : 0.52500000011904757
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.041210436820983909,
+          "text" : "productivity",
+          "width" : 0.11586493253707875,
+          "x" : 0.68425503455805781,
+          "y" : 0.47661700391417006
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "One-city cohort test of repeat and",
+          "width" : 0.19843750000000004,
+          "x" : 0.6843750014174107,
+          "y" : 0.44722222238095244
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "retailer sell-through",
+          "width" : 0.11875000000000002,
+          "x" : 0.68281250148437489,
+          "y" : 0.41944444461805552
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Own the brighter pause, make the pour the proof, then turn concentrated trial into measured repeat.",
+          "width" : 0.60000000000000009,
+          "x" : 0.21666665666666701,
+          "y" : 0.15555555562670109
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2",
+          "width" : 0.203125,
+          "x" : 0.059374997460937551,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312497019767778,
+          "x" : 0.059375000734907812,
+          "y" : 0.027777777638888779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "04 \/ 21",
+          "width" : 0.021874999999999978,
+          "x" : 0.91718749972656255,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "AСT1?THE CASE FOR CHANGE\nThe strategic moves\nOWN THE BRIGHTER PAUSE\nMAKE THE POUR THE PROOF\nTURN TRIAL INTO REPEAT\nQualified demand and\nconversion\nComprehension, trial\nand memorability\nFounder interview, occasion\nresearch and controlled proposition\ntest\nCreative recognition,\ncomprehension and qualified\nsample-to-site test\nRepeat and\ndistribution\nproductivity\nOne-city cohort test of repeat and\nretailer sell-through\nOwn the brighter pause, make the pour the proof, then turn concentrated trial into measured repeat.\nSOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2\nNARRATIVE\nASSUMPTION\n04 \/ 21"
+    },
+    {
+      "file" : "slide-05.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ACT 1\/THE CASE FOR CHANGE",
+          "width" : 0.11406250000000001,
+          "x" : 0.059375001901041592,
+          "y" : 0.9194444445833333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888973,
+          "text" : "What the future could look like",
+          "width" : 0.34374999999999994,
+          "x" : 0.060937502864583284,
+          "y" : 0.83055555564814809
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.066666666666666652,
+          "text" : "A Brighter Pour",
+          "width" : 0.28437499999999999,
+          "x" : 0.057812497630208369,
+          "y" : 0.61944444412037036
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "BOTANICAL SODA",
+          "width" : 0.16718749999999999,
+          "x" : 0.42031250208984366,
+          "y" : 0.60555555562500007
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Turn the small social pause into something vivid:",
+          "width" : 0.37031249999999999,
+          "x" : 0.059375003703124915,
+          "y" : 0.49722222236111102
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907406965891572,
+          "text" : "an unmistakable LOA pour, served with food,",
+          "width" : 0.34166665077209474,
+          "x" : 0.058333346975063538,
+          "y" : 0.45925926083072044
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "colour and a little ceremony.",
+          "width" : 0.21250000000000002,
+          "x" : 0.059375001517857129,
+          "y" : 0.43055555565476189
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.18611111111111112,
+          "text" : "*OA",
+          "width" : 0.21562499999999996,
+          "x" : 0.40312499976562499,
+          "y" : 0.37777777835937498
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.1015625,
+          "x" : 0.059375001692708283,
+          "y" : 0.28888888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "GRAPEFRUIT",
+          "width" : 0.12343750000000003,
+          "x" : 0.4453124984570313,
+          "y" : 0.31666666652777775
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030860651863945932,
+          "text" : "BASIL",
+          "width" : 0.058256870508193948,
+          "x" : 0.47946531542330417,
+          "y" : 0.27901411812880494
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "SPARKLING",
+          "width" : 0.11093750000000002,
+          "x" : 0.45312500039062498,
+          "y" : 0.24444444416666677
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Fictional visual proof. Test relevance, distinctiveness and product",
+          "width" : 0.31562500000000004,
+          "x" : 0.060937503156249927,
+          "y" : 0.23611111127777773
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "comprehension before selection.",
+          "width" : 0.16093750000000001,
+          "x" : 0.059375002011718706,
+          "y" : 0.21666666673611112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "SOURCES: A5, C1, C2",
+          "width" : 0.093749994039535531,
+          "x" : 0.059375004542732188,
+          "y" : 0.077777777962962924
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312497019767778,
+          "x" : 0.059375000734907812,
+          "y" : 0.027777777638888779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.109375,
+          "x" : 0.75312499863281257,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "05 \/ 21",
+          "width" : 0.021874999999999978,
+          "x" : 0.91718750036458341,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "ACT 1\/THE CASE FOR CHANGE\nWhat the future could look like\nA Brighter Pour\nBOTANICAL SODA\nTurn the small social pause into something vivid:\nan unmistakable LOA pour, served with food,\ncolour and a little ceremony.\n*OA\nCREATIVE ILLUSTRATION\nGRAPEFRUIT\nBASIL\nSPARKLING\nFictional visual proof. Test relevance, distinctiveness and product\ncomprehension before selection.\nSOURCES: A5, C1, C2\nNARRATIVE\nCREATIVE ILLUSTRATION\n05 \/ 21"
+    },
+    {
+      "file" : "slide-06.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The Opportunity",
+          "width" : 0.19062499999999999,
+          "x" : 0.05937499880859376,
+          "y" : 0.83888888878472223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.052777777777777812,
+          "text" : "The base case produces a £1,528 first-year contribution",
+          "width" : 0.57083330154418943,
+          "x" : 0.054166688269571849,
+          "y" : 0.67361111148148145
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.03560679091347585,
+          "text" : "proxy atter 265,000 ot assumed investment. Verify every",
+          "width" : 0.55947918891906734,
+          "x" : 0.060879487890900474,
+          "y" : 0.64024859935272493
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.057044651773240918,
+          "text" : "input before committing.",
+          "width" : 0.25430512428283691,
+          "x" : 0.055542912666574629,
+          "y" : 0.58244431354285064
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "SCENARIO",
+          "width" : 0.10312500000000002,
+          "x" : 0.74218749914062498,
+          "y" : 0.602777777662037
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Validate before",
+          "width" : 0.096875000000000044,
+          "x" : 0.74531250080729161,
+          "y" : 0.48611111120370365
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "investment",
+          "width" : 0.074999999999999956,
+          "x" : 0.75624999906250001,
+          "y" : 0.46111111100694446
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "LOA could test an annualised ecommerce revenue scenario of £547,200, £443,520 above the assumed baseline.",
+          "width" : 0.66249999999999998,
+          "x" : 0.22187500828124981,
+          "y" : 0.16111111114583332
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "SOURCES: A1, A2, A3, A7, A8, A9",
+          "width" : 0.140625,
+          "x" : 0.059375001354166602,
+          "y" : 0.077777777500000145
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.014393423663245253,
+          "text" : "MODELLED",
+          "width" : 0.05019705891609183,
+          "x" : 0.81240146872090979,
+          "y" : 0.08169217716555266
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "06\/21",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500116172463,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "The Opportunity\nThe base case produces a £1,528 first-year contribution\nproxy atter 265,000 ot assumed investment. Verify every\ninput before committing.\nSCENARIO\nValidate before\ninvestment\nLOA could test an annualised ecommerce revenue scenario of £547,200, £443,520 above the assumed baseline.\nSOURCES: A1, A2, A3, A7, A8, A9\nNARRATIVE\nMODELLED\n06\/21"
+    },
+    {
+      "file" : "slide-07.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "CHACKHE OPPOKENHEY",
+          "width" : 0.11406250000000001,
+          "x" : 0.059374999921875005,
+          "y" : 0.93333333333713853
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The scenario bridge",
+          "width" : 0.23281250000000001,
+          "x" : 0.059375001417410679,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024705558353000256,
+          "text" : "01 CLAIM",
+          "width" : 0.061208629608154305,
+          "x" : 0.11392693458527266,
+          "y" : 0.66820277629286573
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "The sequential bridge reconciles",
+          "width" : 0.29999999999999993,
+          "x" : 0.56666667166666651,
+          "y" : 0.64444444393178302
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "to £443,520. The attribution order",
+          "width" : 0.30156250000000007,
+          "x" : 0.567187498484375,
+          "y" : 0.5999999995555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111205,
+          "text" : "is a modelling convention.",
+          "width" : 0.2421875,
+          "x" : 0.56562500242187497,
+          "y" : 0.56388888891666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022675159242418141,
+          "text" : "02 PROOF",
+          "width" : 0.06567305326461792,
+          "x" : 0.15778847289868453,
+          "y" : 0.53032908692964731
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "03 METHOD",
+          "width" : 0.073437500000000017,
+          "x" : 0.20156250007642659,
+          "y" : 0.39166666664251215
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781250000000001,
+          "x" : 0.059374999973958342,
+          "y" : 0.16388888916666655
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Traffic contributes £241,920; Conversion contributes £115,200; Average order value contributes £86,400.",
+          "width" : 0.625,
+          "x" : 0.21666665625000031,
+          "y" : 0.15555555562670109
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A1, A2, A3, A7, A8, A9",
+          "width" : 0.140625,
+          "x" : 0.059374998242187525,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "MODELLED",
+          "width" : 0.050000000000000044,
+          "x" : 0.81249999957031238,
+          "y" : 0.080555555381944366
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "07\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHACKHE OPPOKENHEY\nThe scenario bridge\n01 CLAIM\nThe sequential bridge reconciles\nto £443,520. The attribution order\nis a modelling convention.\n02 PROOF\n03 METHOD\nCOMMERCIAL CONSEQUENCE\nTraffic contributes £241,920; Conversion contributes £115,200; Average order value contributes £86,400.\nSOURCES: A1, A2, A3, A7, A8, A9\nNARRATIVE\nMODELLED\n07\/21"
+    },
+    {
+      "file" : "slide-08.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "CHAPTER 2\/THE CONSTRANTI",
+          "width" : 0.10937498807907105,
+          "x" : 0.059375011429213934,
+          "y" : 0.93333333347222225
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Constraint",
+          "width" : 0.17499999999999999,
+          "x" : 0.059375000874999986,
+          "y" : 0.84444444458333334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024705558353000256,
+          "text" : "01 CLAIM",
+          "width" : 0.061208629608154291,
+          "x" : 0.11392693570539639,
+          "y" : 0.66820277649716431
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222365,
+          "text" : "02 PROOF",
+          "width" : 0.065624999999999989,
+          "x" : 0.15781250065624999,
+          "y" : 0.53055555572222213
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Reject this diagnosis if founder,",
+          "width" : 0.29166665077209475,
+          "x" : 0.56666667947506344,
+          "y" : 0.64444444500941711
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "customer and cohort evidence",
+          "width" : 0.2734375,
+          "x" : 0.56874999772135415,
+          "y" : 0.60833333312500004
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907406965891461,
+          "text" : "already shows a clear occasion,",
+          "width" : 0.29166665077209464,
+          "x" : 0.56666667225284162,
+          "y" : 0.56249999985770893
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "strong unprompted proposition",
+          "width" : 0.28281250000000002,
+          "x" : 0.56875000282812493,
+          "y" : 0.52500000011111103
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "recall and profitable repeat without",
+          "width" : 0.31406249999999991,
+          "x" : 0.56874999910156254,
+          "y" : 0.48333333305555548
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037187514040205261,
+          "text" : "increased discounting.",
+          "width" : 0.20986452102661135,
+          "x" : 0.56695554123185854,
+          "y" : 0.44389438920918201
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "03 METHOD",
+          "width" : 0.073437500000000017,
+          "x" : 0.20156250007642659,
+          "y" : 0.39166666664251215
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "LOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route",
+          "width" : 0.65156250000000004,
+          "x" : 0.22031250542968744,
+          "y" : 0.15833333347222234
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "from first taste to profitable repeat.",
+          "width" : 0.2109375,
+          "x" : 0.22031250210937497,
+          "y" : 0.13333333338888897
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A4",
+          "width" : 0.062499999999999993,
+          "x" : 0.059375001041666632,
+          "y" : 0.080555555648148092
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSUMPTION",
+          "width" : 0.059375000000000067,
+          "x" : 0.80312499901041678,
+          "y" : 0.080555555416666591
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "08 \/ 21",
+          "width" : 0.021874999999999978,
+          "x" : 0.91718749972656255,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER 2\/THE CONSTRANTI\nThe Constraint\n01 CLAIM\n02 PROOF\nReject this diagnosis if founder,\ncustomer and cohort evidence\nalready shows a clear occasion,\nstrong unprompted proposition\nrecall and profitable repeat without\nincreased discounting.\n03 METHOD\nCOMMERCIAL CONSEQUENCE\nLOA may have a memorable bottle, but it has not yet proved the specific occasion, reason to choose or route\nfrom first taste to profitable repeat.\nSOURCES: A4\nNARRATIVE\nASSUMPTION\n08 \/ 21"
+    },
+    {
+      "file" : "slide-09.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "HAHHE CONSTRAIN H",
+          "width" : 0.10937500000000001,
+          "x" : 0.059375000076992743,
+          "y" : 0.93333333332930757
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.051851850085788298,
+          "text" : "What would disprove the diagnosis",
+          "width" : 0.41250000000000003,
+          "x" : 0.058333331458333325,
+          "y" : 0.83703703878426627
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Reject this diagnosis if founder, customer and cohort evidence already shows",
+          "width" : 0.578125,
+          "x" : 0.21249999817708343,
+          "y" : 0.69166666615740735
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907405641343878,
+          "text" : "a clear occasion, strong unprompted proposition recall and profitable repeat",
+          "width" : 0.57499999999999996,
+          "x" : 0.21249999739583333,
+          "y" : 0.65138889009939693
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.034417144457499216,
+          "text" : "without increased discounting.",
+          "width" : 0.23471558094024658,
+          "x" : 0.38267699302252145,
+          "y" : 0.62455784152577321
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "2",
+          "width" : 0.010937499999999989,
+          "x" : 0.42031250009765631,
+          "y" : 0.5333333330208333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017399044831593824,
+          "text" : "FOUNDER",
+          "width" : 0.048515543341636658,
+          "x" : 0.1452734791368874,
+          "y" : 0.38296714433124257
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "RETAIL",
+          "width" : 0.034374999999999989,
+          "x" : 0.40937499957031254,
+          "y" : 0.3833333331944444
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.016666666666666607,
+          "text" : "CRM",
+          "width" : 0.0234375,
+          "x" : 0.67343750029296878,
+          "y" : 0.3833333334722222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "The diagnosis fails if LOA already owns a clear occasion and existing cohorts repeat profitably without heavier",
+          "width" : 0.66250000000000009,
+          "x" : 0.22187499171875019,
+          "y" : 0.16111111107638898
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.023470253414577869,
+          "text" : "discounting.",
+          "width" : 0.07667397856712338,
+          "x" : 0.22181926199242624,
+          "y" : 0.13548709549411719
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "SOURCES: A4",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999238281267,
+          "y" : 0.080555555451388927
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "09\/21",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500116172463,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "HAHHE CONSTRAIN H\nWhat would disprove the diagnosis\nReject this diagnosis if founder, customer and cohort evidence already shows\na clear occasion, strong unprompted proposition recall and profitable repeat\nwithout increased discounting.\n2\nFOUNDER\nRETAIL\nCRM\nThe diagnosis fails if LOA already owns a clear occasion and existing cohorts repeat profitably without heavier\ndiscounting.\nSOURCES: A4\nASSUMPTION\nNARRATIVE\n09\/21"
+    },
+    {
+      "file" : "slide-10.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER 3\/THE ADVANTAGE",
+          "width" : 0.10625000000000001,
+          "x" : 0.059375002421874878,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The Advantage",
+          "width" : 0.17656250000000001,
+          "x" : 0.059375001015624984,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "A BRIGHTER POUR",
+          "width" : 0.082812500000000067,
+          "x" : 0.51249999861979167,
+          "y" : 0.59166666657407418
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01422254509396037,
+          "text" : "THE GAP",
+          "width" : 0.037538650631904646,
+          "x" : 0.72498067461293692,
+          "y" : 0.68594428303950838
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "A vivid adult soft-drink",
+          "width" : 0.16562499999999991,
+          "x" : 0.72343749792968759,
+          "y" : 0.62499999993055555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "ritual for everyday social",
+          "width" : 0.17812499999999998,
+          "x" : 0.72500000081249993,
+          "y" : 0.58888888858333333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025760451952616337,
+          "text" : "pauses",
+          "width" : 0.053236621618270918,
+          "x" : 0.72494418963282381,
+          "y" : 0.56073088530317861
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "WHO IT MATTERS TO",
+          "width" : 0.067187499999999956,
+          "x" : 0.72500000091145833,
+          "y" : 0.52222222245370364
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Adults seeking a grown-up soft option;",
+          "width" : 0.17656249999999996,
+          "x" : 0.7265625029427083,
+          "y" : 0.48611111120370365
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "definition requires research",
+          "width" : 0.12656249999999991,
+          "x" : 0.72500000158203126,
+          "y" : 0.46666666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "No competitor position is asserted until",
+          "width" : 0.1640625,
+          "x" : 0.72499999794921877,
+          "y" : 0.35833333326388894
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "research is completed.",
+          "width" : 0.095312500000000022,
+          "x" : 0.72500000119140628,
+          "y" : 0.34166666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "GENERIC REFRESHMENT",
+          "width" : 0.089062500000000003,
+          "x" : 0.092187498886718774,
+          "y" : 0.32499999989583328
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "OCCASION SPECIFIC",
+          "width" : 0.074999999999999956,
+          "x" : 0.54374999875000007,
+          "y" : 0.32499999986111117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "LOA could turn its coral bottle and optimistic visual language into a recognisable adult soft-drink ritual: a",
+          "width" : 0.62968749999999996,
+          "x" : 0.22031250524739576,
+          "y" : 0.15833333344907408
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "brighter pour for social pauses that deserve more than water and less than alcohol.",
+          "width" : 0.49999999999999994,
+          "x" : 0.22031250624999982,
+          "y" : 0.1333333333333333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C2",
+          "width" : 0.078124999999999986,
+          "x" : 0.059375000781249979,
+          "y" : 0.077777777453703623
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "10\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER 3\/THE ADVANTAGE\nThe Advantage\nA BRIGHTER POUR\nTHE GAP\nA vivid adult soft-drink\nritual for everyday social\npauses\nWHO IT MATTERS TO\nAdults seeking a grown-up soft option;\ndefinition requires research\nNo competitor position is asserted until\nresearch is completed.\nGENERIC REFRESHMENT\nOCCASION SPECIFIC\nLOA could turn its coral bottle and optimistic visual language into a recognisable adult soft-drink ritual: a\nbrighter pour for social pauses that deserve more than water and less than alcohol.\nSOURCES: A5, C2\nASSUMPTION\nNARRATIVE\n10\/21"
+    },
+    {
+      "file" : "slide-11.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER 3ГТHЕ ADVANTAGE",
+          "width" : 0.10625000000000001,
+          "x" : 0.059375002421874878,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The advantage needs proof",
+          "width" : 0.31874999999999998,
+          "x" : 0.059374998406250025,
+          "y" : 0.83888888877777779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "BRAND ASSET",
+          "width" : 0.053124999999999978,
+          "x" : 0.52500000013888892,
+          "y" : 0.70555555564814809
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "A distinctive bottle illustration",
+          "width" : 0.14687499999999998,
+          "x" : 0.65156249816406253,
+          "y" : 0.7055555554166667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "EVIDENCE TO COLLECT",
+          "width" : 0.095312494039535525,
+          "x" : 0.079687501391690632,
+          "y" : 0.6972222220833334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "CUSTOMER EVIDENCE REQUIRED",
+          "width" : 0.10781249999999999,
+          "x" : 0.079687501796874935,
+          "y" : 0.66111111125000011
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777901,
+          "text" : "Map real social pauses",
+          "width" : 0.14687500000000001,
+          "x" : 0.079687501223958318,
+          "y" : 0.57500000013888886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "CUSTOMER DATA",
+          "width" : 0.065625000000000044,
+          "x" : 0.52343750065624994,
+          "y" : 0.56666666677777777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Not yet supplied",
+          "width" : 0.081249999999999933,
+          "x" : 0.6515625013541666,
+          "y" : 0.56944444467592592
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Test the bright-pour proposition",
+          "width" : 0.20468749999999999,
+          "x" : 0.078124999433593773,
+          "y" : 0.49722222184027776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Measure trial and repeat",
+          "width" : 0.15625000000000003,
+          "x" : 0.079687501124999977,
+          "y" : 0.42499999972222235
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019868015580707166,
+          "text" : "CHOICE TEST",
+          "width" : 0.051612514257430964,
+          "x" : 0.52341249263741763,
+          "y" : 0.43589932540821141
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Required before selection",
+          "width" : 0.12968749999999996,
+          "x" : 0.6484374983789063,
+          "y" : 0.43333333322916667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "The territory remains a hypothesis until customer choice and repeat evidence support it.",
+          "width" : 0.52968749999999998,
+          "x" : 0.22656249470312506,
+          "y" : 0.27499999988888879
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "COmmEnCIAL CONSEQUENCE",
+          "width" : 0.10624999999999998,
+          "x" : 0.059375000156249989,
+          "y" : 0.16666666678947029
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Founder conviction can frame a hypothesis. Customer choice data must decide whether the advantage is real.",
+          "width" : 0.66666665077209464,
+          "x" : 0.21666668572506326,
+          "y" : 0.15555555504289409
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C2",
+          "width" : 0.078124999999999986,
+          "x" : 0.059375000781249979,
+          "y" : 0.077777777453703623
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017599756187862803,
+          "text" : "NARRATIVE",
+          "width" : 0.045418176054954532,
+          "x" : 0.05932216251754889,
+          "y" : 0.027311233306213767
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "11\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER 3ГТHЕ ADVANTAGE\nThe advantage needs proof\nBRAND ASSET\nA distinctive bottle illustration\nEVIDENCE TO COLLECT\nCUSTOMER EVIDENCE REQUIRED\nMap real social pauses\nCUSTOMER DATA\nNot yet supplied\nTest the bright-pour proposition\nMeasure trial and repeat\nCHOICE TEST\nRequired before selection\nThe territory remains a hypothesis until customer choice and repeat evidence support it.\nCOmmEnCIAL CONSEQUENCE\nFounder conviction can frame a hypothesis. Customer choice data must decide whether the advantage is real.\nSOURCES: A5, C2\nNARRATIVE\nASSUMPTION\n11\/21"
+    },
+    {
+      "file" : "slide-12.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.050150540139940025,
+          "text" : "The Strategy",
+          "width" : 0.15028289556503294,
+          "x" : 0.059233553412894671,
+          "y" : 0.83464695041080117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000133,
+          "text" : "1",
+          "width" : 0.0093749999999999944,
+          "x" : 0.081249999921874996,
+          "y" : 0.64722222253472217
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "TENSION",
+          "width" : 0.037499999999999992,
+          "x" : 0.08124999992187501,
+          "y" : 0.59166666669560186
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "A memorable bottle without",
+          "width" : 0.20937500000000003,
+          "x" : 0.08124999946875,
+          "y" : 0.50833333363888888
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "a proven buying occasion",
+          "width" : 0.19374999999999998,
+          "x" : 0.081250001383928572,
+          "y" : 0.47222222236111111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "2",
+          "width" : 0.0078125,
+          "x" : 0.387499999921875,
+          "y" : 0.65000000019444437
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "SHIFT",
+          "width" : 0.025000000000000022,
+          "x" : 0.38593750031249996,
+          "y" : 0.59166666677083335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "Make the LOA pour the",
+          "width" : 0.17343749999999997,
+          "x" : 0.38593750173437497,
+          "y" : 0.50555555569444444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "recognisable ritual",
+          "width" : 0.14375000000000004,
+          "x" : 0.38437499856250001,
+          "y" : 0.47222222208333342
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.019444444444444486,
+          "text" : "3",
+          "width" : 0.0093750000000000222,
+          "x" : 0.69062499992187509,
+          "y" : 0.65000000024305549
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "RESOLUTION",
+          "width" : 0.0546875,
+          "x" : 0.69062500068359367,
+          "y" : 0.59166666677083335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Link concentrated trial to",
+          "width" : 0.18749999999999989,
+          "x" : 0.690624998125,
+          "y" : 0.50833333322222218
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "measured repeat before",
+          "width" : 0.18125000000000002,
+          "x" : 0.68906249773437511,
+          "y" : 0.47222222218749987
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "reach",
+          "width" : 0.043749999999999956,
+          "x" : 0.69062500027343754,
+          "y" : 0.44444444456597221
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "Give LOA one social job, then make the pour earn",
+          "width" : 0.53437500000000004,
+          "x" : 0.23281249996093756,
+          "y" : 0.26388888833333335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "the next purchase.",
+          "width" : 0.20312500000000006,
+          "x" : 0.39843750203125,
+          "y" : 0.21944444444444444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Give LOA one ownable social job, make the bright-pour ritual unmistakable, then connect selective trial to",
+          "width" : 0.6328125,
+          "x" : 0.22031249607812509,
+          "y" : 0.1583333336388888
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "measured repeat before buying reach.",
+          "width" : 0.23125000000000007,
+          "x" : 0.22031250289062493,
+          "y" : 0.1333333333333333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2",
+          "width" : 0.203125,
+          "x" : 0.059374997460937551,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "12\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "The Strategy\n1\nTENSION\nA memorable bottle without\na proven buying occasion\n2\nSHIFT\nMake the LOA pour the\nrecognisable ritual\n3\nRESOLUTION\nLink concentrated trial to\nmeasured repeat before\nreach\nGive LOA one social job, then make the pour earn\nthe next purchase.\nGive LOA one ownable social job, make the bright-pour ritual unmistakable, then connect selective trial to\nmeasured repeat before buying reach.\nSOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2\nNARRATIVE\nASSUMPTION\n12\/21"
+    },
+    {
+      "file" : "slide-13.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER&\/THE STRATEGYI",
+          "width" : 0.1015625,
+          "x" : 0.059375002304687376,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.050000000000000044,
+          "text" : "Three moves, three tests",
+          "width" : 0.28750000000000003,
+          "x" : 0.059375000260416665,
+          "y" : 0.83333333291666667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "01 \/ OWN THE BRIGHTER PAUSE",
+          "width" : 0.16250000000000001,
+          "x" : 0.07656249796875006,
+          "y" : 0.70277777763888893
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "02 \/ MAKE THE POUR THE PROOF",
+          "width" : 0.17031250000000003,
+          "x" : 0.3812500021289062,
+          "y" : 0.70277777791666662
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "03 \/ TURN TRIAL INTO REPEAT",
+          "width" : 0.15312499999999984,
+          "x" : 0.68593749808593762,
+          "y" : 0.70277777763888893
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ROLE",
+          "width" : 0.018750000000000003,
+          "x" : 0.076562500104166667,
+          "y" : 0.64166666689814811
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Qualified demand and conversion",
+          "width" : 0.12812499999999999,
+          "x" : 0.13437500160156246,
+          "y" : 0.64444444454861105
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Comprehension, trial and memorability",
+          "width" : 0.14687499999999998,
+          "x" : 0.43906250146874992,
+          "y" : 0.64166666677777773
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TENSION",
+          "width" : 0.028125000000000011,
+          "x" : 0.074999999531250014,
+          "y" : 0.58333333319444447
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROOF",
+          "width" : 0.021874999999999992,
+          "x" : 0.076562499927884622,
+          "y" : 0.52500000005341874
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSET",
+          "width" : 0.021874999999999992,
+          "x" : 0.076562500156250005,
+          "y" : 0.46666666689814817
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "A sharper occasion excludes generic",
+          "width" : 0.13750000000000001,
+          "x" : 0.13437500137499997,
+          "y" : 0.5805555556944445
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "refreshment traffic and must earn",
+          "width" : 0.12499999999999997,
+          "x" : 0.13437500156249996,
+          "y" : 0.56666666677083333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "credibility.",
+          "width" : 0.042187499999999989,
+          "x" : 0.13281250052734372,
+          "y" : 0.54722222232638895
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.041666666666666741,
+          "text" : "Courted proposionason research and",
+          "width" : 0.16249999999999998,
+          "x" : 0.13124999837500001,
+          "y" : 0.50555555558333332
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Strategy Director",
+          "width" : 0.068749999999999978,
+          "x" : 0.13281250085937499,
+          "y" : 0.4638888890277777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "PROOF",
+          "width" : 0.021874999999999978,
+          "x" : 0.38124999973958335,
+          "y" : 0.52500000023148141
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Product-centred work will reveal any",
+          "width" : 0.13749999999999996,
+          "x" : 0.43906250137500002,
+          "y" : 0.58333333344444438
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "weakness in taste, pack, serve or",
+          "width" : 0.12500000000000006,
+          "x" : 0.43906250156249998,
+          "y" : 0.56666666680555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "avallability.",
+          "width" : 0.04531249701976775,
+          "x" : 0.4375000007349078,
+          "y" : 0.54999999981481484
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Creative recognition, comprehension and",
+          "width" : 0.15625,
+          "x" : 0.4390624984375,
+          "y" : 0.5249999998888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "qualified sample-to-site test",
+          "width" : 0.10624999999999996,
+          "x" : 0.43906250177083328,
+          "y" : 0.5083333335185185
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Creative Director",
+          "width" : 0.064062500000000022,
+          "x" : 0.43906249914062501,
+          "y" : 0.46666666638888887
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ROLE",
+          "width" : 0.018749999999999933,
+          "x" : 0.68593750010416665,
+          "y" : 0.64166666689814811
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "TENSION",
+          "width" : 0.029687499999999978,
+          "x" : 0.68437500049479161,
+          "y" : 0.58333333347222216
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROOF",
+          "width" : 0.021874999999999978,
+          "x" : 0.68593749992788466,
+          "y" : 0.52500000005341874
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSET",
+          "width" : 0.021874999999999978,
+          "x" : 0.68593750015624999,
+          "y" : 0.46666666689814817
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Repeat and distribution productivity",
+          "width" : 0.13593750000000004,
+          "x" : 0.74375000169921868,
+          "y" : 0.64166666680555551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Geographic focus slows broad awareness",
+          "width" : 0.15781250000000002,
+          "x" : 0.74375000197265617,
+          "y" : 0.58055555569444439
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "while protecting cash and learning quality.",
+          "width" : 0.15781249999999991,
+          "x" : 0.74375000131510416,
+          "y" : 0.56388888898148148
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "selery cohort test of repeat and retaller",
+          "width" : 0.15781250000000002,
+          "x" : 0.74218750157812496,
+          "y" : 0.50555555583333334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Growth Strategy Director",
+          "width" : 0.095312494039535678,
+          "x" : 0.7437500024333572,
+          "y" : 0.46666666699074077
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "VERBAL ASSETS",
+          "width" : 0.054687500000000007,
+          "x" : 0.060937499316406261,
+          "y" : 0.35277777763888885
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Specific promise • Visible proof",
+          "width" : 0.12968750000000001,
+          "x" : 0.062500001621093704,
+          "y" : 0.31388888906250001
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TONE + MOTION",
+          "width" : 0.053125000000000033,
+          "x" : 0.36562500088541661,
+          "y" : 0.35277777791666665
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Direct • Useful",
+          "width" : 0.060937499999999978,
+          "x" : 0.36562500076171872,
+          "y" : 0.31666666680555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "RECURRING FORMATS",
+          "width" : 0.073437500000000044,
+          "x" : 0.67031249908203128,
+          "y" : 0.35277777767361107
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Claim and proof • Test and result",
+          "width" : 0.13437500000000002,
+          "x" : 0.67187499937500006,
+          "y" : 0.31388888856481478
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "The strategy connects each recommendation to a measurable commercial lever.",
+          "width" : 0.47968749999999993,
+          "x" : 0.22031250479687489,
+          "y" : 0.15833333338888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2",
+          "width" : 0.203125,
+          "x" : 0.059374997460937551,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "13\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER&\/THE STRATEGYI\nThree moves, three tests\n01 \/ OWN THE BRIGHTER PAUSE\n02 \/ MAKE THE POUR THE PROOF\n03 \/ TURN TRIAL INTO REPEAT\nROLE\nQualified demand and conversion\nComprehension, trial and memorability\nTENSION\nPROOF\nASSET\nA sharper occasion excludes generic\nrefreshment traffic and must earn\ncredibility.\nCourted proposionason research and\nStrategy Director\nPROOF\nProduct-centred work will reveal any\nweakness in taste, pack, serve or\navallability.\nCreative recognition, comprehension and\nqualified sample-to-site test\nCreative Director\nROLE\nTENSION\nPROOF\nASSET\nRepeat and distribution productivity\nGeographic focus slows broad awareness\nwhile protecting cash and learning quality.\nselery cohort test of repeat and retaller\nGrowth Strategy Director\nVERBAL ASSETS\nSpecific promise • Visible proof\nTONE + MOTION\nDirect • Useful\nRECURRING FORMATS\nClaim and proof • Test and result\nCOMMERCIAL CONSEQUENCE\nThe strategy connects each recommendation to a measurable commercial lever.\nSOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2\nASSUMPTION\nNARRATIVE\n13\/21"
+    },
+    {
+      "file" : "slide-14.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Creative Future",
+          "width" : 0.22968749999999999,
+          "x" : 0.059375001148437481,
+          "y" : 0.84444444455555556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "01",
+          "width" : 0.01249999925494194,
+          "x" : 0.54531250021627908,
+          "y" : 0.70555555583333329
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "POUR BRIGHTER",
+          "width" : 0.22343750000000001,
+          "x" : 0.065625001117187498,
+          "y" : 0.65833333347222223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027225412262810611,
+          "text" : "meets",
+          "width" : 0.045685222744941717,
+          "x" : 0.063876138795436271,
+          "y" : 0.57666507190475391
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.04166666666666663,
+          "text" : "MAKE THE PAUSE MATTER",
+          "width" : 0.35468750000000004,
+          "x" : 0.064062502216796838,
+          "y" : 0.48888888904513883
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "02",
+          "width" : 0.014062499999999978,
+          "x" : 0.5437500001367187,
+          "y" : 0.5555555553125
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "03",
+          "width" : 0.012499999999999956,
+          "x" : 0.54531249984375008,
+          "y" : 0.41388888878472219
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "PRODUCT FIRST",
+          "width" : 0.065624999999999933,
+          "x" : 0.59687499992187498,
+          "y" : 0.7083333333498677
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Bottle, opening and pour are the",
+          "width" : 0.22968750000000004,
+          "x" : 0.59687500164062501,
+          "y" : 0.64722222236111104
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.028152881728278234,
+          "text" : "mnemonic",
+          "width" : 0.076605284214019798,
+          "x" : 0.59529110734636337,
+          "y" : 0.61925689230778458
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016969262229071802,
+          "text" : "APPETITE",
+          "width" : 0.040663942694664001,
+          "x" : 0.59685552933018204,
+          "y" : 0.55818203573226866
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037037036154005332,
+          "text" : "Food, glass, bubbles and condensation",
+          "width" : 0.28749999999999987,
+          "x" : 0.59166666576388893,
+          "y" : 0.50370370476250348
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.028828995757632758,
+          "text" : "stay tactile",
+          "width" : 0.079801326990127652,
+          "x" : 0.59525558584031191,
+          "y" : 0.47169661243990235
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "ORDINARY TO VIVID",
+          "width" : 0.079687500000000022,
+          "x" : 0.59687499971354163,
+          "y" : 0.41388888861111106
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Colour arrives through the serve, not",
+          "width" : 0.27083332538604743,
+          "x" : 0.59583334182086511,
+          "y" : 0.35555555504289404
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.028114035394456671,
+          "text" : "visual noise",
+          "width" : 0.089095491170883223,
+          "x" : 0.59529600530504856,
+          "y" : 0.32760964908391244
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "A Brighter Pour: Turn the small social pause into something vivid: an unmistakable LOA pour, served with food,",
+          "width" : 0.66875000000000018,
+          "x" : 0.22031249164062522,
+          "y" : 0.15833333326388899
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "colour and a little ceremony.",
+          "width" : 0.17343750000000002,
+          "x" : 0.22031249826562505,
+          "y" : 0.13333333319444429
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C1, C2",
+          "width" : 0.092187500000000006,
+          "x" : 0.059375000839843727,
+          "y" : 0.077777777534722259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999999,
+          "x" : 0.059375000566406232,
+          "y" : 0.027777777881944465
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.11093749999999991,
+          "x" : 0.75312500184895836,
+          "y" : 0.080555555740740692
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "14\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "The Creative Future\n01\nPOUR BRIGHTER\nmeets\nMAKE THE PAUSE MATTER\n02\n03\nPRODUCT FIRST\nBottle, opening and pour are the\nmnemonic\nAPPETITE\nFood, glass, bubbles and condensation\nstay tactile\nORDINARY TO VIVID\nColour arrives through the serve, not\nvisual noise\nA Brighter Pour: Turn the small social pause into something vivid: an unmistakable LOA pour, served with food,\ncolour and a little ceremony.\nSOURCES: A5, C1, C2\nNARRATIVE\nCREATIVE ILLUSTRATION\n14\/21"
+    },
+    {
+      "file" : "slide-15.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "CHAPTER 5\/ THE CREATIVE FUTURE",
+          "width" : 0.12968750000000001,
+          "x" : 0.059375001953124951,
+          "y" : 0.93055555578703708
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The campaign behaviour",
+          "width" : 0.2890625,
+          "x" : 0.059375001605902741,
+          "y" : 0.83888888904320991
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "A six-second film opens on the flat hum of a convenience-store cooler. A coral LOA bottle is lifted, opened and poured beside a late lunch; the scene",
+          "width" : 0.82968750000000002,
+          "x" : 0.070312508296874923,
+          "y" : 0.73611111127777773
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "warms as the bubbles rise.",
+          "width" : 0.15312499999999998,
+          "x" : 0.068749998085937541,
+          "y" : 0.71388888878472223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "01",
+          "width" : 0.015625,
+          "x" : 0.08593750013020833,
+          "y" : 0.61388888902777772
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "02",
+          "width" : 0.015625000000000056,
+          "x" : 0.39062500013020834,
+          "y" : 0.5888888890277777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "03",
+          "width" : 0.014062499999999978,
+          "x" : 0.6968750001757813,
+          "y" : 0.5694444445486111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333215,
+          "text" : "PRODUCT FIRST",
+          "width" : 0.16250000000000001,
+          "x" : 0.087499998645833355,
+          "y" : 0.53055555541666677
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Bottle, opening and pour are the",
+          "width" : 0.16875000000000001,
+          "x" : 0.089062502109374941,
+          "y" : 0.46666666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "mnemonic",
+          "width" : 0.057812500000000017,
+          "x" : 0.087500000578124987,
+          "y" : 0.44166666680555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.034482709566752145,
+          "text" : "APPETITE",
+          "width" : 0.098558598756790128,
+          "x" : 0.39212695000587044,
+          "y" : 0.50498086730714831
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Food, glass, bubbles and",
+          "width" : 0.13125000000000003,
+          "x" : 0.39374999950000006,
+          "y" : 0.44166666644444452
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "condensation stay tactile",
+          "width" : 0.12968750000000007,
+          "x" : 0.39375000162109364,
+          "y" : 0.41666666680555553
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "ORDINARY TO VIVID",
+          "width" : 0.1953125,
+          "x" : 0.69687500073437503,
+          "y" : 0.47777777741666672
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Colour arrives through the serve, not",
+          "width" : 0.19218749999999996,
+          "x" : 0.69843750192187493,
+          "y" : 0.41666666683333331
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022955081197950644,
+          "text" : "visual noise",
+          "width" : 0.065702271461486772,
+          "x" : 0.69527386356712761,
+          "y" : 0.39130023746443154
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Turn the small social pause into something vivid: an unmistakable LOA pour, served with food, colour and a little",
+          "width" : 0.67500000000000004,
+          "x" : 0.22031250562499985,
+          "y" : 0.15833333347222234
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.026372003555297896,
+          "text" : "ceremony.",
+          "width" : 0.065786033868789673,
+          "x" : 0.22023198331393196,
+          "y" : 0.13264733181090027
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C1, C2",
+          "width" : 0.092187500000000006,
+          "x" : 0.059375000839843727,
+          "y" : 0.077777777534722259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.109375,
+          "x" : 0.75312499998046878,
+          "y" : 0.080555555576388937
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "15\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER 5\/ THE CREATIVE FUTURE\nThe campaign behaviour\nA six-second film opens on the flat hum of a convenience-store cooler. A coral LOA bottle is lifted, opened and poured beside a late lunch; the scene\nwarms as the bubbles rise.\n01\n02\n03\nPRODUCT FIRST\nBottle, opening and pour are the\nmnemonic\nAPPETITE\nFood, glass, bubbles and\ncondensation stay tactile\nORDINARY TO VIVID\nColour arrives through the serve, not\nvisual noise\nTurn the small social pause into something vivid: an unmistakable LOA pour, served with food, colour and a little\nceremony.\nSOURCES: A5, C1, C2\nNARRATIVE\nCREATIVE ILLUSTRATION\n15\/21"
+    },
+    {
+      "file" : "slide-16.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER 6\/THE GROWTH ENGINE",
+          "width" : 0.12343748807907104,
+          "x" : 0.059375008890151813,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The Growth Engine",
+          "width" : 0.22499999999999998,
+          "x" : 0.059375001071428568,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "Selective wholesale",
+          "width" : 0.07343749403953552,
+          "x" : 0.073437501222419807,
+          "y" : 0.73055555543275197
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Sampling and partnerships",
+          "width" : 0.10468749999999999,
+          "x" : 0.073437501744791606,
+          "y" : 0.63055555564814814
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Owned DTC and CRM",
+          "width" : 0.082812499999999997,
+          "x" : 0.073437498619791694,
+          "y" : 0.5361111110185186
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Place LOA inside the target occasion and observe",
+          "width" : 0.35468750000000004,
+          "x" : 0.26093749754687501,
+          "y" : 0.71388888919444438
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.032249723540412112,
+          "text" : "sell-through",
+          "width" : 0.087682187557220459,
+          "x" : 0.26084640679583398,
+          "y" : 0.67970847131961742
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "Create qualified first taste around food, design and",
+          "width" : 0.36249999999999999,
+          "x" : 0.26093750362499996,
+          "y" : 0.61666666686111116
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025918157895406191,
+          "text" : "culture",
+          "width" : 0.051700955629348788,
+          "x" : 0.26086827185154798,
+          "y" : 0.59120758802552742
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777901,
+          "text" : "Convert mixed-case trial into measured replenishment",
+          "width" : 0.38750000000000001,
+          "x" : 0.26093750387499998,
+          "y" : 0.52500000016666659
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Stockist economics, weekly",
+          "width" : 0.11562499999999998,
+          "x" : 0.78437500144531247,
+          "y" : 0.72500000010416665
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "sell-through and reorder",
+          "width" : 0.1015625,
+          "x" : 0.79843749981770828,
+          "y" : 0.7055555552777778
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Permission, sample-to-site capture,",
+          "width" : 0.1484375,
+          "x" : 0.75156249752604176,
+          "y" : 0.62777777782407407
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "cost and product feedback",
+          "width" : 0.11406250000000007,
+          "x" : 0.78749999809895832,
+          "y" : 0.61111111097222226
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "et conversion, second purchas",
+          "width" : 0.125,
+          "x" : 0.76562500124999988,
+          "y" : 0.53055555566666668
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "ot-out and contributio",
+          "width" : 0.084374999999999978,
+          "x" : 0.80625000070312502,
+          "y" : 0.51666666678240747
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Paid social",
+          "width" : 0.04531249701976775,
+          "x" : 0.073437502245324429,
+          "y" : 0.44166666685185185
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Scale only the creative and occasions already linked",
+          "width" : 0.37187500000000007,
+          "x" : 0.26093749774999997,
+          "y" : 0.42777777747222223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.031908416748046786,
+          "text" : "to repeat",
+          "width" : 0.068936288356781006,
+          "x" : 0.25928185631967365,
+          "y" : 0.39654579194136608
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Incremental contribution after",
+          "width" : 0.125,
+          "x" : 0.77500000104166666,
+          "y" : 0.43888888900462963
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "production and media cost",
+          "width" : 0.11406249999999996,
+          "x" : 0.78593749857421891,
+          "y" : 0.41944444430555561
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Use one city and a small number of food-led occasions to connect observed trial, DTC capture, replenishment",
+          "width" : 0.65781250000000013,
+          "x" : 0.22031249177734394,
+          "y" : 0.15833333322916687
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "and retailer sell-through before any national awareness spend.",
+          "width" : 0.37656250000000002,
+          "x" : 0.22031249898437508,
+          "y" : 0.13055555522222229
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A6, A7, A8, A9",
+          "width" : 0.10937500000000001,
+          "x" : 0.059375001367187472,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "16\/21",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500048464135,
+          "y" : 0.02777777805555548
+        }
+      ],
+      "text" : "CHAPTER 6\/THE GROWTH ENGINE\nThe Growth Engine\nSelective wholesale\nSampling and partnerships\nOwned DTC and CRM\nPlace LOA inside the target occasion and observe\nsell-through\nCreate qualified first taste around food, design and\nculture\nConvert mixed-case trial into measured replenishment\nStockist economics, weekly\nsell-through and reorder\nPermission, sample-to-site capture,\ncost and product feedback\net conversion, second purchas\not-out and contributio\nPaid social\nScale only the creative and occasions already linked\nto repeat\nIncremental contribution after\nproduction and media cost\nUse one city and a small number of food-led occasions to connect observed trial, DTC capture, replenishment\nand retailer sell-through before any national awareness spend.\nSOURCES: A6, A7, A8, A9\nNARRATIVE\nASSUMPTION\n16\/21"
+    },
+    {
+      "file" : "slide-17.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "Measurement before scale",
+          "width" : 0.3046875,
+          "x" : 0.060937498095703146,
+          "y" : 0.84444444430555554
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016979112890031622,
+          "text" : "LEADING",
+          "width" : 0.040665197372436512,
+          "x" : 0.084354900897795293,
+          "y" : 0.67206599939152112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Brand attribution, occasion comprehension, qualified",
+          "width" : 0.39687497615814205,
+          "x" : 0.37500001624384549,
+          "y" : 0.67222222171296298
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "sample-to-site and retailer availability",
+          "width" : 0.28125,
+          "x" : 0.37343749718750008,
+          "y" : 0.63888888875000005
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "BEHAVIOURAL",
+          "width" : 0.065624999999999989,
+          "x" : 0.08437500082031249,
+          "y" : 0.51666666680555551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "Net conversion, mixed-case uptake, second purchase, retailer",
+          "width" : 0.46250000000000002,
+          "x" : 0.37343750462499992,
+          "y" : 0.51388888905555552
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "sell-through and reorder",
+          "width" : 0.18437500000000001,
+          "x" : 0.37343749978125002,
+          "y" : 0.4833333330277777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL",
+          "width" : 0.060937500000000006,
+          "x" : 0.084374998984375033,
+          "y" : 0.36111111092592585
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Contribution after product, fulfilment, sampling, production, media",
+          "width" : 0.49531249999999988,
+          "x" : 0.37343749587239589,
+          "y" : 0.36111111099537041
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "and distribution",
+          "width" : 0.12031249999999999,
+          "x" : 0.37343750085937499,
+          "y" : 0.33055555567460315
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Leading indicators must move before the plan releases larger media or inventory commitments.",
+          "width" : 0.57343750000000004,
+          "x" : 0.22031250573437494,
+          "y" : 0.15833333338888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A6, A7, A8, A9",
+          "width" : 0.10937500000000001,
+          "x" : 0.059374998632812523,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "17\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "Measurement before scale\nLEADING\nBrand attribution, occasion comprehension, qualified\nsample-to-site and retailer availability\nBEHAVIOURAL\nNet conversion, mixed-case uptake, second purchase, retailer\nsell-through and reorder\nCOMMERCIAL\nContribution after product, fulfilment, sampling, production, media\nand distribution\nLeading indicators must move before the plan releases larger media or inventory commitments.\nSOURCES: A6, A7, A8, A9\nNARRATIVE\nASSUMPTION\n17\/21"
+    },
+    {
+      "file" : "slide-18.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Next 12 Months",
+          "width" : 0.23125000000000001,
+          "x" : 0.059375001156249982,
+          "y" : 0.84444444455555556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Months 1-3",
+          "width" : 0.043749999999999997,
+          "x" : 0.081249999453125013,
+          "y" : 0.66666666656250007
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Months 4-6",
+          "width" : 0.043750000000000011,
+          "x" : 0.38281249927083338,
+          "y" : 0.66666666652777784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017133947213490819,
+          "text" : "Months 7-9",
+          "width" : 0.043805569410324097,
+          "x" : 0.68434721474844251,
+          "y" : 0.66365524847074564
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333215,
+          "text" : "Establish the truth",
+          "width" : 0.17499999999999999,
+          "x" : 0.081249998749999983,
+          "y" : 0.56666666650793651
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Verify unit economics, formulation",
+          "width" : 0.20312499999999994,
+          "x" : 0.079687497460937548,
+          "y" : 0.44722222215277774
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "and availability; interview founder,",
+          "width" : 0.20156250000000001,
+          "x" : 0.081250001679687461,
+          "y" : 0.41666666668981478
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "customers and trade; test three",
+          "width" : 0.18593750000000001,
+          "x" : 0.081250001549479117,
+          "y" : 0.39166666678240747
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "occasion propositions.",
+          "width" : 0.13437499999999999,
+          "x" : 0.081250001679687461,
+          "y" : 0.3611111111805555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111205,
+          "text" : "Prove the brighter",
+          "width" : 0.17031250000000003,
+          "x" : 0.38281249829687508,
+          "y" : 0.56111111102777778
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "pour",
+          "width" : 0.045312500000000033,
+          "x" : 0.38281249976562498,
+          "y" : 0.51944444413888891
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Run controlled creative, sampling,",
+          "width" : 0.20156249999999998,
+          "x" : 0.38437500251953116,
+          "y" : 0.44999999999999996
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "DTC capture and one-city",
+          "width" : 0.15468749999999998,
+          "x" : 0.38281249885937507,
+          "y" : 0.4194444447222222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "wholesale tests using approved",
+          "width" : 0.18749998807907103,
+          "x" : 0.38281250283546459,
+          "y" : 0.39166666652777782
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "claims and assets.",
+          "width" : 0.11093749999999997,
+          "x" : 0.38437499900390631,
+          "y" : 0.36666666694444439
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111205,
+          "text" : "Build the repeat",
+          "width" : 0.14999999999999991,
+          "x" : 0.68437500084375003,
+          "y" : 0.56111111074999998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111110983,
+          "text" : "system",
+          "width" : 0.0703125,
+          "x" : 0.68437499983258931,
+          "y" : 0.51944444418650804
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Codify winning serve, content,",
+          "width" : 0.17812499999999998,
+          "x" : 0.68593749781250002,
+          "y" : 0.45000000031249998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "CRM, replenishment and retailer",
+          "width" : 0.1953125,
+          "x" : 0.6843749984570312,
+          "y" : 0.41666666628472226
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222221559948352,
+          "text" : "reorder mechanics.",
+          "width" : 0.1171875,
+          "x" : 0.68437500122395833,
+          "y" : 0.39444444481481489
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781250000000001,
+          "x" : 0.059374999973958342,
+          "y" : 0.16388888916666655
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+          "width" : 0.61250000000000004,
+          "x" : 0.22187500612499989,
+          "y" : 0.15833333338888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2, E3",
+          "width" : 0.21718749999999998,
+          "x" : 0.059374997285156314,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "18\/21",
+          "width" : 0.021874999999999978,
+          "x" : 0.91718749972656255,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "The Next 12 Months\nMonths 1-3\nMonths 4-6\nMonths 7-9\nEstablish the truth\nVerify unit economics, formulation\nand availability; interview founder,\ncustomers and trade; test three\noccasion propositions.\nProve the brighter\npour\nRun controlled creative, sampling,\nDTC capture and one-city\nwholesale tests using approved\nclaims and assets.\nBuild the repeat\nsystem\nCodify winning serve, content,\nCRM, replenishment and retailer\nreorder mechanics.\nCOMMERCIAL CONSEQUENCE\nA staged validation programme protects cash while the business replaces assumptions with evidence.\nSOURCES: A4, A5, A6, A7, A8, A9, C1, C2, E1, E2, E3\nNARRATIVE\nASSUMPTION\n18\/21"
+    },
+    {
+      "file" : "slide-19.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "GOVERNANCE \/EVIDENCE",
+          "width" : 0.093749994039535517,
+          "x" : 0.059375005089607136,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "Evidence and assumptions ledger (1 of 2)",
+          "width" : 0.47968750000000004,
+          "x" : 0.0609374973350695,
+          "y" : 0.83888888879629631
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ID",
+          "width" : 0.01249999925494194,
+          "x" : 0.059375000580862355,
+          "y" : 0.71944444458333334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Class",
+          "width" : 0.026562499999999989,
+          "x" : 0.10625000033203125,
+          "y" : 0.71944444454861112
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.011111111111111183,
+          "text" : "E1",
+          "width" : 0.010937500000000003,
+          "x" : 0.059374999921875005,
+          "y" : 0.66944444452380947
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "VERIFIED EXTERNAL",
+          "width" : 0.073437500000000003,
+          "x" : 0.10468750073437498,
+          "y" : 0.66666666677777786
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.013888888888888951,
+          "text" : "E2",
+          "width" : 0.01249999925494194,
+          "x" : 0.059375000580862355,
+          "y" : 0.61388888902777772
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "VERIFIED EXTERNAL",
+          "width" : 0.076562499999999992,
+          "x" : 0.10312499971354168,
+          "y" : 0.61388888916666673
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.01388888888888884,
+          "text" : "E3",
+          "width" : 0.010937500000000003,
+          "x" : 0.059374999921875005,
+          "y" : 0.56111111121031743
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "VERIFIED EXTERNAL",
+          "width" : 0.073437500000000003,
+          "x" : 0.10468750073437498,
+          "y" : 0.56111111122222224
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.01388888888888884,
+          "text" : "A1",
+          "width" : 0.012500000000000004,
+          "x" : 0.059375000156249989,
+          "y" : 0.50833333343749998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSUMPTION",
+          "width" : 0.049999999999999989,
+          "x" : 0.10468750062499999,
+          "y" : 0.50833333343749998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Claim in this Blueprint",
+          "width" : 0.1015625,
+          "x" : 0.21874999898437503,
+          "y" : 0.71666666655555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "The UK government announced that the lower Soft Drinks Industry Levy sugar threshold will reduce from 5g",
+          "width" : 0.3359375,
+          "x" : 0.21874999580078133,
+          "y" : 0.66666666652777784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "to 4.5g per 100ml from January 2028.",
+          "width" : 0.11875000000000002,
+          "x" : 0.21875000197916661,
+          "y" : 0.65277777787037039
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "2015 and 202oment reported a 46% average reduction in sugar content in in-scope sot drinks between",
+          "width" : 0.32499999999999996,
+          "x" : 0.21718750324999991,
+          "y" : 0.59722222244444445
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111110983,
+          "text" : "Toe artin of Drinks Asociation's 2025 annual report states that more than seven in ten UK soft drinks.",
+          "width" : 0.33124999999999999,
+          "x" : 0.21718750331249997,
+          "y" : 0.54166666691666676
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "LOA receives 180,000 ecommerce sessions per year.",
+          "width" : 0.17031250000000001,
+          "x" : 0.21718750283854157,
+          "y" : 0.50555555564814814
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444597,
+          "text" : "What would verify it",
+          "width" : 0.090624999999999956,
+          "x" : 0.57031250093750008,
+          "y" : 0.71666666690972214
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Confirm the final legislation and verify LOA recipes independently before making any formulation claim.",
+          "width" : 0.3203125,
+          "x" : 0.57031250400390621,
+          "y" : 0.66666666673611108
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Use the latest official category data and obtain product-level evidence before commercial use.",
+          "width" : 0.29374999999999996,
+          "x" : 0.56875000367187489,
+          "y" : 0.61111111124999995
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Recheck the original report and triangulate with independent retail and customer evidence.",
+          "width" : 0.28281250000000002,
+          "x" : 0.57031250471354156,
+          "y" : 0.55833333342592595
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Reconcile an authorised GA4 export to ecommerce sessions and orders.",
+          "width" : 0.22812500000000002,
+          "x" : 0.56874999619791677,
+          "y" : 0.50555555546296294
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "A2",
+          "width" : 0.012500000000000004,
+          "x" : 0.059375000156249989,
+          "y" : 0.4527777778819444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017977825800577718,
+          "text" : "ASSUMPTION",
+          "width" : 0.050133025646209708,
+          "x" : 0.1046209863421141,
+          "y" : 0.45212219804754017
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "LOA converts 1.8% of ecommerce sessions to orders.",
+          "width" : 0.17031250000000003,
+          "x" : 0.2171875021289062,
+          "y" : 0.4527777778819444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Agree the denominator and reconcile sessions to completed non-refunded orders.",
+          "width" : 0.2578125,
+          "x" : 0.56875000429687483,
+          "y" : 0.45277777782407402
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.01388888888888884,
+          "text" : "A3",
+          "width" : 0.01249999925494194,
+          "x" : 0.059375000580862355,
+          "y" : 0.39722222236111115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016920651329888181,
+          "text" : "ASSUMPTION",
+          "width" : 0.050026589632034296,
+          "x" : 0.10467420435035527,
+          "y" : 0.39709522970966127
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "LOA has a 232 average ecommerce order value before returns, discounts and VAT treatment.",
+          "width" : 0.29374999999999996,
+          "x" : 0.21718750367187489,
+          "y" : 0.39722222236111115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Calculate realised order value from an authorised transaction export.",
+          "width" : 0.21562499999999996,
+          "x" : 0.5687499965104168,
+          "y" : 0.39722222249999994
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "A4",
+          "width" : 0.01249999925494194,
+          "x" : 0.059375000372529033,
+          "y" : 0.34166666638888887
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017663082811567477,
+          "text" : "ASSUMPTION",
+          "width" : 0.050102055072784424,
+          "x" : 0.10463647162915804,
+          "y" : 0.34394623620344489
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.016666666666666607,
+          "text" : "A5",
+          "width" : 0.010937499999999996,
+          "x" : 0.059375000130208334,
+          "y" : 0.28888888861111106
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017177359263102265,
+          "text" : "ASSUMPTION",
+          "width" : 0.050053066015243536,
+          "x" : 0.1046609677745135,
+          "y" : 0.28863354232088179
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "DA's principal growth constraint is an attractive visual identity without a sufficiently specific occasic",
+          "width" : 0.30312499999999998,
+          "x" : 0.2250000037890624,
+          "y" : 0.34166666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "oposition or trial-to-repeat syster",
+          "width" : 0.099999994039535495,
+          "x" : 0.22500000464689887,
+          "y" : 0.33055555560185179
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "For social pauild an advantage by pairing its distinctive bottle with a clear role as the bright adult soft dink",
+          "width" : 0.33124999999999993,
+          "x" : 0.2171875041406249,
+          "y" : 0.27500000027777771
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Run founder interviews, occasion research, proposition testing and a controlled conversion test.",
+          "width" : 0.29843750000000013,
+          "x" : 0.5703125037304686,
+          "y" : 0.34166666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Test the territory against category alternatives with target customers and trade buyers.",
+          "width" : 0.26875000000000004,
+          "x" : 0.57031250447916648,
+          "y" : 0.28888888898148146
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "No verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.",
+          "width" : 0.56093749999999987,
+          "x" : 0.059375005609374878,
+          "y" : 0.21111111124999993
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: E1, E2, E3, A1, A2, A3, A4, A5",
+          "width" : 0.17031250000000001,
+          "x" : 0.059374997871093793,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017953952153523689,
+          "text" : "NARRATIVE",
+          "width" : 0.045456758141517645,
+          "x" : 0.059302870361656976,
+          "y" : 0.027134134911595886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "EVIDENCE REGISTER",
+          "width" : 0.090624999999999956,
+          "x" : 0.77187500090625005,
+          "y" : 0.080555555666666723
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "19\/21",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "GOVERNANCE \/EVIDENCE\nEvidence and assumptions ledger (1 of 2)\nID\nClass\nE1\nVERIFIED EXTERNAL\nE2\nVERIFIED EXTERNAL\nE3\nVERIFIED EXTERNAL\nA1\nASSUMPTION\nClaim in this Blueprint\nThe UK government announced that the lower Soft Drinks Industry Levy sugar threshold will reduce from 5g\nto 4.5g per 100ml from January 2028.\n2015 and 202oment reported a 46% average reduction in sugar content in in-scope sot drinks between\nToe artin of Drinks Asociation's 2025 annual report states that more than seven in ten UK soft drinks.\nLOA receives 180,000 ecommerce sessions per year.\nWhat would verify it\nConfirm the final legislation and verify LOA recipes independently before making any formulation claim.\nUse the latest official category data and obtain product-level evidence before commercial use.\nRecheck the original report and triangulate with independent retail and customer evidence.\nReconcile an authorised GA4 export to ecommerce sessions and orders.\nA2\nASSUMPTION\nLOA converts 1.8% of ecommerce sessions to orders.\nAgree the denominator and reconcile sessions to completed non-refunded orders.\nA3\nASSUMPTION\nLOA has a 232 average ecommerce order value before returns, discounts and VAT treatment.\nCalculate realised order value from an authorised transaction export.\nA4\nASSUMPTION\nA5\nASSUMPTION\nDA's principal growth constraint is an attractive visual identity without a sufficiently specific occasic\noposition or trial-to-repeat syster\nFor social pauild an advantage by pairing its distinctive bottle with a clear role as the bright adult soft dink\nRun founder interviews, occasion research, proposition testing and a controlled conversion test.\nTest the territory against category alternatives with target customers and trade buyers.\nNo verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.\nSOURCES: E1, E2, E3, A1, A2, A3, A4, A5\nNARRATIVE\nEVIDENCE REGISTER\n19\/21"
+    },
+    {
+      "file" : "slide-20.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "GOVERNANCE \/EVIDENCE",
+          "width" : 0.093749994039535517,
+          "x" : 0.059375005089607136,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
+          "text" : "Evidence and assumptions ledger (2 of 2)",
+          "width" : 0.47968749999999999,
+          "x" : 0.06093750251562495,
+          "y" : 0.83611111063888888
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ID",
+          "width" : 0.01249999925494194,
+          "x" : 0.059375000580862355,
+          "y" : 0.71944444458333334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Class",
+          "width" : 0.026562499999999989,
+          "x" : 0.10625000033203125,
+          "y" : 0.71944444451388889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Claim in this Blueprint",
+          "width" : 0.1015625,
+          "x" : 0.2187499987304688,
+          "y" : 0.71666666659722222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "What would verify it",
+          "width" : 0.092187494039535522,
+          "x" : 0.56875000144377386,
+          "y" : 0.71388888888888891
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.013888888888888951,
+          "text" : "A6",
+          "width" : 0.012500000000000004,
+          "x" : 0.059375000156249989,
+          "y" : 0.65277777788194435
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ASSUMPTION",
+          "width" : 0.049999997019767747,
+          "x" : 0.10468750232344944,
+          "y" : 0.65277777791666658
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "A city-led sampling, selective wholesale, DTC replenishment and CRM growth engine is operationally",
+          "width" : 0.31718750000000001,
+          "x" : 0.21874999903645836,
+          "y" : 0.65000000032407401
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "feasible.",
+          "width" : 0.026562500000000017,
+          "x" : 0.21875000033203124,
+          "y" : 0.63888888899305551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Obtain contribution, capacity, distribution and cohort data before any activation.",
+          "width" : 0.24843749999999998,
+          "x" : 0.56874999585937513,
+          "y" : 0.65277777763888878
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444597,
+          "text" : "AT",
+          "width" : 0.014062500000000006,
+          "x" : 0.057812500046874993,
+          "y" : 0.57777777758333326
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.020475313398573114,
+          "text" : "ASSUMPTION",
+          "width" : 0.051682382822036743,
+          "x" : 0.10306505901937493,
+          "y" : 0.58004012118562376
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Incremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and",
+          "width" : 0.30312499999999998,
+          "x" : 0.21718750505208315,
+          "y" : 0.58055555574074069
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "incremental media costs.",
+          "width" : 0.079687499999999994,
+          "x" : 0.21718749867187501,
+          "y" : 0.56944444430555563
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Reconcile order-level net revenue and variable cost by product and channel.",
+          "width" : 0.23906249999999996,
+          "x" : 0.57031249760937508,
+          "y" : 0.58055555544444437
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "A8",
+          "width" : 0.014062499999999999,
+          "x" : 0.057812499921875003,
+          "y" : 0.51111111120370367
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.020047359996371861,
+          "text" : "ASSUMPTION",
+          "width" : 0.051633369922637937,
+          "x" : 0.10308956546793073,
+          "y" : 0.51080965345591345
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "LOA could realise 30% to 60% of annualised ecommerce scenario headroom during the first 12 months.",
+          "width" : 0.32656250000000003,
+          "x" : 0.21718750335937492,
+          "y" : 0.51111111078703697
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Build a monthly plan with test velocity, stock capacity and seasonality.",
+          "width" : 0.21875,
+          "x" : 0.5687499963541669,
+          "y" : 0.51111111101851847
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "A9",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999921875005,
+          "y" : 0.44444444453124998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017509851190778969,
+          "text" : "ASSUMPTION",
+          "width" : 0.050086754560470598,
+          "x" : 0.10464412209405113,
+          "y" : 0.44402285205405478
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "The first 12 months require 265,000 of incremental implementation investment beyond the £5,000 Growth",
+          "width" : 0.32968750000000008,
+          "x" : 0.21875000412109363,
+          "y" : 0.44166666677083333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Blueprint fee.",
+          "width" : 0.042187500000000017,
+          "x" : 0.21875000070312497,
+          "y" : 0.4277777778703703
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Obtain a costed activation plan before approval.",
+          "width" : 0.15000000000000002,
+          "x" : 0.57031250187499993,
+          "y" : 0.44444444461805566
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.013888888888888951,
+          "text" : "C1",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999921875005,
+          "y" : 0.37500000008680545
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.090624994039535514,
+          "x" : 0.10468750449064886,
+          "y" : 0.3750000000925926
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "A Brighter Pour is an illustrative campaign territory for fictional LOA.",
+          "width" : 0.21250000000000005,
+          "x" : 0.21718749645833343,
+          "y" : 0.37222222208333333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Check strategic fit, distinction, comprehension and legal availability.",
+          "width" : 0.21250000000000002,
+          "x" : 0.56874999645833346,
+          "y" : 0.37222222212962963
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.01388888888888884,
+          "text" : "C2",
+          "width" : 0.012500000000000004,
+          "x" : 0.059375000156249989,
+          "y" : 0.30555555565972214
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.089062500000000017,
+          "x" : 0.10468749888671877,
+          "y" : 0.30555555541666668
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "(laude existing LOA coral bottle hero and convenience-store film are reused as internal creative",
+          "width" : 0.30781249999999993,
+          "x" : 0.21718750384765614,
+          "y" : 0.29166666690972221
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Matt must confirm source provenance, usage rights, product accuracy and client-facing suitability.",
+          "width" : 0.30625000000000013,
+          "x" : 0.56875000382812491,
+          "y" : 0.3027777779166666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "No verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.",
+          "width" : 0.5625,
+          "x" : 0.059375009374999711,
+          "y" : 0.21111111115740744
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "SOURCES: A6, A7, A8, A9, C1, C2",
+          "width" : 0.14218750000000002,
+          "x" : 0.057812501184895823,
+          "y" : 0.075000000138888967
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "NARRATIVE",
+          "width" : 0.046875,
+          "x" : 0.057812499531250006,
+          "y" : 0.024999999861111122
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "EVIDENCE REGISTER",
+          "width" : 0.090624999999999956,
+          "x" : 0.77187500090625005,
+          "y" : 0.080555555666666723
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "20\/21",
+          "width" : 0.026562500000000044,
+          "x" : 0.91406249990234367,
+          "y" : 0.022222221944444565
+        }
+      ],
+      "text" : "GOVERNANCE \/EVIDENCE\nEvidence and assumptions ledger (2 of 2)\nID\nClass\nClaim in this Blueprint\nWhat would verify it\nA6\nASSUMPTION\nA city-led sampling, selective wholesale, DTC replenishment and CRM growth engine is operationally\nfeasible.\nObtain contribution, capacity, distribution and cohort data before any activation.\nAT\nASSUMPTION\nIncremental ecommerce revenue contributes 30% after product, fulfilment, payment, returns and\nincremental media costs.\nReconcile order-level net revenue and variable cost by product and channel.\nA8\nASSUMPTION\nLOA could realise 30% to 60% of annualised ecommerce scenario headroom during the first 12 months.\nBuild a monthly plan with test velocity, stock capacity and seasonality.\nA9\nASSUMPTION\nThe first 12 months require 265,000 of incremental implementation investment beyond the £5,000 Growth\nBlueprint fee.\nObtain a costed activation plan before approval.\nC1\nCREATIVE ILLUSTRATION\nA Brighter Pour is an illustrative campaign territory for fictional LOA.\nCheck strategic fit, distinction, comprehension and legal availability.\nC2\nCREATIVE ILLUSTRATION\n(laude existing LOA coral bottle hero and convenience-store film are reused as internal creative\nMatt must confirm source provenance, usage rights, product accuracy and client-facing suitability.\nNo verified client evidence appears in this fictional sample. Real external market context does not verify fictional company performance.\nSOURCES: A6, A7, A8, A9, C1, C2\nNARRATIVE\nEVIDENCE REGISTER\n20\/21"
+    },
+    {
+      "file" : "slide-21.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "DECISION \/ NEXT COMMITMENT",
+          "width" : 0.11249999999999999,
+          "x" : 0.059375000039062487,
+          "y" : 0.93055555572916671
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The founder decision",
+          "width" : 0.24843749999999998,
+          "x" : 0.059375002070312474,
+          "y" : 0.84444444453703704
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.094122356838650223,
+          "text" : "Fund proof,",
+          "width" : 0.24745435714721681,
+          "x" : 0.068460319965383196,
+          "y" : 0.61127215550061487
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.065537855360243036,
+          "text" : "not scale.",
+          "width" : 0.1845535337924957,
+          "x" : 0.065535730880225934,
+          "y" : 0.51306440352975957
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "Release investment only as evidence improves.",
+          "width" : 0.53281250000000002,
+          "x" : 0.067187503805803545,
+          "y" : 0.40833333337301592
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "IMMEDIATE NEXT STEP",
+          "width" : 0.092187500000000006,
+          "x" : 0.065624998847656268,
+          "y" : 0.27499999989583335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Verify the baseline, cost the 12-week proof phase and approve only the first decision gate.",
+          "width" : 0.63906249999999998,
+          "x" : 0.065625005325520736,
+          "y" : 0.20555555562500005
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: E1, E2, E3, A1, A2, A3, A4, A5, A6, A7, A8, A9, C1, C2",
+          "width" : 0.265625,
+          "x" : 0.05937500442708319,
+          "y" : 0.077777777916666735
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999999,
+          "x" : 0.059375000566406232,
+          "y" : 0.027777777881944465
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "HUMAN DECISION REQUIRED",
+          "width" : 0.125,
+          "x" : 0.73750000156249984,
+          "y" : 0.080555555694444392
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "21 \/ 21",
+          "width" : 0.021874999999999978,
+          "x" : 0.91718750007211547,
+          "y" : 0.027777777724358854
+        }
+      ],
+      "text" : "DECISION \/ NEXT COMMITMENT\nThe founder decision\nFund proof,\nnot scale.\nRelease investment only as evidence improves.\nIMMEDIATE NEXT STEP\nVerify the baseline, cost the 12-week proof phase and approve only the first decision gate.\nSOURCES: E1, E2, E3, A1, A2, A3, A4, A5, A6, A7, A8, A9, C1, C2\nNARRATIVE\nHUMAN DECISION REQUIRED\n21 \/ 21"
+    }
+  ]
+}

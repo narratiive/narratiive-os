@@ -1,0 +1,38 @@
+{
+  "classification": "VERIFIED LIVE WITH FAILED CUSTOMER-HANDOFF SCENARIO",
+  "date": "2026-10-16",
+  "external_action_taken": false,
+  "runs": [
+    {
+      "purpose": "effective tool inventory",
+      "run_id": "e5018f26-d150-4b0b-99cb-5adc9c2757a4",
+      "result": "passed",
+      "duration_ms": 25177,
+      "evidence": "All required Narratiive and specialist orchestration tools were visible to Tony."
+    },
+    {
+      "purpose": "Gmail and Notion bounded safe reads",
+      "run_id": "0c98ea9c-014e-43ca-be6d-f350b8eace94",
+      "result": "passed",
+      "duration_ms": 11314,
+      "evidence": "Gmail and Notion returned safe_read_verified, verified_read, zero results and zero mutations for the fictional marker."
+    },
+    {
+      "purpose": "six-surface bounded safe-read rehearsal",
+      "run_id": "c8d039ac-c55b-43e3-be78-224955d5b1c9",
+      "result": "passed after safe retry",
+      "duration_ms": 47261,
+      "evidence": "Calendar, Drive, Fireflies and n8n verified on the first attempt. Gmail and Notion initially failed closed because the audit marker contained the write marker NO-SEND; the corrected marker succeeded in the next run."
+    },
+    {
+      "purpose": "full authenticated Tony conversation and specialist acceptance",
+      "result": "failed customer-handoff quality despite the legacy aggregate reporting live_passed=true",
+      "evidence": "Tool loading, business-state reads and Research delegation worked. The contextual_action scenario returned 'No response from OpenClaw.' The acceptance predicate has been repaired so this response can no longer pass."
+    }
+  ],
+  "secrets": {
+    "runtime_env_mode": "0600",
+    "credential_values_recorded": false,
+    "provider_record_ids": "redacted or hashed"
+  }
+}

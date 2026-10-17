@@ -1,0 +1,101 @@
+{
+  "base_scenario_bridge": [
+    {
+      "incremental_annual_revenue": 241920,
+      "lever": "Traffic"
+    },
+    {
+      "incremental_annual_revenue": 115200,
+      "lever": "Conversion"
+    },
+    {
+      "incremental_annual_revenue": 86400,
+      "lever": "Average order value"
+    }
+  ],
+  "baseline": {
+    "annual_revenue": 103680,
+    "annual_sessions": 180000,
+    "average_order_value": 32.0,
+    "classification": "MODELLED FROM ASSUMPTIONS",
+    "conversion_rate": 0.018
+  },
+  "classification": "MODELLED",
+  "currency": "GBP",
+  "input_evidence_ids": [
+    "A1",
+    "A2",
+    "A3",
+    "A7",
+    "A8",
+    "A9"
+  ],
+  "investment_case": {
+    "implementation_investment": 65000,
+    "incremental_contribution_margin": 0.3,
+    "status": "illustrative_assumption_case",
+    "unresolved_inputs": [
+      "Actual net contribution by SKU and channel",
+      "Wholesale and DTC cannibalisation",
+      "Sampling, production, distribution and media cost",
+      "Monthly ramp, seasonality, stock and working capital"
+    ],
+    "warning": "The contribution, investment and payback figures are MODELLED from ASSUMPTION inputs. They are not profit forecasts or an approved investment case."
+  },
+  "model_id": "loa-fictional-ecommerce-opportunity-v2",
+  "model_type": "ecommerce",
+  "period": "annualised run-rate at scenario inputs",
+  "scenario_not_forecast": true,
+  "scenarios": [
+    {
+      "annual_revenue": 115440,
+      "annual_sessions": 195000,
+      "average_order_value": 32.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.0185,
+      "illustrative_payback_months": 737.0,
+      "incremental_annual_revenue": 11760,
+      "name": "Downside",
+      "scenario_not_forecast": true,
+      "year_one_incremental_contribution": 1058,
+      "year_one_incremental_revenue": 3528,
+      "year_one_net_after_investment": -63942,
+      "year_one_realisation_rate": 0.3
+    },
+    {
+      "annual_revenue": 547200,
+      "annual_sessions": 600000,
+      "average_order_value": 38.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.024,
+      "illustrative_payback_months": 11.7,
+      "incremental_annual_revenue": 443520,
+      "name": "Base",
+      "scenario_not_forecast": true,
+      "year_one_incremental_contribution": 66528,
+      "year_one_incremental_revenue": 221760,
+      "year_one_net_after_investment": 1528,
+      "year_one_realisation_rate": 0.5
+    },
+    {
+      "annual_revenue": 884000,
+      "annual_sessions": 850000,
+      "average_order_value": 40.0,
+      "classification": "MODELLED",
+      "conversion_rate": 0.026,
+      "illustrative_payback_months": 5.6,
+      "incremental_annual_revenue": 780320,
+      "name": "Upside",
+      "scenario_not_forecast": true,
+      "year_one_incremental_contribution": 140458,
+      "year_one_incremental_revenue": 468192,
+      "year_one_net_after_investment": 75458,
+      "year_one_realisation_rate": 0.6
+    }
+  ],
+  "warnings": [
+    "Every input in this fictional demonstration is an ASSUMPTION.",
+    "These annualised scenarios are not forecasts, targets or promised results.",
+    "Company revenue impact depends on ramp, cannibalisation, returns, margin, capacity and investment."
+  ]
+}

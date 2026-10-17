@@ -1,0 +1,49 @@
+{
+  "boundary_result": {
+    "authoritative_deal_won": false,
+    "classification": "VERIFIED SANDBOX",
+    "client_delivery_authorized": false,
+    "commercial_close_ready": true,
+    "contract_event_id": "sandbox-contract-84fb429d93a776d51bc3fbdf",
+    "currency": "GBP",
+    "deposit_amount_minor": 250000,
+    "environment": "sandbox",
+    "media_activation_authorized": false,
+    "onboarding_authorized": false,
+    "opportunity_id": "loa-fictional-pass2",
+    "payment_event_id": "sandbox-payment-84fb429d93a776d51bc3fbdf"
+  },
+  "contract_receipt": {
+    "contract_version": "FIELDWORK-5000-50-50-v1",
+    "environment": "sandbox",
+    "event_id": "sandbox-contract-84fb429d93a776d51bc3fbdf",
+    "event_type": "contract.executed",
+    "occurred_at": "2026-10-16T22:47:31.921666+00:00",
+    "opportunity_id": "loa-fictional-pass2",
+    "provider": "narratiive_contract_sandbox",
+    "simulated": true,
+    "verified": true
+  },
+  "external_provider_called": false,
+  "money_moved": false,
+  "payment_receipt": {
+    "amount_minor": 250000,
+    "currency": "GBP",
+    "environment": "sandbox",
+    "event_id": "sandbox-payment-84fb429d93a776d51bc3fbdf",
+    "event_type": "payment.succeeded",
+    "occurred_at": "2026-10-16T22:47:31.921666+00:00",
+    "opportunity_id": "loa-fictional-pass2",
+    "provider": "narratiive_payment_sandbox",
+    "simulated": true,
+    "verified": true
+  },
+  "policy": {
+    "currency": "GBP",
+    "deposit_amount_minor": 250000,
+    "terms": "50% upfront / 50% before final delivery",
+    "total_amount_minor": 500000
+  },
+  "schema_version": 1,
+  "tested_at": "2026-10-16T22:47:31.921666+00:00"
+}

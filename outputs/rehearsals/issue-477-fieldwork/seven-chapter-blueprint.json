@@ -1,0 +1,245 @@
+{
+  "blueprint_id": "fieldwork-fictional-growth-blueprint-demo-v2",
+  "canon_relationship": "Additive Issue #471/#473 demonstration profile. The checksum-locked 30-slide production canon remains unchanged.",
+  "chapters": [
+    {
+      "argument": "FIELDWORK could test an annualised ecommerce revenue scenario of £1,890,000, £690,000 above the assumed baseline. At the assumed ramp, contribution margin and £85,000 investment, the first-year net contribution proxy is £36,440.",
+      "classification": "MODELLED",
+      "decision": "Validate the baseline and economics before treating the scenario as an investment case.",
+      "evidence_ids": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "title": "The Opportunity"
+    },
+    {
+      "argument": "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household should choose its first object or return for the second.",
+      "classification": "ASSUMPTION",
+      "decision": "Reject this diagnosis if a specific mixed-use proposition does not improve qualified product-page progression and net conversion, or if existing cohorts already show strong second-purchase behaviour.",
+      "evidence_ids": [
+        "A4"
+      ],
+      "title": "The Constraint"
+    },
+    {
+      "argument": "FIELDWORK could own the mixed-use surface: modular objects designed for the daily collision of paid work, domestic life and limited space.",
+      "classification": "ASSUMPTION",
+      "decision": "Compare this territory with organisation-led and status-led alternatives on relevance, distinctiveness, willingness to pay and unprompted recall.",
+      "evidence_ids": [
+        "A5"
+      ],
+      "title": "The Advantage"
+    },
+    {
+      "argument": "Turn the mixed-use surface into a category FIELDWORK can own, then prove that one useful object earns the next purchase before scaling acquisition.",
+      "classification": "ASSUMPTION",
+      "decision": "Approve only the next tests, not the modelled revenue outcome.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "recommendations": [
+        {
+          "action": "Organise the proposition around the moments when work and home collide, rather than a broad accessories catalogue.",
+          "evidence_ids": [
+            "A4",
+            "A5"
+          ],
+          "lever": "Qualified conversion",
+          "name": "Own the mixed-use surface",
+          "owner": "Strategy Director",
+          "test": "Controlled message and landing-page test",
+          "trade_off": "A narrower promise may reduce broad but low-intent traffic."
+        },
+        {
+          "action": "Merchandise each object through a specific domestic work moment, with dimensions, material decisions and usage proof visible before purchase.",
+          "evidence_ids": [
+            "A5",
+            "C1"
+          ],
+          "lever": "Conversion and average order value",
+          "name": "Make usefulness visible",
+          "owner": "Creative Director",
+          "test": "Product-story comprehension and basket test",
+          "trade_off": "More proof requires disciplined production and may expose weak claims."
+        },
+        {
+          "action": "Build modular add-on, post-purchase and referral tests that reveal whether the first object creates a repeatable customer system.",
+          "evidence_ids": [
+            "A6"
+          ],
+          "lever": "Second-purchase economics",
+          "name": "Earn the second object",
+          "owner": "Strategy Director",
+          "test": "Cohort retention and referral pilot",
+          "trade_off": "Near-term reach grows more slowly while economics are validated."
+        }
+      ],
+      "title": "The Strategy"
+    },
+    {
+      "argument": "Built for the work of living: Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+      "classification": "CREATIVE ILLUSTRATION",
+      "decision": "Test founder authenticity, customer recognition, distinctiveness and whether the territory improves product understanding.",
+      "evidence_ids": [
+        "A5",
+        "C1"
+      ],
+      "territory": {
+        "asset_alt": "Fictional FIELDWORK modular desk object on a lived-in dining table shared by work and family life",
+        "asset_path": "fieldwork/built-for-the-work-of-living-v1.png",
+        "description": "Use real traces of domestic work as the setting, then annotate the product decisions that make a shared surface calmer without pretending life is tidy.",
+        "evidence_ids": [
+          "A5",
+          "C1"
+        ],
+        "example_execution": "A film keeps the camera on one dining table as invoice, lunch, school drawing and late call replace each other. The FIELDWORK object stays, adapts and gathers the day's essential tools. Product annotations explain every material and modular choice.",
+        "name": "Built for the work of living",
+        "platform": "Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+        "primary_phrase": "USEFUL BY DESIGN",
+        "principles": [
+          [
+            "OBSERVE",
+            "Real work leaves traces"
+          ],
+          [
+            "PROVE",
+            "Materials and use stay visible"
+          ],
+          [
+            "REPEAT",
+            "One warm orange work mark"
+          ]
+        ],
+        "secondary_phrase": "HUMAN IN PRACTICE",
+        "validation_test": "Test founder authenticity, customer recognition, distinctiveness and whether the territory improves product understanding."
+      },
+      "title": "The Creative Future"
+    },
+    {
+      "argument": "Use the owned site to prove the mixed-use proposition, then use the first object to earn a second purchase before paid media scales the system.",
+      "channels": [
+        {
+          "channel": "Owned site",
+          "gate": "Message comprehension and net conversion",
+          "role": "Prove the proposition and convert qualified demand"
+        },
+        {
+          "channel": "CRM",
+          "gate": "Cohort contribution and opt-out guardrail",
+          "role": "Build repeat, cross-sell and referral evidence"
+        },
+        {
+          "channel": "Paid social",
+          "gate": "Incremental contribution after creative and media cost",
+          "role": "Scale tested creative and proposition routes"
+        },
+        {
+          "channel": "Partnerships",
+          "gate": "Qualified traffic and assisted conversion",
+          "role": "Reach relevant work and design communities"
+        }
+      ],
+      "classification": "ASSUMPTION",
+      "decision": "Increase paid acquisition only after proposition comprehension, net conversion and cohort contribution improve without unacceptable returns or discounting.",
+      "evidence_ids": [
+        "A6"
+      ],
+      "measurement": [
+        {
+          "level": "LEADING",
+          "metrics": "Proposition comprehension, qualified click-through, product-page progression"
+        },
+        {
+          "level": "BEHAVIOURAL",
+          "metrics": "Net conversion, average order value, repeat and referral"
+        },
+        {
+          "level": "COMMERCIAL",
+          "metrics": "Contribution after returns, fulfilment, media and implementation"
+        }
+      ],
+      "title": "The Growth Engine"
+    },
+    {
+      "argument": "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+      "classification": "ASSUMPTION",
+      "decision": "Matt approves the exact client-facing artefact before release. The founder then decides whether the verified economics justify the next bounded investment.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "C1"
+      ],
+      "phases": [
+        {
+          "decision_gate": "Matt selects a proposition test and approves its bounded budget.",
+          "evidence_ids": [
+            "A4",
+            "A5",
+            "A7"
+          ],
+          "name": "Establish the truth",
+          "outcome": "Verify economics, interview customers and test three proposition routes.",
+          "owner": "Research Analyst and Strategy Director",
+          "period": "Months 1-3"
+        },
+        {
+          "decision_gate": "Continue only if comprehension and net conversion improve.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "C1"
+          ],
+          "name": "Prove the proposition",
+          "outcome": "Run controlled site, product-story and CRM tests with contribution guardrails.",
+          "owner": "Strategy Director and Creative Director",
+          "period": "Months 4-6"
+        },
+        {
+          "decision_gate": "Approve scale only when repeat economics and stock capacity support it.",
+          "evidence_ids": [
+            "A6",
+            "A7"
+          ],
+          "name": "Build the engine",
+          "outcome": "Codify winning creative, CRM and referral mechanics and assess capacity.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 7-9"
+        },
+        {
+          "decision_gate": "Matt approves any material commercial commitment or client-facing release.",
+          "evidence_ids": [
+            "A6",
+            "A7"
+          ],
+          "name": "Scale selectively",
+          "outcome": "Increase investment in validated routes and document what changed commercially.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 10-12"
+        }
+      ],
+      "title": "The Next 12 Months"
+    }
+  ],
+  "commercial_model_id": "fieldwork-fictional-ecommerce-opportunity-v2",
+  "external_action_taken": false,
+  "fictional_demonstration": true,
+  "opening_slide_functions": [
+    "Where the business could go",
+    "What the commercial opportunity looks like",
+    "What currently prevents growth",
+    "What strategic moves are required",
+    "What the future could look like"
+  ],
+  "release_state": "pending_human_approval",
+  "status": "INTERNAL REVIEW DRAFT - HUMAN APPROVAL REQUIRED",
+  "title": "Narratiive Growth Blueprint - FIELDWORK"
+}

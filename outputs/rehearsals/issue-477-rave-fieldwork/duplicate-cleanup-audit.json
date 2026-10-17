@@ -1,0 +1,121 @@
+{
+  "apply": true,
+  "completed_at": "2026-10-17T13:11:28.128602+00:00",
+  "gmail": [
+    {
+      "before": {
+        "headers": {
+          "From": "Matt Franks <hello@narratiive.com>",
+          "Subject": "Fictional LOA Growth Blueprint enquiry \u2014 ISSUE477-LOA-PASS3-20261017T0644Z",
+          "To": "hello@narratiive.com"
+        },
+        "id": "1a1489864621076b",
+        "label_ids": [
+          "INBOX",
+          "Label_7042679246653734213",
+          "SENT",
+          "UNREAD"
+        ],
+        "snippet": "CONTROLLED INTERNAL TEST \u2014 fictional customer, not a real prospect. I am the founder of fictional FMCG brand LOA and am considering a \u00a35000 Growth Blueprint. We need to understand our next meaningful",
+        "thread_id": "1a1489864621076b"
+      },
+      "error": "HTTPError: HTTP Error 403: Forbidden",
+      "id": "1a1489864621076b",
+      "status": "blocked"
+    },
+    {
+      "before": {
+        "headers": {
+          "From": "Matt Franks <hello@narratiive.com>",
+          "Subject": "Fictional LOA Growth Blueprint enquiry \u2014 ISSUE477-LOA-PASS3-20261017T0644Z",
+          "To": "hello@narratiive.com"
+        },
+        "id": "1a1489867661ed8e",
+        "label_ids": [
+          "INBOX",
+          "Label_7042679246653734213",
+          "SENT",
+          "UNREAD"
+        ],
+        "snippet": "CONTROLLED INTERNAL TEST \u2014 fictional customer, not a real prospect. I am the founder of fictional FMCG brand LOA and am considering a \u00a35000 Growth Blueprint. We need to understand our next meaningful",
+        "thread_id": "1a1489867661ed8e"
+      },
+      "error": "HTTPError: HTTP Error 403: Forbidden",
+      "id": "1a1489867661ed8e",
+      "status": "blocked"
+    },
+    {
+      "before": {
+        "headers": {
+          "From": "Matt Franks <hello@narratiive.com>",
+          "Subject": "Fictional LOA Growth Blueprint enquiry \u2014 ISSUE477-LOA-PASS3-20261017T0644Z",
+          "To": "hello@narratiive.com"
+        },
+        "id": "1a1489a037ccfc1e",
+        "label_ids": [
+          "INBOX",
+          "Label_7042679246653734213",
+          "SENT",
+          "UNREAD"
+        ],
+        "snippet": "CONTROLLED INTERNAL TEST \u2014 fictional customer, not a real prospect. I am the founder of fictional FMCG brand LOA and am considering a \u00a35000 Growth Blueprint. We need to understand our next meaningful",
+        "thread_id": "1a1489a037ccfc1e"
+      },
+      "error": "HTTPError: HTTP Error 403: Forbidden",
+      "id": "1a1489a037ccfc1e",
+      "status": "blocked"
+    }
+  ],
+  "google_oauth_scopes": [
+    "https://www.googleapis.com/auth/calendar.calendars.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.events.freebusy",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send"
+  ],
+  "marker": "ISSUE477-LOA-PASS3-20261017T0644Z",
+  "notion": [
+    {
+      "after": {
+        "archived": true,
+        "id": "3fc0c9cf-a8f2-81b5-b75a-d3f865a526c7",
+        "in_trash": true,
+        "title": "Matt Franks",
+        "url": "https://app.notion.com/p/Matt-Franks-3fc0c9cfa8f281b5b75ad3f865a526c7"
+      },
+      "before": {
+        "archived": false,
+        "id": "3fc0c9cf-a8f2-81b5-b75a-d3f865a526c7",
+        "in_trash": false,
+        "title": "Matt Franks",
+        "url": "https://app.notion.com/p/Matt-Franks-3fc0c9cfa8f281b5b75ad3f865a526c7"
+      },
+      "id": "3fc0c9cf-a8f2-81b5-b75a-d3f865a526c7",
+      "status": "archived"
+    },
+    {
+      "after": {
+        "archived": true,
+        "id": "3fc0c9cf-a8f2-81aa-8692-c59a92ecdbac",
+        "in_trash": true,
+        "title": "Matt Franks",
+        "url": "https://app.notion.com/p/Matt-Franks-3fc0c9cfa8f281aa8692c59a92ecdbac"
+      },
+      "before": {
+        "archived": false,
+        "id": "3fc0c9cf-a8f2-81aa-8692-c59a92ecdbac",
+        "in_trash": false,
+        "title": "Matt Franks",
+        "url": "https://app.notion.com/p/Matt-Franks-3fc0c9cfa8f281aa8692c59a92ecdbac"
+      },
+      "id": "3fc0c9cf-a8f2-81aa-8692-c59a92ecdbac",
+      "status": "archived"
+    }
+  ],
+  "operation": "issue-477-duplicate-test-cleanup",
+  "preserved_notion_page_id": "3fc0c9cf-a8f2-81e7-aeea-cdd7cdc8ab16",
+  "recovery_policy": "Gmail messages moved to Trash; Notion pages archived. No permanent deletion.",
+  "started_at": "2026-10-17T13:11:25.140683+00:00"
+}

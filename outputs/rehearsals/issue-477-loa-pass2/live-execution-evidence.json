@@ -1,0 +1,94 @@
+{
+  "schema_version": 1,
+  "issue": 477,
+  "pass": 2,
+  "client": "LOA",
+  "client_is_fictional": true,
+  "generated_at": "2026-10-17T06:20:46Z",
+  "safeguards": {
+    "real_prospects_contacted": false,
+    "money_moved": false,
+    "advertising_published": false,
+    "media_spend": false,
+    "human_approval_bypassed": false,
+    "production_launch_agent_modified": true,
+    "oauth_grant_modified": false
+  },
+  "gmail_watcher": {
+    "classification": "VERIFIED LIVE",
+    "live_baseline_at": "2026-10-16T22:49:37Z",
+    "loaded": true,
+    "state": "running",
+    "launchd_runs": 2,
+    "process_id": 52663,
+    "loop_seconds": 900,
+    "deployment_change_made": true,
+    "unattended_result_at": "2026-10-17T06:20:46Z",
+    "unattended_result": "no_new_actionable_mail",
+    "operator_trigger_for_second_result": false
+  },
+  "tony_async_specialist": {
+    "classification": "VERIFIED LIVE",
+    "started_at": "2026-10-16T22:55:37Z",
+    "elapsed_seconds": 54.538,
+    "session_key": "narratiive:tony:issue477-pass2-auto-resume-1792191337",
+    "specialist": "creative-director",
+    "operator_polling_required": false,
+    "external_action": false,
+    "result": "The normal Tony request returned the reviewed specialist answer after OpenClaw resumed the same transcript."
+  },
+  "gmail_oauth": {
+    "classification": "VERIFIED LIVE READ",
+    "audited_at": "2026-10-16T22:49:37Z",
+    "draft_creation_ready": false,
+    "missing_minimum_scope": "https://www.googleapis.com/auth/gmail.compose",
+    "scope_classification": "RESTRICTED",
+    "grant_modified": false,
+    "matt_approved_scope_expansion": true,
+    "remaining_blocker": "Narratiive mailbox holder must complete Google's password/MFA and consent challenge.",
+    "human_send_approval_retained": true
+  },
+  "commercial_close": {
+    "classification": "VERIFIED SANDBOX",
+    "tested_at": "2026-10-16T22:47:31.921666+00:00",
+    "total_amount_minor": 500000,
+    "deposit_amount_minor": 250000,
+    "currency": "GBP",
+    "contract_event_id": "sandbox-contract-84fb429d93a776d51bc3fbdf",
+    "payment_event_id": "sandbox-payment-84fb429d93a776d51bc3fbdf",
+    "external_provider_called": false,
+    "money_moved": false,
+    "authoritative_deal_won": false,
+    "onboarding_authorized": false,
+    "client_delivery_authorized": false,
+    "media_activation_authorized": false
+  },
+  "drive_assets": {
+    "classification": "VERIFIED LIVE READ",
+    "folder_id": "1ezoEb0rwcfvjS9RR-X9tJFWyfEvUzWJ5",
+    "files": 12,
+    "png": 7,
+    "mp4": 5,
+    "activation_evidence": false,
+    "external_use_approved": false
+  },
+  "blueprint": {
+    "classification": "VERIFIED SANDBOX",
+    "rendered_at": "2026-10-16T22:49:24Z",
+    "status": "PASS_FOR_HUMAN_REVIEW",
+    "approval": "pending",
+    "slide_count": 21,
+    "slides_visually_inspected": 21,
+    "pptx_sha256": "09d80006658dbf49d33644abe1b6271e7b0069f570046df493c57ce611204360",
+    "pdf_sha256": "9467f099588db7daf4ecdb2a1f9b5cc64098299990051c14a5105d85bad8d8a4",
+    "external_action": false
+  },
+  "activation": {
+    "classification": "BLOCKED",
+    "simulated_media_is_verified_live": false,
+    "google_ads": "PRIOR VERIFIED LIVE READ ONLY",
+    "meta": "BLOCKED - no business/ad account and campaign read HTTP 400",
+    "tiktok": "BLOCKED - advertiser OAuth not configured",
+    "ctv_ttd": "UNTESTED - no authorised provider/account"
+  }
+}

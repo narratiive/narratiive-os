@@ -1,0 +1,255 @@
+{
+  "activation_implications": {
+    "diagnosis": "If pursued, activation should: (a) restructure storefront/lifecycle content around an explicit anchor/explore/rare progression; (b) resolve pod-compostability messaging conflict and clarify impact-accounting proof; (c) integrate rewards with subscriptions to remove current customer-service friction; (d) use wholesale sampling/training as a trial and local-salience channel; (e) pause further RTD expansion pending brand-fit evidence; (f) instrument retention/CAC measurement before scaling any paid acquisition.",
+    "evidence_refs": [
+      "rave-quiz",
+      "rave-rewards",
+      "claim-consistency-and-operations",
+      "channel-and-proposition-options",
+      "rave-iced"
+    ],
+    "implication": "Low-cost, controllable fixes (messaging coherence, lifecycle architecture, rewards integration) should precede any acquisition spend increase, since they reduce risk and create the measurement foundation acquisition decisions require.",
+    "uncertainties": [
+      "Feasibility depends on internal systems/team capacity not visible from public evidence",
+      "No confirmation of available marketing budget or build resource for proposed changes"
+    ]
+  },
+  "audience": {
+    "diagnosis": "Public signals point to at least four overlapping audiences: supermarket/instant upgraders moving into specialty (BCA notes 80% of households still buy instant, a large conversion pool); equipment upgraders who buy Rave after investing in a premium espresso machine; subscription-driven explorers using Traditional/Discovery Coffee Club; and office/hospitality wholesale buyers seeking embedded supply plus training/service. Enthusiasts chasing Rare microlots are a smaller, vocal segment visible in sold-out limited items.",
+    "evidence_refs": [
+      "british-coffee-association-consumption",
+      "customer-signals",
+      "rave-coffee-subscription",
+      "rave-wholesale"
+    ],
+    "implication": "The largest volume opportunity is likely the supermarket-to-specialty upgrade moment, which should anchor top-of-funnel messaging, while enthusiast/rare-range audiences support margin and brand credibility rather than scale.",
+    "uncertainties": [
+      "No segmentation sizing, CAC or conversion data by audience",
+      "Reviews and subscription language are self-selected, not representative",
+      "Wholesale buyer volume and retention are unknown"
+    ]
+  },
+  "evidence_and_uncertainty": [
+    "Contradiction: Rave's own pages disagree on pod compostability (home-compostable vs industrially compostable), a materially consumer-facing inconsistency that is unresolved in available evidence and undermines the sustainability proof layer.",
+    "Evidence limit: No source in the pack provides revenue, margin, CAC, retention, churn, cohort behaviour, capacity utilisation or channel profitability; filed accounts omit the income statement entirely, so every growth-lever sizing claim in this draft remains a hypothesis pending internal data.",
+    "Open input: 2026 Trustpilot reviews conflict on delivery reliability (delay complaints vs fast-delivery reports); whether this reflects an isolated issue or a scaling-related operational strain cannot be determined from public review text alone.",
+    "Open input: Audience segmentation, true market share, and whether customers actually perceive Rave's stated combination of accessibility, tone, breadth and wholesale service as distinctive are all unverified and require primary customer research before commitment."
+  ],
+  "evidence_lineage": [
+    {
+      "claim": "UK green-coffee imports rose from 154,000 tonnes (2024) to 165,000 tonnes (2025), with nearly 2,000 registered UK roasters.",
+      "classification": "fact",
+      "source_refs": [
+        "cbi-uk-market-2026"
+      ]
+    },
+    {
+      "claim": "An unaudited public infographic reports only 8% of surveyed UK consumers (12% under 35) willing to pay more than \u00a35 for a premium beverage.",
+      "classification": "fact",
+      "source_refs": [
+        "world-coffee-portal-2025"
+      ]
+    },
+    {
+      "claim": "Rave's pod collection page states 'home-compostable' while its knowledge-base page states 'industrially compostable', a direct inconsistency.",
+      "classification": "fact",
+      "source_refs": [
+        "claim-consistency-and-operations"
+      ]
+    },
+    {
+      "claim": "Rave Coffee Club starts at \u00a39.95 versus Pact \u00a38.95, Grind ~\u00a313.95-\u00a314.95, Origin \u00a312.95 and Union \u00a318.95, though weights and cadence differ.",
+      "classification": "fact",
+      "source_refs": [
+        "market-and-competition"
+      ]
+    },
+    {
+      "claim": "Competitor subscription offers converge on flexibility, freshness and ethical sourcing, making these weak standalone differentiators for any brand including Rave.",
+      "classification": "interpretation",
+      "source_refs": [
+        "market-and-competition"
+      ]
+    },
+    {
+      "claim": "Rave's RTD entry under Signature Blend may not transfer its speciality credibility, given CBI's caution that coffee quality plays a small role in multi-ingredient RTD products.",
+      "classification": "hypothesis",
+      "source_refs": [
+        "rave-iced",
+        "cbi-uk-market-2026"
+      ]
+    }
+  ],
+  "fact_interpretation_hypothesis_lineage": [
+    {
+      "claim": "Rave's Trustpilot profile showed 356 reviews at 4.0/5, with 75% five-star and 13% one-star at the time of capture.",
+      "classification": "fact",
+      "source_refs": [
+        "customer-signals"
+      ]
+    },
+    {
+      "claim": "Rave Coffee Limited's filed net assets rose from \u00a31.511m (2023) to \u00a32.272m (2024), with average employees increasing from 42 to 61.",
+      "classification": "fact",
+      "source_refs": [
+        "accounts-and-scale"
+      ]
+    },
+    {
+      "claim": "Rave's accessible price, irreverent tone, format breadth and personable service form a potentially distinctive but currently unarticulated progression system.",
+      "classification": "interpretation",
+      "source_refs": [
+        "rave-about",
+        "rave-range",
+        "channel-and-proposition-options"
+      ]
+    },
+    {
+      "claim": "The CBI-described eroding 84-86 point middle tier structurally favours brands combining accessible blends with distinctive frontier products, which plausibly includes Rave's architecture.",
+      "classification": "interpretation",
+      "source_refs": [
+        "cbi-uk-market-2026",
+        "rave-rare"
+      ]
+    },
+    {
+      "claim": "Wholesale, rather than DTC paid acquisition, is the faster and more controllable compounding growth channel for Rave over the next 12 months.",
+      "classification": "hypothesis",
+      "source_refs": [
+        "rave-wholesale",
+        "channel-and-proposition-options",
+        "accounts-and-scale"
+      ]
+    }
+  ],
+  "growth_barriers": {
+    "diagnosis": "Recurring trust and system-coherence issues could cap compounding growth: conflicting pod compostability claims (home vs industrial) across owned pages; environmental impact figures without dates or reconciled totals; conflicting 2026 reviews on dispatch reliability during apparent scaling; rewards points that cannot be applied to subscriptions without customer-service intervention; and a 57-SKU range not organised as a legible customer journey. Filed accounts show headcount and fixed-asset growth but omit income statement, so capacity strain cannot be assessed.",
+    "evidence_refs": [
+      "claim-consistency-and-operations",
+      "customer-signals",
+      "rave-rewards",
+      "accounts-and-scale"
+    ],
+    "implication": "Scaling acquisition spend before resolving proof-layer and reliability inconsistencies risks amplifying churn and reputational cost rather than compounding growth.",
+    "uncertainties": [
+      "Prevalence/severity of dispatch issues is unverifiable from reviews alone",
+      "Whether impact-accounting gaps are presentation artefacts or substantive",
+      "Capacity utilisation and whether scaling is already straining operations are unknown"
+    ]
+  },
+  "growth_opportunity": {
+    "diagnosis": "Three plausible compounding levers emerge: (1) convert supermarket/instant upgraders via low-friction entry (Coffee Club, accessible pricing) with a visible path to Rare range, building LTV; (2) deepen wholesale as a recurring, embedded, locally compounding channel distinct from anonymous DTC; (3) resolve reliability and proof-layer gaps before scaling paid acquisition to protect repeat and referral economics.",
+    "evidence_refs": [
+      "rave-coffee-subscription",
+      "rave-rewards",
+      "rave-wholesale",
+      "claim-consistency-and-operations",
+      "customer-signals"
+    ],
+    "implication": "Sequencing trust-fixes and progression architecture ahead of heavy top-of-funnel spend is likely the more controllable growth path; wholesale may offer more durable compounding than DTC acquisition given embedded relationships, though this is unverified.",
+    "uncertainties": [
+      "No CAC, LTV, retention or cohort data exists to size any lever",
+      "Wholesale margin, capacity and geographic service limits are unknown",
+      "RTD's strategic contribution to brand equity is unresolved"
+    ]
+  },
+  "key_strategic_choices": [
+    {
+      "choice": "Prioritise resolving operational and proof-layer trust issues (compostability messaging conflict, impact-accounting clarity, dispatch reliability) before increasing acquisition spend.",
+      "evidence_refs": [
+        "claim-consistency-and-operations",
+        "customer-signals"
+      ],
+      "tradeoff": "Slower near-term growth acceleration in exchange for reduced risk of amplifying churn and reputational damage if issues are systemic."
+    },
+    {
+      "choice": "Restructure the product range as an explicit anchor/explore/rare progression system rather than a flat 57-SKU catalogue.",
+      "evidence_refs": [
+        "rave-range",
+        "channel-and-proposition-options"
+      ],
+      "tradeoff": "Requires content, UX and merchandising investment and may complicate current simple browsing versus maintaining the existing broad, low-structure catalogue."
+    },
+    {
+      "choice": "Treat wholesale as a primary compounding growth channel ahead of scaling DTC paid acquisition.",
+      "evidence_refs": [
+        "rave-wholesale",
+        "channel-and-proposition-options",
+        "accounts-and-scale"
+      ],
+      "tradeoff": "Wholesale offers embedded, recurring relationships but unknown margin, service burden and capacity limits; DTC has a larger addressable pool but weaker differentiation and acquisition-cost exposure."
+    },
+    {
+      "choice": "Hold RTD expansion at current scale until evidence shows it recruits customers into Rave's coffee system rather than diluting specialty credibility.",
+      "evidence_refs": [
+        "rave-iced",
+        "cbi-uk-market-2026"
+      ],
+      "tradeoff": "Forgoes near-term participation in a fast-growing category versus protecting brand coherence and specialty positioning."
+    }
+  ],
+  "market_category_diagnosis": {
+    "diagnosis": "UK specialty coffee is large and still growing, but growth is value-led premiumisation, not volume. CBI evidence describes polarisation: demand for scarce/experimental coffee at the top, cost-pressured buyers shifting to lower-priced specialty blends, and an eroding 84-86 point middle. Supply-side density is high (~2,000 registered UK roasters, rising import tonnage), and RTD is growing fast but its quality linkage is unproven. Rave's accessible-blend-plus-rare-microlot range sits across this polarised structure, which is relevant but not yet evidenced as advantageous to Rave specifically.",
+    "evidence_refs": [
+      "cbi-uk-market-2026",
+      "world-coffee-portal-2025",
+      "rave-range",
+      "rave-rare"
+    ],
+    "implication": "Rave's positioning straddling accessible and rare tiers could let it capture share vacated by the eroding middle, but this requires deliberate differentiation from both the cost-pressured and ultra-premium poles rather than passive breadth.",
+    "uncertainties": [
+      "No addressable market size or share data for Rave exists",
+      "Willingness-to-pay survey is a small, unaudited infographic (directional only)",
+      "Polarisation trend is a market-level observation, not proof Rave benefits from it"
+    ]
+  },
+  "model": "claude-sonnet-5",
+  "narrative": {
+    "diagnosis": "The organising story: most UK households still drink instant/supermarket coffee while the specialty market polarises into scarce premium and a shrinking, cost-pressured middle. Rave already has the component parts of a confidence-building progression (dependable anchor blends, guided Coffee Club exploration, Rare frontier, wholesale embedding, RTD experiments) but does not narrate them as one coherent customer journey on its public surfaces.",
+    "evidence_refs": [
+      "cbi-uk-market-2026",
+      "british-coffee-association-consumption",
+      "channel-and-proposition-options",
+      "rave-coffee-subscription"
+    ],
+    "implication": "Making the progression explicit (anchor \u2192 explore \u2192 rare) can become the organising principle for content, lifecycle marketing and range architecture, converting one-off acquisition into compounding retention.",
+    "uncertainties": [
+      "This narrative is an interpretive synthesis across public pages, not validated by Rave customer research",
+      "No evidence yet shows customers currently self-progress along any such path"
+    ]
+  },
+  "positioning": {
+    "diagnosis": "Rave can credibly position as the non-judgemental bridge from supermarket/instant coffee into genuine specialty: specialty quality without premium markup, pedigree-signalling or solemnity. This avoids direct head-to-head competition with Origin/Union on provenance pedigree or Grind on urban lifestyle aesthetics, instead owning accessibility plus competence.",
+    "evidence_refs": [
+      "rave-about",
+      "market-and-competition",
+      "customer-signals"
+    ],
+    "implication": "Messaging and onboarding should foreground the 'upgrade moment' (leaving supermarket coffee, buying a new machine) as the primary hook, with Rare/wholesale as proof points of depth rather than the lead story.",
+    "uncertainties": [
+      "Positioning hypothesis untested against actual competitor-switching behaviour",
+      "Risk that 'accessible' pricing is read as 'cheap' rather than 'value', undermining specialty credibility"
+    ]
+  },
+  "provider": "anthropic",
+  "provider_message_id": "msg_011Cg7rqynkveDqDMnUjhFnd",
+  "recommendation": "advance",
+  "source_of_difference": {
+    "diagnosis": "Rave's most distinctive stated combination is: accessible pricing against an explicit quality floor (82+/84+ SCA), irreverent anti-solemnity tone rejecting corporate pedigree, breadth across brewing formats (blend, single origin, pods, RTD, equipment), and a wholesale offer bundling coffee with installation, training and servicing, creating recurring embedded relationships unlike anonymous DTC acquisition.",
+    "evidence_refs": [
+      "rave-about",
+      "rave-signature",
+      "rave-wholesale",
+      "rave-hq",
+      "channel-and-proposition-options"
+    ],
+    "implication": "This bundle is a defensible point of difference if presented as one ownable system rather than a flat catalogue; competitors each own narrower single claims (Pact=farmer fairness, Origin=provenance, Grind=lifestyle, Union=direct trade), leaving Rave's combination unclaimed if substantiated.",
+    "uncertainties": [
+      "Whether customers actually perceive and value the combination (vs individual attributes) is unproven",
+      "Flexibility, freshness and ethical sourcing are common claims across competitors, diluting standalone differentiation"
+    ]
+  },
+  "stop_reason": "end_turn",
+  "verified": true,
+  "work_product": "{\n  \"market_category_diagnosis\": {\n    \"diagnosis\": \"UK specialty coffee is large and still growing, but growth is value-led premiumisation, not volume. CBI evidence describes polarisation: demand for scarce/experimental coffee at the top, cost-pressured buyers shifting to lower-priced specialty blends, and an eroding 84-86 point middle. Supply-side density is high (~2,000 registered UK roasters, rising import tonnage), and RTD is growing fast but its quality linkage is unproven. Rave's accessible-blend-plus-rare-microlot range sits across this polarised structure, which is relevant but not yet evidenced as advantageous to Rave specifically.\",\n    \"evidence_refs\": [\"cbi-uk-market-2026\", \"world-coffee-portal-2025\", \"rave-range\", \"rave-rare\"],\n    \"implication\": \"Rave's positioning straddling accessible and rare tiers could let it capture share vacated by the eroding middle, but this requires deliberate differentiation from both the cost-pressured and ultra-premium poles rather than passive breadth.\",\n    \"uncertainties\": [\"No addressable market size or share data for Rave exists\", \"Willingness-to-pay survey is a small, unaudited infographic (directional only)\", \"Polarisation trend is a market-level observation, not proof Rave benefits from it\"]\n  },\n  \"audience\": {\n    \"diagnosis\": \"Public signals point to at least four overlapping audiences: supermarket/instant upgraders moving into specialty (BCA notes 80% of households still buy instant, a large conversion pool); equipment upgraders who buy Rave after investing in a premium espresso machine; subscription-driven explorers using Traditional/Discovery Coffee Club; and office/hospitality wholesale buyers seeking embedded supply plus training/service. Enthusiasts chasing Rare microlots are a smaller, vocal segment visible in sold-out limited items.\",\n    \"evidence_refs\": [\"british-coffee-association-consumption\", \"customer-signals\", \"rave-coffee-subscription\", \"rave-wholesale\"],\n    \"implication\": \"The largest volume opportunity is likely the supermarket-to-specialty upgrade moment, which should anchor top-of-funnel messaging, while enthusiast/rare-range audiences support margin and brand credibility rather than scale.\",\n    \"uncertainties\": [\"No segmentation sizing, CAC or conversion data by audience\", \"Reviews and subscription language are self-selected, not representative\", \"Wholesale buyer volume and retention are unknown\"]\n  },\n  \"growth_barriers\": {\n    \"diagnosis\": \"Recurring trust and system-coherence issues could cap compounding growth: conflicting pod compostability claims (home vs industrial) across owned pages; environmental impact figures without dates or reconciled totals; conflicting 2026 reviews on dispatch reliability during apparent scaling; rewards points that cannot be applied to subscriptions without customer-service intervention; and a 57-SKU range not organised as a legible customer journey. Filed accounts show headcount and fixed-asset growth but omit income statement, so capacity strain cannot be assessed.\",\n    \"evidence_refs\": [\"claim-consistency-and-operations\", \"customer-signals\", \"rave-rewards\", \"accounts-and-scale\"],\n    \"implication\": \"Scaling acquisition spend before resolving proof-layer and reliability inconsistencies risks amplifying churn and reputational cost rather than compounding growth.\",\n    \"uncertainties\": [\"Prevalence/severity of dispatch issues is unverifiable from reviews alone\", \"Whether impact-accounting gaps are presentation artefacts or substantive\", \"Capacity utilisation and whether scaling is already straining operations are unknown\"]\n  },\n  \"source_of_difference\": {\n    \"diagnosis\": \"Rave's most distinctive stated combination is: accessible pricing against an explicit quality floor (82+/84+ SCA), irreverent anti-solemnity tone rejecting corporate pedigree, breadth across brewing formats (blend, single origin, pods, RTD, equipment), and a wholesale offer bundling coffee with installation, training and servicing, creating recurring embedded relationships unlike anonymous DTC acquisition.\",\n    \"evidence_refs\": [\"rave-about\", \"rave-signature\", \"rave-wholesale\", \"rave-hq\", \"channel-and-proposition-options\"],\n    \"implication\": \"This bundle is a defensible point of difference if presented as one ownable system rather than a flat catalogue; competitors each own narrower single claims (Pact=farmer fairness, Origin=provenance, Grind=lifestyle, Union=direct trade), leaving Rave's combination unclaimed if substantiated.\",\n    \"uncertainties\": [\"Whether customers actually perceive and value the combination (vs individual attributes) is unproven\", \"Flexibility, freshness and ethical sourcing are common claims across competitors, diluting standalone differentiation\"]\n  },\n  \"positioning\": {\n    \"diagnosis\": \"Rave can credibly position as the non-judgemental bridge from supermarket/instant coffee into genuine specialty: specialty quality without premium markup, pedigree-signalling or solemnity. This avoids direct head-to-head competition with Origin/Union on provenance pedigree or Grind on urban lifestyle aesthetics, instead owning accessibility plus competence.\",\n    \"evidence_refs\": [\"rave-about\", \"market-and-competition\", \"customer-signals\"],\n    \"implication\": \"Messaging and onboarding should foreground the 'upgrade moment' (leaving supermarket coffee, buying a new machine) as the primary hook, with Rare/wholesale as proof points of depth rather than the lead story.\",\n    \"uncertainties\": [\"Positioning hypothesis untested against actual competitor-switching behaviour\", \"Risk that 'accessible' pricing is read as 'cheap' rather than 'value', undermining specialty credibility\"]\n  },\n  \"narrative\": {\n    \"diagnosis\": \"The organising story: most UK households still drink instant/supermarket coffee while the specialty market polarises into scarce premium and a shrinking, cost-pressured middle. Rave already has the component parts of a confidence-building progression (dependable anchor blends, guided Coffee Club exploration, Rare frontier, wholesale embedding, RTD experiments) but does not narrate them as one coherent customer journey on its public surfaces.\",\n    \"evidence_refs\": [\"cbi-uk-market-2026\", \"british-coffee-association-consumption\", \"channel-and-proposition-options\", \"rave-coffee-subscription\"],\n    \"implication\": \"Making the progression explicit (anchor \u2192 explore \u2192 rare) can become the organising principle for content, lifecycle marketing and range architecture, converting one-off acquisition into compounding retention.\",\n    \"uncertainties\": [\"This narrative is an interpretive synthesis across public pages, not validated by Rave customer research\", \"No evidence yet shows customers currently self-progress along any such path\"]\n  },\n  \"growth_opportunity\": {\n    \"diagnosis\": \"Three plausible compounding levers emerge: (1) convert supermarket/instant upgraders via low-friction entry (Coffee Club, accessible pricing) with a visible path to Rare range, building LTV; (2) deepen wholesale as a recurring, embedded, locally compounding channel distinct from anonymous DTC; (3) resolve reliability and proof-layer gaps before scaling paid acquisition to protect repeat and referral economics.\",\n    \"evidence_refs\": [\"rave-coffee-subscription\", \"rave-rewards\", \"rave-wholesale\", \"claim-consistency-and-operations\", \"customer-signals\"],\n    \"implication\": \"Sequencing trust-fixes and progression architecture ahead of heavy top-of-funnel spend is likely the more controllable growth path; wholesale may offer more durable compounding than DTC acquisition given embedded relationships, though this is unverified.\",\n    \"uncertainties\": [\"No CAC, LTV, retention or cohort data exists to size any lever\", \"Wholesale margin, capacity and geographic service limits are unknown\", \"RTD's strategic contribution to brand equity is unresolved\"]\n  },\n  \"activation_implications\": {\n    \"diagnosis\": \"If pursued, activation should: (a) restructure storefront/lifecycle content around an explicit anchor/explore/rare progression; (b) resolve pod-compostability messaging conflict and clarify impact-accounting proof; (c) integrate rewards with subscriptions to remove current customer-service friction; (d) use wholesale sampling/training as a trial and local-salience channel; (e) pause further RTD expansion pending brand-fit evidence; (f) instrument retention/CAC measurement before scaling any paid acquisition.\",\n    \"evidence_refs\": [\"rave-quiz\", \"rave-rewards\", \"claim-consistency-and-operations\", \"channel-and-proposition-options\", \"rave-iced\"],\n    \"implication\": \"Low-cost, controllable fixes (messaging coherence, lifecycle architecture, rewards integration) should precede any acquisition spend increase, since they reduce risk and create the measurement foundation acquisition decisions require.\",\n    \"uncertainties\": [\"Feasibility depends on internal systems/team capacity not visible from public evidence\", \"No confirmation of available marketing budget or build resource for proposed changes\"]\n  },\n  \"key_strategic_choices\": [\n    {\n      \"choice\": \"Prioritise resolving operational and proof-layer trust issues (compostability messaging conflict, impact-accounting clarity, dispatch reliability) before increasing acquisition spend.\",\n      \"tradeoff\": \"Slower near-term growth acceleration in exchange for reduced risk of amplifying churn and reputational damage if issues are systemic.\",\n      \"evidence_refs\": [\"claim-consistency-and-operations\", \"customer-signals\"]\n    },\n    {\n      \"choice\": \"Restructure the product range as an explicit anchor/explore/rare progression system rather than a flat 57-SKU catalogue.\",\n      \"tradeoff\": \"Requires content, UX and merchandising investment and may complicate current simple browsing versus maintaining the existing broad, low-structure catalogue.\",\n      \"evidence_refs\": [\"rave-range\", \"channel-and-proposition-options\"]\n    },\n    {\n      \"choice\": \"Treat wholesale as a primary compounding growth channel ahead of scaling DTC paid acquisition.\",\n      \"tradeoff\": \"Wholesale offers embedded, recurring relationships but unknown margin, service burden and capacity limits; DTC has a larger addressable pool but weaker differentiation and acquisition-cost exposure.\",\n      \"evidence_refs\": [\"rave-wholesale\", \"channel-and-proposition-options\", \"accounts-and-scale\"]\n    },\n    {\n      \"choice\": \"Hold RTD expansion at current scale until evidence shows it recruits customers into Rave's coffee system rather than diluting specialty credibility.\",\n      \"tradeoff\": \"Forgoes near-term participation in a fast-growing category versus protecting brand coherence and specialty positioning.\",\n      \"evidence_refs\": [\"rave-iced\", \"cbi-uk-market-2026\"]\n    }\n  ],\n  \"evidence_and_uncertainty\": [\n    \"Contradiction: Rave's own pages disagree on pod compostability (home-compostable vs industrially compostable), a materially consumer-facing inconsistency that is unresolved in available evidence and undermines the sustainability proof layer.\",\n    \"Evidence limit: No source in the pack provides revenue, margin, CAC, retention, churn, cohort behaviour, capacity utilisation or channel profitability; filed accounts omit the income statement entirely, so every growth-lever sizing claim in this draft remains a hypothesis pending internal data.\",\n    \"Open input: 2026 Trustpilot reviews conflict on delivery reliability (delay complaints vs fast-delivery reports); whether this reflects an isolated issue or a scaling-related operational strain cannot be determined from public review text alone.\",\n    \"Open input: Audience segmentation, true market share, and whether customers actually perceive Rave's stated combination of accessibility, tone, breadth and wholesale service as distinctive are all unverified and require primary customer research before commitment.\"\n  ],\n  \"fact_interpretation_hypothesis_lineage\": [\n    {\n      \"claim\": \"Rave's Trustpilot profile showed 356 reviews at 4.0/5, with 75% five-star and 13% one-star at the time of capture.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"customer-signals\"]\n    },\n    {\n      \"claim\": \"Rave Coffee Limited's filed net assets rose from \u00a31.511m (2023) to \u00a32.272m (2024), with average employees increasing from 42 to 61.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"accounts-and-scale\"]\n    },\n    {\n      \"claim\": \"Rave's accessible price, irreverent tone, format breadth and personable service form a potentially distinctive but currently unarticulated progression system.\",\n      \"classification\": \"interpretation\",\n      \"source_refs\": [\"rave-about\", \"rave-range\", \"channel-and-proposition-options\"]\n    },\n    {\n      \"claim\": \"The CBI-described eroding 84-86 point middle tier structurally favours brands combining accessible blends with distinctive frontier products, which plausibly includes Rave's architecture.\",\n      \"classification\": \"interpretation\",\n      \"source_refs\": [\"cbi-uk-market-2026\", \"rave-rare\"]\n    },\n    {\n      \"claim\": \"Wholesale, rather than DTC paid acquisition, is the faster and more controllable compounding growth channel for Rave over the next 12 months.\",\n      \"classification\": \"hypothesis\",\n      \"source_refs\": [\"rave-wholesale\", \"channel-and-proposition-options\", \"accounts-and-scale\"]\n    }\n  ],\n  \"evidence_lineage\": [\n    {\n      \"claim\": \"UK green-coffee imports rose from 154,000 tonnes (2024) to 165,000 tonnes (2025), with nearly 2,000 registered UK roasters.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"cbi-uk-market-2026\"]\n    },\n    {\n      \"claim\": \"An unaudited public infographic reports only 8% of surveyed UK consumers (12% under 35) willing to pay more than \u00a35 for a premium beverage.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"world-coffee-portal-2025\"]\n    },\n    {\n      \"claim\": \"Rave's pod collection page states 'home-compostable' while its knowledge-base page states 'industrially compostable', a direct inconsistency.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"claim-consistency-and-operations\"]\n    },\n    {\n      \"claim\": \"Rave Coffee Club starts at \u00a39.95 versus Pact \u00a38.95, Grind ~\u00a313.95-\u00a314.95, Origin \u00a312.95 and Union \u00a318.95, though weights and cadence differ.\",\n      \"classification\": \"fact\",\n      \"source_refs\": [\"market-and-competition\"]\n    },\n    {\n      \"claim\": \"Competitor subscription offers converge on flexibility, freshness and ethical sourcing, making these weak standalone differentiators for any brand including Rave.\",\n      \"classification\": \"interpretation\",\n      \"source_refs\": [\"market-and-competition\"]\n    },\n    {\n      \"claim\": \"Rave's RTD entry under Signature Blend may not transfer its speciality credibility, given CBI's caution that coffee quality plays a small role in multi-ingredient RTD products.\",\n      \"classification\": \"hypothesis\",\n      \"source_refs\": [\"rave-iced\", \"cbi-uk-market-2026\"]\n    }\n  ],\n  \"recommendation\": \"advance\"\n}"
+}

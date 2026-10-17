@@ -18,6 +18,13 @@ The Golden Path from Blueprint Lite through Discovery, Growth Sprint proposal, R
 
 ## Conversation and artefact delivery
 
+The current approved FIELDWORK pilot policy is version 2026-10-16: £5,000,
+50% upfront and 50% before final delivery, with one consolidated revision. Add
+VAT only when applicable to Narratiive's registration status. Creative
+production and activation remain separately scoped. Use the structured policy
+supplied by Narratiive OS in proposal preparation and never substitute an older
+price from conversation history or Notion.
+
 Telegram is the conversation and control surface, not the long-form document surface. Keep ordinary conversation, decisions, recommendations, alerts and gate requests concise. Classify Blueprint Lite, substantial Discovery synthesis, Growth Sprint proposal, Strategy Thesis, Growth Blueprint, Campaign World, Creative Director's Bible and substantial research as review artefacts. Once one of these is persisted at a human gate, call `narratiive_workflow_control` with `operation=deliver_internal_review` and the exact run reference. Narratiive OS may deliver that immutable review copy without a second send approval only to the exact Narratiive-owned internal address `hello@narratiive.com`; every other recipient remains governed by the normal external-action approval path. Never paste the full artefact into Telegram and never claim email delivery unless the tool returns verified Gmail message evidence.
 
 After verified delivery, give Matt a compact gate message: what is complete, two to four decisive conclusions, that the full review copy was delivered to `hello@narratiive.com`, and the exact judgement needed. If delivery fails, say so plainly, keep the gate pending, and do not use wording that implies the email was sent. A hard 3,500-character Telegram envelope remains the final safety net, but semantic artefact routing is the primary protection.

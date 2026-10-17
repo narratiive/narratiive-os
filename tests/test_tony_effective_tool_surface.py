@@ -58,6 +58,23 @@ class TonyEffectiveToolSurfaceTests(unittest.TestCase):
         self.assertFalse(result["effective_tool_surface_ready"])
         self.assertEqual(result["failure_stage"], "effective_tools_json")
 
+    def test_live_inventory_has_operating_margin_above_observed_latency(self):
+        captured = {}
+
+        def runner(command, **kwargs):
+            captured.update(kwargs)
+            tools = sorted(EXPECTED_NARRATIIVE_TOOLS | REQUIRED_ORCHESTRATION_TOOLS)
+            return subprocess.CompletedProcess(
+                command,
+                0,
+                stdout=json.dumps({"payloads": [{"text": "\n".join(tools)}]}),
+                stderr="",
+            )
+
+        result = inspect_effective_tools(runner=runner)
+        self.assertTrue(result["effective_tool_surface_ready"])
+        self.assertEqual(captured["timeout"], 45.0)
+
 
 if __name__ == "__main__":
     unittest.main()

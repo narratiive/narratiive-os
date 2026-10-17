@@ -1,0 +1,44 @@
+# Issue #477 — LOA end-to-end customer journey
+
+Generated: 2026-10-16 16:58 UTC  
+Client: **LOA (fictional controlled rehearsal)**  
+Decision: **NO-GO for a real paying-client journey today; GO for a supervised internal rehearsal.**
+
+Status vocabulary is literal: **VERIFIED LIVE** means an authenticated provider returned observable evidence; **VERIFIED SANDBOX** means the governed local workflow actually ran; **SIMULATED** means no live provider transaction occurred; **FAILED** means an attempted integration did not complete; **BLOCKED** means authority or configuration is missing.
+
+| # | Stage | Result | Timestamp (UTC) | Inspectable evidence | Remaining blocker |
+|---:|---|---|---|---|---|
+| 1 | Commercial policy | VERIFIED LIVE / PASS | 2026-10-16 | Canonical Notion policy updated to £5,000, 50/50, one consolidated revision, VAT conditional, production and activation separate; four live block hashes and decision-history block are in [live execution evidence](live-execution-evidence.json). | Matt must confirm whether the pilot policy is final for external use and whether Narratiive is VAT registered at invoicing time. |
+| 2 | Fictional Gmail enquiry created | VERIFIED LIVE / PASS | 16:37:48 | Gmail message/thread `1a14593b011c3509`; exact marker `ISSUE477-LOA-20261016T163748Z`; inbox, unread and sent labels observed. | Controlled self-message only; no real prospect tested or contacted. |
+| 3 | Gmail watcher classified enquiry | VERIFIED LIVE / PASS | 16:38–16:39 | Targeted run: checked 1, alerted 1, candidate 1, ingested 1. Replay: checked 1, alerted 0, candidate 0, ingested 0. Implementation and regression tests are in this PR. | Installed LaunchAgent has never run since load. The branch fix is not deployed to the production runtime. |
+| 4 | n8n intake workflow | VERIFIED LIVE / PASS | 16:38:09–16:39:08 | Workflow `l6TysPR86l5VAoXc`; executions `2990` and `2991` both succeeded. Replay used the existing Notion lead instead of creating a duplicate. | None for the controlled path. |
+| 5 | Notion lead record | VERIFIED LIVE / PASS | 16:38 | Page `3fb0c9cf-a8f2-812f-ad03-c616a90d5188`; status New, pipeline Email Enquiry, approval Needs Review, exact Gmail message ID retained. | Real client field completeness and owner routing remain untested. |
+| 6 | Tony intake synchronisation | VERIFIED LIVE / PASS | 16:38–16:39 | Both n8n executions returned Tony sync HTTP 200 and “Inbound lead stored in Notion and synchronized to Tony.” | Scheduled autonomous watcher remains undeployed; manual targeted execution proved the path. |
+| 7 | Telegram internal alert | VERIFIED LIVE / PASS | 16:38 and Fireflies follow-up run | Authenticated bot/webhook healthy, no pending update or webhook error; internal alerts were received. | Alert delivery has no persistent provider message receipt in the repo; human receipt was observed in Telegram. |
+| 8 | Duplicate and retry safety | VERIFIED LIVE / PASS | 16:39:07 | Gmail targeted replay produced no new action; n8n replay reused the existing lead. | Broad Gmail metadata search returned provider HTTP 500 twice; exact-marker query is the safe proven route. |
+| 9 | Calendar create and cleanup | VERIFIED LIVE / PASS | 2026-10-16 | Synthetic 2099 event `395aa2b55b8ee06d193d90b57fc0e9ca` created with no attendees or updates, deleted with HTTP 204, then read back as `cancelled`. | No real-client booking tested. |
+| 10 | Fireflies meeting ingestion | VERIFIED LIVE / PASS | 2026-10-16 | Verified meeting `01M52PY4BBJWFZAZ2WTJ1GA0G2`; 6.55 minutes, 29 sentences, one speaker, two participants, processed summary and action items; source hash in [live execution evidence](live-execution-evidence.json). | Meeting is not a LOA discovery call; it proves the integration, not LOA customer evidence. |
+| 11 | Tony/Claude follow-up preparation | VERIFIED LIVE / PASS | 2026-10-16 | Claude message `msg_011Cg6FNywrgEEQ4rV7NkSRS`; zero decisions and five source-grounded action items; explicitly marked internal rehearsal. | Native OpenClaw long-flow reliability is incomplete; see stage 12. |
+| 12 | Tony specialist orchestration | VERIFIED LIVE / PARTIAL | 16:54–17:00 | Full 13-step conversation: 11 passed initially. Internal Research delegation completed. `business_and_specialist_status` failed its acceptance rule and `contextual_action` returned no response. On bounded retries, Strategy completed first; Creative Director and Production later completed with transcript-backed results and no external action. Execution-truth check correctly said nothing was sent. | Tune local-model latency/yield handling so delayed child completion automatically resumes Tony’s original answer instead of requiring operator polling. |
+| 13 | Gmail follow-up draft and approval gate | VERIFIED LIVE / PARTIAL | 2026-10-16 | Saved Gmail draft `1a145977e3daa29f`, thread `1a1459775f13d596`, labels DRAFT and IMPORTANT, no SENT label; Notion projection awaits approval. | Gmail OAuth lacks draft-create scope, so native API draft creation returned 403; authenticated UI fallback worked. Matt must approve scope expansion or retain supervised UI drafting. |
+| 14 | Proposal, contract and deposit | VERIFIED LIVE + SIMULATED / BLOCKED | 2026-10-16 | Claude proposal `msg_011Cg6FZemFKgJyU8BkMmZiP` returned the exact approved terms. Existing commercial-close control requires explicit contract and payment/PO satisfaction before Won. | No e-signature or payment provider is integrated. No contract was signed and no money moved. Matt must select providers and acceptance evidence. |
+| 15 | FIELDWORK / Growth Blueprint delivery | VERIFIED SANDBOX / PASS FOR HUMAN REVIEW | 16:50–16:55 | [LOA Blueprint PDF](loa-fictional-Growth-Blueprint-v2.pdf), [editable deck](loa-fictional-Growth-Blueprint-v2.pptx), [seven chapters](seven-chapter-blueprint.json), [commercial model](commercial-opportunity-model.json), [evidence ledger](evidence-and-assumptions-ledger.json), [QA report](independent-qa-report.md). Final QA and rendered review pass; release status is pending. | All LOA company economics, constraint, audience and demand claims require real authorised evidence. Matt must approve the exact checksum before client release. |
+| 16 | Creative production and human approvals | VERIFIED SANDBOX / PARTIAL | 2026-10-16 | Claude’s existing [hero bottle](creative-assets/loa-hero-bottle-claude.png) and [cooler preview](creative-assets/loa-convenience-store-preview-claude.mp4) reused; [creative brief](loa-creative-brief.md), [Campaign World](loa-campaign-world.md), and [asset provenance](creative-assets/asset-provenance.json). Nothing new was generated. | Matt must confirm provenance, usage rights and product accuracy, then approve the territory and exact assets before external production. |
+| 17 | Advertising activation readiness | VERIFIED LIVE READ / BLOCKED | 16:53:25 | Google Ads authenticates, one account, zero campaigns. Meta authenticates with ten permissions but has zero business/ad accounts and campaign read returns HTTP 400. TikTok is unconfigured. [Activation preflight](activation-readiness.md). | Configure a Meta business/ad account, diagnose campaign-read 400, configure TikTok advertiser OAuth, and identify/authorise CTV/TTD accounts. No campaign, spend or publication is authorised. |
+
+## What worked end to end
+
+The controlled journey genuinely reached Gmail → watcher → n8n → Notion → Tony → Telegram, including replay suppression. The verified Fireflies transcript genuinely reached Tony/Claude and produced a real saved, unsent Gmail draft plus an approval-gated Notion projection. The LOA Blueprint and creative package were then built through the existing supervised delivery system, rendered, independently checked and left pending human approval.
+
+## Why this is still NO-GO
+
+Four blockers prevent a real paying-client journey: the Gmail watcher fix is not deployed to its scheduled runtime; Gmail cannot create drafts through its current OAuth scope; Tony requires manual polling to recover slower local specialist results; and contract/payment plus advertising-account activation are not integrated. The product can be reviewed and rehearsed, but the customer journey cannot yet be represented as operationally complete.
+
+## Matt’s next approvals/configuration
+
+1. Approve or reject the exact £5,000 pilot policy and confirm VAT treatment.
+2. Choose Gmail draft scope expansion versus an explicitly supervised Gmail UI step.
+3. Authorise deployment of this branch’s watcher fix and a controlled LaunchAgent run.
+4. Choose e-signature and payment providers and define the authoritative contract/deposit receipt.
+5. Approve the LOA territory/assets only for continued internal rehearsal, or request changes; do not treat them as client evidence.
+6. Connect a Meta business/ad account, TikTok advertiser account and any intended CTV/TTD platform before activation can be tested.
