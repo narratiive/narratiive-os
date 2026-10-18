@@ -15,6 +15,7 @@ from runtime.workflow_quality import (
     delivery_preparation_quality_gate,
     follow_up_preparation_quality_gate,
     discovery_preparation_quality_gate,
+    fieldwork_founder_argument_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
@@ -312,6 +313,105 @@ def growth_blueprint_output() -> dict:
     }
 
 
+def fieldwork_founder_argument_output() -> dict:
+    evidence = [
+        {
+            "claim": f"Rave evidence claim {index} supports a distinct part of the internal argument.",
+            "classification": classification,
+            "source_refs": [f"rave-{index}"],
+        }
+        for index, classification in enumerate(
+            (
+                "VERIFIED EXTERNAL",
+                "VERIFIED EXTERNAL",
+                "MODELLED",
+                "ASSUMPTION",
+                "VERIFIED EXTERNAL",
+            ),
+            start=1,
+        )
+    ]
+    move_names = (
+        "current_position",
+        "commercial_opportunity",
+        "growth_levers",
+        "audience_opportunity",
+        "strategic_direction",
+    )
+    move_arguments = (
+        "Rave already owns approachable coffee, recurring purchase routes and broad product choice, but customers do not yet see those assets as one connected journey.",
+        "The twelve month opportunity comes from improving qualified entry, the first purchase decision, early repeat behaviour and progression into greater value.",
+        "Four controllable levers connect the commercial model: entry at the upgrade moment, simpler choice, useful replenishment and visible discovery after trust develops.",
+        "People replacing supermarket coffee form the priority hypothesis because their active decision can connect acquisition intent with repeat purchase and guided exploration.",
+        "Rave should organise the business around owning the upgrade moment, then validate each part of that progression before increasing acquisition investment.",
+    )
+    move_consequences = (
+        "Existing assets can create more value when customers understand how they fit together.",
+        "The model focuses management on measurable customer behaviour rather than an invented revenue promise.",
+        "Sequencing these levers shows which operational and marketing work deserves priority.",
+        "A moment-based audience gives acquisition and product journeys one commercially useful focus.",
+        "A single direction aligns customer entry, retention evidence and future investment decisions.",
+    )
+    founder_decisions = (
+        "Confirm whether the disconnected journey describes the current commercial constraint.",
+        "Approve the internal data required to replace every open model variable.",
+        "Choose which lever should receive the first bounded commercial test.",
+        "Authorise primary research to validate or reject the Upgrader hypothesis.",
+        "Approve or reject owning the upgrade as the experimental strategic direction.",
+    )
+    moves = [
+        {
+            "move": move,
+            "headline": f"Rave decision {index} has a distinct commercial role",
+            "argument": move_arguments[index - 1],
+            "commercial_consequence": move_consequences[index - 1],
+            "founder_decision": founder_decisions[index - 1],
+            "evidence_refs": [f"rave-{index}"],
+        }
+        for index, move in enumerate(move_names, start=1)
+    ]
+    return {
+        "founder_argument": {
+            "client_name": "Rave",
+            "central_argument": "Rave can turn its accessible speciality range into a clearer customer progression by concentrating on the upgrade moment, reducing uncertainty at the first choice and proving which steps increase repeat purchase before scaling acquisition or making an unsupported revenue promise.",
+            "business_opportunity": {
+                "statement": "The business opportunity is to convert more first orders into retained relationships.",
+                "growth_mechanism": "Improve qualified entry, first choice, early repeat and customer progression.",
+                "commercial_consequence": "Better retention and progression can increase contribution without assuming an unsupported revenue forecast.",
+                "evidence_refs": ["rave-1", "rave-3"],
+                "validation_required": "Rave must supply channel conversion, repeat and contribution baselines.",
+            },
+            "audience_opportunity": {
+                "priority_audience": "People ready to replace supermarket coffee with a dependable speciality choice.",
+                "commercial_moment": "Their routine or equipment has changed and the first speciality decision feels uncertain.",
+                "commercial_relevance": "This moment connects acquisition intent to a route for repeat purchase and discovery.",
+                "evidence_refs": ["rave-2", "rave-4"],
+                "validation_required": "Validate the audience with CRM cohorts and primary customer research.",
+            },
+            "strategic_recommendation": {
+                "recommendation": "Rave should own the upgrade moment and organise entry, choice, repeat and discovery as one visible progression.",
+                "why_this": "The recommendation joins Rave's existing range and recurring routes around a specific customer decision.",
+                "tradeoffs": "Rave would give less prominence to an undifferentiated catalogue and delay broad acquisition until the progression is measured.",
+                "competitor_substitution_test": "A competitor cannot reuse this recommendation without Rave's accessible range, subscription routes and documented upgrade signals.",
+                "next_decision": "Approve or reject the upgrader hypothesis for validation before any presentation is produced.",
+                "evidence_refs": ["rave-1", "rave-2", "rave-5"],
+            },
+            "commercial_growth_mechanism": {
+                "growth_equation": "Qualified entry multiplied by first purchase conversion, early repeat and value progression increases contribution.",
+                "growth_levers": ["qualified entry", "early repeat", "value progression"],
+                "known_inputs": ["Public range and subscription routes exist."],
+                "missing_inputs": ["Channel conversion, repeat, margin and cohort evidence."],
+                "scenario_not_forecast": True,
+            },
+            "evidence_basis": evidence,
+            "argument_moves": moves,
+        },
+        "evidence_lineage": evidence,
+        "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
 def blueprint_director_output(
     *, client_name: str = "Synthetic Client", page_count: int = 17,
 ) -> dict:
@@ -573,6 +673,45 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
         output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
         self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_growth_blueprint_gate_fails_closed_for_every_missing_mandatory_field(self) -> None:
+        mandatory = (
+            "central_thesis",
+            "narrative_progression",
+            "editorial_judgement",
+            "contradiction_resolution",
+            "quantitative_evidence_treatment",
+            "assumption_control",
+            "completeness",
+        )
+        for field in mandatory:
+            with self.subTest(field=field):
+                output = growth_blueprint_output()
+                output.pop(field)
+                output["recommendation"] = "advance"
+                result = growth_blueprint_quality_gate(output)
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["missing_mandatory_fields"], [field])
+                self.assertIn("mandatory quality fields are present", result["failed_checks"])
+
+    def test_founder_argument_gate_accepts_coherent_evidence_linked_argument(self) -> None:
+        result = fieldwork_founder_argument_quality_gate(fieldwork_founder_argument_output())
+        self.assertTrue(result["passed"], result)
+        self.assertTrue(all(axis["passed"] for axis in result["editorial_qa"].values()))
+
+    def test_founder_argument_gate_rejects_jargon_repetition_and_unsupported_precision(self) -> None:
+        output = fieldwork_founder_argument_output()
+        argument = output["founder_argument"]
+        argument["strategic_recommendation"]["recommendation"] = (
+            "Rave should unlock potential through a best-in-class holistic ecosystem with a £2m outcome."
+        )
+        argument["argument_moves"][1] = dict(argument["argument_moves"][0])
+        result = fieldwork_founder_argument_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("writing is clear and free of jargon", result["failed_checks"])
+        self.assertIn("argument does not repeat itself", result["failed_checks"])
+        self.assertIn("financial precision is supported", result["failed_checks"])
+        self.assertEqual(result["editorial_qa"]["unsupported_financial_precision"]["tokens"], ["£2"])
 
     def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
         output = senior_strategist_review_output("a" * 64)
