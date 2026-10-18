@@ -90,6 +90,8 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("scenario is not a forecast", instruction)
         self.assertIn("must not trigger presentation production", instruction)
         self.assertIn("VERIFIED CLIENT", instruction)
+        self.assertIn("a list of known_inputs", instruction)
+        self.assertIn("a list of missing_inputs", instruction)
 
     def test_blueprint_director_contract_prioritises_editorial_product(self) -> None:
         instruction = workflow_instruction(

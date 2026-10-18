@@ -403,7 +403,9 @@ def fieldwork_founder_argument_quality_gate(output: Mapping[str, Any]) -> Mappin
             *(str(item.get("argument") or "") for item in moves or [] if isinstance(item, Mapping)),
         )
     )
-    financial_tokens = set(re.findall(r"(?:[£$€]\s?\d[\d,.]*|\b\d+(?:\.\d+)?%)", visible_text))
+    financial_tokens = set(
+        re.findall(r"(?:[£$€]\s?\d(?:[\d,]*\d)?(?:\.\d+)?|\b\d+(?:\.\d+)?%)", visible_text)
+    )
     supported_financial_text = " ".join(
         str(item.get("claim") or "")
         for item in evidence_basis or []

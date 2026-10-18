@@ -713,6 +713,15 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertIn("financial precision is supported", result["failed_checks"])
         self.assertEqual(result["editorial_qa"]["unsupported_financial_precision"]["tokens"], ["£2"])
 
+    def test_founder_argument_gate_accepts_supported_currency_before_punctuation(self) -> None:
+        output = fieldwork_founder_argument_output()
+        output["founder_argument"]["central_argument"] += " The current public entry price is £9.95, subject to revalidation."
+        output["founder_argument"]["evidence_basis"][0]["claim"] += " The captured public entry price is £9.95."
+
+        result = fieldwork_founder_argument_quality_gate(output)
+
+        self.assertTrue(result["checks"]["financial_precision_is_supported"])
+
     def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
         output = senior_strategist_review_output("a" * 64)
         self.assertTrue(senior_strategist_review_quality_gate(output)["passed"])

@@ -1,0 +1,15 @@
+{
+  "action": "await_human_approval",
+  "approval_status": "pending",
+  "artifact_checksum": "5afd87770969c189abe6df126b7e8943a2aeeb493b0cee4cfd5e8f4793813145",
+  "artifact_id": "artifact-791e8aa079606bf6-5afd87770969c189",
+  "business_id": "rave",
+  "case_sha256": "c89829ba861d8b10c053533128f81337b74b5f4b5144eb03e13a5815d68d576e",
+  "executed_at": "2026-10-18T21:13:52.498388+00:00",
+  "external_action_taken": false,
+  "presentation_production_triggered": false,
+  "provider_message_id": "msg_011CgAPgTC7bhHffZS1e61yy",
+  "run_id": "rave-fieldwork-calibration-20261018-v3",
+  "status": "awaiting_approval",
+  "workflow_id": "fieldwork_founder_argument_experiment"
+}

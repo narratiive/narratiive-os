@@ -10,6 +10,7 @@ runtime-state/
 # Generated review outputs and PDF visual-QA intermediates
 output/pdf/
 tmp/pdfs/
+.presentation-build/
 
 # macOS
 .DS_Store
