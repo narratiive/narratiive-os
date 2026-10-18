@@ -10,9 +10,13 @@ All three live commissions passed strict structural, evidence and editorial vali
 
 | Business | Central commercial argument | Founder decision | Clarity | Commercial usefulness | Strategic distinctiveness | Presentation result |
 |---|---|---|---|---|---|---|
-| Rave Coffee | Turn existing breadth into one measurable progression from first choice to repeat and discovery. | Instrument and test one progression before more offer, positioning or acquisition work. | Strong: one unresolved commercial question carries all five moves. | Strong but data-gated: directs effort to repeat and contribution rather than a new campaign. | Strong: accessible breadth becomes a progression system, not a generic “premium coffee” position. | Preserves the original warm paper, ink, yellow-path and cobalt-evidence language. |
-| KatKin | Make scientific ambition useful at the trial, transition and early-feeding decisions. | Build and test a customer decision system before further acquisition or brand spend. | Strong: separates public scale claims from unknown customer economics. | Strong: focuses on transition completion and retained feeders. | Strong: science becomes operating guidance, not another ingredient claim. | Uses the same FIELDWORK grammar with a distinct warm coral, violet and cat-led world. |
-| The Yardstick Agency | Reorganise broad specialist capability around the change points that cause advice firms to buy. | Validate a diagnostic entry route against pipeline and account data before wider messaging. | Strong: resolves a service menu into a buying logic. | Strong: connects diagnosis, service sequence and retained proof. | Strong: owns moments of organisational change rather than generic financial-services expertise. | Demonstrates that the system works without consumer-product photography or packaging cues. |
+| Rave Coffee | Turn existing breadth into one measurable progression from first choice to repeat and discovery. | Instrument and test one progression before more offer, positioning or acquisition work. | **5/5**: one unresolved commercial question carries all five moves. | **4/5**, data-gated: directs effort to repeat and contribution rather than a new campaign. | **4/5**: accessible breadth becomes a progression system, not a generic “premium coffee” position. | **4/5**: preserves the original warm paper, ink, yellow-path and cobalt-evidence language. |
+| KatKin | Make scientific ambition useful at the trial, transition and early-feeding decisions. | Build and test a customer decision system before further acquisition or brand spend. | **5/5**: separates public scale claims from unknown customer economics. | **4/5**: focuses on transition completion and retained feeders. | **4/5**: science becomes operating guidance, not another ingredient claim. | **4/5**: uses the same FIELDWORK grammar with a distinct warm coral, violet and cat-led world. |
+| The Yardstick Agency | Reorganise broad specialist capability around the change points that cause advice firms to buy. | Validate a diagnostic entry route against pipeline and account data before wider messaging. | **4/5**: resolves a service menu into a buying logic, with slightly more abstraction than the consumer cases. | **4/5**: connects diagnosis, service sequence and retained proof. | **4/5**: owns moments of organisational change rather than generic financial-services expertise. | **4/5**: demonstrates that the system works without consumer-product photography or packaging cues. |
+
+The scores use the documented 1–5 rubric in
+`editorial-and-visual-scorecard.json`. They are internal comparative judgements,
+not client validation or human approval.
 
 ## What the calibration establishes
 
@@ -31,4 +35,3 @@ All three live commissions passed strict structural, evidence and editorial vali
 ## Judgement
 
 The founder-argument gate is ready to remain an opt-in candidate for supervised use. It consistently improves the conditions for clarity and usefulness by forcing one argument, one mechanism and one founder decision before presentation production. Promotion to the default should wait for Matt's comparative review and one supervised engagement using first-party evidence.
-

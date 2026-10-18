@@ -1,0 +1,173 @@
+{
+  "schema_version": "1.0.0",
+  "business_id": "rave",
+  "client_name": "Rave Coffee",
+  "status": "internal_not_client_approved",
+  "source_files": [
+    "research-case.json",
+    "founder-argument.json"
+  ],
+  "counts": {
+    "ASSUMPTION": 2,
+    "VERIFIED EXTERNAL": 8
+  },
+  "evidence_and_assumptions": [
+    {
+      "evidence_id": "R1",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Companies House lists Rave Coffee Limited as active, founder-controlled and incorporated in 2010. Full accounts to 31 December 2025 were filed on 8 September 2026. The filing confirms a newer reporting period exists, but this public research did not extract or verify revenue, profit, channel mix or unit economics.",
+      "source_refs": [
+        "https://find-and-update.company-information.service.gov.uk/company/07384599",
+        "https://find-and-update.company-information.service.gov.uk/company/07384599/filing-history"
+      ]
+    },
+    {
+      "evidence_id": "R2",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Rave's current Coffee Club page offers Traditional, Discovery and mixed subscriptions from £9.95 with tracked delivery, education and monthly coffee selection. This verifies proposition and price at capture, not subscriptions, retention or margin.",
+      "source_refs": [
+        "https://ravecoffee.co.uk/pages/coffee-subscription"
+      ]
+    },
+    {
+      "evidence_id": "R3",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Rave also offers Subscribe and Save with a 10% recurring discount across familiar blends and formats. Its public range includes blends, single origins, rare releases, pods, gifts, equipment, wholesale and cold brew. Product breadth is visible, but demand and progression between products are unavailable.",
+      "source_refs": [
+        "https://ravecoffee.co.uk/collections/subscribe-save-10",
+        "https://ravecoffee.co.uk/collections/all-roasted"
+      ]
+    },
+    {
+      "evidence_id": "R4",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Rave Wholesale currently combines roasted coffee with machines, installation, training, servicing and ongoing support for offices and hospitality. This verifies an embedded service proposition, not wholesale economics, retention or service capacity.",
+      "source_refs": [
+        "https://wholesale.ravecoffee.co.uk/"
+      ]
+    },
+    {
+      "evidence_id": "R5",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "CBI's August 2026 UK coffee study says consumption value is growing mainly through premiumisation, calls the UK Europe's largest speciality coffee market and notes growing ground and single-serve use. The British Coffee Association reports 103 million cups consumed daily and faster growth among 18 to 34 year olds. These are market-level indicators, not Rave demand evidence.",
+      "source_refs": [
+        "https://www.cbi.eu/market-information/coffee/united-kingdom/market-potential",
+        "https://britishcoffeeassociation.org/media-centre/"
+      ]
+    },
+    {
+      "evidence_id": "R6",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Pact currently frames subscription around a House, Select and Micro-Lot ladder priced at £7.95, £8.95 and £10.95 per 250g before temporary offers, with coffee ratings and direct farmer sourcing. This makes guided progression and sourcing proof visible competitor choices.",
+      "source_refs": [
+        "https://www.pactcoffee.com/subscribe-and-save-p"
+      ]
+    },
+    {
+      "evidence_id": "R7",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Grind currently spans pods, beans, ground coffee and cans, using a free tin, subscription discount and lifestyle visibility. Origin's Feature subscription is £12.95 and foregrounds provenance and awards. Union's £18.95 Discovery plan foregrounds direct trade, quality scores and monthly exploration. Prices are snapshots with different pack sizes and must not be treated as a like-for-like index.",
+      "source_refs": [
+        "https://grind.co.uk/pages/coffee-subscription-50",
+        "https://www.origincoffee.co.uk/pages/coffee-subscriptions",
+        "https://unionroasted.com/collections/coffee-subscriptions/products/discovery-coffee-subscription"
+      ]
+    },
+    {
+      "evidence_id": "R8",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Rave states that it gives 1% of sales to environmental causes, but the page displays several cumulative impact figures without a date or reconciled method. The commitment is visible while its public proof system remains difficult to audit.",
+      "source_refs": [
+        "https://ravecoffee.co.uk/pages/1-for-the-planet"
+      ]
+    },
+    {
+      "evidence_id": "R9",
+      "classification": "ASSUMPTION",
+      "content": "The most promising audience is a capable home-coffee upgrader who wants better coffee without specialist intimidation. Public pages and market data make this reasonable to test, but Rave has supplied no first-party segment, conversion or cohort evidence.",
+      "source_refs": [
+        "R2",
+        "R3",
+        "R5"
+      ]
+    },
+    {
+      "evidence_id": "R10",
+      "classification": "ASSUMPTION",
+      "content": "A guided progression from dependable first choice to repeat and discovery could improve customer value. No first-party baseline exists for qualified traffic, first-order conversion, 90-day repeat, contribution, wholesale retention or product progression, so this remains a mechanism rather than a forecast.",
+      "source_refs": [
+        "R2",
+        "R3",
+        "R4",
+        "R6",
+        "R7"
+      ]
+    }
+  ],
+  "argument_evidence_basis": [
+    {
+      "claim": "Rave is an active, founder-controlled company with a recent accounts filing whose financial detail was not extracted or verified.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R1"
+      ]
+    },
+    {
+      "claim": "Rave's public range spans entry blends, subscriptions, single origins, rare releases and a wholesale service model.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    {
+      "claim": "UK speciality coffee consumption is growing mainly through premiumisation, with faster growth among 18-34 year olds.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R5"
+      ]
+    },
+    {
+      "claim": "Competitors including Pact and Union already present explicit progression, provenance or discovery narratives in their subscriptions.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R6",
+        "R7"
+      ]
+    },
+    {
+      "claim": "The home-coffee upgrader is a reasonable audience to test, but it is not evidenced by any first-party Rave data.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "R9"
+      ]
+    },
+    {
+      "claim": "A guided progression from first choice to repeat and discovery is a plausible growth mechanism, not a validated one.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "R10"
+      ]
+    },
+    {
+      "claim": "Rave's environmental giving claim is publicly stated but its supporting figures are not independently reconciled.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R8"
+      ]
+    }
+  ],
+  "unavailable_first_party_inputs": [
+    "Channel-level traffic and first-order conversion data",
+    "First-party 90-day repeat rates",
+    "Contribution margin by product line",
+    "Wholesale retention and service capacity data",
+    "Confirmed audience segment data for the proposed upgrader"
+  ],
+  "scenario_boundary": {
+    "scenario_not_forecast": true,
+    "forecast_produced": false,
+    "client_contacted": false
+  }
+}
