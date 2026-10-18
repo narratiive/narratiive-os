@@ -1,0 +1,142 @@
+{
+  "checks": {
+    "no_near_duplicate_rendered_layouts": true,
+    "no_rendered_truncation_markers": true,
+    "rendered_citations_are_visible": true,
+    "rendered_commercial_model_is_present": true,
+    "rendered_copy_is_client_safe_and_complete": true,
+    "rendered_expected_copy_is_visible": true,
+    "rendered_images_match_approved_roles": true,
+    "rendered_narrative_progression_is_complete": true,
+    "rendered_seven_chapter_profile_is_complete": true,
+    "rendered_slide_count_matches_specification": true,
+    "rendered_slide_dimensions_are_complete": true,
+    "rendered_source_register_is_present": true,
+    "rendered_text_is_legible": true
+  },
+  "citation_slides": [
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    11,
+    12,
+    13,
+    14,
+    15,
+    16,
+    17,
+    18,
+    19,
+    20,
+    21
+  ],
+  "duplicate_layout_pairs": [],
+  "findings": [],
+  "ocr_output": "outputs/rehearsals/issue-477-loa-pass2/blueprint-rerun/rendered-slide-ocr.json",
+  "progression_terms_found": [
+    "opportunity",
+    "constraint",
+    "advantage",
+    "strategy",
+    "creative",
+    "growth engine",
+    "12 months",
+    "founder decision"
+  ],
+  "rendered_copy_gaps": [],
+  "rendered_slide_dimensions": [
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ],
+    [
+      1280,
+      720
+    ]
+  ],
+  "review_basis": "rendered_png_pixels_and_macos_vision_ocr",
+  "status": "passed",
+  "truncated_slides": []
+}

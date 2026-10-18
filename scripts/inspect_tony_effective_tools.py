@@ -39,6 +39,7 @@ def _all_strings(value: Any) -> list[str]:
 def inspect_effective_tools(
     agent_id: str = "tony",
     *,
+    timeout_seconds: float = 45.0,
     runner: Callable[..., subprocess.CompletedProcess[str]] = subprocess.run,
 ) -> dict[str, Any]:
     """Inspect the tool surface OpenClaw exposes to Tony in a real session.
@@ -64,7 +65,7 @@ def inspect_effective_tools(
             command,
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=timeout_seconds,
             check=False,
         )
     except (OSError, subprocess.TimeoutExpired) as exc:

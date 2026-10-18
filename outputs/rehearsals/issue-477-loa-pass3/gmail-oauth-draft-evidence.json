@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "issue": 477,
+  "classification": "VERIFIED LIVE",
+  "authorised_at": "2026-10-17T06:44:09Z",
+  "granted_scopes": [
+    "https://www.googleapis.com/auth/calendar.calendars.readonly",
+    "https://www.googleapis.com/auth/calendar.events",
+    "https://www.googleapis.com/auth/calendar.events.freebusy",
+    "https://www.googleapis.com/auth/drive.file",
+    "https://www.googleapis.com/auth/gmail.compose",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/gmail.send"
+  ],
+  "unexpected_gmail_scopes": [],
+  "previous_environment_backup": "/Users/admin/.config/narratiive/runtime.env.pre-gmail-compose-20261017T064409Z",
+  "secrets_printed": false,
+  "draft": {
+    "marker": "ISSUE477-LOA-DRAFT-PASS3-20261017T0645Z",
+    "recipient": "hello@narratiive.com",
+    "draft_id": "r7424548435740595408",
+    "message_id": "1a1489b63b0dd8ba",
+    "provider_labels": ["DRAFT"],
+    "first_mutation_count": 1,
+    "replay_after_dispatcher_restart_mutation_count": 0,
+    "duplicate_suppressed": true,
+    "draft_search_count": 1,
+    "sent_search_count": 0,
+    "sent": false,
+    "human_send_approval_required": true,
+    "receipt_store_sha256": "01d4cd2fcc023acd1364b7626a98c57ad63546e428d3c8ed2d545ebd1bc3f4c8"
+  }
+}

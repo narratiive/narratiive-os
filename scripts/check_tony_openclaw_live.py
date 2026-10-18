@@ -56,6 +56,7 @@ _REJECTION_MARKERS = (
     "command not recognised",
     "command not recognized",
     "unsupported command",
+    "no response from openclaw",
 )
 
 _SPECIALIST_FAILURE_MARKERS = (

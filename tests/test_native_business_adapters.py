@@ -246,6 +246,94 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
 
+    def test_gmail_approved_draft_is_created_without_sending(self):
+        router = Router([
+            {"messages": []},
+            {"id": "draft-1", "message": {"id": "message-1", "threadId": "thread-1"}},
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter(approved_contract({
+            "kind": "gmail_draft_create",
+            "recipient_email": "hello@narratiive.com",
+            "subject": "SAFE follow-up",
+            "body": "Prepared for human approval.",
+        }))
+
+        self.assertTrue(result["verified"])
+        self.assertTrue(result["created"])
+        self.assertFalse(result["sent"])
+        self.assertEqual(result["draft_id"], "draft-1")
+        self.assertEqual(result["mutation_count"], 1)
+        self.assertTrue(router.requests[1].full_url.endswith("/users/me/drafts"))
+
+        replay = adapter(approved_contract({
+            "kind": "gmail_draft_create",
+            "recipient_email": "hello@narratiive.com",
+            "subject": "SAFE follow-up",
+            "body": "Prepared for human approval.",
+        }))
+        self.assertTrue(replay["duplicate_suppressed"])
+        self.assertEqual(replay["mutation_count"], 0)
+        self.assertEqual(replay["draft_id"], "draft-1")
+        self.assertEqual(len(router.requests), 2)
+
+    def test_gmail_immediate_send_replay_uses_mutation_receipt_before_search_indexes(self):
+        router = Router([
+            {"messages": []},
+            {"id": "sent-1", "threadId": "thread-1"},
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+        contract = approved_contract({
+            "recipient_email": "hello@narratiive.com",
+            "subject": "SAFE controlled enquiry",
+            "body": "Controlled internal test.",
+        })
+        contract["idempotency_key"] = "controlled-enquiry-1"
+
+        first = adapter(contract)
+        replay = adapter(contract)
+
+        self.assertEqual(first["mutation_count"], 1)
+        self.assertFalse(first["duplicate_suppressed"])
+        self.assertEqual(replay["mutation_count"], 0)
+        self.assertTrue(replay["duplicate_suppressed"])
+        self.assertEqual(replay["message_id"], "sent-1")
+        self.assertEqual(len(router.requests), 2)
+
+    def test_gmail_send_receipt_survives_dispatcher_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            store = Path(directory) / "gmail-receipts.json"
+            first_router = Router([
+                {"messages": []},
+                {"id": "sent-1", "threadId": "thread-1"},
+            ])
+            contract = approved_contract({
+                "recipient_email": "hello@narratiive.com",
+                "subject": "SAFE controlled enquiry",
+                "body": "Controlled internal test.",
+            })
+            contract["idempotency_key"] = "controlled-enquiry-1"
+            first = GmailDispatcher(
+                GoogleOAuthConfig(access_token="synthetic"),
+                opener=first_router,
+                receipt_store=store,
+            )(contract)
+
+            restarted_router = Router([])
+            replay = GmailDispatcher(
+                GoogleOAuthConfig(access_token="synthetic"),
+                opener=restarted_router,
+                receipt_store=store,
+            )(contract)
+
+            self.assertEqual(first["mutation_count"], 1)
+            self.assertEqual(replay["mutation_count"], 0)
+            self.assertTrue(replay["duplicate_suppressed"])
+            self.assertEqual(replay["message_id"], "sent-1")
+            self.assertEqual(restarted_router.requests, [])
+            self.assertEqual(store.stat().st_mode & 0o777, 0o600)
+
     def test_gmail_internal_review_exception_is_exact_and_supports_attachment(self):
         contract = {
             "execution_mode": "authorised_internal_review_write",

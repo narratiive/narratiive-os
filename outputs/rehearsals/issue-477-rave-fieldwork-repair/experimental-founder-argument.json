@@ -1,0 +1,259 @@
+{
+  "evidence_lineage": [
+    {
+      "claim": "All evidence used comes from a frozen public-evidence comparison pack captured 2026-09-06; Rave Coffee did not supply or commission it and has not reviewed or approved this argument.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "rave-owned-surface",
+        "market-and-competition",
+        "customer-signals",
+        "accounts-and-scale",
+        "claim-consistency-and-operations",
+        "channel-and-proposition-options"
+      ]
+    },
+    {
+      "claim": "No source in the evidence pack provides Rave's revenue by channel, contribution margin, CAC, retention, churn or cohort behaviour; all unit-economics claims in this argument are hypotheses pending internal data.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "rave-owned-surface",
+        "accounts-and-scale"
+      ]
+    },
+    {
+      "claim": "Competitor subscription offers (Pact, Origin, Grind, Union) each foreground a single proof point - farmer fairness, provenance, lifestyle/format, or direct trade - while Rave's assets combine several jobs without one unifying narrative.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "market-and-competition",
+        "channel-and-proposition-options"
+      ]
+    },
+    {
+      "claim": "Public customer reviews provide directional signals on value, freshness and reliability concerns but are self-selected and cannot be treated as a representative customer study.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "customer-signals"
+      ]
+    },
+    {
+      "claim": "Rave's filed Companies House accounts for FY2024 confirm balance-sheet and headcount growth but exclude the income statement, so no profitability or growth-rate figure can be cited.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "accounts-and-scale"
+      ]
+    },
+    {
+      "claim": "The upgrade-moment audience and the proposed anchor/explore/rare progression are strategic hypotheses constructed for this internal experiment, not verified client segments or confirmed customer journeys.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "channel-and-proposition-options",
+        "market-and-competition"
+      ]
+    },
+    {
+      "claim": "The commercial growth equation and lever model are a transparent reasoning scaffold for decision-making, not a forecast; no numeric values are assigned to any lever.",
+      "classification": "MODELLED",
+      "source_refs": [
+        "channel-and-proposition-options"
+      ]
+    }
+  ],
+  "founder_argument": {
+    "argument_moves": [
+      {
+        "argument": "Public evidence shows core blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, wholesale and RTD - a wide but fragmented set of jobs, not a traceable connected journey.",
+        "commercial_consequence": "Without knowing which entry route produces stronger repeat purchase and contribution, further investment in any one channel risks scaling an unproven mechanism.",
+        "evidence_refs": [
+          "rave-owned-surface",
+          "channel-and-proposition-options"
+        ],
+        "founder_decision": "Confirm whether Rave currently tracks customers by entry route and repeat behaviour, or whether this must be built first.",
+        "headline": "Rave has built many credible entry and retention routes but no proof of which works best.",
+        "move": "current_position"
+      },
+      {
+        "argument": "Market data shows premiumisation growth and a large non-specialty buyer pool, while Rave's pricing and tone plausibly suit people leaving supermarket coffee; no source shows Rave's actual share of recent upgraders.",
+        "commercial_consequence": "If the upgrade moment converts well, Rave can grow value per customer without discounting or competing head-on with enthusiast-focused rivals.",
+        "evidence_refs": [
+          "market-and-competition",
+          "customer-signals"
+        ],
+        "founder_decision": "Decide whether to commission data or a controlled test to size the upgrade-moment audience before committing budget.",
+        "headline": "The upgrade moment is a testable opportunity, not yet a proven one.",
+        "move": "commercial_opportunity"
+      },
+      {
+        "argument": "The growth equation's components exist in Rave's product range, but conversion, repeat rate and contribution values are unknown; filed accounts show growth in assets and headcount but no income statement.",
+        "commercial_consequence": "Scaling acquisition before measuring these levers risks investing without proof of which segment or format returns value.",
+        "evidence_refs": [
+          "accounts-and-scale",
+          "market-and-competition",
+          "rave-owned-surface"
+        ],
+        "founder_decision": "Choose which lever to instrument first - likely early repeat, since two repeat mechanisms already exist - rather than fixing all four at once.",
+        "headline": "Four levers determine value per customer; all four currently lack internal data.",
+        "move": "growth_levers"
+      },
+      {
+        "argument": "Competitors visibly compete for the committed specialty buyer via provenance or lifestyle; reviewer language ('step up from supermarket') points to an underserved upgrade audience better matched to Rave's accessible tone.",
+        "commercial_consequence": "Targeting this audience changes what success means - confident first choice and low-friction repeat, not maximum novelty - which reshapes the whole progression Rave builds.",
+        "evidence_refs": [
+          "customer-signals",
+          "channel-and-proposition-options",
+          "market-and-competition"
+        ],
+        "founder_decision": "Confirm whether Rave wants to prioritise the upgrader explicitly, even if communications lead less with Rare/microlot credentials.",
+        "headline": "The upgrader, not the enthusiast, is where Rave's assets are least contested.",
+        "move": "audience_opportunity"
+      },
+      {
+        "argument": "Build and instrument a three-tier progression for the upgrade moment, but first resolve the compostability-claim inconsistency and conflicting delivery-reliability reviews that could undermine trust during a scaled test.",
+        "commercial_consequence": "This converts Rave's component assets into one measurable system and prevents acquisition investment from being undermined by unresolved operational or proof issues.",
+        "evidence_refs": [
+          "claim-consistency-and-operations",
+          "channel-and-proposition-options",
+          "accounts-and-scale"
+        ],
+        "founder_decision": "Decide whether to commission the pilot and the operational fixes concurrently, or sequence the fixes first.",
+        "headline": "Pilot a proven progression before scaling acquisition, and fix proof and reliability issues first.",
+        "move": "strategic_direction"
+      }
+    ],
+    "audience_opportunity": {
+      "commercial_moment": "The decision window before brand loyalty forms, when buyers need reassurance - price, ease, reliability - more than specialist credentials.",
+      "commercial_relevance": "Public reviewer language ('step up from supermarket', 'only slightly dearer than Tesco Finest') and market data showing 80% of UK households still buy instant coffee suggest this audience is large relative to committed specialty buyers, and better matched to Rave's accessible, non-judgemental voice than to competitors' provenance- or lifestyle-led positioning.",
+      "evidence_refs": [
+        "customer-signals",
+        "market-and-competition",
+        "rave-owned-surface"
+      ],
+      "priority_audience": "The supermarket-upgrade moment: buyers moving from supermarket coffee, or who have just bought a new brewing setup, choosing their first speciality supplier.",
+      "validation_required": [
+        "Verified-purchase segmentation confirming upgrader share of new customers",
+        "Qualified reach/awareness data at the upgrade moment",
+        "Comparison of upgrader retention versus enthusiast retention"
+      ]
+    },
+    "business_opportunity": {
+      "commercial_consequence": "If proven, Rave can raise value per qualified customer relationship without raising acquisition volume or cutting price; left untested, current breadth risks diffusing resource across unproven routes while competitors sharpen single differentiators.",
+      "evidence_refs": [
+        "rave-owned-surface",
+        "channel-and-proposition-options",
+        "market-and-competition"
+      ],
+      "growth_mechanism": "Improve qualified entry at the upgrade moment, first-purchase conversion, early repeat behaviour and progression into higher-value formats, then scale only the steps that prove out.",
+      "statement": "Rave's growth gap is not a shortage of entry routes but an absence of evidence about which route produces stronger repeat purchase and contribution; the opportunity is to design and test an explicit upgrade-moment progression - everyday anchor, guided exploration, rare frontier - before committing further acquisition investment.",
+      "validation_required": [
+        "Channel-level conversion and repeat-purchase data by entry route",
+        "Contribution margin by product/channel",
+        "Verified cohort behaviour for customers who recently left supermarket coffee or bought new equipment"
+      ]
+    },
+    "central_argument": "Rave has assembled many credible entry and retention mechanisms - accessible blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, wholesale, RTD - but public evidence does not show they are experienced as one connected progression, nor which entry route produces stronger repeat purchase and contribution. The commercial opportunity is to treat the supermarket-upgrade moment as a testable system (confident first choice, early repeat, guided progression) and prove it before scaling acquisition spend.",
+    "client_name": "Rave Coffee",
+    "commercial_growth_mechanism": {
+      "growth_equation": "Qualified reach at the upgrade moment x first-purchase conversion x early repeat rate x progression into higher-value formats = value created per qualified customer relationship over twelve months.",
+      "growth_levers": [
+        "qualified reach at the upgrade moment",
+        "first purchase conversion",
+        "early repeat behaviour",
+        "progression into greater value"
+      ],
+      "known_inputs": [
+        "Rave's range already spans anchor, exploration and rare tiers (rave-owned-surface)",
+        "Rave already runs two repeat mechanisms - Coffee Club and Subscribe & Save - plus a rewards scheme (rave-owned-surface)",
+        "UK market is premiumising with a large non-specialty buyer pool and an eroding mid-tier (market-and-competition)"
+      ],
+      "missing_inputs": [
+        "Current qualified reach or traffic at the upgrade moment",
+        "First-purchase conversion rate by entry route",
+        "Repeat and churn rates by cohort",
+        "Contribution margin by product and channel",
+        "Operational reliability rate behind the freshness and delivery promise"
+      ],
+      "scenario_not_forecast": true
+    },
+    "evidence_basis": [
+      {
+        "claim": "Rave's public site offers accessible core blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, equipment, wholesale and RTD, presented as separate offers rather than one connected progression.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "rave-owned-surface",
+          "channel-and-proposition-options"
+        ]
+      },
+      {
+        "claim": "UK coffee market growth is value-led premiumisation with an eroding mid-tier, and roughly 80% of UK households still buy instant coffee, indicating a large pool of potential upgraders.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "market-and-competition"
+        ]
+      },
+      {
+        "claim": "Public Trustpilot reviews describe Rave as a step up from supermarket coffee and only slightly dearer than premium supermarket options, but these are self-selected, unverified reviews.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "customer-signals"
+        ]
+      },
+      {
+        "claim": "Rave's filed accounts show balance-sheet and headcount growth between 2023 and 2024 but omit the income statement, so revenue, margin and channel economics cannot be established.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "accounts-and-scale"
+        ]
+      },
+      {
+        "claim": "Rave's public pages give inconsistent disposal guidance for its coffee pods and conflicting recent reviews on delivery reliability, which could undermine a proof-dependent progression if unresolved.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "claim-consistency-and-operations"
+        ]
+      },
+      {
+        "claim": "Treating the upgrade moment as a priority audience and the anchor/explore/rare tiers as one progression are modelled hypotheses built from combining Rave's assets with market signals, not confirmed customer segments.",
+        "classification": "ASSUMPTION",
+        "source_refs": [
+          "channel-and-proposition-options",
+          "market-and-competition"
+        ]
+      },
+      {
+        "claim": "The growth equation (reach x first conversion x early repeat x progression = value per customer) is a transparent planning scaffold, not a forecast or a validated figure.",
+        "classification": "MODELLED",
+        "source_refs": [
+          "channel-and-proposition-options"
+        ]
+      }
+    ],
+    "strategic_recommendation": {
+      "competitor_substitution_test": "Pact, Origin, Grind and Union each already use a single proof point - farmer fairness, provenance, lifestyle, direct trade - to simplify first choice, so a generic 'add a subscription journey' recommendation would fit any of them. This recommendation only works for Rave because it depends on Rave's specific asset combination (accessible pricing plus anchor/explore/rare breadth plus non-judgemental tone), not on any single competitor differentiator.",
+      "evidence_refs": [
+        "channel-and-proposition-options",
+        "rave-owned-surface",
+        "market-and-competition",
+        "accounts-and-scale"
+      ],
+      "next_decision": "Decide whether to release internal channel, repeat and contribution data to replace the hypotheses in this argument before committing pilot budget.",
+      "recommendation": "Before any acquisition scaling or campaign investment, pilot an explicit three-step progression (everyday anchor blend, guided subscription exploration, rare/frontier coffee) aimed at the upgrade moment, instrumented to measure first-choice conversion, 90-day repeat and progression rate.",
+      "tradeoffs": "The pilot does not itself grow revenue and diverts attention from pure rare-coffee exploration framing; it also requires resolving the pods compostability inconsistency and conflicting delivery-reliability reviews first, or the pilot risks measuring operational noise rather than progression effect.",
+      "why_this": "Rave already owns the component assets; public evidence shows no sign they are presented as one connected system. Competitors each own a single proof point, so Rave's distinct advantage is the combination of accessible price, breadth and personable tone - proving that combination as a journey is what converts breadth into one argument."
+    }
+  },
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "provider_message_id": "msg_011Cg9hDhGoFhwkcU34gMtok",
+  "recommendation": "advance",
+  "stop_reason": "end_turn",
+  "verified": true,
+  "work_product": "{\"founder_argument\":{\"client_name\":\"Rave Coffee\",\"central_argument\":\"Rave has assembled many credible entry and retention mechanisms - accessible blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, wholesale, RTD - but public evidence does not show they are experienced as one connected progression, nor which entry route produces stronger repeat purchase and contribution. The commercial opportunity is to treat the supermarket-upgrade moment as a testable system (confident first choice, early repeat, guided progression) and prove it before scaling acquisition spend.\",\"business_opportunity\":{\"statement\":\"Rave's growth gap is not a shortage of entry routes but an absence of evidence about which route produces stronger repeat purchase and contribution; the opportunity is to design and test an explicit upgrade-moment progression - everyday anchor, guided exploration, rare frontier - before committing further acquisition investment.\",\"growth_mechanism\":\"Improve qualified entry at the upgrade moment, first-purchase conversion, early repeat behaviour and progression into higher-value formats, then scale only the steps that prove out.\",\"commercial_consequence\":\"If proven, Rave can raise value per qualified customer relationship without raising acquisition volume or cutting price; left untested, current breadth risks diffusing resource across unproven routes while competitors sharpen single differentiators.\",\"evidence_refs\":[\"rave-owned-surface\",\"channel-and-proposition-options\",\"market-and-competition\"],\"validation_required\":[\"Channel-level conversion and repeat-purchase data by entry route\",\"Contribution margin by product/channel\",\"Verified cohort behaviour for customers who recently left supermarket coffee or bought new equipment\"]},\"audience_opportunity\":{\"priority_audience\":\"The supermarket-upgrade moment: buyers moving from supermarket coffee, or who have just bought a new brewing setup, choosing their first speciality supplier.\",\"commercial_moment\":\"The decision window before brand loyalty forms, when buyers need reassurance - price, ease, reliability - more than specialist credentials.\",\"commercial_relevance\":\"Public reviewer language ('step up from supermarket', 'only slightly dearer than Tesco Finest') and market data showing 80% of UK households still buy instant coffee suggest this audience is large relative to committed specialty buyers, and better matched to Rave's accessible, non-judgemental voice than to competitors' provenance- or lifestyle-led positioning.\",\"evidence_refs\":[\"customer-signals\",\"market-and-competition\",\"rave-owned-surface\"],\"validation_required\":[\"Verified-purchase segmentation confirming upgrader share of new customers\",\"Qualified reach/awareness data at the upgrade moment\",\"Comparison of upgrader retention versus enthusiast retention\"]},\"strategic_recommendation\":{\"recommendation\":\"Before any acquisition scaling or campaign investment, pilot an explicit three-step progression (everyday anchor blend, guided subscription exploration, rare/frontier coffee) aimed at the upgrade moment, instrumented to measure first-choice conversion, 90-day repeat and progression rate.\",\"why_this\":\"Rave already owns the component assets; public evidence shows no sign they are presented as one connected system. Competitors each own a single proof point, so Rave's distinct advantage is the combination of accessible price, breadth and personable tone - proving that combination as a journey is what converts breadth into one argument.\",\"tradeoffs\":\"The pilot does not itself grow revenue and diverts attention from pure rare-coffee exploration framing; it also requires resolving the pods compostability inconsistency and conflicting delivery-reliability reviews first, or the pilot risks measuring operational noise rather than progression effect.\",\"competitor_substitution_test\":\"Pact, Origin, Grind and Union each already use a single proof point - farmer fairness, provenance, lifestyle, direct trade - to simplify first choice, so a generic 'add a subscription journey' recommendation would fit any of them. This recommendation only works for Rave because it depends on Rave's specific asset combination (accessible pricing plus anchor/explore/rare breadth plus non-judgemental tone), not on any single competitor differentiator.\",\"next_decision\":\"Decide whether to release internal channel, repeat and contribution data to replace the hypotheses in this argument before committing pilot budget.\",\"evidence_refs\":[\"channel-and-proposition-options\",\"rave-owned-surface\",\"market-and-competition\",\"accounts-and-scale\"]},\"commercial_growth_mechanism\":{\"growth_equation\":\"Qualified reach at the upgrade moment x first-purchase conversion x early repeat rate x progression into higher-value formats = value created per qualified customer relationship over twelve months.\",\"growth_levers\":[\"qualified reach at the upgrade moment\",\"first purchase conversion\",\"early repeat behaviour\",\"progression into greater value\"],\"known_inputs\":[\"Rave's range already spans anchor, exploration and rare tiers (rave-owned-surface)\",\"Rave already runs two repeat mechanisms - Coffee Club and Subscribe & Save - plus a rewards scheme (rave-owned-surface)\",\"UK market is premiumising with a large non-specialty buyer pool and an eroding mid-tier (market-and-competition)\"],\"missing_inputs\":[\"Current qualified reach or traffic at the upgrade moment\",\"First-purchase conversion rate by entry route\",\"Repeat and churn rates by cohort\",\"Contribution margin by product and channel\",\"Operational reliability rate behind the freshness and delivery promise\"],\"scenario_not_forecast\":true},\"argument_moves\":[{\"move\":\"current_position\",\"headline\":\"Rave has built many credible entry and retention routes but no proof of which works best.\",\"argument\":\"Public evidence shows core blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, wholesale and RTD - a wide but fragmented set of jobs, not a traceable connected journey.\",\"commercial_consequence\":\"Without knowing which entry route produces stronger repeat purchase and contribution, further investment in any one channel risks scaling an unproven mechanism.\",\"founder_decision\":\"Confirm whether Rave currently tracks customers by entry route and repeat behaviour, or whether this must be built first.\",\"evidence_refs\":[\"rave-owned-surface\",\"channel-and-proposition-options\"]},{\"move\":\"commercial_opportunity\",\"headline\":\"The upgrade moment is a testable opportunity, not yet a proven one.\",\"argument\":\"Market data shows premiumisation growth and a large non-specialty buyer pool, while Rave's pricing and tone plausibly suit people leaving supermarket coffee; no source shows Rave's actual share of recent upgraders.\",\"commercial_consequence\":\"If the upgrade moment converts well, Rave can grow value per customer without discounting or competing head-on with enthusiast-focused rivals.\",\"founder_decision\":\"Decide whether to commission data or a controlled test to size the upgrade-moment audience before committing budget.\",\"evidence_refs\":[\"market-and-competition\",\"customer-signals\"]},{\"move\":\"growth_levers\",\"headline\":\"Four levers determine value per customer; all four currently lack internal data.\",\"argument\":\"The growth equation's components exist in Rave's product range, but conversion, repeat rate and contribution values are unknown; filed accounts show growth in assets and headcount but no income statement.\",\"commercial_consequence\":\"Scaling acquisition before measuring these levers risks investing without proof of which segment or format returns value.\",\"founder_decision\":\"Choose which lever to instrument first - likely early repeat, since two repeat mechanisms already exist - rather than fixing all four at once.\",\"evidence_refs\":[\"accounts-and-scale\",\"market-and-competition\",\"rave-owned-surface\"]},{\"move\":\"audience_opportunity\",\"headline\":\"The upgrader, not the enthusiast, is where Rave's assets are least contested.\",\"argument\":\"Competitors visibly compete for the committed specialty buyer via provenance or lifestyle; reviewer language ('step up from supermarket') points to an underserved upgrade audience better matched to Rave's accessible tone.\",\"commercial_consequence\":\"Targeting this audience changes what success means - confident first choice and low-friction repeat, not maximum novelty - which reshapes the whole progression Rave builds.\",\"founder_decision\":\"Confirm whether Rave wants to prioritise the upgrader explicitly, even if communications lead less with Rare/microlot credentials.\",\"evidence_refs\":[\"customer-signals\",\"channel-and-proposition-options\",\"market-and-competition\"]},{\"move\":\"strategic_direction\",\"headline\":\"Pilot a proven progression before scaling acquisition, and fix proof and reliability issues first.\",\"argument\":\"Build and instrument a three-tier progression for the upgrade moment, but first resolve the compostability-claim inconsistency and conflicting delivery-reliability reviews that could undermine trust during a scaled test.\",\"commercial_consequence\":\"This converts Rave's component assets into one measurable system and prevents acquisition investment from being undermined by unresolved operational or proof issues.\",\"founder_decision\":\"Decide whether to commission the pilot and the operational fixes concurrently, or sequence the fixes first.\",\"evidence_refs\":[\"claim-consistency-and-operations\",\"channel-and-proposition-options\",\"accounts-and-scale\"]}],\"evidence_basis\":[{\"claim\":\"Rave's public site offers accessible core blends, pods, Coffee Club, Subscribe & Save, rewards, rare microlots, equipment, wholesale and RTD, presented as separate offers rather than one connected progression.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"rave-owned-surface\",\"channel-and-proposition-options\"]},{\"claim\":\"UK coffee market growth is value-led premiumisation with an eroding mid-tier, and roughly 80% of UK households still buy instant coffee, indicating a large pool of potential upgraders.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"market-and-competition\"]},{\"claim\":\"Public Trustpilot reviews describe Rave as a step up from supermarket coffee and only slightly dearer than premium supermarket options, but these are self-selected, unverified reviews.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"customer-signals\"]},{\"claim\":\"Rave's filed accounts show balance-sheet and headcount growth between 2023 and 2024 but omit the income statement, so revenue, margin and channel economics cannot be established.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"accounts-and-scale\"]},{\"claim\":\"Rave's public pages give inconsistent disposal guidance for its coffee pods and conflicting recent reviews on delivery reliability, which could undermine a proof-dependent progression if unresolved.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"claim-consistency-and-operations\"]},{\"claim\":\"Treating the upgrade moment as a priority audience and the anchor/explore/rare tiers as one progression are modelled hypotheses built from combining Rave's assets with market signals, not confirmed customer segments.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"channel-and-proposition-options\",\"market-and-competition\"]},{\"claim\":\"The growth equation (reach x first conversion x early repeat x progression = value per customer) is a transparent planning scaffold, not a forecast or a validated figure.\",\"classification\":\"MODELLED\",\"source_refs\":[\"channel-and-proposition-options\"]}]},\"evidence_lineage\":[{\"claim\":\"All evidence used comes from a frozen public-evidence comparison pack captured 2026-09-06; Rave Coffee did not supply or commission it and has not reviewed or approved this argument.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"rave-owned-surface\",\"market-and-competition\",\"customer-signals\",\"accounts-and-scale\",\"claim-consistency-and-operations\",\"channel-and-proposition-options\"]},{\"claim\":\"No source in the evidence pack provides Rave's revenue by channel, contribution margin, CAC, retention, churn or cohort behaviour; all unit-economics claims in this argument are hypotheses pending internal data.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"rave-owned-surface\",\"accounts-and-scale\"]},{\"claim\":\"Competitor subscription offers (Pact, Origin, Grind, Union) each foreground a single proof point - farmer fairness, provenance, lifestyle/format, or direct trade - while Rave's assets combine several jobs without one unifying narrative.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"market-and-competition\",\"channel-and-proposition-options\"]},{\"claim\":\"Public customer reviews provide directional signals on value, freshness and reliability concerns but are self-selected and cannot be treated as a representative customer study.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"customer-signals\"]},{\"claim\":\"Rave's filed Companies House accounts for FY2024 confirm balance-sheet and headcount growth but exclude the income statement, so no profitability or growth-rate figure can be cited.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"accounts-and-scale\"]},{\"claim\":\"The upgrade-moment audience and the proposed anchor/explore/rare progression are strategic hypotheses constructed for this internal experiment, not verified client segments or confirmed customer journeys.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"channel-and-proposition-options\",\"market-and-competition\"]},{\"claim\":\"The commercial growth equation and lever model are a transparent reasoning scaffold for decision-making, not a forecast; no numeric values are assigned to any lever.\",\"classification\":\"MODELLED\",\"source_refs\":[\"channel-and-proposition-options\"]}],\"recommendation\":\"advance\"}",
+  "worker_execution": {
+    "attempt": 1,
+    "capability": "strategic_reasoning",
+    "policy_id": "deterministic-default",
+    "provider": "anthropic",
+    "selection_reason": "only_eligible_worker",
+    "side_effect_classification": "preparation",
+    "worker_id": "claude-anthropic"
+  }
+}

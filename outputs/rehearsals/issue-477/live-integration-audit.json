@@ -1,0 +1,249 @@
+{
+  "activation": {
+    "google": {
+      "authenticate": {
+        "count": null,
+        "status": "VERIFIED LIVE"
+      },
+      "configured": true,
+      "get_accounts": {
+        "count": 1,
+        "status": "VERIFIED LIVE"
+      },
+      "get_businesses": {
+        "reason": "adapter does not expose this provider operation",
+        "status": "NOT TESTED"
+      },
+      "get_campaigns": {
+        "count": 0,
+        "status": "VERIFIED LIVE"
+      },
+      "get_permissions": {
+        "reason": "adapter does not expose this provider operation",
+        "status": "NOT TESTED"
+      },
+      "mutation_count": 0,
+      "read_only": true,
+      "status": "VERIFIED LIVE"
+    },
+    "meta": {
+      "authenticate": {
+        "count": null,
+        "status": "VERIFIED LIVE"
+      },
+      "configured": true,
+      "get_accounts": {
+        "count": 0,
+        "status": "VERIFIED LIVE"
+      },
+      "get_businesses": {
+        "count": 0,
+        "status": "VERIFIED LIVE"
+      },
+      "get_campaigns": {
+        "error": "provider HTTP request failed with status 400",
+        "status": "NOT WORKING"
+      },
+      "get_permissions": {
+        "count": 10,
+        "status": "VERIFIED LIVE"
+      },
+      "mutation_count": 0,
+      "read_only": true,
+      "status": "PARTIAL"
+    },
+    "tiktok": {
+      "configured": false,
+      "status": "NOT WORKING"
+    }
+  },
+  "business_adapter_probes": {
+    "Fireflies": {
+      "configured": true,
+      "mutation_count": 0,
+      "read_only": true,
+      "source_id": "fireflies:user",
+      "status": "VERIFIED LIVE",
+      "validated_capabilities": [
+        "api_key_authentication",
+        "transcript_discovery",
+        "meeting_metadata",
+        "participants_and_speakers",
+        "transcript_text_and_timestamps",
+        "source_provided_summary_notes_and_action_items"
+      ]
+    },
+    "Gmail": {
+      "configured": true,
+      "mutation_count": 0,
+      "read_only": true,
+      "source_id": "gmail:profile",
+      "status": "VERIFIED LIVE",
+      "validated_capabilities": []
+    },
+    "Google Calendar": {
+      "configured": true,
+      "mutation_count": 0,
+      "read_only": true,
+      "source_id": "calendar:primary",
+      "status": "VERIFIED LIVE",
+      "validated_capabilities": []
+    },
+    "Google Drive": {
+      "configured": true,
+      "mutation_count": 0,
+      "read_only": true,
+      "source_id": "drive:files",
+      "status": "VERIFIED LIVE",
+      "validated_capabilities": []
+    },
+    "Notion": {
+      "configured": true,
+      "mutation_count": 0,
+      "read_only": true,
+      "source_id": "notion:data_source:34b0c9cf-a8f2-80af-98e4-000b95243de6",
+      "status": "VERIFIED LIVE",
+      "validated_capabilities": []
+    }
+  },
+  "classification_legend": [
+    "VERIFIED LIVE",
+    "VERIFIED SANDBOX",
+    "SIMULATED",
+    "NOT WORKING",
+    "NOT TESTED"
+  ],
+  "generated_at": "2026-10-16T14:12:52.244587+00:00",
+  "issue": 477,
+  "journey_safe_reads": {
+    "calendar": {
+      "counts": {
+        "busy_count": 2
+      },
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [],
+      "runtime_status": "safe_read_verified",
+      "source_id": "calendar:primary",
+      "status": "VERIFIED LIVE"
+    },
+    "drive": {
+      "counts": {
+        "result_count": 0
+      },
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [],
+      "runtime_status": "safe_read_verified",
+      "source_id": "drive:list",
+      "status": "VERIFIED LIVE"
+    },
+    "fireflies": {
+      "counts": {},
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [],
+      "runtime_status": "safe_read_verified",
+      "source_id": "fireflies:transcripts",
+      "status": "VERIFIED LIVE"
+    },
+    "gmail": {
+      "counts": {
+        "result_count": 0
+      },
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [],
+      "runtime_status": "safe_read_verified",
+      "source_id": "gmail:search",
+      "status": "VERIFIED LIVE"
+    },
+    "n8n": {
+      "counts": {
+        "result_count": 1
+      },
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [
+        "sha256:efcd027e596e"
+      ],
+      "runtime_status": "safe_read_verified",
+      "source_id": "n8n:local:workflows",
+      "status": "VERIFIED LIVE"
+    },
+    "notion": {
+      "counts": {
+        "result_count": 0
+      },
+      "error": "",
+      "execution_truth": "verified_read",
+      "mutation_count": 0,
+      "redacted_record_ids": [],
+      "runtime_status": "safe_read_verified",
+      "source_id": "notion:search",
+      "status": "VERIFIED LIVE"
+    }
+  },
+  "runtime_observations": {
+    "gmail_inbox_watch": {
+      "last_exit_code": "(never exited)",
+      "loaded": true,
+      "run_interval_seconds": 900,
+      "runs_since_load": 0,
+      "state": "not running",
+      "status": "NOT WORKING"
+    },
+    "presentation_runtime_dependency": {
+      "configured": true,
+      "configured_path_exists": false,
+      "status": "NOT WORKING"
+    }
+  },
+  "safeguards": {
+    "campaigns_published": false,
+    "external_writes": 0,
+    "fictional_marker": "ISSUE477-FICTIONAL-MARKER-ALPHA",
+    "media_spend": false,
+    "outreach_sent": false,
+    "production_configuration_changed": false
+  },
+  "schema_version": 1,
+  "service_health": {
+    "n8n": {
+      "healthy": true,
+      "http_status": 200,
+      "status": "VERIFIED LIVE"
+    },
+    "runtime_gateway": {
+      "healthy": true,
+      "http_status": 200,
+      "status": "VERIFIED LIVE"
+    },
+    "tony_bridge": {
+      "healthy": true,
+      "http_status": 200,
+      "status": "VERIFIED LIVE"
+    }
+  },
+  "telegram": {
+    "configured": true,
+    "identity": {
+      "bot_id": "sha256:b2ef1fb51162",
+      "is_bot": true,
+      "ok": true
+    },
+    "mutation_count": 0,
+    "status": "VERIFIED LIVE",
+    "webhook": {
+      "configured": true,
+      "last_error_present": false,
+      "ok": true,
+      "pending_update_count": 0
+    }
+  }
+}

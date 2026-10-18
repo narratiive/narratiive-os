@@ -87,7 +87,7 @@ class SupervisedBlueprintDeliveryTests(unittest.TestCase):
         self.assertEqual(package.commercial_model["investment_case"]["status"], "incomplete")
         self.assertEqual(package.qa_report["status"], "PASS_FOR_HUMAN_REVIEW")
 
-    def test_evidence_classes_are_strict_and_fictional_verified_claims_fail_closed(self):
+    def test_evidence_classes_are_strict_and_fictional_client_claims_fail_closed(self):
         intake = self._intake()
         intake["evidence_ledger"][0]["classification"] = "ESTIMATE"
         with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(
@@ -102,12 +102,32 @@ class SupervisedBlueprintDeliveryTests(unittest.TestCase):
         intake["evidence_ledger"][0]["classification"] = "VERIFIED CLIENT"
         intake["evidence_ledger"][0]["source_document_id"] = "fictional-source"
         with tempfile.TemporaryDirectory() as temporary, self.assertRaisesRegex(
-            SupervisedBlueprintError, "fictional fixtures cannot claim verified evidence"
+            SupervisedBlueprintError, "fictional fixtures cannot claim verified client evidence"
         ):
             build_supervised_blueprint_package(
                 intake,
                 artifact_catalog=FileArtifactCatalog(Path(temporary), workspace_id="demo-fieldwork"),
             )
+
+    def test_fictional_fixture_can_cite_verified_external_market_context(self):
+        intake = self._intake()
+        intake["evidence_ledger"].append({
+            "evidence_id": "E1",
+            "classification": "VERIFIED EXTERNAL",
+            "claim": "A real external market fact that does not assert fictional client performance.",
+            "observed_at": "2026-10-16",
+            "confidence": "high",
+            "validation_step": "Recheck the primary source before client release.",
+            "source_url": "https://example.gov/research",
+            "publisher": "Example Government",
+        })
+        with tempfile.TemporaryDirectory() as temporary:
+            package = build_supervised_blueprint_package(
+                intake,
+                artifact_catalog=FileArtifactCatalog(Path(temporary), workspace_id="demo-fieldwork"),
+            )
+        self.assertEqual(package.evidence_ledger["verified_evidence_count"], 1)
+        self.assertTrue(package.qa_report["checks"]["no_fictional_verified_client_evidence"])
 
     def test_lineage_uses_existing_immutable_artifact_catalog_and_specialist_order(self):
         with tempfile.TemporaryDirectory() as temporary:

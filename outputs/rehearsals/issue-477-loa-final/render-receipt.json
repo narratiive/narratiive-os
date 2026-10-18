@@ -1,0 +1,14 @@
+{
+  "brandVisuals": true,
+  "pdf": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pdf",
+  "pptx": "outputs/rehearsals/issue-477-loa-final/loa-fictional-Growth-Blueprint-v2.pptx",
+  "slideCount": 21,
+  "validation": "outputs/rehearsals/issue-477-loa-final/presentation-validation.json",
+  "visualManifest": [
+    {
+      "asset": "loa-hero-bottle-claude.png",
+      "role": "creative illustration",
+      "slide": 5
+    }
+  ]
+}

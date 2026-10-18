@@ -151,8 +151,8 @@ def validate_intake(intake: Mapping[str, Any]) -> None:
             _required_text(item.get("publisher"), f"{evidence_id}.publisher")
         if classification == "VERIFIED CLIENT":
             _required_text(item.get("source_document_id"), f"{evidence_id}.source_document_id")
-        if identity["fictional"] is True and classification.startswith("VERIFIED"):
-            raise SupervisedBlueprintError("fictional fixtures cannot claim verified evidence")
+        if identity["fictional"] is True and classification == "VERIFIED CLIENT":
+            raise SupervisedBlueprintError("fictional fixtures cannot claim verified client evidence")
 
     model = _required_mapping(intake.get("commercial_model"), "commercial_model")
     if model.get("model_type") != "ecommerce":
@@ -210,8 +210,9 @@ def build_evidence_ledger(intake: Mapping[str, Any]) -> dict[str, Any]:
             item["classification"].startswith("VERIFIED") for item in entries
         ),
         "notice": (
-            "This fictional fixture contains no verified client or external research. "
-            "Its numeric inputs are assumptions and its outputs are modelled scenarios."
+            "This fictional fixture contains no verified client evidence. Verified external sources may describe "
+            "the real market context, but they do not verify the fictional company's performance. Numeric company "
+            "inputs remain assumptions and commercial outputs remain modelled scenarios."
         ),
     }
 
@@ -472,6 +473,7 @@ def build_presentation_specification(
     chapters = {item["title"]: item for item in blueprint["chapters"]}
     strategy = intake["strategy"]
     creative = intake["creative_territory"]
+    presentation = intake.get("presentation") or {}
     base = model["scenarios"][1]
     refs = tuple(model["input_evidence_ids"])
     has_economics = "year_one_net_after_investment" in base
@@ -484,7 +486,7 @@ def build_presentation_specification(
     rows = [
         {
             "title": f"Where {company} could go",
-            "takeaway": "FIELDWORK could own the mixed-use surface, turning one useful object into a repeatable customer relationship.",
+            "takeaway": presentation.get("destination_takeaway") or strategy["thesis"],
             "body": (
                 f"The base scenario reaches £{base['annual_revenue']:,} in annualised online revenue, but the strategic prize "
                 "is a defensible reason to choose and return. This is a scenario, not a forecast."
@@ -494,8 +496,8 @@ def build_presentation_specification(
             "refs": refs,
             "content": {
                 "brand_name": company,
-                "platform": "Own the mixed-use surface",
-                "subtitle": "A conditional route from first object to repeat purchase",
+                "platform": presentation.get("platform") or strategy["recommendations"][0]["name"],
+                "subtitle": presentation.get("subtitle") or "A conditional route from attention to repeat purchase",
             },
         },
         {
@@ -522,11 +524,11 @@ def build_presentation_specification(
             "layout": "provocation_page",
             "classification": "ASSUMPTION",
             "refs": tuple(strategy["constraint"]["evidence_ids"]),
-            "content": {"left_label": "CURRENT PATTERN", "left_headline": "Reach before reason", "left_detail": "A broad catalogue asks paid media to create the distinction.", "right_label": "WORKING CONSTRAINT", "right_headline": "No proven repeat path"},
+            "content": presentation.get("constraint_content") or {"left_label": "CURRENT PATTERN", "left_headline": "Reach before reason", "left_detail": "Paid attention is being asked to create the distinction.", "right_label": "WORKING CONSTRAINT", "right_headline": "No proven repeat path"},
         },
         {
             "title": "The strategic moves",
-            "takeaway": "Own the mixed-use surface, make usefulness visible, then earn the second object before scaling acquisition.",
+            "takeaway": presentation.get("strategic_moves_takeaway") or ", then ".join(item["name"].lower() for item in strategy["recommendations"]) + ".",
             "body": "Each move changes a customer decision and has a measurable commercial gate. Larger investment remains conditional on evidence.",
             "layout": "constraint_priority_roadmap",
             "classification": "ASSUMPTION",
@@ -561,8 +563,11 @@ def build_presentation_specification(
         },
         {
             "title": "The scenario bridge",
-            "takeaway": "Traffic and conversion each account for £300,000 of the base case. Higher order value accounts for £90,000.",
-            "body": "The sequential bridge reconciles to £690,000. The attribution order is a modelling convention.",
+            "takeaway": "; ".join(
+                f"{item['lever']} contributes £{item['incremental_annual_revenue']:,}"
+                for item in model["base_scenario_bridge"]
+            ) + ".",
+            "body": f"The sequential bridge reconciles to £{base['incremental_annual_revenue']:,}. The attribution order is a modelling convention.",
             "layout": "evidence_ladder",
             "classification": "MODELLED",
             "refs": refs,
@@ -579,7 +584,7 @@ def build_presentation_specification(
         },
         {
             "title": "What would disprove the diagnosis",
-            "takeaway": "The diagnosis fails if a specific mixed-use proposition does not improve net conversion or existing cohorts already repeat strongly.",
+            "takeaway": presentation.get("falsification_takeaway") or "The diagnosis must be rejected if its stated falsification test fails.",
             "body": strategy["constraint"]["falsification_test"],
             "layout": "test_plan",
             "classification": "ASSUMPTION",
@@ -593,7 +598,7 @@ def build_presentation_specification(
             "layout": "market_gap_map",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Advantage"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "x_axis": ["GENERIC ORGANISATION", "MIXED-USE SPECIFIC"], "y_axis": ["DECORATIVE", "PROVEN IN USE"], "competitors": [], "current_position": ["FIELDWORK TODAY", 42, 44], "future_position": ["TEST TERRITORY", 78, 80], "market_gap": "Modular objects for surfaces shared by work and life", "audience": "People whose home workspace disappears and reappears every day", "competitor_miss": "Validation required. No competitor position is asserted in this fictional fixture."},
+            "content": presentation.get("market_gap_content") or {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "x_axis": ["GENERIC", "DISTINCTIVE"], "y_axis": ["LOW PROOF", "HIGH PROOF"], "competitors": [], "current_position": [f"{company} TODAY", 42, 44], "future_position": ["TEST TERRITORY", 78, 80], "market_gap": strategy["advantage"]["statement"], "audience": "Target customer definition requires validation", "competitor_miss": "Validation required. No competitor position is asserted in this fictional fixture."},
         },
         {
             "title": "The advantage needs proof",
@@ -602,7 +607,7 @@ def build_presentation_specification(
             "layout": "customer_evidence_board",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Advantage"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "language_status": "CUSTOMER EVIDENCE REQUIRED", "customer_language": ["Observe how shared surfaces are reset", "Test the mixed-use proposition", "Measure willingness to pay"], "signals": [["FOUNDER VIEW", "A proposed category to own"], ["CUSTOMER DATA", "Not yet supplied"], ["CHOICE TEST", "Required before selection"]], "interpretation": "The territory remains a hypothesis until observed behaviour and customer choice evidence support it."},
+            "content": presentation.get("customer_evidence_content") or {"chapter_label": "CHAPTER 3 / THE ADVANTAGE", "language_status": "CUSTOMER EVIDENCE REQUIRED", "customer_language": ["Observe the occasion", "Test the proposition", "Measure willingness to pay"], "signals": [["FOUNDER VIEW", "A proposed category to own"], ["CUSTOMER DATA", "Not yet supplied"], ["CHOICE TEST", "Required before selection"]], "interpretation": "The territory remains a hypothesis until observed behaviour and customer choice evidence support it."},
         },
         {
             "title": "The Strategy",
@@ -611,7 +616,7 @@ def build_presentation_specification(
             "layout": "narrative_platform_framework",
             "classification": "ASSUMPTION",
             "refs": tuple(chapters["The Strategy"]["evidence_ids"]),
-            "content": {"chapter_label": "CHAPTER 4 / THE STRATEGY", "steps": [["TENSION", "Broad accessories compete on taste and paid attention"], ["SHIFT", "Own the mixed-use surface and show usefulness in context"], ["RESOLUTION", "Let the first object earn the second before buying reach"]], "banner": "Turn one useful object into a reason to return."},
+            "content": presentation.get("strategy_framework_content") or {"chapter_label": "CHAPTER 4 / THE STRATEGY", "steps": [["TENSION", strategy["constraint"]["statement"]], ["SHIFT", strategy["recommendations"][0]["action"]], ["RESOLUTION", strategy["recommendations"][2]["action"]]], "banner": strategy["thesis"]},
         },
         {
             "title": "Three moves, three tests",
@@ -678,7 +683,7 @@ def build_presentation_specification(
         },
         {
             "title": "The founder decision",
-            "takeaway": "Fund a bounded proof phase, not the £690,000 outcome.",
+            "takeaway": f"Fund a bounded proof phase, not the £{base['incremental_annual_revenue']:,} outcome.",
             "body": "Before client release, Matt approves the exact artefact. The founder then decides whether to fund 12 weeks of verification against explicit stop and scale gates.",
             "layout": "closing_mandate",
             "classification": "HUMAN DECISION REQUIRED",
@@ -686,6 +691,25 @@ def build_presentation_specification(
             "content": {"chapter_label": "DECISION / NEXT COMMITMENT", "lines": ["Fund proof,", "not scale.", "Release investment only as evidence improves."], "next_step": "Verify the baseline, cost the 12-week proof phase and approve only the first decision gate."},
         },
     ]
+    if len(ledger["entries"]) > 12:
+        register_index = next(
+            index for index, row in enumerate(rows) if row["layout"] == "source_register"
+        )
+        register_row = rows[register_index]
+        chunks = [ledger["entries"][:8], ledger["entries"][8:]]
+        register_rows = []
+        for page, entries in enumerate(chunks, 1):
+            register_rows.append({
+                **register_row,
+                "title": f"Evidence and assumptions ledger ({page} of {len(chunks)})",
+                "refs": tuple(item["evidence_id"] for item in entries),
+                "content": {
+                    **register_row["content"],
+                    "entries": entries,
+                    "source_register_entries": entries,
+                },
+            })
+        rows[register_index:register_index + 1] = register_rows
     slides: list[PresentationSlideSpec] = []
     for number, row in enumerate(rows, 1):
         slide_refs = tuple(ref for ref in row["refs"] if ref in ledger_by_id)
@@ -769,7 +793,7 @@ def run_independent_qa(
     checks = {
         "fictional_status_is_explicit": intake["identity"].get("fictional") is True and blueprint.get("fictional_demonstration") is True,
         "evidence_classes_are_allowed": all(item["classification"] in EVIDENCE_CLASSIFICATIONS for item in ledger["entries"]),
-        "no_fictional_verified_evidence": not any(item["classification"].startswith("VERIFIED") for item in ledger["entries"]),
+        "no_fictional_verified_client_evidence": not any(item["classification"] == "VERIFIED CLIENT" for item in ledger["entries"]),
         "all_blueprint_evidence_refs_resolve": cited_ids.issubset(ledger_ids),
         "three_scenarios_present": [item["name"] for item in model["scenarios"]] == ["Downside", "Base", "Upside"],
         "scenarios_are_not_forecasts": model.get("scenario_not_forecast") is True and all(item.get("scenario_not_forecast") is True for item in model["scenarios"]),

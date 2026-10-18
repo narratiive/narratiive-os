@@ -1,0 +1,3460 @@
+{
+  "slides" : [
+    {
+      "file" : "slide-01.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "NARRATIIVE",
+          "width" : 0.071874999999999994,
+          "x" : 0.071875000718749998,
+          "y" : 0.87777777791666667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "GROWTH BLUEPRINT \/ 2026",
+          "width" : 0.109375,
+          "x" : 0.070312498177083377,
+          "y" : 0.8305555554166667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.086111111111111027,
+          "text" : "FIELDWORK",
+          "width" : 0.32499999999999996,
+          "x" : 0.071875001328124993,
+          "y" : 0.55833333376388894
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "Own the mixed-use surface",
+          "width" : 0.28437500000000004,
+          "x" : 0.073437501579861092,
+          "y" : 0.47777777787037035
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "A conditional route from first object to repeat purchase",
+          "width" : 0.34583332538604739,
+          "x" : 0.06666667515419844,
+          "y" : 0.38472222239799025
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "INTERNAL FICTIONAL DEMONSTRATION - HUMAN APPROVAL REQUIRED",
+          "width" : 0.25312499999999999,
+          "x" : 0.071874995781250117,
+          "y" : 0.086111110972222127
+        }
+      ],
+      "text" : "NARRATIIVE\nGROWTH BLUEPRINT \/ 2026\nFIELDWORK\nOwn the mixed-use surface\nA conditional route from first object to repeat purchase\nINTERNAL FICTIONAL DEMONSTRATION - HUMAN APPROVAL REQUIRED"
+    },
+    {
+      "file" : "slide-02.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "ACT11 THE CASE FOR CHANGE",
+          "width" : 0.11250000000000002,
+          "x" : 0.059375002578124871,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
+          "text" : "What the commercial opportunity looks like",
+          "width" : 0.50312499999999993,
+          "x" : 0.060937502187500006,
+          "y" : 0.83611111071759259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019682414001888637,
+          "text" : "Scenario",
+          "width" : 0.050029110908508298,
+          "x" : 0.060922945045869578,
+          "y" : 0.69432545974667503
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Annual revenue",
+          "width" : 0.089062500000000017,
+          "x" : 0.23906249888671879,
+          "y" : 0.69444444427083329
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Conversion",
+          "width" : 0.065624999999999989,
+          "x" : 0.41875000082031255,
+          "y" : 0.6944444445486111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Year 1 contribution",
+          "width" : 0.109375,
+          "x" : 0.59531250132812497,
+          "y" : 0.68888888854166663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Net after investment",
+          "width" : 0.11562500000000009,
+          "x" : 0.77499999807291675,
+          "y" : 0.69444444439814812
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025263603528340672,
+          "text" : "Downside",
+          "width" : 0.060971546173095692,
+          "x" : 0.059357977348908852,
+          "y" : 0.59709042059505701
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "£1.35m",
+          "width" : 0.045312500000000033,
+          "x" : 0.23750000037760416,
+          "y" : 0.60000000009259258
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "2.1%",
+          "width" : 0.032812500000000022,
+          "x" : 0.415624999671875,
+          "y" : 0.59722222208333342
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "£17k",
+          "width" : 0.03125,
+          "x" : 0.59531249980468748,
+          "y" : 0.59722222190972218
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "-£68k",
+          "width" : 0.035937500000000067,
+          "x" : 0.77343750032812497,
+          "y" : 0.59722222197222219
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Base",
+          "width" : 0.032812500000000008,
+          "x" : 0.059375000273437492,
+          "y" : 0.50555555567129629
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "£1.89m",
+          "width" : 0.045312500000000033,
+          "x" : 0.23750000037760416,
+          "y" : 0.50555555567129629
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "2.4%",
+          "width" : 0.034374999999999989,
+          "x" : 0.41562500021484378,
+          "y" : 0.50555555569444444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "£121k",
+          "width" : 0.037500000000000089,
+          "x" : 0.59531249976562495,
+          "y" : 0.50555555543402786
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "£36k",
+          "width" : 0.032812500000000022,
+          "x" : 0.77343749981770826,
+          "y" : 0.50555555543209874
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.031009795930650452,
+          "text" : "Upside",
+          "width" : 0.046968081593513476,
+          "x" : 0.057765958734756019,
+          "y" : 0.41088399083568461
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "£2.27m",
+          "width" : 0.046874999999999972,
+          "x" : 0.23593749941406253,
+          "y" : 0.41111111104166664
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "2.6%",
+          "width" : 0.034374999999999989,
+          "x" : 0.41562499980902778,
+          "y" : 0.41111111097222219
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "£223k",
+          "width" : 0.040624999999999911,
+          "x" : 0.59374999959375008,
+          "y" : 0.41111111102777775
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.031072264247470449,
+          "text" : "£138k",
+          "width" : 0.040747109055519259,
+          "x" : 0.77337644572662989,
+          "y" : 0.41085275688344403
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "32% CONTRIBUTION, £85k INVESTMENT AND SCENARIO RAMP ARE ASSUMPTIONS. NOT A PROFIT FORECAST.",
+          "width" : 0.42656250000000007,
+          "x" : 0.059375005332031126,
+          "y" : 0.3027777779166666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781250000000001,
+          "x" : 0.059375000130208334,
+          "y" : 0.16388888861111117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "The base scenario adds £690,000 of annualised revenue headroom. The base case produces a £36,440 first-year",
+          "width" : 0.66874999999999996,
+          "x" : 0.22031250171874994,
+          "y" : 0.15833333366666658
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "contribution proxy after £85,000 of assumed investment. Verify every input before committing.",
+          "width" : 0.5625,
+          "x" : 0.22031250562499985,
+          "y" : 0.13333333330555552
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A1, A2, A3, A8, A9, A10",
+          "width" : 0.14531249999999998,
+          "x" : 0.059375001816406224,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017072441842820862,
+          "text" : "NARRATIVE",
+          "width" : 0.045359173417091378,
+          "x" : 0.059351663839109822,
+          "y" : 0.027574890462574997
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "MODELLED - SCENARIO, NOT FORECAST",
+          "width" : 0.17500000000000004,
+          "x" : 0.6875000005729166,
+          "y" : 0.077777777453703623
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "02\/20",
+          "width" : 0.025000000000000022,
+          "x" : 0.91562499968750011,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "ACT11 THE CASE FOR CHANGE\nWhat the commercial opportunity looks like\nScenario\nAnnual revenue\nConversion\nYear 1 contribution\nNet after investment\nDownside\n£1.35m\n2.1%\n£17k\n-£68k\nBase\n£1.89m\n2.4%\n£121k\n£36k\nUpside\n£2.27m\n2.6%\n£223k\n£138k\n32% CONTRIBUTION, £85k INVESTMENT AND SCENARIO RAMP ARE ASSUMPTIONS. NOT A PROFIT FORECAST.\nCOMMERCIAL CONSEQUENCE\nThe base scenario adds £690,000 of annualised revenue headroom. The base case produces a £36,440 first-year\ncontribution proxy after £85,000 of assumed investment. Verify every input before committing.\nSOURCES: A1, A2, A3, A8, A9, A10\nNARRATIVE\nMODELLED - SCENARIO, NOT FORECAST\n02\/20"
+    },
+    {
+      "file" : "slide-03.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "NASE POK CHANGE",
+          "width" : 0.11249999999999999,
+          "x" : 0.059374999921875005,
+          "y" : 0.93333333333719137
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "What currently prevents growth",
+          "width" : 0.36562500000000003,
+          "x" : 0.060937497388392894,
+          "y" : 0.83888888880952384
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "CURRENT PATTERNI",
+          "width" : 0.076562494039535522,
+          "x" : 0.071875004894294631,
+          "y" : 0.70277777784722217
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "WORKING CONSTRAINT",
+          "width" : 0.096875000000000044,
+          "x" : 0.62343750121093744,
+          "y" : 0.70000000010416663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "Reach before reason",
+          "width" : 0.27187500000000003,
+          "x" : 0.071874999187500024,
+          "y" : 0.59444444488888892
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
+          "text" : "No proven repeat path",
+          "width" : 0.29531250000000009,
+          "x" : 0.62187500164062492,
+          "y" : 0.5888888890586419
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "THE",
+          "width" : 0.042187499999999989,
+          "x" : 0.47968750042187497,
+          "y" : 0.57222222238888887
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111110983,
+          "text" : "GAP",
+          "width" : 0.043750000000000067,
+          "x" : 0.47812499956249999,
+          "y" : 0.53055555541666677
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "A broad catalogue asks paid media to",
+          "width" : 0.27656250000000004,
+          "x" : 0.070312502765624979,
+          "y" : 0.50277777791666667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "create the distinction.",
+          "width" : 0.15781249999999999,
+          "x" : 0.070312501315104164,
+          "y" : 0.46944444449074074
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Working diagnosis only. Falsify it by: Reject",
+          "width" : 0.27499999999999991,
+          "x" : 0.62187499792968759,
+          "y" : 0.50555555517361106
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "this diagnosis if a specific mixed-use",
+          "width" : 0.23125000000000018,
+          "x" : 0.62343749847656249,
+          "y" : 0.4805555552430556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "proposition does not improve qualified",
+          "width" : 0.24062500000000009,
+          "x" : 0.62343749759375,
+          "y" : 0.44999999980555561
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "product-page progression and net conversion,",
+          "width" : 0.29218750000000004,
+          "x" : 0.62343750365234363,
+          "y" : 0.41944444447916673
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "or if existing cohorts already show strong",
+          "width" : 0.25781249999999989,
+          "x" : 0.62343749677734384,
+          "y" : 0.39166666649305559
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "second-purchase behaviour.",
+          "width" : 0.18125000000000002,
+          "x" : 0.62343749878906252,
+          "y" : 0.36111111142361108
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household",
+          "width" : 0.65156250000000004,
+          "x" : 0.22031249185546892,
+          "y" : 0.15833333322916687
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "should choose its first object or return for the second.",
+          "width" : 0.32656250000000003,
+          "x" : 0.22031250272135411,
+          "y" : 0.13333333337962983
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "SOURCES: A4",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999921875005,
+          "y" : 0.080555555833333292
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312497019767778,
+          "x" : 0.059375000734907812,
+          "y" : 0.027777777638888779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSUMPTION",
+          "width" : 0.059375000000000067,
+          "x" : 0.80312499901041678,
+          "y" : 0.080555555416666591
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "03\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "NASE POK CHANGE\nWhat currently prevents growth\nCURRENT PATTERNI\nWORKING CONSTRAINT\nReach before reason\nNo proven repeat path\nTHE\nGAP\nA broad catalogue asks paid media to\ncreate the distinction.\nWorking diagnosis only. Falsify it by: Reject\nthis diagnosis if a specific mixed-use\nproposition does not improve qualified\nproduct-page progression and net conversion,\nor if existing cohorts already show strong\nsecond-purchase behaviour.\nFIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household\nshould choose its first object or return for the second.\nSOURCES: A4\nNARRATIVE\nASSUMPTION\n03\/20"
+    },
+    {
+      "file" : "slide-04.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ACT 1\/THE CASE FOR CHANGE",
+          "width" : 0.11406249999999998,
+          "x" : 0.059375001692708283,
+          "y" : 0.93055555578703708
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The strategic moves",
+          "width" : 0.23749999999999999,
+          "x" : 0.059375001979166633,
+          "y" : 0.83888888902777781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "OWN THE MIXED-USE SURFACE",
+          "width" : 0.12343750000000003,
+          "x" : 0.082812499921875005,
+          "y" : 0.66666666667545704
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "MAKE USEFULNESS VISIBLE",
+          "width" : 0.11249999999999999,
+          "x" : 0.38281249812500012,
+          "y" : 0.66666666652777784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "EARN THE SECOND OBJECT",
+          "width" : 0.11250000000000004,
+          "x" : 0.68437500140624996,
+          "y" : 0.66388888902777765
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "Qualified conversion",
+          "width" : 0.2109375,
+          "x" : 0.081249998242187524,
+          "y" : 0.56388888872685183
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Controlled message and",
+          "width" : 0.15468750000000001,
+          "x" : 0.081249998144531294,
+          "y" : 0.46944444482638892
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "landing-page test",
+          "width" : 0.1140625,
+          "x" : 0.078124998613281302,
+          "y" : 0.4416666670138889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333437,
+          "text" : "Conversion and",
+          "width" : 0.16093749999999996,
+          "x" : 0.38281249865885414,
+          "y" : 0.56388888874999998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "average order value",
+          "width" : 0.20156249999999998,
+          "x" : 0.382812499296875,
+          "y" : 0.51388888852777781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Product-story comprehension and",
+          "width" : 0.21249999999999997,
+          "x" : 0.38281249848214288,
+          "y" : 0.46944444436507937
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "basket test",
+          "width" : 0.073437499999999989,
+          "x" : 0.38124999908203128,
+          "y" : 0.44444444434027774
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044001653459337042,
+          "text" : "Second-purchase",
+          "width" : 0.18012640476226793,
+          "x" : 0.68414009934177655,
+          "y" : 0.55630235301466335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "economics",
+          "width" : 0.11406249999999996,
+          "x" : 0.68437500048437505,
+          "y" : 0.51944444480555552
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Cohort retention and referral pilot",
+          "width" : 0.20937500000000009,
+          "x" : 0.68437500140624996,
+          "y" : 0.47222222201388886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Own the mixed-use surface, make usefulness visible, then earn the second object before scaling acquisition.",
+          "width" : 0.65000000000000002,
+          "x" : 0.22187498916666701,
+          "y" : 0.16111111106481479
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A4, A5, A6, C1",
+          "width" : 0.10937500000000001,
+          "x" : 0.059375001367187472,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "04\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "ACT 1\/THE CASE FOR CHANGE\nThe strategic moves\nOWN THE MIXED-USE SURFACE\nMAKE USEFULNESS VISIBLE\nEARN THE SECOND OBJECT\nQualified conversion\nControlled message and\nlanding-page test\nConversion and\naverage order value\nProduct-story comprehension and\nbasket test\nSecond-purchase\neconomics\nCohort retention and referral pilot\nOwn the mixed-use surface, make usefulness visible, then earn the second object before scaling acquisition.\nSOURCES: A4, A5, A6, C1\nNARRATIVE\nASSUMPTION\n04\/20"
+    },
+    {
+      "file" : "slide-05.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ACT 1\/THE CASE FOR CHANGE",
+          "width" : 0.11406250000000001,
+          "x" : 0.059375001901041592,
+          "y" : 0.9194444445833333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "What the future could look like",
+          "width" : 0.34218749999999998,
+          "x" : 0.060937498098958362,
+          "y" : 0.8305555554320988
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.05555555555555558,
+          "text" : "Built for the work of",
+          "width" : 0.35625000000000007,
+          "x" : 0.060937497773437557,
+          "y" : 0.63055555545138886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.063888888888888884,
+          "text" : "living",
+          "width" : 0.10156250000000001,
+          "x" : 0.056249999274553583,
+          "y" : 0.54166666664682539
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Objects designed for the table where invoices,",
+          "width" : 0.34687499999999999,
+          "x" : 0.059375002890624987,
+          "y" : 0.49722222224537049
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907406965891572,
+          "text" : "lunch, school drawings and late calls all happen.",
+          "width" : 0.37083332538604741,
+          "x" : 0.054166676820864977,
+          "y" : 0.45925926083072044
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.1015625,
+          "x" : 0.059375001692708283,
+          "y" : 0.28888888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Fictional visual proof. Test relevance, distinctiveness and product",
+          "width" : 0.31562500000000004,
+          "x" : 0.060937503156249927,
+          "y" : 0.23611111127777773
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "comprehension before selection.",
+          "width" : 0.16093750000000001,
+          "x" : 0.059375002011718706,
+          "y" : 0.21666666673611112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "SOURCES: A5, C1",
+          "width" : 0.076562500000000006,
+          "x" : 0.059375000807291634,
+          "y" : 0.077777777500000145
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.109375,
+          "x" : 0.75312499863281257,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999999,
+          "x" : 0.059375000566406232,
+          "y" : 0.027777777881944465
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "05 \/ 20",
+          "width" : 0.023437498509883858,
+          "x" : 0.91718750113568304,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "ACT 1\/THE CASE FOR CHANGE\nWhat the future could look like\nBuilt for the work of\nliving\nObjects designed for the table where invoices,\nlunch, school drawings and late calls all happen.\nCREATIVE ILLUSTRATION\nFictional visual proof. Test relevance, distinctiveness and product\ncomprehension before selection.\nSOURCES: A5, C1\nCREATIVE ILLUSTRATION\nNARRATIVE\n05 \/ 20"
+    },
+    {
+      "file" : "slide-06.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "CHACKHE OPPOKENHEY",
+          "width" : 0.11406250000000001,
+          "x" : 0.059374999921875005,
+          "y" : 0.93333333333713853
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The Opportunity",
+          "width" : 0.19218749999999998,
+          "x" : 0.059375001921874969,
+          "y" : 0.83888888894444447
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907404316796073,
+          "text" : "The base case produces a £36,440 first-year",
+          "width" : 0.45000000000000001,
+          "x" : 0.058333340833333039,
+          "y" : 0.68148148329985636
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.051851850085788298,
+          "text" : "contribution proxy after £85,000 of assumed investment.",
+          "width" : 0.57083330154418943,
+          "x" : 0.058333346519572025,
+          "y" : 0.63703703878426632
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.049999999999999933,
+          "text" : "Verify every input before committing.",
+          "width" : 0.37656249999999997,
+          "x" : 0.059375003765624969,
+          "y" : 0.59444444433333332
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "SCENARIO",
+          "width" : 0.10312500000000002,
+          "x" : 0.74218749914062498,
+          "y" : 0.602777777662037
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Validate before",
+          "width" : 0.096875000000000044,
+          "x" : 0.74531250080729161,
+          "y" : 0.48611111120370365
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.026716634962293817,
+          "text" : "investment",
+          "width" : 0.076733958721160844,
+          "x" : 0.75460177155953478,
+          "y" : 0.45469723778253945
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "FIELDWORK could test an annualised ecommerce revenue scenario of 21,890,000, £690,000 above the assumed",
+          "width" : 0.67500000000000004,
+          "x" : 0.2166666779166663,
+          "y" : 0.15555555504289409
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.028117561340332053,
+          "text" : "baseline.",
+          "width" : 0.057863861322402982,
+          "x" : 0.22028681939803793,
+          "y" : 0.13316344189893192
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "SOURCES: A1, A2, A3, A8, A9, A10",
+          "width" : 0.14531250000000001,
+          "x" : 0.059374998515625069,
+          "y" : 0.080555555833333292
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.018270226319630933,
+          "text" : "MODELLED",
+          "width" : 0.050161242485046387,
+          "x" : 0.81241937938096298,
+          "y" : 0.079753775888018019
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "06\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "CHACKHE OPPOKENHEY\nThe Opportunity\nThe base case produces a £36,440 first-year\ncontribution proxy after £85,000 of assumed investment.\nVerify every input before committing.\nSCENARIO\nValidate before\ninvestment\nFIELDWORK could test an annualised ecommerce revenue scenario of 21,890,000, £690,000 above the assumed\nbaseline.\nSOURCES: A1, A2, A3, A8, A9, A10\nNARRATIVE\nMODELLED\n06\/20"
+    },
+    {
+      "file" : "slide-07.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "CHACKHE OPPOKENHEY",
+          "width" : 0.11406250000000001,
+          "x" : 0.059374999921875005,
+          "y" : 0.93333333333713853
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The scenario bridge",
+          "width" : 0.23281250000000001,
+          "x" : 0.059375001417410679,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024705558353000256,
+          "text" : "01 CLAIM",
+          "width" : 0.061208629608154305,
+          "x" : 0.11392693458527266,
+          "y" : 0.66820277629286573
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "The sequential bridge reconciles",
+          "width" : 0.29999999999999993,
+          "x" : 0.56666667166666651,
+          "y" : 0.64444444393178302
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.051868735419379308,
+          "text" : "to £690,000. The attribution order",
+          "width" : 0.30054464340209974,
+          "x" : 0.56693705386785664,
+          "y" : 0.59721135953827509
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111205,
+          "text" : "is a modelling convention.",
+          "width" : 0.2421875,
+          "x" : 0.56562500242187497,
+          "y" : 0.56388888891666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "02 PROOF",
+          "width" : 0.065624999999999961,
+          "x" : 0.15781249953125001,
+          "y" : 0.5305555554365079
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "03 METHOD",
+          "width" : 0.073437500000000017,
+          "x" : 0.20156250007642659,
+          "y" : 0.39166666664251215
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "COmmEKCIAL CONSEQUENCE",
+          "width" : 0.10624999999999998,
+          "x" : 0.059375000156249989,
+          "y" : 0.16666666678947029
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Traffic and conversion each account for £300,000 of the base case. Higher order value accounts for £90,000.",
+          "width" : 0.65000000000000002,
+          "x" : 0.21666667749999977,
+          "y" : 0.15555555504289409
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A1, A2, A3, A8, A9, A10",
+          "width" : 0.14531249999999998,
+          "x" : 0.059375001816406224,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "MODELLED",
+          "width" : 0.050000000000000044,
+          "x" : 0.81249999957031238,
+          "y" : 0.080555555381944366
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "07 \/ 20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHACKHE OPPOKENHEY\nThe scenario bridge\n01 CLAIM\nThe sequential bridge reconciles\nto £690,000. The attribution order\nis a modelling convention.\n02 PROOF\n03 METHOD\nCOmmEKCIAL CONSEQUENCE\nTraffic and conversion each account for £300,000 of the base case. Higher order value accounts for £90,000.\nSOURCES: A1, A2, A3, A8, A9, A10\nNARRATIVE\nMODELLED\n07 \/ 20"
+    },
+    {
+      "file" : "slide-08.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "CHAPTER 2\/THE CONSTRAINTI",
+          "width" : 0.10937498807907105,
+          "x" : 0.059375011429213934,
+          "y" : 0.93333333347222225
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Constraint",
+          "width" : 0.17499999999999999,
+          "x" : 0.059375000874999986,
+          "y" : 0.84444444458333334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024705558353000256,
+          "text" : "01 CLAIM",
+          "width" : 0.061208629608154291,
+          "x" : 0.11392693570539639,
+          "y" : 0.66820277649716431
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "02 PROOF",
+          "width" : 0.065624999999999961,
+          "x" : 0.15781249953125001,
+          "y" : 0.5305555554365079
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Reject this diagnosis if a specific",
+          "width" : 0.30416665077209459,
+          "x" : 0.56666667968339701,
+          "y" : 0.64444444393178302
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "mixed-use proposition does not",
+          "width" : 0.28749999999999998,
+          "x" : 0.56874999712500007,
+          "y" : 0.60277777763888896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907408290439266,
+          "text" : "improve qualified product-page",
+          "width" : 0.28749999999999998,
+          "x" : 0.56666667026041651,
+          "y" : 0.56249999948733853
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907404316796073,
+          "text" : "progression and net conversion,",
+          "width" : 0.29583332538604734,
+          "x" : 0.56666666709864322,
+          "y" : 0.51805555658087843
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111110983,
+          "text" : "or if existing cohorts already show",
+          "width" : 0.31093749999999998,
+          "x" : 0.56875000259114583,
+          "y" : 0.48333333349537044
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "strong second-purchase",
+          "width" : 0.22031250000000002,
+          "x" : 0.56875000087890626,
+          "y" : 0.44166666621527784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.035911411709255714,
+          "text" : "behaviour.",
+          "width" : 0.097145199775695801,
+          "x" : 0.56861490091935296,
+          "y" : 0.4042665163891096
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "03 METHOD",
+          "width" : 0.073437500000000017,
+          "x" : 0.20156250007642659,
+          "y" : 0.39166666664251215
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household",
+          "width" : 0.65156249999999993,
+          "x" : 0.22031249348437507,
+          "y" : 0.15833333319444431
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "should choose its first object or return for the second.",
+          "width" : 0.32656249999999998,
+          "x" : 0.22031250326562493,
+          "y" : 0.13333333338888897
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A4",
+          "width" : 0.0625,
+          "x" : 0.059375000781249979,
+          "y" : 0.080555555694444392
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSUMPTION",
+          "width" : 0.059375000000000067,
+          "x" : 0.80312499901041678,
+          "y" : 0.080555555416666591
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "08\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "CHAPTER 2\/THE CONSTRAINTI\nThe Constraint\n01 CLAIM\n02 PROOF\nReject this diagnosis if a specific\nmixed-use proposition does not\nimprove qualified product-page\nprogression and net conversion,\nor if existing cohorts already show\nstrong second-purchase\nbehaviour.\n03 METHOD\nCOMMERCIAL CONSEQUENCE\nFIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household\nshould choose its first object or return for the second.\nSOURCES: A4\nNARRATIVE\nASSUMPTION\n08\/20"
+    },
+    {
+      "file" : "slide-09.png",
+      "observations" : [
+        {
+          "confidence" : 0.30000001192092896,
+          "height" : 0.0055555555555555358,
+          "text" : "HAHHE CONSTRAIN H",
+          "width" : 0.10937500000000001,
+          "x" : 0.059375000076992743,
+          "y" : 0.93333333332930757
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.051851850085788298,
+          "text" : "What would disprove the diagnosis",
+          "width" : 0.41250000000000003,
+          "x" : 0.058333331822916668,
+          "y" : 0.83703703856821698
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Reject this diagnosis if a specific mixed-use proposition does not improve",
+          "width" : 0.55312499999999998,
+          "x" : 0.22343750553124994,
+          "y" : 0.69166666680555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044907408290439044,
+          "text" : "qualified product-page progression and net conversion, or if existing cohorts",
+          "width" : 0.5833333015441895,
+          "x" : 0.20833335651957174,
+          "y" : 0.65138888837622755
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "already show strong second-purchase.",
+          "width" : 0.29531250000000003,
+          "x" : 0.35156249630859387,
+          "y" : 0.62499999989583332
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000133,
+          "text" : "2",
+          "width" : 0.012500000000000011,
+          "x" : 0.42031250012499999,
+          "y" : 0.53333333347222212
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "3",
+          "width" : 0.0093750000000000222,
+          "x" : 0.67968750007812484,
+          "y" : 0.5388888886458334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016855577627817753,
+          "text" : "FOUNDER",
+          "width" : 0.048457953333854664,
+          "x" : 0.1453022741402481,
+          "y" : 0.38323887794849931
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "RETAIL",
+          "width" : 0.034374999999999989,
+          "x" : 0.40937499957031254,
+          "y" : 0.3833333331944444
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.016666666666666607,
+          "text" : "CRM",
+          "width" : 0.0234375,
+          "x" : 0.67343750029296878,
+          "y" : 0.3833333334722222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "The diagnosis fails if a specific mixed-use proposition does not improve net conversion or existing cohorts",
+          "width" : 0.640625,
+          "x" : 0.22187501067708304,
+          "y" : 0.16111111124999999
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.024999999999999911,
+          "text" : "already repeat strongly.",
+          "width" : 0.14375000000000002,
+          "x" : 0.22031250119791665,
+          "y" : 0.13333333344907417
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "SOURCES: A4",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999238281267,
+          "y" : 0.080555555451388927
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "09\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "HAHHE CONSTRAIN H\nWhat would disprove the diagnosis\nReject this diagnosis if a specific mixed-use proposition does not improve\nqualified product-page progression and net conversion, or if existing cohorts\nalready show strong second-purchase.\n2\n3\nFOUNDER\nRETAIL\nCRM\nThe diagnosis fails if a specific mixed-use proposition does not improve net conversion or existing cohorts\nalready repeat strongly.\nSOURCES: A4\nASSUMPTION\nNARRATIVE\n09\/20"
+    },
+    {
+      "file" : "slide-10.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER 3ГТHЕ ADVANTAGE",
+          "width" : 0.10625000000000001,
+          "x" : 0.059375002421874878,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The Advantage",
+          "width" : 0.17656250000000001,
+          "x" : 0.059375001015624984,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROVEN IN USE",
+          "width" : 0.057812499999999989,
+          "x" : 0.082812500807291634,
+          "y" : 0.69444444467592592
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "TEST TERRITORY",
+          "width" : 0.076562499999999978,
+          "x" : 0.50312500095703128,
+          "y" : 0.60000000013888877
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.015392408106062128,
+          "text" : "THE GAP",
+          "width" : 0.037667027115821816,
+          "x" : 0.72491648581548274,
+          "y" : 0.6853593513887889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Modular objects for",
+          "width" : 0.14374999999999993,
+          "x" : 0.72343750179687505,
+          "y" : 0.62222222246527781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "surfaces shared by work",
+          "width" : 0.17656250000000007,
+          "x" : 0.725000000953125,
+          "y" : 0.58888888858333333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "and life",
+          "width" : 0.0546875,
+          "x" : 0.7250000004557291,
+          "y" : 0.56388888900462963
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "WHO IT MATTERS TO",
+          "width" : 0.067187499999999956,
+          "x" : 0.72499999888020839,
+          "y" : 0.52222222208333335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "People whose home workspace",
+          "width" : 0.14375000000000004,
+          "x" : 0.72499999760416678,
+          "y" : 0.48611111101851856
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "disappears and reappears every day",
+          "width" : 0.1640625,
+          "x" : 0.72499999726562514,
+          "y" : 0.46666666657407407
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Validation required. No competitor position",
+          "width" : 0.17812499999999998,
+          "x" : 0.7249999977734376,
+          "y" : 0.35833333326388894
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "is asserted in this fictional fixture.",
+          "width" : 0.140625,
+          "x" : 0.72500000175781243,
+          "y" : 0.34444444454861112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "GENERIC ORGANISATION",
+          "width" : 0.090624999999999997,
+          "x" : 0.092187498867187537,
+          "y" : 0.32499999989583328
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "MIXED-USE SPECIFIC",
+          "width" : 0.076562499999999978,
+          "x" : 0.54218749872395833,
+          "y" : 0.32499999986111117
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "FIELDWORK could own the mixed-use surface: modular objects designed for the daily collision of paid work,",
+          "width" : 0.65833330154418945,
+          "x" : 0.21666667158901678,
+          "y" : 0.15555555562670109
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "domestic life and limited space.",
+          "width" : 0.19218749999999993,
+          "x" : 0.22031250160156249,
+          "y" : 0.13333333337962983
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A5",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999238281267,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "10\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.9171875009533913,
+          "y" : 0.02777777805555548
+        }
+      ],
+      "text" : "CHAPTER 3ГТHЕ ADVANTAGE\nThe Advantage\nPROVEN IN USE\nTEST TERRITORY\nTHE GAP\nModular objects for\nsurfaces shared by work\nand life\nWHO IT MATTERS TO\nPeople whose home workspace\ndisappears and reappears every day\nValidation required. No competitor position\nis asserted in this fictional fixture.\nGENERIC ORGANISATION\nMIXED-USE SPECIFIC\nFIELDWORK could own the mixed-use surface: modular objects designed for the daily collision of paid work,\ndomestic life and limited space.\nSOURCES: A5\nASSUMPTION\nNARRATIVE\n10\/20"
+    },
+    {
+      "file" : "slide-11.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER З\/ТHЕ ADVANTAGE",
+          "width" : 0.10625000000000001,
+          "x" : 0.059375002421874878,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The advantage needs proof",
+          "width" : 0.31874999999999998,
+          "x" : 0.059374998406250025,
+          "y" : 0.83888888877777779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "FOUNDER VIEW",
+          "width" : 0.057812499999999933,
+          "x" : 0.52500000007595493,
+          "y" : 0.70555555553626537
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "EVIDENCE TO COLLECT",
+          "width" : 0.095312494039535525,
+          "x" : 0.079687501391690632,
+          "y" : 0.6972222220833334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444597,
+          "text" : "A proposed category to own",
+          "width" : 0.13906249999999998,
+          "x" : 0.65156250231770829,
+          "y" : 0.70277777791666662
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Observe how shared surfaces are reset",
+          "width" : 0.25156250000000002,
+          "x" : 0.07968749790364589,
+          "y" : 0.57777777766203697
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022870967123243657,
+          "text" : "CUSTOMER DATA",
+          "width" : 0.065693527460098267,
+          "x" : 0.52340323692653834,
+          "y" : 0.56634229432077454
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Not yet supplied",
+          "width" : 0.082812500000000067,
+          "x" : 0.65000000103515621,
+          "y" : 0.566666666875
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "Test the mixed-use proposition",
+          "width" : 0.20000000000000001,
+          "x" : 0.078124997500000057,
+          "y" : 0.49999999993055555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.034630469481150228,
+          "text" : "Measure willingness to pay",
+          "width" : 0.17402716875076291,
+          "x" : 0.079389832195653473,
+          "y" : 0.42133735614819756
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019977513949076431,
+          "text" : "CHOICE TEST",
+          "width" : 0.051625269651412897,
+          "x" : 0.52340611465822262,
+          "y" : 0.43584457622524253
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Required before selection",
+          "width" : 0.12968749999999996,
+          "x" : 0.6484374983789063,
+          "y" : 0.43333333322916667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "The territory remains a hypothesis until observed behaviour and customer choice evidence support it.",
+          "width" : 0.61093750000000002,
+          "x" : 0.18593750408203116,
+          "y" : 0.27500000034722216
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "COMMEKCIAL CONSEQUENCE",
+          "width" : 0.10624999999999998,
+          "x" : 0.059375000156249989,
+          "y" : 0.16666666678947029
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "Founder conviction can frame a hypothesis. Customer choice data must decide whether the advantage is real.",
+          "width" : 0.66666665077209464,
+          "x" : 0.21666668572506326,
+          "y" : 0.15555555504289409
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A5",
+          "width" : 0.0625,
+          "x" : 0.059375000781249979,
+          "y" : 0.080555555694444392
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312497019767778,
+          "x" : 0.059375000734907812,
+          "y" : 0.027777777638888779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "11\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.9171875009533913,
+          "y" : 0.02777777805555548
+        }
+      ],
+      "text" : "CHAPTER З\/ТHЕ ADVANTAGE\nThe advantage needs proof\nFOUNDER VIEW\nEVIDENCE TO COLLECT\nA proposed category to own\nObserve how shared surfaces are reset\nCUSTOMER DATA\nNot yet supplied\nTest the mixed-use proposition\nMeasure willingness to pay\nCHOICE TEST\nRequired before selection\nThe territory remains a hypothesis until observed behaviour and customer choice evidence support it.\nCOMMEKCIAL CONSEQUENCE\nFounder conviction can frame a hypothesis. Customer choice data must decide whether the advantage is real.\nSOURCES: A5\nNARRATIVE\nASSUMPTION\n11\/20"
+    },
+    {
+      "file" : "slide-12.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.045180967119004989,
+          "text" : "The Strategy",
+          "width" : 0.15096665620803834,
+          "x" : 0.058919054621742427,
+          "y" : 0.83959164780861717
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.025000000000000133,
+          "text" : "1",
+          "width" : 0.0093749999999999944,
+          "x" : 0.081249999921874996,
+          "y" : 0.64722222253472217
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.015124268001980301,
+          "text" : "TENSION",
+          "width" : 0.037638586759567272,
+          "x" : 0.081180706542407027,
+          "y" : 0.59104897714162985
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555669,
+          "text" : "Broad accessories",
+          "width" : 0.14218750000000002,
+          "x" : 0.079687498222656278,
+          "y" : 0.50833333322916663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "compete on taste and paid",
+          "width" : 0.19999999999999998,
+          "x" : 0.079687498000000051,
+          "y" : 0.4722222221111112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.031942635112338635,
+          "text" : "attention",
+          "width" : 0.07049914002418517,
+          "x" : 0.079594179402729531,
+          "y" : 0.44097312676096678
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "2",
+          "width" : 0.0078125,
+          "x" : 0.387499999921875,
+          "y" : 0.65000000019444437
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "SHIFT",
+          "width" : 0.025000000000000022,
+          "x" : 0.38593750031249996,
+          "y" : 0.59166666677083335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Own the mixed-use surface",
+          "width" : 0.20468749999999997,
+          "x" : 0.38593750146205358,
+          "y" : 0.50833333345238096
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "and show usefulness in",
+          "width" : 0.17812499999999998,
+          "x" : 0.38593750011718753,
+          "y" : 0.47499999965277784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022889961136711934,
+          "text" : "context",
+          "width" : 0.059452939033508345,
+          "x" : 0.38589853097753302,
+          "y" : 0.44411057513165386
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.019444444444444486,
+          "text" : "3",
+          "width" : 0.0093750000000000222,
+          "x" : 0.69062499992187509,
+          "y" : 0.65000000024305549
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "RESOLUTION",
+          "width" : 0.0546875,
+          "x" : 0.69062500068359367,
+          "y" : 0.59166666677083335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777901,
+          "text" : "Let the first object earn the",
+          "width" : 0.203125,
+          "x" : 0.69062500169270824,
+          "y" : 0.5083333334722222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "second before buying",
+          "width" : 0.1640625,
+          "x" : 0.690624998828125,
+          "y" : 0.47222222208333342
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "reach",
+          "width" : 0.043750000000000067,
+          "x" : 0.69062500018229167,
+          "y" : 0.44166666689814815
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "Turn one useful object into a reason to return.",
+          "width" : 0.49687500000000007,
+          "x" : 0.25156249585937507,
+          "y" : 0.26944444435185189
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Turn the mixed-use surface into a category FIELDWORK can own, then prove that one useful object earns the",
+          "width" : 0.65312499999999996,
+          "x" : 0.22031250466517846,
+          "y" : 0.15833333347222223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "next purchase before scaling acquisition.",
+          "width" : 0.25,
+          "x" : 0.22031250249999995,
+          "y" : 0.13333333338888897
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A4, A5, A6, C1",
+          "width" : 0.10937499999999999,
+          "x" : 0.05937500182291662,
+          "y" : 0.080555555648148092
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "12\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "The Strategy\n1\nTENSION\nBroad accessories\ncompete on taste and paid\nattention\n2\nSHIFT\nOwn the mixed-use surface\nand show usefulness in\ncontext\n3\nRESOLUTION\nLet the first object earn the\nsecond before buying\nreach\nTurn one useful object into a reason to return.\nTurn the mixed-use surface into a category FIELDWORK can own, then prove that one useful object earns the\nnext purchase before scaling acquisition.\nSOURCES: A4, A5, A6, C1\nNARRATIVE\nASSUMPTION\n12\/20"
+    },
+    {
+      "file" : "slide-13.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER&\/THE STRATEGYI",
+          "width" : 0.1015625,
+          "x" : 0.059375002304687376,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.050000000000000044,
+          "text" : "Three moves, three tests",
+          "width" : 0.28750000000000003,
+          "x" : 0.059375000260416665,
+          "y" : 0.83333333291666667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "01 \/ OWN THE MIXED-USE SURFACE",
+          "width" : 0.18124999999999997,
+          "x" : 0.076562502265624929,
+          "y" : 0.70277777791666662
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "02\/ MAKE USEFULNESS VISIBLE",
+          "width" : 0.16562499999999997,
+          "x" : 0.38124999834375001,
+          "y" : 0.7027777776666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "03 \/ EARN THE SECOND OBJECT",
+          "width" : 0.1640625,
+          "x" : 0.68593749794921877,
+          "y" : 0.70277777763888893
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ROLE",
+          "width" : 0.018750000000000003,
+          "x" : 0.076562500104166667,
+          "y" : 0.64166666689814811
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Qualified conversion",
+          "width" : 0.079687500000000022,
+          "x" : 0.13437500099609373,
+          "y" : 0.64444444454861105
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Conversion and average order value",
+          "width" : 0.13749999999999996,
+          "x" : 0.43906250171874994,
+          "y" : 0.64166666680555551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ROLE",
+          "width" : 0.018749999999999933,
+          "x" : 0.6859375003125,
+          "y" : 0.64166666680555551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Second-purchase economics",
+          "width" : 0.11093750000000002,
+          "x" : 0.74375000138671865,
+          "y" : 0.64166666680555551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TENSION",
+          "width" : 0.028125000000000011,
+          "x" : 0.074999999531250014,
+          "y" : 0.58333333319444447
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROOF",
+          "width" : 0.021874999999999992,
+          "x" : 0.076562499927884622,
+          "y" : 0.52500000005341874
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSET",
+          "width" : 0.020312499999999997,
+          "x" : 0.076562500182291673,
+          "y" : 0.46666666689814817
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "narrower promise may reduce broad bu",
+          "width" : 0.1484375,
+          "x" : 0.13906249992270608,
+          "y" : 0.58333333334219861
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01980949044227609,
+          "text" : "w-intent traffi",
+          "width" : 0.053166896104812622,
+          "x" : 0.13904155239055047,
+          "y" : 0.56648414411158443
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Controlled message and landing-page test",
+          "width" : 0.16250000000000003,
+          "x" : 0.13281249909374998,
+          "y" : 0.51944444469444451
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Strategy Director",
+          "width" : 0.067187499999999983,
+          "x" : 0.13281250055989582,
+          "y" : 0.4638888890277777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "More proof requires disciplined production",
+          "width" : 0.16250000000000003,
+          "x" : 0.43906250203125002,
+          "y" : 0.58333333347222216
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "and may expose weak claims.",
+          "width" : 0.11406250000000001,
+          "x" : 0.43906250190104162,
+          "y" : 0.56666666666666665
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Product-story comprehension and basket",
+          "width" : 0.15624999999999994,
+          "x" : 0.43906250195312496,
+          "y" : 0.52500000013888881
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01111111044883728,
+          "text" : "test",
+          "width" : 0.017187499999999967,
+          "x" : 0.4374999997135417,
+          "y" : 0.51111111134965548
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Creative Director",
+          "width" : 0.064062500000000022,
+          "x" : 0.43906249914062501,
+          "y" : 0.46666666638888887
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "TENSION",
+          "width" : 0.029687499999999978,
+          "x" : 0.68437500049479161,
+          "y" : 0.58333333347222216
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROOF",
+          "width" : 0.023437498509883858,
+          "x" : 0.68437500035443311,
+          "y" : 0.52499999986111123
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "ASSET",
+          "width" : 0.021874999999999978,
+          "x" : 0.68593750015624999,
+          "y" : 0.46666666689814817
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Near-term reach grows more slowly while",
+          "width" : 0.15625,
+          "x" : 0.7437499994140625,
+          "y" : 0.58333333357638883
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "economics are validated.",
+          "width" : 0.095312500000000022,
+          "x" : 0.74218750095312502,
+          "y" : 0.563888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222365,
+          "text" : "Cohort retention and referral pilot",
+          "width" : 0.12968750000000007,
+          "x" : 0.74218750073437501,
+          "y" : 0.52222222244444438
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Strategy Director",
+          "width" : 0.065625000000000044,
+          "x" : 0.74375000082031251,
+          "y" : 0.46666666680555546
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "VERBAL ASSETS",
+          "width" : 0.054687500000000007,
+          "x" : 0.060937499316406261,
+          "y" : 0.35277777763888885
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Specific promise • Visible proof",
+          "width" : 0.13124999999999998,
+          "x" : 0.060937497812500088,
+          "y" : 0.31388888875000009
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "TONE + MOTION",
+          "width" : 0.053125000000000033,
+          "x" : 0.36562500088541661,
+          "y" : 0.35277777791666665
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Direct • Useful",
+          "width" : 0.060937499999999978,
+          "x" : 0.36562500076171872,
+          "y" : 0.31666666680555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "RECURRING FORMATS",
+          "width" : 0.073437500000000044,
+          "x" : 0.67031249908203128,
+          "y" : 0.35277777767361107
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Claim and proof • Test and result",
+          "width" : 0.13437500000000002,
+          "x" : 0.67187499937500006,
+          "y" : 0.31388888856481478
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781249999999999,
+          "x" : 0.059375001347656206,
+          "y" : 0.16388888902777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "The strategy connects each recommendation to a measurable commercial lever.",
+          "width" : 0.47968749999999993,
+          "x" : 0.22031250479687489,
+          "y" : 0.15833333338888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A4, A5, A6, C1",
+          "width" : 0.10937500000000001,
+          "x" : 0.059374998632812523,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "13\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER&\/THE STRATEGYI\nThree moves, three tests\n01 \/ OWN THE MIXED-USE SURFACE\n02\/ MAKE USEFULNESS VISIBLE\n03 \/ EARN THE SECOND OBJECT\nROLE\nQualified conversion\nConversion and average order value\nROLE\nSecond-purchase economics\nTENSION\nPROOF\nASSET\nnarrower promise may reduce broad bu\nw-intent traffi\nControlled message and landing-page test\nStrategy Director\nMore proof requires disciplined production\nand may expose weak claims.\nProduct-story comprehension and basket\ntest\nCreative Director\nTENSION\nPROOF\nASSET\nNear-term reach grows more slowly while\neconomics are validated.\nCohort retention and referral pilot\nStrategy Director\nVERBAL ASSETS\nSpecific promise • Visible proof\nTONE + MOTION\nDirect • Useful\nRECURRING FORMATS\nClaim and proof • Test and result\nCOMMERCIAL CONSEQUENCE\nThe strategy connects each recommendation to a measurable commercial lever.\nSOURCES: A4, A5, A6, C1\nNARRATIVE\nASSUMPTION\n13\/20"
+    },
+    {
+      "file" : "slide-14.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Creative Future",
+          "width" : 0.22968749999999999,
+          "x" : 0.059375001148437481,
+          "y" : 0.84444444455555556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "01",
+          "width" : 0.01249999925494194,
+          "x" : 0.54531250021627908,
+          "y" : 0.70555555583333329
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888973,
+          "text" : "USEFUL BY DESIGN",
+          "width" : 0.26093749999999999,
+          "x" : 0.06562500186383928,
+          "y" : 0.65833333345238088
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "OBSERVE",
+          "width" : 0.040624999999999911,
+          "x" : 0.5968750005078125,
+          "y" : 0.70833333343749993
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "Real work leaves traces",
+          "width" : 0.17031249999999998,
+          "x" : 0.59531250141927072,
+          "y" : 0.65277777789351843
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.026295200983683209,
+          "text" : "meets",
+          "width" : 0.04553327858448028,
+          "x" : 0.063952110823043223,
+          "y" : 0.57713017749760054
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "02",
+          "width" : 0.01249999925494194,
+          "x" : 0.54531250052877911,
+          "y" : 0.55833333305555555
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "HUMAN IN PRACTICE",
+          "width" : 0.27656250000000004,
+          "x" : 0.065625001382812437,
+          "y" : 0.4916666668055556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "PROVE",
+          "width" : 0.029687499999999978,
+          "x" : 0.59687500037109376,
+          "y" : 0.56111111121527779
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037037036154005221,
+          "text" : "Materials and use stay visible",
+          "width" : 0.21666665077209479,
+          "x" : 0.59166667100284154,
+          "y" : 0.5037037037748493
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "03",
+          "width" : 0.012499999999999956,
+          "x" : 0.54531249984375008,
+          "y" : 0.41388888878472219
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "REPEAT",
+          "width" : 0.034374999999999933,
+          "x" : 0.59687499965625002,
+          "y" : 0.41388888877777774
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037500000000000089,
+          "text" : "One warm orange work mark",
+          "width" : 0.20833332538604743,
+          "x" : 0.59583333991114296,
+          "y" : 0.35555555513548676
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Built for the work of living: Objects designed for the table where invoices, lunch, school drawings and late calls",
+          "width" : 0.66562500000000002,
+          "x" : 0.22187500665624996,
+          "y" : 0.15833333350000012
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.026358082559373552,
+          "text" : "all happen.",
+          "width" : 0.068902182579040544,
+          "x" : 0.22023640939741576,
+          "y" : 0.1326542921505709
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C1",
+          "width" : 0.076562499999999992,
+          "x" : 0.059375000957031229,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.11093749999999991,
+          "x" : 0.75312500184895836,
+          "y" : 0.080555555740740692
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "14\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91718750116172454,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "The Creative Future\n01\nUSEFUL BY DESIGN\nOBSERVE\nReal work leaves traces\nmeets\n02\nHUMAN IN PRACTICE\nPROVE\nMaterials and use stay visible\n03\nREPEAT\nOne warm orange work mark\nBuilt for the work of living: Objects designed for the table where invoices, lunch, school drawings and late calls\nall happen.\nSOURCES: A5, C1\nNARRATIVE\nCREATIVE ILLUSTRATION\n14\/20"
+    },
+    {
+      "file" : "slide-15.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "CHAPTER 5\/ THE CREATIVE FUTURE",
+          "width" : 0.12968750000000001,
+          "x" : 0.059375001953124951,
+          "y" : 0.93055555578703708
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "The campaign behaviour",
+          "width" : 0.2890625,
+          "x" : 0.059375001806640612,
+          "y" : 0.83888888902777781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "A film keeps the camera on one dining table as invoice, lunch, school drawing and late call replace each other. The FIELDWORK object stays, adapts",
+          "width" : 0.82968750000000013,
+          "x" : 0.068749986171875485,
+          "y" : 0.73611111101851845
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "and gathers the day's essential tools.",
+          "width" : 0.2109375,
+          "x" : 0.068749996484375117,
+          "y" : 0.71111111101851854
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "01",
+          "width" : 0.014062500000000006,
+          "x" : 0.087500000175781245,
+          "y" : 0.61944444454861114
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "02",
+          "width" : 0.015625000000000056,
+          "x" : 0.39062500013020834,
+          "y" : 0.5888888890277777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "03",
+          "width" : 0.014062499999999978,
+          "x" : 0.6968750001757813,
+          "y" : 0.5694444445486111
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333437,
+          "text" : "OBSERVE",
+          "width" : 0.098437500000000011,
+          "x" : 0.08749999929687502,
+          "y" : 0.53055555539682531
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "Real work leaves traces",
+          "width" : 0.125,
+          "x" : 0.089062501249999967,
+          "y" : 0.46944444452777789
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033688304159376403,
+          "text" : "PROVE",
+          "width" : 0.07192683219909668,
+          "x" : 0.3921615833017128,
+          "y" : 0.50537807000068646
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "Materials and use stay visible",
+          "width" : 0.15312500000000001,
+          "x" : 0.39375000101562491,
+          "y" : 0.44166666638888896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333326,
+          "text" : "REPEAT",
+          "width" : 0.081249999999999933,
+          "x" : 0.69687499932291674,
+          "y" : 0.48055555541666672
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222143,
+          "text" : "One warm orange work mark",
+          "width" : 0.15312499999999996,
+          "x" : 0.69843750027343754,
+          "y" : 0.41666666638888894
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "COMMERCIAL CONSEQUENCE",
+          "width" : 0.10781250000000001,
+          "x" : 0.059374999973958342,
+          "y" : 0.16666666689814824
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+          "width" : 0.57187500000000002,
+          "x" : 0.22187500953124975,
+          "y" : 0.15833333342592593
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A5, C1",
+          "width" : 0.076562499999999978,
+          "x" : 0.059375000644531238,
+          "y" : 0.077777777534722259
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.109375,
+          "x" : 0.75312499998046878,
+          "y" : 0.080555555576388937
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "15\/20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91718750116172454,
+          "y" : 0.027777777916666802
+        }
+      ],
+      "text" : "CHAPTER 5\/ THE CREATIVE FUTURE\nThe campaign behaviour\nA film keeps the camera on one dining table as invoice, lunch, school drawing and late call replace each other. The FIELDWORK object stays, adapts\nand gathers the day's essential tools.\n01\n02\n03\nOBSERVE\nReal work leaves traces\nPROVE\nMaterials and use stay visible\nREPEAT\nOne warm orange work mark\nCOMMERCIAL CONSEQUENCE\nObjects designed for the table where invoices, lunch, school drawings and late calls all happen.\nSOURCES: A5, C1\nNARRATIVE\nCREATIVE ILLUSTRATION\n15\/20"
+    },
+    {
+      "file" : "slide-16.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "CHAPTER 6\/THE GROWTH ENGINE",
+          "width" : 0.12343748807907104,
+          "x" : 0.059375008890151813,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444509,
+          "text" : "The Growth Engine",
+          "width" : 0.22499999999999998,
+          "x" : 0.059375001071428568,
+          "y" : 0.83888888857142851
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Owned site",
+          "width" : 0.043749999999999997,
+          "x" : 0.075000000729166641,
+          "y" : 0.72777777791666665
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Prove the proposition and convert qualified demand",
+          "width" : 0.37031250000000004,
+          "x" : 0.26093749691406254,
+          "y" : 0.71388888879629631
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Message comprehension and net",
+          "width" : 0.13906249999999998,
+          "x" : 0.76250000231770831,
+          "y" : 0.72500000013888888
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333326710595124,
+          "text" : "conversion",
+          "width" : 0.045312497019767695,
+          "x" : 0.85312500262292856,
+          "y" : 0.71111111151169237
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.013888888888888951,
+          "text" : "CRM",
+          "width" : 0.021874999999999992,
+          "x" : 0.073437499726562508,
+          "y" : 0.63333333322916663
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333215,
+          "text" : "Build repeat, cross-sell and referral evidence",
+          "width" : 0.31875000000000003,
+          "x" : 0.26093749609375011,
+          "y" : 0.6166666670833334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Cohort contribution and opt-out",
+          "width" : 0.1328125,
+          "x" : 0.76874999867187499,
+          "y" : 0.63055555544444442
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016878301567501586,
+          "text" : "guardrail",
+          "width" : 0.04065230786800389,
+          "x" : 0.86092384674338385,
+          "y" : 0.61100529384234958
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.018477737241321179,
+          "text" : "Pald social",
+          "width" : 0.043956920504570007,
+          "x" : 0.073334039848205829,
+          "y" : 0.53520557521062195
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Scale tested creative and proposition routes",
+          "width" : 0.31406250000000002,
+          "x" : 0.26093749738281258,
+          "y" : 0.52499999990740742
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Incremental contribution after creative",
+          "width" : 0.15937500000000004,
+          "x" : 0.74062500199218739,
+          "y" : 0.53611111121527777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "and media cost",
+          "width" : 0.065625000000000044,
+          "x" : 0.83437499890625,
+          "y" : 0.51944444430555559
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017561961544884541,
+          "text" : "Partnerships",
+          "width" : 0.051651680469512934,
+          "x" : 0.073392910408980244,
+          "y" : 0.44121901937764108
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Reach relevant work and design communities",
+          "width" : 0.32500000000000007,
+          "x" : 0.26093750270833327,
+          "y" : 0.43055555567129633
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Qualified traffic and assisted",
+          "width" : 0.11875000000000002,
+          "x" : 0.78124999851562504,
+          "y" : 0.44166666656249998
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "conversion",
+          "width" : 0.046875,
+          "x" : 0.85312499953124998,
+          "y" : 0.42222222211111105
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.041665540801154255,
+          "text" : "Use the owned site to prove the mixed-use proposition, then use the first object to earn a second purchase",
+          "width" : 0.63922510147094724,
+          "x" : 0.22023284918564681,
+          "y" : 0.15182753831056794
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "before paid media scales the system.",
+          "width" : 0.22499999999999998,
+          "x" : 0.22031250281249992,
+          "y" : 0.13333333329861119
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A6",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999238281267,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "16\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "CHAPTER 6\/THE GROWTH ENGINE\nThe Growth Engine\nOwned site\nProve the proposition and convert qualified demand\nMessage comprehension and net\nconversion\nCRM\nBuild repeat, cross-sell and referral evidence\nCohort contribution and opt-out\nguardrail\nPald social\nScale tested creative and proposition routes\nIncremental contribution after creative\nand media cost\nPartnerships\nReach relevant work and design communities\nQualified traffic and assisted\nconversion\nUse the owned site to prove the mixed-use proposition, then use the first object to earn a second purchase\nbefore paid media scales the system.\nSOURCES: A6\nASSUMPTION\nNARRATIVE\n16\/20"
+    },
+    {
+      "file" : "slide-17.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "Measurement before scale",
+          "width" : 0.30625000000000002,
+          "x" : 0.060937502552083259,
+          "y" : 0.84444444453703704
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016979112890031622,
+          "text" : "LEADING",
+          "width" : 0.040665197372436512,
+          "x" : 0.084354900897795293,
+          "y" : 0.67206599939152112
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033333333333333215,
+          "text" : "Proposition comprehension, qualified click-through, product-page",
+          "width" : 0.49375000000000002,
+          "x" : 0.37343750355468741,
+          "y" : 0.66944444402777781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02912567191653781,
+          "text" : "progression",
+          "width" : 0.092805224657058705,
+          "x" : 0.37310212554878996,
+          "y" : 0.63920476036615392
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "BEHAVIOURAL",
+          "width" : 0.065624999999999989,
+          "x" : 0.084374999179687521,
+          "y" : 0.51666666656249993
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555447,
+          "text" : "Net conversion, average order value, repeat and referral",
+          "width" : 0.41718749999999999,
+          "x" : 0.37343749702008927,
+          "y" : 0.51666666656746041
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "COMMERCIAL",
+          "width" : 0.060937500000000006,
+          "x" : 0.084374998984375033,
+          "y" : 0.36111111092592585
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Contribution after returns, fulfilment, media and implementation",
+          "width" : 0.4765625,
+          "x" : 0.37343750397135411,
+          "y" : 0.36111111127314821
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Leading indicators must move before the plan releases larger media or inventory commitments.",
+          "width" : 0.57343750000000004,
+          "x" : 0.22031250573437494,
+          "y" : 0.15833333338888889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "SOURCES: A6",
+          "width" : 0.060937500000000006,
+          "x" : 0.059374999238281267,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.04531249701976775,
+          "x" : 0.059375002245324424,
+          "y" : 0.027777777916666802
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "17 \/ 20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "Measurement before scale\nLEADING\nProposition comprehension, qualified click-through, product-page\nprogression\nBEHAVIOURAL\nNet conversion, average order value, repeat and referral\nCOMMERCIAL\nContribution after returns, fulfilment, media and implementation\nLeading indicators must move before the plan releases larger media or inventory commitments.\nSOURCES: A6\nASSUMPTION\nNARRATIVE\n17 \/ 20"
+    },
+    {
+      "file" : "slide-18.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The Next 12 Months",
+          "width" : 0.23125000000000001,
+          "x" : 0.059375001156249982,
+          "y" : 0.84444444455555556
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Months 1-3",
+          "width" : 0.043749999999999997,
+          "x" : 0.081249999453125013,
+          "y" : 0.66666666656250007
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "Months 4-6",
+          "width" : 0.043750000000000011,
+          "x" : 0.38281249927083338,
+          "y" : 0.66666666652777784
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Months 7-9",
+          "width" : 0.043750000000000067,
+          "x" : 0.68437499945312497,
+          "y" : 0.66388888875000007
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111110983,
+          "text" : "Establish the truth",
+          "width" : 0.18593750000000003,
+          "x" : 0.082812498694196449,
+          "y" : 0.56388888914682544
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.027777777777777679,
+          "text" : "Verify economics, interview",
+          "width" : 0.171875,
+          "x" : 0.081250001227678559,
+          "y" : 0.46944444460317469
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "customers and test three",
+          "width" : 0.15625,
+          "x" : 0.081250001116071419,
+          "y" : 0.44444444454365073
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "proposition routes.",
+          "width" : 0.11874999999999999,
+          "x" : 0.081249999687500019,
+          "y" : 0.41111111145833334
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037827139430575918,
+          "text" : "Prove the",
+          "width" : 0.098632138967514049,
+          "x" : 0.38427767974638927,
+          "y" : 0.56303087501666194
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.040867445203992991,
+          "text" : "proposition",
+          "width" : 0.11894997358322146,
+          "x" : 0.38271251236104986,
+          "y" : 0.51289961055846889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Run controlled site, product-story",
+          "width" : 0.20781249999999996,
+          "x" : 0.38281250148437496,
+          "y" : 0.4694444445634921
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.025000000000000022,
+          "text" : "and CRM tests with contribution",
+          "width" : 0.20156249999999998,
+          "x" : 0.382812502015625,
+          "y" : 0.44444444452777776
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.033076503541734414,
+          "text" : "guardrails.",
+          "width" : 0.0698217272758484,
+          "x" : 0.38214036355123504,
+          "y" : 0.40763023738294024
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.043745342890421535,
+          "text" : "Build the engine",
+          "width" : 0.16766079664230338,
+          "x" : 0.6841489891532142,
+          "y" : 0.55719159452305134
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "Codify winning creative, CRM and",
+          "width" : 0.21406250000000004,
+          "x" : 0.68437500178385413,
+          "y" : 0.46944444462962964
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "referral mechanics and assess",
+          "width" : 0.19218749999999996,
+          "x" : 0.68437500192187495,
+          "y" : 0.44722222233333331
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.02777777777777779,
+          "text" : "capacity.",
+          "width" : 0.057812499999999933,
+          "x" : 0.68437500057812495,
+          "y" : 0.40833333344444445
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333333037,
+          "text" : "COmmEKCIAL CONSEQUENCE",
+          "width" : 0.10624999999999998,
+          "x" : 0.059375000156249989,
+          "y" : 0.16666666678947029
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.037499999999999978,
+          "text" : "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+          "width" : 0.61666665077209482,
+          "x" : 0.21666666433617526,
+          "y" : 0.15555555562670109
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A4, A5, A6, A7, C1",
+          "width" : 0.125,
+          "x" : 0.05937500208333326,
+          "y" : 0.077777777916666735
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999992,
+          "x" : 0.05937499943359377,
+          "y" : 0.027777777673611115
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "ASSUMPTION",
+          "width" : 0.059374999999999956,
+          "x" : 0.80312499925781256,
+          "y" : 0.080555555416666702
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "18\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "The Next 12 Months\nMonths 1-3\nMonths 4-6\nMonths 7-9\nEstablish the truth\nVerify economics, interview\ncustomers and test three\nproposition routes.\nProve the\nproposition\nRun controlled site, product-story\nand CRM tests with contribution\nguardrails.\nBuild the engine\nCodify winning creative, CRM and\nreferral mechanics and assess\ncapacity.\nCOmmEKCIAL CONSEQUENCE\nA staged validation programme protects cash while the business replaces assumptions with evidence.\nSOURCES: A4, A5, A6, A7, C1\nNARRATIVE\nASSUMPTION\n18\/20"
+    },
+    {
+      "file" : "slide-19.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.0083333333333334147,
+          "text" : "GOVERNANCE \/EVIDENCE",
+          "width" : 0.093749994039535517,
+          "x" : 0.059375005089607136,
+          "y" : 0.93333333321052969
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.047222222222222276,
+          "text" : "Evidence and assumptions ledger",
+          "width" : 0.39531250000000001,
+          "x" : 0.060937503953124937,
+          "y" : 0.83611111130555549
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "ID",
+          "width" : 0.014062500000000006,
+          "x" : 0.057812499824218752,
+          "y" : 0.71944444434027777
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "A1",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999921875005,
+          "y" : 0.68055555565972226
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "A2",
+          "width" : 0.014062499999999999,
+          "x" : 0.057812499765625004,
+          "y" : 0.64166666652777771
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.016666666666666718,
+          "text" : "A3",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999960937494,
+          "y" : 0.60000000020833333
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "A4",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999921875005,
+          "y" : 0.56111111119791668
+        },
+        {
+          "confidence" : 0.5,
+          "height" : 0.01388888888888884,
+          "text" : "C1",
+          "width" : 0.012499999999999997,
+          "x" : 0.059374999843750012,
+          "y" : 0.26944444434027781
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Class",
+          "width" : 0.026562499999999989,
+          "x" : 0.10625000033203125,
+          "y" : 0.71944444451388889
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019383327166239361,
+          "text" : "ASSUMPTION",
+          "width" : 0.050263851881027236,
+          "x" : 0.10455557342999093,
+          "y" : 0.67919722506217806
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.018180759747823072,
+          "text" : "ASSUMPTION",
+          "width" : 0.050152665376663214,
+          "x" : 0.10461116793924316,
+          "y" : 0.64090962038486932
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.018113754855261899,
+          "text" : "ASSUMPTION",
+          "width" : 0.050146210193634036,
+          "x" : 0.1046143955268261,
+          "y" : 0.59927645606268909
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "ASSUMPTION",
+          "width" : 0.049999999999999989,
+          "x" : 0.10468750062499999,
+          "y" : 0.56111111125000002
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019908114274342803,
+          "text" : "ASSUMPTION",
+          "width" : 0.051617193222045915,
+          "x" : 0.10309765381832955,
+          "y" : 0.51365705409354501
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01749762694040935,
+          "text" : "ASSUMPTION",
+          "width" : 0.050085526704788191,
+          "x" : 0.10464473581528369,
+          "y" : 0.47458451966409021
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022840714454650857,
+          "text" : "ASSUMPTION",
+          "width" : 0.051645731925964361,
+          "x" : 0.10308338464352784,
+          "y" : 0.43024630916883844
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.018427995840708422,
+          "text" : "ASSUMPTION",
+          "width" : 0.050176256895065302,
+          "x" : 0.10459937093069241,
+          "y" : 0.39356377955764288
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016944126288096162,
+          "text" : "ASSUMPTION",
+          "width" : 0.050029027462005632,
+          "x" : 0.10467298543599321,
+          "y" : 0.35541682555503085
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017554091082678913,
+          "text" : "ASSUMPTION",
+          "width" : 0.050091183185577398,
+          "x" : 0.10464190890781086,
+          "y" : 0.31344517678310568
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "CREATIVE ILLUSTRATION",
+          "width" : 0.090624999999999983,
+          "x" : 0.10468750113281247,
+          "y" : 0.26944444458333328
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Claim in this Blueprint",
+          "width" : 0.10312499999999997,
+          "x" : 0.21875000128906247,
+          "y" : 0.71666666680555557
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "FIELDWORK receives 600,000 ecommerce sessions per year.",
+          "width" : 0.1953125,
+          "x" : 0.21875000195312494,
+          "y" : 0.6805555556666667
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+          "width" : 0.19687500000000002,
+          "x" : 0.2187500024609374,
+          "y" : 0.63888888899305551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "FIELDWORK has a £100 average order value before returns and discounts.",
+          "width" : 0.23749999999999999,
+          "x" : 0.21875000395833322,
+          "y" : 0.60000000009259258
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.036111111111111094,
+          "text" : "The pia growth constraint is a broad proposition that gives qualified buyers to lite reason to choose",
+          "width" : 0.33437499999999992,
+          "x" : 0.21718750417968741,
+          "y" : 0.54166666697916666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+          "width" : 0.33437499999999998,
+          "x" : 0.2187500041796874,
+          "y" : 0.51388888899305551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+          "width" : 0.28437499999999999,
+          "x" : 0.21875000355468738,
+          "y" : 0.47500000013888888
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "A staged 12-month validation programme is affordable and resourced.",
+          "width" : 0.22031250000000002,
+          "x" : 0.21718750183593744,
+          "y" : 0.43055555569444437
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+          "width" : 0.3125,
+          "x" : 0.21718749479166685,
+          "y" : 0.39444444435185189
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+          "width" : 0.28437499999999999,
+          "x" : 0.21874999593750016,
+          "y" : 0.35277777745370364
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "The first 12 months require 285,000 of incremental implementation investment beyond the Growth Blueprint",
+          "width" : 0.33750000000000002,
+          "x" : 0.21875000421874988,
+          "y" : 0.31111111121527768
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "fee.",
+          "width" : 0.015625,
+          "x" : 0.21718750026041667,
+          "y" : 0.30000000004629623
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Built for the work of living is an illustrative creative territory for FIELDWORK.",
+          "width" : 0.23750000000000004,
+          "x" : 0.21874999762500003,
+          "y" : 0.26944444433333326
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.022222222222222254,
+          "text" : "What would verify it",
+          "width" : 0.090624999999999956,
+          "x" : 0.57031250093750008,
+          "y" : 0.7138888891666666
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Reconcile an authorised GA4 export to ecommerce platform sessions and orders.",
+          "width" : 0.25624999999999998,
+          "x" : 0.56875000320312485,
+          "y" : 0.68055555562500003
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Agree the conversion denominator and reconcile sessions to completed non-refunded orders.",
+          "width" : 0.29374999999999996,
+          "x" : 0.56875000489583316,
+          "y" : 0.63888888898148144
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Calculate net realised order value from an authorised transaction export.",
+          "width" : 0.2265625,
+          "x" : 0.57031250283203117,
+          "y" : 0.60000000013888877
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Run founder interviews, proposition testing and a controlled landing-page conversion test.",
+          "width" : 0.27968750000000009,
+          "x" : 0.57031249720312505,
+          "y" : 0.55833333322222223
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "Test relevance, distinctiveness and willingness to pay with target customers.",
+          "width" : 0.23749999999999993,
+          "x" : 0.57031250296874991,
+          "y" : 0.51388888899305551
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Obtain channel spend, contribution margin, stock capacity and cohort retention before scale.",
+          "width" : 0.28749999999999998,
+          "x" : 0.57031250479166651,
+          "y" : 0.47500000009259258
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.013888888888888951,
+          "text" : "Scope the work, cost each phase and secure named owner commitments.",
+          "width" : 0.23281250000000009,
+          "x" : 0.56874999611979171,
+          "y" : 0.43611111097222222
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Reconcile order-level net revenue and variable costs by product and channel.",
+          "width" : 0.24374999999999991,
+          "x" : 0.5687499959375002,
+          "y" : 0.39444444435185189
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Build a monthly implementation plan with test cadence, seasonality and operational capacity.",
+          "width" : 0.2890625,
+          "x" : 0.57031249523437511,
+          "y" : 0.35555555583333331
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666607,
+          "text" : "Obtain a costed delivery plan and separate one-off, variable and internal costs.",
+          "width" : 0.24687499999999996,
+          "x" : 0.57031250411458323,
+          "y" : 0.31111111120370372
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "Test strategic fit, distinctiveness, comprehension and trademark risk before selection.",
+          "width" : 0.26718749999999991,
+          "x" : 0.56875000445312485,
+          "y" : 0.26944444453703698
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "No verified client or external evidence appears in this fictional sample. Every claim remains tied to a validation step.",
+          "width" : 0.47812500000000002,
+          "x" : 0.059375004781249886,
+          "y" : 0.21111111119444448
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444375,
+          "text" : "SOURCES: A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, C1",
+          "width" : 0.22343749999999996,
+          "x" : 0.059374997207031321,
+          "y" : 0.077777777673611159
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.017953952153523689,
+          "text" : "NARRATIVE",
+          "width" : 0.045456758141517645,
+          "x" : 0.059302870361656976,
+          "y" : 0.027134134911595886
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "EVIDENCE REGISTER",
+          "width" : 0.090624999999999956,
+          "x" : 0.77187500090625005,
+          "y" : 0.080555555666666723
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "19\/20",
+          "width" : 0.0234375,
+          "x" : 0.91718749970703117,
+          "y" : 0.027777777673611115
+        }
+      ],
+      "text" : "GOVERNANCE \/EVIDENCE\nEvidence and assumptions ledger\nID\nA1\nA2\nA3\nA4\nC1\nClass\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nASSUMPTION\nCREATIVE ILLUSTRATION\nClaim in this Blueprint\nFIELDWORK receives 600,000 ecommerce sessions per year.\nFIELDWORK converts 2.0% of ecommerce sessions to orders.\nFIELDWORK has a £100 average order value before returns and discounts.\nThe pia growth constraint is a broad proposition that gives qualified buyers to lite reason to choose\nFIELDWORK can build an advantage around objects designed for the overlap between work and home life.\nA proposition-led acquisition, conversion and retention programme is operationally feasible.\nA staged 12-month validation programme is affordable and resourced.\nIncremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.\nThe business realises 35% to 65% of annualised scenario headroom in the first 12 months.\nThe first 12 months require 285,000 of incremental implementation investment beyond the Growth Blueprint\nfee.\nBuilt for the work of living is an illustrative creative territory for FIELDWORK.\nWhat would verify it\nReconcile an authorised GA4 export to ecommerce platform sessions and orders.\nAgree the conversion denominator and reconcile sessions to completed non-refunded orders.\nCalculate net realised order value from an authorised transaction export.\nRun founder interviews, proposition testing and a controlled landing-page conversion test.\nTest relevance, distinctiveness and willingness to pay with target customers.\nObtain channel spend, contribution margin, stock capacity and cohort retention before scale.\nScope the work, cost each phase and secure named owner commitments.\nReconcile order-level net revenue and variable costs by product and channel.\nBuild a monthly implementation plan with test cadence, seasonality and operational capacity.\nObtain a costed delivery plan and separate one-off, variable and internal costs.\nTest strategic fit, distinctiveness, comprehension and trademark risk before selection.\nNo verified client or external evidence appears in this fictional sample. Every claim remains tied to a validation step.\nSOURCES: A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, C1\nNARRATIVE\nEVIDENCE REGISTER\n19\/20"
+    },
+    {
+      "file" : "slide-20.png",
+      "observations" : [
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "DECISION \/ NEXT COMMITMENT",
+          "width" : 0.11249999999999999,
+          "x" : 0.059375000039062487,
+          "y" : 0.93055555572916671
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.038888888888888862,
+          "text" : "The founder decision",
+          "width" : 0.24843749999999998,
+          "x" : 0.059375002070312474,
+          "y" : 0.84444444453703704
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.094122356838650223,
+          "text" : "Fund proof,",
+          "width" : 0.24745435714721681,
+          "x" : 0.068460319965383196,
+          "y" : 0.61127215550061487
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.065523873435126334,
+          "text" : "not scale.",
+          "width" : 0.18299105167388915,
+          "x" : 0.067098224906740805,
+          "y" : 0.51307139449243444
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.044444444444444398,
+          "text" : "Release investment only as evidence improves.",
+          "width" : 0.53281250000000002,
+          "x" : 0.067187503805803545,
+          "y" : 0.40833333337301592
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "IMMEDIATE NEXT STEP",
+          "width" : 0.092187500000000006,
+          "x" : 0.065624998847656268,
+          "y" : 0.27499999989583335
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.030555555555555558,
+          "text" : "Verify the baseline, cost the 12-week proof phase and approve only the first decision gate.",
+          "width" : 0.63906249999999998,
+          "x" : 0.065625005325520736,
+          "y" : 0.20555555562500005
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.019444444444444486,
+          "text" : "SOURCES: A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, C1",
+          "width" : 0.22343750000000001,
+          "x" : 0.059375002792968701,
+          "y" : 0.07777777795138896
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "NARRATIVE",
+          "width" : 0.045312499999999999,
+          "x" : 0.059375000566406232,
+          "y" : 0.027777777881944465
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.016666666666666718,
+          "text" : "HUMAN DECISION REQUIRED",
+          "width" : 0.125,
+          "x" : 0.73750000156249984,
+          "y" : 0.080555555694444392
+        },
+        {
+          "confidence" : 1,
+          "height" : 0.01388888888888884,
+          "text" : "20 \/ 20",
+          "width" : 0.024999998509883881,
+          "x" : 0.91562500032839156,
+          "y" : 0.027777777638888779
+        }
+      ],
+      "text" : "DECISION \/ NEXT COMMITMENT\nThe founder decision\nFund proof,\nnot scale.\nRelease investment only as evidence improves.\nIMMEDIATE NEXT STEP\nVerify the baseline, cost the 12-week proof phase and approve only the first decision gate.\nSOURCES: A1, A2, A3, A4, A5, A6, A7, A8, A9, A10, C1\nNARRATIVE\nHUMAN DECISION REQUIRED\n20 \/ 20"
+    }
+  ]
+}

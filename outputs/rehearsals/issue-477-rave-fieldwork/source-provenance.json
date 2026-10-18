@@ -1,0 +1,40 @@
+{
+  "exercise": "Issue #477 Rave FIELDWORK quality benchmark",
+  "retrieved_at": "2026-10-17",
+  "contacted_rave": false,
+  "google_drive_sources": [
+    {
+      "drive_id": "1ciJ2-Y8O0MIS5DAIe_tuoS3OXbIKUx--",
+      "name": "NOS-BLUEPRINT-RAVE-v1.pdf",
+      "sha256": "f08d5c5e4ba36b3ca96f06ebfe13ee8a54d638a66f80ff4bdd0fe4381f558e36"
+    },
+    {
+      "drive_id": "1gCqKHK2VMFbNDmVerD13HlrKDNybuVWZuPyQtnfTfyU",
+      "name": "NOS-BLUEPRINT-RAVE-v1.docx",
+      "sha256": "b24085c04c215a07fb338d7011e45c1bf756b6ea5c205b06746dd2e526316acc"
+    },
+    {
+      "drive_id": "1wDPodX_YfXHlPZEd3YiBc44PoI0-urgNBxG5EV11-Lc",
+      "name": "NOS-BLUEPRINT-RAVE-v1.pptx",
+      "sha256": "28bb459199556b1f029b8925b9f8ab2b88400ea1c40dd49951263f6bdbc00fcb"
+    },
+    {
+      "drive_id": "1EHuQbN2e_61YuOh3yrwz-46K40bW3EBUsDNsiL3cHiQ",
+      "name": "NOS-CAMPAIGNWORLD-RAVE-v3.docx",
+      "sha256": "cd733b8680d9d1d900d6d536071e7d071489d7870acd5c36d7b7dfc509a31dfc"
+    }
+  ],
+  "controlled_comparison": {
+    "research_pack_sha256": "71771f5bfdabb0da52f67ff5bd19d89d4721bf78287c4168f7d88b098bd66428",
+    "provider": "anthropic",
+    "model": "claude-sonnet-5",
+    "direct_message_id": "msg_011Cg7rhd9KWjTrMYHqkJhUd",
+    "tony_message_id": "msg_011Cg7rqynkveDqDMnUjhFnd",
+    "external_action_taken": false
+  },
+  "presentation": {
+    "editorial_background_sha256": "3d58068317fb19386dbe4c32626a745321bbace53fa5affb115e73af5907ae1e",
+    "asset_status": "AI-generated internal editorial illustration; not a Rave-owned asset",
+    "final_version": "v3"
+  }
+}

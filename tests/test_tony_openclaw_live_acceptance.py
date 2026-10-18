@@ -98,6 +98,7 @@ class TonyOpenClawLiveAcceptanceTests(unittest.TestCase):
     def test_rejects_old_command_parser_and_specialist_false_positives(self) -> None:
         self.assertTrue(scenario_passes("I checked the current work and research is still running.", "specialist_status"))
         self.assertFalse(scenario_passes("Unknown command: whta"))
+        self.assertFalse(scenario_passes("No response from OpenClaw.", "contextual_action"))
         self.assertFalse(scenario_passes(""))
         self.assertFalse(
             scenario_passes(

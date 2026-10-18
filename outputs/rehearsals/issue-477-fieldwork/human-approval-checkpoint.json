@@ -1,0 +1,16 @@
+{
+  "approver_role": "Matt",
+  "bound_blueprint_checksum": "f312dfe829163989d8cc5645d4008c496dedb115658cd15122d0f7f3a98120c7",
+  "bound_presentation_specification_checksum": "07d3c23c6400b5eb0c859d28165d5a06363a8810afbc2d256be3425f7339b07f",
+  "bound_qa_checksum": "7a3b1fd536ef020fbbe20f2f083a6c3a3540ffdba5f5b29745b869d9e10d7733",
+  "checkpoint_id": "issue-473-fieldwork-v2-matt-approval",
+  "decision_options": [
+    "approve",
+    "request_revision",
+    "block"
+  ],
+  "external_action_taken": false,
+  "instruction": "Record an authenticated human decision against these exact checksums before client-facing release.",
+  "release_authorised": false,
+  "status": "pending"
+}

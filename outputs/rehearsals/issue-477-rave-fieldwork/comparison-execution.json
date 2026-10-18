@@ -1,0 +1,18 @@
+{
+  "direct": {
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "provider_message_id": "msg_011Cg7rhd9KWjTrMYHqkJhUd",
+    "stop_reason": "end_turn"
+  },
+  "executed_at": "2026-10-17T13:08:50.726139+00:00",
+  "external_action_taken": false,
+  "research_pack_sha256": "71771f5bfdabb0da52f67ff5bd19d89d4721bf78287c4168f7d88b098bd66428",
+  "same_provider_model": true,
+  "tony": {
+    "model": "claude-sonnet-5",
+    "provider": "anthropic",
+    "provider_message_id": "msg_011Cg7rqynkveDqDMnUjhFnd",
+    "stop_reason": "end_turn"
+  }
+}

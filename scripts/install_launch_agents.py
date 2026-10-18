@@ -19,6 +19,7 @@ class AgentSpec:
     start_interval: int | None = None
     start_calendar_interval: dict[str, int] | None = None
     run_at_load: bool = True
+    process_type: str = "Background"
 
 
 LEGACY_AGENT_LABELS = (
@@ -76,10 +77,18 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
         ),
         AgentSpec(
             "com.narratiive.gmail-inbox-watch",
-            (str(python_path), str(launcher), str(env_file), str(python_path), str(gmail_inbox_watch)),
-            False,
-            start_interval=900,
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(gmail_inbox_watch),
+                "--loop-seconds",
+                "900",
+            ),
+            True,
             run_at_load=True,
+            process_type="Standard",
         ),
         AgentSpec(
             "com.narratiive.proactive-morning",
@@ -125,7 +134,7 @@ def render_plist(spec: AgentSpec, repo_root: Path, log_dir: Path) -> bytes:
         "WorkingDirectory": str(repo_root),
         "RunAtLoad": spec.run_at_load,
         "KeepAlive": spec.keep_alive,
-        "ProcessType": "Background",
+        "ProcessType": spec.process_type,
         "StandardOutPath": str(log_dir / f"{spec.label}.out.log"),
         "StandardErrorPath": str(log_dir / f"{spec.label}.err.log"),
     }
@@ -190,7 +199,15 @@ def _write_deployment_receipt(repo_root: Path) -> Path:
     return receipt
 
 
-def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, activate: bool) -> list[Path]:
+def install(
+    repo_root: Path,
+    python_path: Path,
+    env_file: Path,
+    home: Path,
+    activate: bool,
+    *,
+    only_labels: tuple[str, ...] = (),
+) -> list[Path]:
     repo_root = repo_root.expanduser().resolve()
     # Preserve the virtual-environment entry-point path. Resolving its symlink
     # selects the base interpreter and silently drops the venv site-packages.
@@ -219,15 +236,39 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
     log_dir.mkdir(parents=True, exist_ok=True)
     written: list[Path] = []
     uid = os.getuid()
-    _remove_legacy_agents(home, uid, activate)
-    for spec in build_specs(repo_root, python_path, env_file):
+    specs = build_specs(repo_root, python_path, env_file)
+    available = {spec.label for spec in specs}
+    unknown = sorted(set(only_labels).difference(available))
+    if unknown:
+        raise ValueError(f"unknown LaunchAgent label(s): {', '.join(unknown)}")
+    selected = tuple(spec for spec in specs if not only_labels or spec.label in only_labels)
+    if not only_labels:
+        _remove_legacy_agents(home, uid, activate)
+    for spec in selected:
         target = agents_dir / f"{spec.label}.plist"
-        target.write_bytes(render_plist(spec, repo_root, log_dir))
+        previous = target.read_bytes() if target.exists() else None
+        temporary = target.with_suffix(".plist.tmp")
+        temporary.write_bytes(render_plist(spec, repo_root, log_dir))
+        os.replace(temporary, target)
         written.append(target)
         if activate:
             domain = f"gui/{uid}"
             subprocess.run(["launchctl", "bootout", domain, str(target)], check=False, capture_output=True)
-            _run(["launchctl", "bootstrap", domain, str(target)])
+            try:
+                _run(["launchctl", "bootstrap", domain, str(target)])
+            except Exception:
+                if previous is None:
+                    target.unlink(missing_ok=True)
+                else:
+                    rollback = target.with_suffix(".plist.rollback")
+                    rollback.write_bytes(previous)
+                    os.replace(rollback, target)
+                    subprocess.run(
+                        ["launchctl", "bootstrap", domain, str(target)],
+                        check=False,
+                        capture_output=True,
+                    )
+                raise
     if activate:
         _write_deployment_receipt(repo_root)
     return written
@@ -269,6 +310,13 @@ def main() -> None:
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--env-file", type=Path, default=Path.home() / ".config" / "narratiive" / "runtime.env")
     parser.add_argument("--no-activate", action="store_true")
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        dest="only_labels",
+        help="Install only this exact LaunchAgent label; may be repeated.",
+    )
     parser.add_argument("--uninstall", action="store_true")
     args = parser.parse_args()
     if sys.platform != "darwin":
@@ -277,7 +325,14 @@ def main() -> None:
         paths = uninstall(Path.home(), not args.no_activate)
         print(f"removed {len(paths)} LaunchAgents")
     else:
-        paths = install(args.repo_root, args.python, args.env_file, Path.home(), not args.no_activate)
+        paths = install(
+            args.repo_root,
+            args.python,
+            args.env_file,
+            Path.home(),
+            not args.no_activate,
+            only_labels=tuple(args.only_labels),
+        )
         print(f"installed {len(paths)} LaunchAgents")
 
 

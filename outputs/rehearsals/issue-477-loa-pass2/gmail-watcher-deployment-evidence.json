@@ -1,0 +1,55 @@
+{
+  "schema_version": 1,
+  "classification": "VERIFIED LIVE",
+  "approval": {
+    "approved_by": "Matt",
+    "approved_at": "2026-10-16T22:38:58Z",
+    "issue_comment": "https://github.com/narratiive/narratiive-os/issues/477#issuecomment-6226026623",
+    "scope": "Deploy the repaired Gmail watcher after safety checks with rollback available"
+  },
+  "deployment": {
+    "label": "com.narratiive.gmail-inbox-watch",
+    "canonical_checkout": "/Users/admin/Documents/narratiive-os",
+    "other_launch_agents_reloaded": false,
+    "plist_sha256": "936a75afc97c4faf07f088390ab05f7a26e505a29bcd53e63515410f7edb95a6",
+    "keep_alive": true,
+    "process_type": "Standard",
+    "loop_seconds": 900,
+    "run_at_load": true
+  },
+  "rollback": {
+    "backup_directory": "/Users/admin/.config/narratiive/backups/issue-477-pass2-20261016T2259Z",
+    "previous_plist_sha256": "9bf6ef3dd544d4ac6a75d2d15d32e4d1dd64b715808abfdf41fff9e1cb6149db",
+    "previous_state_sha256": "ab9346b37eadaf222aa51a0f465abdc298eb6b90784fd09ca18126c3b28f7591"
+  },
+  "source_sha256": {
+    "runtime/tony_gmail_inbox_watch.py": "ef1c92c3881249ccaa4fbe48c7cd584841b6b795040a5b9e676a34e2c7bf5c04",
+    "scripts/run_gmail_inbox_watch.py": "e02e16c4caf1107dbf40ae6198deab7bf27fa45116e2b4633619b994f31da3",
+    "scripts/install_launch_agents.py": "4caf1a96b9b6f3796f1d424acce77218c634129f350f277993046b135b44837b"
+  },
+  "unattended_proof": {
+    "supervised_start_at": "2026-10-17T06:05:41Z",
+    "unattended_result_at": "2026-10-17T06:20:46Z",
+    "elapsed_seconds": 905,
+    "same_process": true,
+    "launchd_runs": 2,
+    "process_id": 52663,
+    "process_state": "running",
+    "result": {
+      "status": "no_new_actionable_mail",
+      "checked": 10,
+      "alerted": 0,
+      "candidates": 0,
+      "ingested": 0,
+      "ingest_failed": 0,
+      "message_ids": []
+    },
+    "operator_trigger_for_second_result": false
+  },
+  "safeguards": {
+    "prospect_messages_sent": 0,
+    "gmail_messages_mutated": 0,
+    "human_approval_bypassed": false,
+    "production_services_other_than_the_approved_watcher_changed": false
+  }
+}
