@@ -1,0 +1,41 @@
+{
+  "checks": {
+    "argument_does_not_repeat_itself": true,
+    "commercial_growth_mechanism_is_explicit_and_not_a_forecast": true,
+    "evidence_basis_uses_canonical_classifications": true,
+    "financial_precision_is_supported": true,
+    "five_moves_form_the_required_argument_sequence": true,
+    "founder_argument_has_required_opportunities_and_recommendation": true,
+    "no_false_external_execution_claim": true,
+    "recommendation_is_advance": true,
+    "recommendation_is_client_specific": true,
+    "writing_is_clear_and_free_of_jargon": true
+  },
+  "editorial_qa": {
+    "clarity": {
+      "findings": [],
+      "passed": true
+    },
+    "commercial_relevance": {
+      "passed": true
+    },
+    "evidence": {
+      "passed": true
+    },
+    "founder_usefulness": {
+      "passed": true
+    },
+    "repetition": {
+      "passed": true
+    },
+    "specificity": {
+      "passed": true
+    },
+    "unsupported_financial_precision": {
+      "passed": true,
+      "tokens": []
+    }
+  },
+  "failed_checks": [],
+  "passed": true
+}

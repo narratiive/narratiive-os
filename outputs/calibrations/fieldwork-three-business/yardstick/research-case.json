@@ -1,0 +1,80 @@
+{
+  "business_id": "yardstick",
+  "client_name": "The Yardstick Agency",
+  "captured_at": "2026-10-18",
+  "evidence_records": [
+    {
+      "evidence_id": "Y1",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Companies House lists The Yardstick Agency Ltd as active, incorporated in 2016 and filing total-exemption accounts to 31 December 2025. Phillip Bray remains an active director and the company website identifies him as founder. Revenue, margin, utilisation, client concentration and pipeline are unavailable.",
+      "source_refs": ["https://find-and-update.company-information.service.gov.uk/company/10380464", "https://find-and-update.company-information.service.gov.uk/company/10380464/officers", "https://theyardstickagency.co.uk/about-us/phil"]
+    },
+    {
+      "evidence_id": "Y2",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick publicly offers bespoke websites, recurring content membership, a Made Simple offer for new firms, Pick and Mix services and marketing strategy for financial advisers and related firms. This verifies a broad service portfolio, not its revenue mix or profitability.",
+      "source_refs": ["https://theyardstickagency.co.uk/", "https://theyardstickagency.co.uk/services"]
+    },
+    {
+      "evidence_id": "Y3",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick said in August 2025 that it had grown from three people in 2017 to 49 specialists. The same company article cites selected client outcomes including enquiry uplift, new clients and website ROI. These are company-selected examples and cannot establish typical performance.",
+      "source_refs": ["https://theyardstickagency.co.uk/blog/from-websites-to-workshops-your-complete-guide-to-our-marketing-services"]
+    },
+    {
+      "evidence_id": "Y4",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick's Membership supplies branded articles, guides and newsletters on a recurring basis, with syndicated and bespoke options. It is an existing recurring service and distribution capability; customer retention and attach rates are unavailable.",
+      "source_refs": ["https://theyardstickagency.co.uk/services/yardstick-membership"]
+    },
+    {
+      "evidence_id": "Y5",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick publishes ungated checklists, guides and templates and has a current press footprint around adviser growth, conversion, referrals and strategy before tactics. This verifies authority-building activity, not how it converts into qualified commercial demand.",
+      "source_refs": ["https://theyardstickagency.co.uk/checklists-guides-templates", "https://theyardstickagency.co.uk/press"]
+    },
+    {
+      "evidence_id": "Y6",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The FCA's 2025 advice-firm survey covers more than 4,100 firms and reports about 5,500 advice firms, 31,000 advisers, 4.1 million retail clients and £1 trillion assets under advice. Firm count is down 15% since 2021 while adviser numbers are stable, indicating consolidation rather than simple category expansion.",
+      "source_refs": ["https://www.fca.org.uk/data/understanding-financial-advice-market"]
+    },
+    {
+      "evidence_id": "Y7",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The FCA reports that 69% of advice-firm clients mainly seek pensions and retirement advice, 88% receive ongoing advice and a typical adviser serves 150 clients. It also identifies digital capability, client demographics, capacity, succession and Consumer Duty as material market issues. These are sector facts, not Yardstick customer demand.",
+      "source_refs": ["https://www.fca.org.uk/data/understanding-financial-advice-market"]
+    },
+    {
+      "evidence_id": "Y8",
+      "classification": "ASSUMPTION",
+      "content": "The most commercially useful Yardstick audience may be established multi-adviser firms entering a change point such as succession, acquisition, recruitment or a more selective client strategy. No Yardstick pipeline, win-loss or client-segmentation evidence is available to verify this priority.",
+      "source_refs": ["Y2", "Y3", "Y6", "Y7"]
+    },
+    {
+      "evidence_id": "Y9",
+      "classification": "ASSUMPTION",
+      "content": "A diagnostic-led offer that connects a business transition to strategy, proof, website and recurring communications could improve qualification, project scope and retention. No first-party conversion, utilisation, price or contribution baselines are available, so this remains a mechanism rather than a forecast.",
+      "source_refs": ["Y2", "Y4", "Y5", "Y8"]
+    }
+  ],
+  "strategic_synthesis": {
+    "executive_synthesis": "Yardstick has rare category depth, a broad specialist team, recurring content, high-value project services and a large public authority footprint. Its public proposition still reads mainly as a menu of marketing services for the whole advice profession. The FCA evidence points to a more valuable problem: a consolidating sector where firms face succession, capacity, digital and client-selection choices. Yardstick can make marketing the commercial operating decision at those change points, using a diagnostic to select the right combination of strategy, proof, website and recurring communication. Public evidence supports the hypothesis but cannot show Yardstick's pipeline, utilisation, client economics or segment performance.",
+    "commercial_problem": "A broad service menu makes Yardstick credible, but it does not tell an established advice firm which commercial change should determine its marketing investment or service sequence.",
+    "growth_opportunity": "Yardstick can own the marketing decision at the moments when an advice firm's business model is changing, then connect that decision to the right service sequence.",
+    "implications": ["Prioritise transition moments over a broad professional label.", "Use the diagnostic to qualify both need and service sequence.", "Turn recurring content into evidence and continuity around larger strategic engagements."]
+  },
+  "commercial_growth_equation": {
+    "commercial_ambition": "Create more valuable, longer-lived client relationships from qualified advice-firm change moments.",
+    "current_state": "Yardstick has broad offers and authority assets, while segment conversion, service attach and contribution are unavailable.",
+    "growth_gap": "The public offer does not organise Yardstick's capabilities around the commercial decisions that make firms buy more substantial help.",
+    "growth_logic": "Improve change-moment qualification, attach the right strategic project, retain implementation continuity and earn referral proof.",
+    "growth_levers": ["change-moment qualified demand", "diagnostic-to-project conversion", "service sequence value", "retained proof and referral"],
+    "assumptions": ["Established multi-adviser firms at a transition point are a hypothesis requiring pipeline validation.", "No revenue or utilisation forecast is authorised."]
+  },
+  "approved_growth_sprint_scope": {
+    "status": "internal_calibration_only",
+    "question": "How can Yardstick turn category expertise and service breadth into a stronger commercial system for advice firms at change points?",
+    "constraints": ["No Yardstick contact", "No invented client economics", "No full presentation", "No external action"]
+  }
+}

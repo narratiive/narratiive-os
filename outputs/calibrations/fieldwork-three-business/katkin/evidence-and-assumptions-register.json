@@ -1,0 +1,161 @@
+{
+  "schema_version": "1.0.0",
+  "business_id": "katkin",
+  "client_name": "KatKin",
+  "status": "internal_not_client_approved",
+  "source_files": [
+    "research-case.json",
+    "founder-argument.json"
+  ],
+  "counts": {
+    "ASSUMPTION": 2,
+    "VERIFIED EXTERNAL": 7
+  },
+  "evidence_and_assumptions": [
+    {
+      "evidence_id": "K1",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The Grocer reported in December 2025 that KatKin raised £37.4 million in equity and debt for UK expansion, DTC growth, retail and new markets. It reported KatKin's claims of 2% UK cat food share, more than 100 million meals delivered and 150 staff. These are company claims reported by trade press, not audited commercial results.",
+      "source_refs": [
+        "https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article"
+      ]
+    },
+    {
+      "evidence_id": "K2",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "KatKin's current help centre states that a standard 28-day fresh-food plan costs £60.96 to £79.03 depending on calorie needs, plus one £2.99 delivery fee. Current trial pricing and promotions vary. This verifies price mechanics at capture, not margin, retention or willingness to pay.",
+      "source_refs": [
+        "https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "https://help.katkin.com/en/articles/431050-how-much-does-a-trial-box-cost"
+      ]
+    },
+    {
+      "evidence_id": "K3",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "KatKin's July 2026 company article says its 26-product heat-damage study found fresh diets had lower AGE levels and higher available lysine than the compared wet foods, and says the research passed peer review. The article also says all diets exceeded minimum lysine requirements and that the health effect of AGE intake in cats is unknown. The underlying independent journal record was not located in this research pass, so the claim needs direct paper verification before external use.",
+      "source_refs": [
+        "https://www.katkin.com/articles/katkins-heat-damage-study"
+      ]
+    },
+    {
+      "evidence_id": "K4",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "KatKin presents itself as an uncompromising cat-health brand built around fresh food, science and an independent voice. This verifies intended positioning, not customer recognition or preference.",
+      "source_refs": [
+        "https://www.katkin.com/about-us"
+      ]
+    },
+    {
+      "evidence_id": "K5",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "KatKin describes in-home taste panels and ongoing product testing, while acknowledging real-world parent reporting and company involvement. This supports a proprietary learning capability but does not by itself prove health outcomes or independent scientific authority.",
+      "source_refs": [
+        "https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy"
+      ]
+    },
+    {
+      "evidence_id": "K6",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Untamed currently offers a low-cost trial, flexible delivery and whole-meat recipes while claiming 50 million meals delivered. Its current proposition shows that convenience, personalisation, real meat and subscription flexibility are not unique to KatKin.",
+      "source_refs": [
+        "https://untamed.com/products/try-now?step=cats-info",
+        "https://untamed.com/pages/cat-food-subscription"
+      ]
+    },
+    {
+      "evidence_id": "K7",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The FCA-equivalent primary industry source is unavailable for pet-food performance. UK Pet Food says its members represent more than 90% of the market. A 2026 industry report estimates the UK pet-food market at about £4.1 billion in 2025, but this is a broad market estimate and cannot establish the addressable fresh-cat-food opportunity.",
+      "source_refs": [
+        "https://www.ukpetfood.org/static/22d36acc-68c9-4e38-b76cf7954eb33214/UK-Pet-Food-Annual-Report-2025.pdf",
+        "https://www.geraldedelman.com/wp-content/uploads/2026/02/Pet-Food-Industry-Report-v2.pdf"
+      ]
+    },
+    {
+      "evidence_id": "K8",
+      "classification": "ASSUMPTION",
+      "content": "The highest-value audience may be committed cat parents who want evidence strong enough to justify the price and operational change of frozen fresh food. KatKin has supplied no first-party segment conversion, cancellation-reason or cohort data to verify this audience.",
+      "source_refs": [
+        "K2",
+        "K3",
+        "K4",
+        "K6"
+      ]
+    },
+    {
+      "evidence_id": "K9",
+      "classification": "ASSUMPTION",
+      "content": "A visible proof ladder from product evidence to feeding confidence and observed outcomes could improve trial conversion, transition completion and retention. The required baselines are unavailable, so this is a commercial mechanism rather than a forecast.",
+      "source_refs": [
+        "K2",
+        "K3",
+        "K5",
+        "K8"
+      ]
+    }
+  ],
+  "argument_evidence_basis": [
+    {
+      "claim": "KatKin raised £37.4 million for UK expansion and reports 2% UK cat food share, 100m+ meals delivered and 150 staff, as company claims reported by trade press.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K1"
+      ]
+    },
+    {
+      "claim": "A standard 28-day fresh-food plan costs £60.96 to £79.03 plus a £2.99 delivery fee at capture; this verifies price mechanics, not margin or willingness to pay.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K2"
+      ]
+    },
+    {
+      "claim": "KatKin's heat-damage study reports lower AGE levels and higher available lysine than compared wet foods and says it passed peer review, but the underlying independent journal record was not located in this research pass.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K3"
+      ]
+    },
+    {
+      "claim": "KatKin runs in-home taste panels and ongoing product testing, supporting a proprietary learning capability but not proving health outcomes.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K5"
+      ]
+    },
+    {
+      "claim": "Untamed offers low-cost trial, flexible delivery, whole-meat recipes and claims 50 million meals delivered, showing convenience and ingredient claims are not unique to KatKin.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K6"
+      ]
+    },
+    {
+      "claim": "The highest-value audience may be committed cat parents seeking evidence strong enough to justify price and operational change; no first-party segment data confirms this.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "K8"
+      ]
+    },
+    {
+      "claim": "A visible proof ladder from evidence to feeding confidence to observed outcome could improve conversion, transition and retention; this is a commercial mechanism, not a forecast.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "K9"
+      ]
+    }
+  ],
+  "unavailable_first_party_inputs": [
+    "trial conversion rate",
+    "transition completion rate",
+    "retention and churn rate",
+    "retail-to-DTC conversion rate",
+    "customer acquisition cost",
+    "margin per subscriber"
+  ],
+  "scenario_boundary": {
+    "scenario_not_forecast": true,
+    "forecast_produced": false,
+    "client_contacted": false
+  }
+}

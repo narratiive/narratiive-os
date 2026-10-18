@@ -383,9 +383,7 @@ class WorkflowExecutionCoordinator:
                 for field in stage_definition.output_contract.required_fields
                 if field not in output or output[field] in (None, "")
             ]
-            if missing:
-                quality = {"passed": False, "failed_checks": [f"required_output:{field}" for field in missing]}
-            elif stage.quality_contract:
+            if stage.quality_contract:
                 validator = self.quality_validators.get(stage.quality_contract)
                 try:
                     quality = dict(validator(output))
@@ -397,6 +395,15 @@ class WorkflowExecutionCoordinator:
                     }
             else:
                 quality = {"passed": True, "failed_checks": []}
+            if missing:
+                checks = dict(quality.get("checks") or {})
+                checks.update({f"required_output:{field}": False for field in missing})
+                quality["checks"] = checks
+                failed = list(quality.get("failed_checks") or [])
+                failed.extend(f"required_output:{field}" for field in missing)
+                quality["failed_checks"] = list(dict.fromkeys(failed))
+                quality["missing_mandatory_fields"] = list(missing)
+                quality["passed"] = False
             if stage.quality_contract == "senior_strategist_review_quality_gate":
                 identity = state.input_payload.get("blueprint_director_output_identity")
                 expected = str(identity.get("checksum") or "") if isinstance(identity, Mapping) else ""

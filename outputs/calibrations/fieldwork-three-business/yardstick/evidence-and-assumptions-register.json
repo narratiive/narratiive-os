@@ -1,0 +1,175 @@
+{
+  "schema_version": "1.0.0",
+  "business_id": "yardstick",
+  "client_name": "The Yardstick Agency",
+  "status": "internal_not_client_approved",
+  "source_files": [
+    "research-case.json",
+    "founder-argument.json"
+  ],
+  "counts": {
+    "ASSUMPTION": 2,
+    "VERIFIED EXTERNAL": 7
+  },
+  "evidence_and_assumptions": [
+    {
+      "evidence_id": "Y1",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Companies House lists The Yardstick Agency Ltd as active, incorporated in 2016 and filing total-exemption accounts to 31 December 2025. Phillip Bray remains an active director and the company website identifies him as founder. Revenue, margin, utilisation, client concentration and pipeline are unavailable.",
+      "source_refs": [
+        "https://find-and-update.company-information.service.gov.uk/company/10380464",
+        "https://find-and-update.company-information.service.gov.uk/company/10380464/officers",
+        "https://theyardstickagency.co.uk/about-us/phil"
+      ]
+    },
+    {
+      "evidence_id": "Y2",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick publicly offers bespoke websites, recurring content membership, a Made Simple offer for new firms, Pick and Mix services and marketing strategy for financial advisers and related firms. This verifies a broad service portfolio, not its revenue mix or profitability.",
+      "source_refs": [
+        "https://theyardstickagency.co.uk/",
+        "https://theyardstickagency.co.uk/services"
+      ]
+    },
+    {
+      "evidence_id": "Y3",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick said in August 2025 that it had grown from three people in 2017 to 49 specialists. The same company article cites selected client outcomes including enquiry uplift, new clients and website ROI. These are company-selected examples and cannot establish typical performance.",
+      "source_refs": [
+        "https://theyardstickagency.co.uk/blog/from-websites-to-workshops-your-complete-guide-to-our-marketing-services"
+      ]
+    },
+    {
+      "evidence_id": "Y4",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick's Membership supplies branded articles, guides and newsletters on a recurring basis, with syndicated and bespoke options. It is an existing recurring service and distribution capability; customer retention and attach rates are unavailable.",
+      "source_refs": [
+        "https://theyardstickagency.co.uk/services/yardstick-membership"
+      ]
+    },
+    {
+      "evidence_id": "Y5",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "Yardstick publishes ungated checklists, guides and templates and has a current press footprint around adviser growth, conversion, referrals and strategy before tactics. This verifies authority-building activity, not how it converts into qualified commercial demand.",
+      "source_refs": [
+        "https://theyardstickagency.co.uk/checklists-guides-templates",
+        "https://theyardstickagency.co.uk/press"
+      ]
+    },
+    {
+      "evidence_id": "Y6",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The FCA's 2025 advice-firm survey covers more than 4,100 firms and reports about 5,500 advice firms, 31,000 advisers, 4.1 million retail clients and £1 trillion assets under advice. Firm count is down 15% since 2021 while adviser numbers are stable, indicating consolidation rather than simple category expansion.",
+      "source_refs": [
+        "https://www.fca.org.uk/data/understanding-financial-advice-market"
+      ]
+    },
+    {
+      "evidence_id": "Y7",
+      "classification": "VERIFIED EXTERNAL",
+      "content": "The FCA reports that 69% of advice-firm clients mainly seek pensions and retirement advice, 88% receive ongoing advice and a typical adviser serves 150 clients. It also identifies digital capability, client demographics, capacity, succession and Consumer Duty as material market issues. These are sector facts, not Yardstick customer demand.",
+      "source_refs": [
+        "https://www.fca.org.uk/data/understanding-financial-advice-market"
+      ]
+    },
+    {
+      "evidence_id": "Y8",
+      "classification": "ASSUMPTION",
+      "content": "The most commercially useful Yardstick audience may be established multi-adviser firms entering a change point such as succession, acquisition, recruitment or a more selective client strategy. No Yardstick pipeline, win-loss or client-segmentation evidence is available to verify this priority.",
+      "source_refs": [
+        "Y2",
+        "Y3",
+        "Y6",
+        "Y7"
+      ]
+    },
+    {
+      "evidence_id": "Y9",
+      "classification": "ASSUMPTION",
+      "content": "A diagnostic-led offer that connects a business transition to strategy, proof, website and recurring communications could improve qualification, project scope and retention. No first-party conversion, utilisation, price or contribution baselines are available, so this remains a mechanism rather than a forecast.",
+      "source_refs": [
+        "Y2",
+        "Y4",
+        "Y5",
+        "Y8"
+      ]
+    }
+  ],
+  "argument_evidence_basis": [
+    {
+      "claim": "The Yardstick Agency is an active, long-established company with a named founder, but financial and pipeline data are not publicly available.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y1"
+      ]
+    },
+    {
+      "claim": "Yardstick offers a broad portfolio spanning bespoke websites, recurring content membership, a new-firm offer, modular services and marketing strategy.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y2"
+      ]
+    },
+    {
+      "claim": "Yardstick has grown to 49 specialists and publishes selected client outcome examples that cannot establish typical performance.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y3"
+      ]
+    },
+    {
+      "claim": "Yardstick's membership service is an existing recurring content and distribution capability with unknown retention and attach rates.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y4"
+      ]
+    },
+    {
+      "claim": "Yardstick maintains a substantial public authority footprint through guides, checklists and press coverage, with unknown conversion into qualified demand.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y5"
+      ]
+    },
+    {
+      "claim": "The UK advice sector is consolidating, with firm numbers down 15% since 2021 while adviser numbers remain broadly stable.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y6"
+      ]
+    },
+    {
+      "claim": "FCA data identifies succession, capacity, digital capability and Consumer Duty as material pressures facing advice firms.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "Y7"
+      ]
+    },
+    {
+      "claim": "Established multi-adviser firms at a change point are the most plausible priority audience for Yardstick, but this is unverified against any Yardstick client or pipeline data.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "Y8"
+      ]
+    },
+    {
+      "claim": "A diagnostic-led offer connecting a firm's change point to a sequenced set of Yardstick services could improve qualification and retention, but this is a proposed mechanism, not a measured outcome.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "Y9"
+      ]
+    }
+  ],
+  "unavailable_first_party_inputs": [
+    "Yardstick pipeline volume and source mix (Y1)",
+    "Conversion rate from first contact to diagnostic to project (Y8, Y9)",
+    "Service attach and sequencing rates across existing clients (Y9)",
+    "Segment-level revenue, margin and client concentration (Y1)",
+    "Retention and referral rates from membership and project clients (Y4)"
+  ],
+  "scenario_boundary": {
+    "scenario_not_forecast": true,
+    "forecast_produced": false,
+    "client_contacted": false
+  }
+}
