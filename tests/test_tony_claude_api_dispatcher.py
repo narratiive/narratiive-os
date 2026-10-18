@@ -145,6 +145,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
             "blueprint_lite_to_discovery_preparation",
             "research_to_strategic_synthesis",
             "strategic_synthesis_to_strategy_thesis",
+            "fieldwork_founder_argument_experiment",
             "strategy_thesis_to_growth_blueprint",
             "research_to_growth_blueprint",
         ):
@@ -202,6 +203,30 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                 self.assertIn("Return only the top-level fields named in TASK", prompt)
                 self.assertIn("do not reproduce source passages", prompt)
                 self.assertNotIn("For Blueprint Lite work", prompt)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_founder_argument_prompt_is_compact_and_excludes_presentation_schema(self, urlopen):
+        urlopen.return_value = _Response(
+            {
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"recommendation":"revise"}'}],
+            }
+        )
+        contract = self._contract()
+        contract["target"] = {
+            "workflow_context": {"workflow_id": "fieldwork_founder_argument_experiment"}
+        }
+
+        build_claude_api_dispatcher(self._env())(contract)
+
+        sent = json.loads(urlopen.call_args.args[0].data.decode("utf-8"))
+        prompt = sent["messages"][0]["content"]
+        self.assertEqual(sent["max_tokens"], 32768)
+        self.assertIn("under 2,500 words", prompt)
+        self.assertIn("Do not add a work_product wrapper", prompt)
+        self.assertIn("presentation-production fields", prompt)
+        self.assertNotIn("For Blueprint Lite work", prompt)
 
     def test_growth_blueprint_output_budget_must_be_a_positive_integer(self):
         key = "TONY_DISPATCH_CLAUDE_GROWTH_BLUEPRINT_MAX_TOKENS"

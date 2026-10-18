@@ -1,0 +1,13 @@
+{
+  "action": "await_human_approval",
+  "approval_status": "pending",
+  "artifact_checksum": "1206d70f92f3746378cab8d482131426d5cb23ee79335a900df88f1979a8f589",
+  "artifact_id": "artifact-e7c4dbfa45fc06cc-1206d70f92f37463",
+  "executed_at": "2026-10-18T12:23:35.976516+00:00",
+  "external_action_taken": false,
+  "presentation_production_triggered": false,
+  "research_pack_sha256": "7c61c8e74b36a755e1ba3934e1fecc6aba6303a5345abffd984ab78384af0e70",
+  "run_id": "rave-fieldwork-founder-argument-20261018-v3",
+  "status": "awaiting_approval",
+  "workflow_id": "fieldwork_founder_argument_experiment"
+}

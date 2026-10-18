@@ -290,6 +290,33 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
             "weak",
         )
 
+    def test_missing_required_output_cannot_be_overridden_by_successful_validator(self) -> None:
+        definition = WorkflowDefinition(
+            "missing-output",
+            (_stage("draft", outputs=("draft", "mandatory_field")),),
+        )
+        coordinator = self._coordinator(
+            definition,
+            _worker(lambda contract: {"draft": "apparently complete"}),
+            {"quality": lambda output: {"passed": True, "failed_checks": [], "checks": {"semantic": True}}},
+        )
+        coordinator.enqueue(
+            "missing-output",
+            "run-missing-output",
+            {"brief": "safe"},
+            entity_id="e",
+            correlation_id="c",
+        )
+
+        outcome = coordinator.advance("run-missing-output", _lifecycle())
+
+        self.assertEqual(outcome.blocker, "quality_failed:quality")
+        quality = self.runs.load_run("run-missing-output").stage("draft").quality_result
+        self.assertFalse(quality["passed"])
+        self.assertEqual(quality["missing_mandatory_fields"], ["mandatory_field"])
+        self.assertIn("required_output:mandatory_field", quality["failed_checks"])
+        self.assertFalse(quality["checks"]["required_output:mandatory_field"])
+
     def test_present_empty_collection_is_decided_by_quality_contract(self) -> None:
         definition = WorkflowDefinition("empty-collection", (_stage("draft", outputs=("findings",)),))
         coordinator = self._coordinator(

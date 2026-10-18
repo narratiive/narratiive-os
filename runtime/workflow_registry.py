@@ -260,6 +260,31 @@ STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS = _workflow(
     autonomous_handoff=True,
 )
 
+
+FIELDWORK_FOUNDER_ARGUMENT_EXPERIMENT = _workflow(
+    "fieldwork_founder_argument_experiment",
+    _step(
+        "develop_founder_argument",
+        capability="strategic_reasoning",
+        inputs=(
+            "evidence_pack",
+            "strategic_synthesis",
+            "commercial_growth_equation",
+            "approved_growth_sprint_scope",
+            "client_context",
+        ),
+        outputs=(
+            "founder_argument",
+            "evidence_lineage",
+            "recommendation",
+        ),
+        quality="fieldwork_founder_argument_quality_gate",
+        approval_required=True,
+    ),
+    approval_required=True,
+)
+
+
 STRATEGY_THESIS_TO_GROWTH_BLUEPRINT = _workflow(
     "strategy_thesis_to_growth_blueprint",
     (
@@ -393,6 +418,13 @@ RESEARCH_TO_GROWTH_BLUEPRINT = _workflow(
             "narrative",
             "growth_opportunity",
             "activation_implications",
+            "central_thesis",
+            "narrative_progression",
+            "editorial_judgement",
+            "contradiction_resolution",
+            "quantitative_evidence_treatment",
+            "assumption_control",
+            "completeness",
             "key_strategic_choices",
             "evidence_and_uncertainty",
             "fact_interpretation_hypothesis_lineage",
@@ -599,6 +631,7 @@ NARRATIIVE_PRODUCTION_WORKFLOWS = (
     GROWTH_SPRINT_TO_RESEARCH_ENGINE,
     RESEARCH_TO_STRATEGIC_SYNTHESIS,
     STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS,
+    FIELDWORK_FOUNDER_ARGUMENT_EXPERIMENT,
     STRATEGY_THESIS_TO_GROWTH_BLUEPRINT,
     RESEARCH_TO_GROWTH_BLUEPRINT,
     GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION,
