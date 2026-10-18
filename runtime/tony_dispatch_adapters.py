@@ -102,7 +102,15 @@ def build_http_dispatchers(
                         allowed_upload_root=Path(upload_root).expanduser() if upload_root else None,
                     )
                 else:
-                    handlers[worker] = factory(google_oauth)
+                    gmail_store = str(env.get("TONY_GMAIL_IDEMPOTENCY_STORE") or "").strip()
+                    if worker == "Gmail" and not gmail_store:
+                        runtime_root = str(env.get("TONY_WORKFLOW_RUNTIME_ROOT") or "").strip()
+                        if runtime_root:
+                            gmail_store = str(Path(runtime_root).expanduser() / "gmail-idempotency.json")
+                    handlers[worker] = factory(
+                        google_oauth,
+                        **({"receipt_store": gmail_store} if worker == "Gmail" and gmail_store else {}),
+                    )
 
     higgsfield_mode = str(env.get("TONY_DISPATCH_CREATIVE_PRODUCTION_MODE", "")).strip().casefold()
     credential = higgsfield_credential(env)

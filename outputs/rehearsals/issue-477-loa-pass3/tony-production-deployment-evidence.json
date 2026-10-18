@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "issue": 477,
+  "deployed_at": "2026-10-17T06:34:51Z",
+  "classification": "VERIFIED LIVE",
+  "scope": "com.narratiive.tony-http-bridge only",
+  "deployed_file": "/Users/admin/Documents/narratiive-os/openclaw/tony_agent_gateway.py",
+  "deployed_sha256": "8535d0a2ad0c415fcdfecb874363d76fab34604b5f3aad6b1d9898c652ac2faf",
+  "reviewed_feature_sha256": "8535d0a2ad0c415fcdfecb874363d76fab34604b5f3aad6b1d9898c652ac2faf",
+  "backup": {
+    "directory": "/Users/admin/.config/narratiive/backups/issue-477-tony-pass2-20261017T063451Z",
+    "gateway_sha256": "42e97d65164a13f1417ceea90dbeaee55dcd7c4666f55c2a6b75417dae314971",
+    "launch_agent_sha256": "e0944315e7dcbc3a5882d930ea35209477d9e118012e2e67c15afd6b3012f475",
+    "runtime_env_sha256": "073fa481a5b85ee5eaab15fa6101ba7687b9aeacc0ddde7045c3b621fcaa65ee"
+  },
+  "startup_incident": {
+    "observed": true,
+    "cause": "The configured presentation skill directory referenced a retired bundled-runtime version.",
+    "repair": "Updated only NARRATIIVE_PRESENTATION_SKILL_DIR to the installed 26.1015.12040 presentation skill directory.",
+    "other_services_changed": false,
+    "bridge_recovered": true
+  },
+  "service": {
+    "label": "com.narratiive.tony-http-bridge",
+    "state": "running",
+    "pid": 55086,
+    "health_http_200": true,
+    "health_status": "alive"
+  },
+  "normal_request_proof": {
+    "session_key": "narratiive:tony:issue477-production-auto-resume-1792219178",
+    "started_at": "2026-10-17T06:39:38.093957Z",
+    "completed_at": "2026-10-17T06:40:42.625135Z",
+    "elapsed_seconds": 64.531,
+    "specialist": "creative-director",
+    "operator_polling_required": false,
+    "automatic_original_request_resume": true,
+    "external_action_taken": false,
+    "result_summary": "Tony automatically returned the Creative Director's completed strategic-distinctiveness review to the original request."
+  },
+  "focused_tests": {
+    "passed": 20,
+    "subtests_passed": 12
+  },
+  "rollback": "Restore the backed-up gateway and runtime.env, then restart only com.narratiive.tony-http-bridge."
+}

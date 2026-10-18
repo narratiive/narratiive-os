@@ -4,6 +4,7 @@ import json
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
@@ -183,7 +184,12 @@ class TonyAgentGateway:
             "or sessions_yield evidence."
         )
 
-    def _await_yielded_reply(self, session_key: str) -> str:
+    def _await_yielded_reply(
+        self,
+        session_key: str,
+        *,
+        not_before: datetime | None = None,
+    ) -> str:
         """Keep yielded specialist work open until Tony's resumed final turn.
 
         OpenClaw's responses endpoint returns when ``sessions_yield`` releases the
@@ -198,7 +204,10 @@ class TonyAgentGateway:
             time.monotonic() + min(2.0, max(0.01, self.config.work_poll_seconds * 2)),
         )
         while time.monotonic() < deadline:
-            yielded, completed = self._yielded_work_state(session_key)
+            yielded, completed = self._yielded_work_state(
+                session_key,
+                not_before=not_before,
+            )
             if completed:
                 return completed
             if not yielded and time.monotonic() >= detection_deadline:
@@ -208,13 +217,19 @@ class TonyAgentGateway:
             time.sleep(max(0.01, self.config.work_poll_seconds))
         raise TonyAgentGatewayError("OpenClaw yielded work did not produce a final Tony response before the worker deadline")
 
-    def _yielded_work_state(self, session_key: str) -> tuple[bool, str]:
+    def _yielded_work_state(
+        self,
+        session_key: str,
+        *,
+        not_before: datetime | None = None,
+    ) -> tuple[bool, str]:
         transcript = self._session_transcript(session_key)
         if transcript is None:
             return False, ""
         yielded_at = ""
         governed_at = ""
         pushed_at = ""
+        yield_context_at = ""
         completed = ""
         workflow_calls: dict[str, str] = {}
         try:
@@ -226,10 +241,19 @@ class TonyAgentGateway:
                 entry = json.loads(line)
             except json.JSONDecodeError:
                 continue
+            timestamp = str(entry.get("timestamp") or "")
+            if (
+                yielded_at
+                and entry.get("type") == "custom_message"
+                and entry.get("customType") == "openclaw.sessions_yield"
+                and timestamp > yielded_at
+            ):
+                yield_context_at = timestamp
             message = entry.get("message")
             if not isinstance(message, Mapping):
                 continue
-            timestamp = str(entry.get("timestamp") or "")
+            if not_before is not None and not self._timestamp_at_or_after(timestamp, not_before):
+                continue
             if yielded_at and message.get("role") == "user" and timestamp > yielded_at:
                 pushed_at = timestamp
             content = message.get("content")
@@ -240,6 +264,7 @@ class TonyAgentGateway:
                     if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "sessions_yield":
                         yielded_at = timestamp
                         pushed_at = ""
+                        yield_context_at = ""
                         completed = ""
                     if isinstance(part, Mapping) and part.get("type") == "toolCall" and part.get("name") == "narratiive_workflow_control":
                         arguments = part.get("arguments")
@@ -247,7 +272,8 @@ class TonyAgentGateway:
                         call_id = str(part.get("id") or "")
                         if call_id and operation in {"commission", "continue", "additional_research"}:
                             workflow_calls[call_id] = operation
-                if (pushed_at or governed_at) and timestamp > (pushed_at or governed_at) and message.get("stopReason") == "stop":
+                resume_anchor = pushed_at or governed_at or yield_context_at
+                if resume_anchor and timestamp > resume_anchor and message.get("stopReason") == "stop":
                     texts = [
                         str(part.get("text") or "").strip()
                         for part in content
@@ -262,6 +288,16 @@ class TonyAgentGateway:
                     governed_at = timestamp
                     completed = ""
         return bool(yielded_at or governed_at), completed
+
+    @staticmethod
+    def _timestamp_at_or_after(value: str, boundary: datetime) -> bool:
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return False
+        if parsed.tzinfo is None:
+            return False
+        return parsed.astimezone(timezone.utc) >= boundary.astimezone(timezone.utc)
 
     @staticmethod
     def _verified_workflow_result(content: list[object]) -> bool:
@@ -316,12 +352,24 @@ class TonyAgentGateway:
             "input": message,
         }
 
+        started_at = datetime.now(timezone.utc)
         payload = self._post_openclaw(
             request_body,
             session_key=session_key,
             timeout_seconds=timeout_seconds,
         )
         reply = self._extract_text(payload)
+        yielded, resumed = self._yielded_work_state(
+            session_key,
+            not_before=started_at,
+        )
+        if resumed:
+            return resumed
+        if yielded:
+            return self._await_yielded_reply(
+                session_key,
+                not_before=started_at,
+            )
         if not reply:
             raise TonyAgentGatewayError("OpenClaw returned no conversational response")
         return reply
