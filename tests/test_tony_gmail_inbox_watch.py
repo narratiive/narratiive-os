@@ -70,6 +70,57 @@ class GmailInboxWatchTests(unittest.TestCase):
             self.assertFalse(state.exists())
         self.assertEqual(sent, [])
 
+    def test_exact_synthetic_marker_allows_owned_sender_only_for_controlled_rehearsal(self):
+        evidence = {
+            "verified": True,
+            "read_only": True,
+            "mutation_count": 0,
+            "results": [{
+                "message_id": "fixture-1",
+                "from": "Narratiive <hello@narratiive.com>",
+                "subject": "Fictional LOA growth enquiry [ISSUE477-LOA-EXACT]",
+                "snippet": "Looking for help with a fictional campaign.",
+                "label_ids": ["INBOX"],
+            }],
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            ordinary = GmailInboxWatchService(
+                lambda _contract: evidence,
+                Path(directory) / "ordinary.json",
+                lambda _message: None,
+            ).run()
+            controlled = GmailInboxWatchService(
+                lambda _contract: evidence,
+                Path(directory) / "controlled.json",
+                lambda _message: None,
+                synthetic_test_marker="ISSUE477-LOA-EXACT",
+            ).run()
+
+        self.assertEqual(ordinary.alerted, 0)
+        self.assertEqual(controlled.alerted, 1)
+        self.assertEqual(controlled.candidates, 1)
+
+    def test_controlled_query_is_passed_to_gmail(self):
+        contracts: list[dict] = []
+
+        def gmail(contract):
+            contracts.append(contract)
+            return {"verified": True, "read_only": True, "mutation_count": 0, "results": []}
+
+        with tempfile.TemporaryDirectory() as directory:
+            result = GmailInboxWatchService(
+                gmail,
+                Path(directory) / "state.json",
+                lambda _message: None,
+                query='in:inbox subject:"ISSUE477-LOA-EXACT"',
+            ).run()
+
+        self.assertEqual(result.status, "no_new_actionable_mail")
+        self.assertEqual(
+            contracts[0]["target"]["query"],
+            'in:inbox subject:"ISSUE477-LOA-EXACT"',
+        )
+
     def test_delivery_failure_leaves_message_unseen_for_retry(self):
         evidence = {
             "verified": True,

@@ -54,12 +54,16 @@ class GmailInboxWatchService:
         *,
         ingest_lead_candidate: LeadCandidateIngestor | None = None,
         owned_addresses: tuple[str, ...] = ("hello@narratiive.com", "tony@narratiive.com"),
+        synthetic_test_marker: str = "",
+        query: str = "in:inbox newer_than:7d",
     ) -> None:
         self.gmail = gmail
         self.state_path = Path(state_path)
         self.send_message = send_message
         self.ingest_lead_candidate = ingest_lead_candidate
         self.owned_addresses = {value.casefold() for value in owned_addresses}
+        self.synthetic_test_marker = synthetic_test_marker.strip()
+        self.query = query.strip() or "in:inbox newer_than:7d"
 
     def run(self) -> InboxWatchResult:
         evidence = self.gmail(
@@ -69,7 +73,7 @@ class GmailInboxWatchService:
                 "action": "List recent inbox correspondence for Tony attention triage without changing Gmail",
                 "operation": "search",
                 "instruction": "Return bounded inbox metadata only. Do not send, label, archive or mutate Gmail.",
-                "target": {"query": "in:inbox newer_than:7d", "max_results": 10},
+                "target": {"query": self.query, "max_results": 10},
                 "execution_mode": "autonomous_read",
                 "eligible": True,
                 "state": "ready_for_autonomous_dispatch",
@@ -168,7 +172,11 @@ class GmailInboxWatchService:
         if "INBOX" not in labels or labels.intersection({"SPAM", "TRASH"}):
             return False
         sender = parseaddr(str(item.get("from") or ""))[1].casefold()
-        if not sender or sender in self.owned_addresses:
+        is_controlled_fixture = bool(
+            self.synthetic_test_marker
+            and self.synthetic_test_marker in str(item.get("subject") or "")
+        )
+        if not sender or (sender in self.owned_addresses and not is_controlled_fixture):
             return False
         auto_submitted = str(item.get("auto_submitted") or "").strip().casefold()
         precedence = str(item.get("precedence") or "").strip().casefold()

@@ -50,9 +50,12 @@ class LaunchdInstallerTests(unittest.TestCase):
         self.assertEqual(specs[4].start_interval, 900)
         self.assertEqual(specs[4].arguments[-1], "escalation")
         self.assertFalse(specs[4].run_at_load)
-        self.assertEqual(specs[5].start_interval, 900)
-        self.assertTrue(specs[5].arguments[-1].endswith("run_gmail_inbox_watch.py"))
+        self.assertIsNone(specs[5].start_interval)
+        self.assertTrue(specs[5].keep_alive)
+        self.assertTrue(specs[5].arguments[-3].endswith("run_gmail_inbox_watch.py"))
+        self.assertEqual(specs[5].arguments[-2:], ("--loop-seconds", "900"))
         self.assertTrue(specs[5].run_at_load)
+        self.assertEqual(specs[5].process_type, "Standard")
         self.assertEqual(specs[6].start_calendar_interval, {"Hour": 8, "Minute": 0})
         self.assertEqual(specs[6].arguments[-1], "morning")
         self.assertFalse(specs[6].run_at_load)
@@ -75,8 +78,10 @@ class LaunchdInstallerTests(unittest.TestCase):
         morning = plistlib.loads(installer.render_plist(specs[6], Path("/repo"), Path("/logs")))
         evening = plistlib.loads(installer.render_plist(specs[7], Path("/repo"), Path("/logs")))
         self.assertEqual(watch["StartInterval"], 900)
-        self.assertEqual(inbox["StartInterval"], 900)
+        self.assertNotIn("StartInterval", inbox)
+        self.assertTrue(inbox["KeepAlive"])
         self.assertTrue(inbox["RunAtLoad"])
+        self.assertEqual(inbox["ProcessType"], "Standard")
         self.assertEqual(morning["StartCalendarInterval"], {"Hour": 8, "Minute": 0})
         self.assertEqual(evening["StartCalendarInterval"], {"Hour": 18, "Minute": 0})
         self.assertFalse(watch["RunAtLoad"])
@@ -111,6 +116,80 @@ class LaunchdInstallerTests(unittest.TestCase):
             for path in written:
                 self.assertTrue(path.exists())
                 plistlib.loads(path.read_bytes())
+
+    def test_scoped_install_writes_only_requested_agent(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            (repo / "runtime").mkdir(parents=True)
+            (repo / "openclaw").mkdir(parents=True)
+            (repo / "scripts").mkdir(parents=True)
+            for path in (
+                repo / "runtime" / "server.py",
+                repo / "openclaw" / "tony_live_bridge.py",
+                repo / "scripts" / "service_supervisor.py",
+                repo / "scripts" / "run_with_env.py",
+                repo / "scripts" / "run_proactive_brief.py",
+                repo / "scripts" / "run_gmail_inbox_watch.py",
+                repo / "scripts" / "run_tony_conversation_worker.py",
+            ):
+                path.write_text("", encoding="utf-8")
+            python_path = root / "python3"
+            python_path.write_text("", encoding="utf-8")
+            env_file = root / "runtime.env"
+            env_file.write_text("NARRATIIVE_API_KEY=test\n", encoding="utf-8")
+            env_file.chmod(0o600)
+            home = root / "home"
+
+            written = installer.install(
+                repo,
+                python_path,
+                env_file,
+                home,
+                activate=False,
+                only_labels=("com.narratiive.gmail-inbox-watch",),
+            )
+
+            self.assertEqual(
+                written,
+                [home / "Library" / "LaunchAgents" / "com.narratiive.gmail-inbox-watch.plist"],
+            )
+            self.assertEqual(
+                [path.name for path in (home / "Library" / "LaunchAgents").iterdir()],
+                ["com.narratiive.gmail-inbox-watch.plist"],
+            )
+
+    def test_scoped_install_rejects_unknown_label(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            (repo / "runtime").mkdir(parents=True)
+            (repo / "openclaw").mkdir(parents=True)
+            (repo / "scripts").mkdir(parents=True)
+            for path in (
+                repo / "runtime" / "server.py",
+                repo / "openclaw" / "tony_live_bridge.py",
+                repo / "scripts" / "run_with_env.py",
+                repo / "scripts" / "run_proactive_brief.py",
+                repo / "scripts" / "run_gmail_inbox_watch.py",
+                repo / "scripts" / "run_tony_conversation_worker.py",
+            ):
+                path.write_text("", encoding="utf-8")
+            python_path = root / "python3"
+            python_path.write_text("", encoding="utf-8")
+            env_file = root / "runtime.env"
+            env_file.write_text("NARRATIIVE_API_KEY=test\n", encoding="utf-8")
+            env_file.chmod(0o600)
+
+            with self.assertRaisesRegex(ValueError, "unknown LaunchAgent label"):
+                installer.install(
+                    repo,
+                    python_path,
+                    env_file,
+                    root / "home",
+                    activate=False,
+                    only_labels=("com.narratiive.not-real",),
+                )
 
     def test_install_preserves_virtual_environment_python_symlink(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
