@@ -1,0 +1,429 @@
+{
+  "schema_version": "2.0.0",
+  "template_id": "sketchbook-canonical",
+  "status": "canonical_document_contract_runtime_adoption_pending",
+  "product": "SKETCHBOOK",
+  "human_approval": "required_before_client_or_production_use",
+  "canvas": {
+    "width_px": 1280,
+    "height_px": 720,
+    "aspect_ratio": "16:9",
+    "safe_margin_px": 58,
+    "footer_top_px": 676,
+    "grid": {
+      "columns": 12,
+      "gutter_px": 20,
+      "column_width_px": 78.66666666666667,
+      "baseline_px": 8
+    }
+  },
+  "design_tokens": {
+    "type_hierarchy_px": {
+      "display": {
+        "min": 46,
+        "max": 72,
+        "weight": 700
+      },
+      "title": {
+        "min": 42,
+        "max": 50,
+        "weight": 700
+      },
+      "subhead": {
+        "min": 24,
+        "max": 34,
+        "weight": 700
+      },
+      "body": {
+        "min": 18,
+        "max": 24,
+        "weight": 400
+      },
+      "label": {
+        "min": 9,
+        "max": 12,
+        "weight": 700
+      }
+    },
+    "client_manifest_required": [
+      "client_id",
+      "version",
+      "palette",
+      "display_typeface",
+      "body_typeface",
+      "imagery_rules",
+      "product_rules",
+      "rights_and_provenance"
+    ],
+    "palette_roles": [
+      "ink",
+      "paper",
+      "accent",
+      "secondary",
+      "muted",
+      "rule",
+      "white"
+    ]
+  },
+  "global_rules": {
+    "one_dominant_idea_per_page": true,
+    "maximum_primary_text_blocks": 5,
+    "footer_required": true,
+    "speaker_notes_provenance_required": true,
+    "evidence_label_required_for_claims": true,
+    "brand_logo_required": false,
+    "client_manifest_required": true,
+    "forbidden_visuals_from_client_manifest": true,
+    "no_automatic_rewrite_of_approved_strategy": true,
+    "missing_required_content_blocks_release": true,
+    "unreviewed_variants_forbidden": true
+  },
+  "page_types": [
+    {
+      "id": "creative_proposition",
+      "required_fields": [
+        "proposition_line_1",
+        "proposition_line_2",
+        "emotional_payoff",
+        "source_label",
+        "hero_image",
+        "commercial_role",
+        "approved_strategy_reference"
+      ],
+      "optional_fields": [
+        "supporting_rule"
+      ],
+      "geometry_px": {
+        "content_panel": [
+          0,
+          0,
+          760,
+          720
+        ],
+        "eyebrow": [
+          58,
+          38,
+          690,
+          19
+        ],
+        "headline": [
+          58,
+          104,
+          610,
+          362
+        ],
+        "payoff": [
+          58,
+          532,
+          610,
+          104
+        ],
+        "image": [
+          0,
+          0,
+          1280,
+          720
+        ]
+      },
+      "text_constraints": {
+        "proposition_line_1_max_chars": 18,
+        "proposition_line_2_max_chars": 18,
+        "emotional_payoff_max_chars": 125
+      },
+      "image_rules": {
+        "minimum_px": [
+          1600,
+          900
+        ],
+        "crop": "cover",
+        "focal_area": "right_45_percent",
+        "context": "Use the client manifest; imagery must express this proposition, not a generic product/category photograph."
+      },
+      "overflow": "Shorten or select alternate copy with editorial review; use the defined minimum sizes only. Never clip, auto-shrink below the floor or redesign. Block output if still over.",
+      "missing_content": "Block population/release when a required field or asset is missing. Internal drafts may show an explicit missing-content marker; never present a placeholder as finished creative.",
+      "allowed_variant": "standard"
+    },
+    {
+      "id": "audience_profile",
+      "required_fields": [
+        "audience_name",
+        "human_truth",
+        "wants",
+        "hesitates",
+        "moves_when",
+        "validation_status",
+        "portrait",
+        "creative_job"
+      ],
+      "optional_fields": [
+        "verified_quote"
+      ],
+      "geometry_px": {
+        "copy_panel": [
+          0,
+          0,
+          760,
+          720
+        ],
+        "portrait": [
+          710,
+          0,
+          570,
+          720
+        ],
+        "headline": [
+          58,
+          98,
+          620,
+          154
+        ],
+        "profile_rows": [
+          58,
+          314,
+          598,
+          274
+        ],
+        "evidence_caption": [
+          886,
+          570,
+          304,
+          70
+        ]
+      },
+      "text_constraints": {
+        "audience_name_max_chars": 28,
+        "human_truth_max_chars": 70,
+        "row_max_chars": 110
+      },
+      "image_rules": {
+        "minimum_px": [
+          900,
+          1200
+        ],
+        "crop": "cover",
+        "focal_area": "right_half_subject",
+        "portrayal": "Use the audience buying context from the approved inputs; do not imply a generated portrait is a real customer or endorsement."
+      },
+      "overflow": "Shorten or select alternate copy with editorial review; use the defined minimum sizes only. Never clip, auto-shrink below the floor or redesign. Block output if still over.",
+      "missing_content": "Block population/release when a required field or asset is missing. Internal drafts may show an explicit missing-content marker; never present a placeholder as finished creative.",
+      "allowed_variant": "standard"
+    },
+    {
+      "id": "visual_world",
+      "required_fields": [
+        "art_direction_statement",
+        "hero_reference",
+        "setting_rule",
+        "legibility_rule",
+        "avoid_list",
+        "palette"
+      ],
+      "optional_fields": [],
+      "geometry_px": {
+        "hero_image": [
+          0,
+          0,
+          1280,
+          460
+        ],
+        "title": [
+          58,
+          104,
+          720,
+          74
+        ],
+        "rules_band": [
+          0,
+          460,
+          1280,
+          260
+        ],
+        "rules_columns": [
+          [
+            58,
+            506,
+            340,
+            112
+          ],
+          [
+            462,
+            506,
+            326,
+            112
+          ],
+          [
+            850,
+            506,
+            350,
+            112
+          ]
+        ],
+        "palette_and_type_notes": "Use existing rules band slots; no new primary objects."
+      },
+      "text_constraints": {
+        "statement_max_chars": 38,
+        "rule_max_chars": 90,
+        "avoid_list_max_items": 6
+      },
+      "image_rules": {
+        "minimum_px": [
+          1600,
+          900
+        ],
+        "crop": "cover",
+        "hero_elements_max": 3,
+        "context": "Client manifest defines lighting, setting, casting, product treatment and exclusions. Repeat this type for additional references instead of inventing a montage."
+      },
+      "overflow": "Shorten or select alternate copy with editorial review; use the defined minimum sizes only. Never clip, auto-shrink below the floor or redesign. Block output if still over.",
+      "missing_content": "Block population/release when a required field or asset is missing. Internal drafts may show an explicit missing-content marker; never present a placeholder as finished creative.",
+      "allowed_variant": "standard"
+    },
+    {
+      "id": "campaign_territory",
+      "required_fields": [
+        "territory_name",
+        "territory_role",
+        "hero_copy",
+        "repeatable_construction",
+        "evidence_label",
+        "hero_execution",
+        "commercial_objective"
+      ],
+      "geometry_px": {
+        "title": [
+          58,
+          92,
+          740,
+          144
+        ],
+        "hero_execution": [
+          58,
+          286,
+          742,
+          294
+        ],
+        "mechanism": [
+          858,
+          286,
+          326,
+          331
+        ]
+      },
+      "text_constraints": {
+        "territory_name_max_chars": 32,
+        "territory_role_max_chars": 110,
+        "hero_copy_max_chars": 65,
+        "mechanism_steps": 3
+      },
+      "image_rules": {
+        "required": true,
+        "kind": "Native editable copy-led execution or sourced/labelled raster concept, following the client manifest.",
+        "minimum_raster_px": [
+          1200,
+          600
+        ],
+        "crop": "contain for meaning-bearing mockups; cover only for decorative photography."
+      },
+      "overflow": "Shorten or select alternate copy with editorial review; use the defined minimum sizes only. Never clip, auto-shrink below the floor or redesign. Block output if still over.",
+      "missing_content": "Block population/release when a required field or asset is missing. Internal drafts may show an explicit missing-content marker; never present a placeholder as finished creative.",
+      "allowed_variant": "standard"
+    },
+    {
+      "id": "campaign_executions",
+      "required_fields": [
+        "application_1",
+        "application_2",
+        "application_3",
+        "activation_status"
+      ],
+      "optional_fields": [
+        "channel_note",
+        "operational_disclaimer"
+      ],
+      "geometry_px": {
+        "headline": [
+          58,
+          86,
+          1010,
+          126
+        ],
+        "application_1": [
+          58,
+          276,
+          300,
+          300
+        ],
+        "application_2": [
+          390,
+          276,
+          300,
+          300
+        ],
+        "application_3": [
+          722,
+          276,
+          500,
+          300
+        ]
+      },
+      "text_constraints": {
+        "headline_max_chars": 40,
+        "intro_max_chars": 125,
+        "execution_headline_max_chars": 70,
+        "disclaimer_max_chars": 90
+      },
+      "image_rules": {
+        "minimum_px_per_raster_execution": [
+          900,
+          900
+        ],
+        "crop": "contain for mockups, UI and text-bearing executions; no stretching or cropped messaging",
+        "unverified_operational_detail_must_be_labelled": true
+      },
+      "overflow": "Shorten or select alternate copy with editorial review; use the defined minimum sizes only. Never clip, auto-shrink below the floor or redesign. Block output if still over.",
+      "missing_content": "Block population/release when a required field or asset is missing. Internal drafts may show an explicit missing-content marker; never present a placeholder as finished creative.",
+      "allowed_variant": "standard"
+    }
+  ],
+  "visual_qa_checks": [
+    "all text remains inside the 58px safe area except full-bleed imagery",
+    "no body text is below 18px and no label text below 9px",
+    "images are not stretched and follow the specified focal crop",
+    "every image has meaningful alt text",
+    "unverified claims are labelled source hypothesis or creative illustration",
+    "no timestamp, price, performance or quiz state is presented as verified unless sourced",
+    "footer and internal/not-client-approved state are visible on every page",
+    "speaker notes identify source and evidence status",
+    "no overflow, overlap or clipped heading is reported by presentation validation",
+    "editable text remains native rather than flattened into a page image",
+    "All five types occur in the required order; repeated territory/application pairs follow commissioned scope.",
+    "Brand palette, typography and imagery come only from the exact client-manifest version.",
+    "A creative illustration is labelled once clearly; no fabricated quote, product claim, UI behaviour or result.",
+    "Rendered pages require visual inspection; structural validation does not establish layout quality.",
+    "No new variant is used without a versioned layout definition and rendered review."
+  ],
+  "lineage": {
+    "parent_template": "sketchbook-rave-canonical-five-page-v1",
+    "parent_commit": "90f251c2778126842a8e2b0858180c17ac8d2ad6",
+    "founder_instruction": "2026-10-19: finalise canonical SKETCHBOOK for reuse; no existing client output approval inferred"
+  },
+  "assembly": {
+    "order": [
+      "creative_proposition",
+      "audience_profile",
+      "visual_world",
+      "campaign_territory",
+      "campaign_executions"
+    ],
+    "five_types_not_five_page_limit": true,
+    "repeat": "Repeat campaign_territory and campaign_executions for each scoped territory within the selected approved Campaign World. Extra audiences or image references repeat an existing type. No spontaneous layout changes.",
+    "scope": "Number of territories, channels and examples follows the commissioned scope; no automatic production quantity promise.",
+    "cover": "Creative proposition can serve as cover; optional separate cover does not replace any required type."
+  },
+  "stage_boundaries": {
+    "input": "Approved FIELDWORK argument and selected exact Campaign World with source lineage.",
+    "output": "Persuasive visual creative direction and concept applications, not live advertising or finished production assets.",
+    "downstream": "Creative Director's Bible / Production Pack / Asset Manifest retain their internal identities; customer-facing production noun unresolved.",
+    "human_approval": "Exact SKETCHBOOK version, territories, copy, rights and claims require human decision before client release or production."
+  }
+}
