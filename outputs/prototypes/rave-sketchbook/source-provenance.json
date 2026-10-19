@@ -1,0 +1,48 @@
+{
+  "artefact": "Rave SKETCHBOOK canonical template prototype",
+  "status": "internal_not_client_approved",
+  "source": {
+    "title": "NOS-CAMPAIGNWORLD-RAVE-v3",
+    "google_drive_id": "1EHuQbN2e_61YuOh3yrwz-46K40bW3EBUsDNsiL3cHiQ",
+    "url": "https://docs.google.com/document/d/1EHuQbN2e_61YuOh3yrwz-46K40bW3EBUsDNsiL3cHiQ",
+    "exported_docx_sha256": "ac510360ab763cbea6ae4a66d885dd6c0429a8f0884c6c167ae35f5020f034df",
+    "committed": false,
+    "purpose": "private source reference only"
+  },
+  "creative_illustrations": [
+    {
+      "file": "assets/upgrader-audience-illustration-v1.png",
+      "sha256": "a53f051dcb03ebaa108f25039b208dd8f39f2a440a495c96ea8d8c591d1dbc12",
+      "use": "audience portrait reference",
+      "depicts_real_customer": false,
+      "claim_status": "CREATIVE ILLUSTRATION"
+    },
+    {
+      "file": "assets/doormat-delivery-illustration-v1.png",
+      "sha256": "fb89c0385ffcb4b5a29b4b27a98ba37749cd51e0f824c2585c11c4a8b4c51471",
+      "use": "delivery execution mock-up",
+      "depicts_real_product": false,
+      "claim_status": "CREATIVE ILLUSTRATION"
+    },
+    {
+      "file": "assets/rave-kitchen-visual-world-v1.png",
+      "sha256": "ec681588917be0198b6f7162df492f0c1e4852016929b32144131b01734dd817",
+      "use": "art-direction reference",
+      "depicts_real_product": false,
+      "claim_status": "CREATIVE ILLUSTRATION"
+    },
+    {
+      "file": "assets/rave-editorial-background-v1.png",
+      "sha256": "3d58068317fb19386dbe4c32626a745321bbace53fa5affb115e73af5907ae1e",
+      "use": "shared Rave FIELDWORK/SKETCHBOOK visual anchor",
+      "claim_status": "CREATIVE ILLUSTRATION"
+    }
+  ],
+  "content_boundaries": {
+    "source_creative_is_current_client_approval": false,
+    "persona_is_verified_customer_evidence": false,
+    "delivery_timestamp_is_verified_operations_data": false,
+    "quiz_state_is_verified_current_functionality": false,
+    "media_is_live_or_activated": false
+  }
+}
