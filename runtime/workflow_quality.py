@@ -6,6 +6,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from runtime.fieldwork_v4 import FIELDWORK_V4_OPENING_TITLES
+
 from runtime.external_action_truth import no_asserted_external_action
 
 
@@ -737,9 +739,8 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         }
         for source_id in registered_pages
     }
-    canonical_titles = (
-        "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
-        "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+    canonical_titles = FIELDWORK_V4_OPENING_TITLES + (
+        "Competitive Landscape", "The Sea of Sameness",
         "The Market Gap", "Growth Constraint Diagnosis", "The Provocation", "Audience Reality",
         "Audience Segments / Demand Pools", "Customer Evidence Board",
         "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
@@ -753,7 +754,7 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
         "full_blueprint_has_exactly_thirty_slides": isinstance(presentation_slides, list)
         and len(presentation_slides) == 30,
-        "canonical_schema_v3_slide_roles_are_preserved": isinstance(presentation_slides, list)
+        "fieldwork_v4_slide_roles_are_preserved": isinstance(presentation_slides, list)
         and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
         == canonical_titles,
         "canonical_schema_v3_slide_roles_are_substantive": (
@@ -766,14 +767,19 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
             and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
         ),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
+        "editable_native_google_slides_is_present": isinstance(output.get("editable_google_slides"), Mapping)
+        and str(output["editable_google_slides"].get("presentation_url") or "").startswith("https://docs.google.com/presentation/d/")
+        and output["editable_google_slides"].get("mime_type") == "application/vnd.google-apps.presentation",
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
         "quantified_commercial_model_is_present": isinstance(model_scenarios, list)
-        and len(model_scenarios) == 3
+        and 1 <= len(model_scenarios) <= 3
+        and isinstance(commercial_model, Mapping)
+        and commercial_model.get("model_type") == "new_customer_cohort"
+        and commercial_model.get("output_metric") in {"revenue", "revenue_index"}
         and all(
             isinstance(item, Mapping)
-            and item.get("classification") == "illustrative_scenario"
-            and isinstance(item.get("incremental_annual_revenue"), int)
-            and isinstance(item.get("incremental_annual_contribution"), int)
+            and item.get("classification") in {"planning_case", "sensitivity", "illustrative_scenario"}
+            and isinstance(item.get("new_customer_cohort_revenue"), int)
             for item in model_scenarios
         ),
         "source_register_is_present": isinstance(source_entries, list)

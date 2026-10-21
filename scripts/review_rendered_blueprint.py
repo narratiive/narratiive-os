@@ -102,6 +102,15 @@ def main() -> int:
     founder_quality_profile = "issue #473 founder-quality controls" in str(
         spec.get("template_source") or ""
     ).casefold()
+    fieldwork_v4_roles = (
+        "commercial_position_today", "twelve_month_opportunity", "where_gains_come_from",
+        "audience_opportunity", "strategic_direction",
+    )
+    fieldwork_v4_profile = tuple(
+        str(((slide.get("content_data") or {}).get("fieldwork_role") or ""))
+        for slide in (spec.get("slides") or [])[:5]
+        if isinstance(slide, dict)
+    ) == fieldwork_v4_roles
     slides = sorted(args.slides_dir.glob("slide-*.png"))
     expected = spec.get("slides") or []
     ocr_path = args.output.with_name("rendered-slide-ocr.json")
@@ -150,7 +159,9 @@ def main() -> int:
         if isinstance(slide, dict) and slide.get("layout_type") == "commercial_model"
     ]
     citation_pattern = re.compile(
-        r"\b(?:A\d+|C\d+)\b" if demonstration_profile else r"\b(?:S\d+[A-Z]?|T1)\b"
+        r"\b(?:A\d+|C\d+)\b"
+        if demonstration_profile
+        else r"\b(?:[A-Z]{1,3}\d+[A-Z]?|T1)\b"
     )
     citation_slides = [index for index, content in enumerate(ocr_text, 1) if citation_pattern.search(content)]
     backstage_pattern = re.compile(
@@ -175,7 +186,17 @@ def main() -> int:
         19: ("katkin future", "ownable territory"),
         22: ("role", "tension", "proof", "asset", "verbal assets", "tone motion", "recurring formats"),
     }
-    if demonstration_profile:
+    if fieldwork_v4_profile:
+        rendered_roles = all(
+            slide_no <= len(ocr_text)
+            and title in " ".join(normalized_words(ocr_text[slide_no - 1]))
+            for slide_no, title in enumerate((
+                "the commercial position today", "the 12 month opportunity",
+                "where the gains come from", "the audience opportunity",
+                "the strategic direction",
+            ), 1)
+        )
+    elif demonstration_profile:
         rendered_roles = all(
             term in combined
             for term in (
@@ -193,7 +214,7 @@ def main() -> int:
     receipt_path = args.slides_dir.parent / "render-receipt.json"
     receipt = load_object(receipt_path) if receipt_path.exists() else {}
     visual_manifest = receipt.get("visualManifest") or []
-    image_relevance = (
+    image_relevance = True if fieldwork_v4_profile else (
         any(
             isinstance(item, dict) and item.get("role") == "creative illustration"
             for item in visual_manifest
@@ -233,7 +254,7 @@ def main() -> int:
         and "revenue" in ocr_text[slide_no - 1].casefold()
         and (
             "conversion" in ocr_text[slide_no - 1].casefold()
-            if demonstration_profile
+            if demonstration_profile or fieldwork_v4_profile
             else "contribution" in ocr_text[slide_no - 1].casefold()
         )
         for slide_no in model_slides

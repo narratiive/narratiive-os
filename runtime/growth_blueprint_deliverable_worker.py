@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import time
 from collections.abc import Callable, Mapping
@@ -23,6 +24,7 @@ from runtime.deliverable_production import (
 )
 
 WorkerAdapter = Callable[[dict[str, Any]], dict[str, Any]]
+NativeSlidesImporter = Callable[[Path, Mapping[str, Any]], Mapping[str, Any]]
 
 
 class GrowthBlueprintDeliverableWorkerError(RuntimeError):
@@ -41,10 +43,12 @@ class GrowthBlueprintDeliverableWorker:
         renderer: LocalArtifactToolPresentationRenderer,
         store: FileDeliverableStore,
         output_root: Path,
+        native_slides_importer: NativeSlidesImporter | None = None,
     ) -> None:
         self.renderer = renderer
         self.store = store
         self.output_root = Path(output_root)
+        self.native_slides_importer = native_slides_importer
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         started = time.perf_counter()
@@ -121,9 +125,10 @@ class GrowthBlueprintDeliverableWorker:
         existing = self.store.load(workspace_id, client_id, deliverable_id)
         if existing is not None:
             self._validate_existing(existing, specification)
+            slides_export = self._native_slides_export(existing, specification)
             return self._output(
                 existing, specification, commercial_model=commercial_model,
-                source_register=source_register, replay=True,
+                source_register=source_register, slides_export=slides_export, replay=True,
                 elapsed_seconds=time.perf_counter() - started,
             )
 
@@ -135,11 +140,44 @@ class GrowthBlueprintDeliverableWorker:
             output_dir=output_dir,
             created_at=datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         )
+        slides_export = self._native_slides_export(record, specification)
         return self._output(
             record, specification, commercial_model=commercial_model,
-            source_register=source_register, replay=False,
+            source_register=source_register, slides_export=slides_export, replay=False,
             elapsed_seconds=time.perf_counter() - started,
         )
+
+    def _native_slides_export(
+        self,
+        record: DeliverableProductionRecord,
+        specification: PresentationSpecification,
+    ) -> dict[str, Any]:
+        receipt_path = Path(record.pptx_path).parent / "google-slides-export.json"
+        if receipt_path.is_file():
+            payload = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if payload.get("specification_checksum") != record.specification_checksum:
+                raise GrowthBlueprintDeliverableWorkerError("Google Slides export lineage does not match the presentation")
+            return payload
+        if self.native_slides_importer is None:
+            raise GrowthBlueprintDeliverableWorkerError(
+                "native Google Slides importer is not configured; FIELDWORK v4 fails closed"
+            )
+        raw = self.native_slides_importer(Path(record.pptx_path), specification.to_dict())
+        url = str(raw.get("presentation_url") or raw.get("url") or "").strip()
+        presentation_id = str(raw.get("presentation_id") or raw.get("id") or "").strip()
+        if not url.startswith("https://docs.google.com/presentation/d/") or not presentation_id:
+            raise GrowthBlueprintDeliverableWorkerError("native Google Slides import did not return verified metadata")
+        payload = {
+            "presentation_id": presentation_id,
+            "presentation_url": url,
+            "mime_type": "application/vnd.google-apps.presentation",
+            "specification_checksum": record.specification_checksum,
+            "source_pptx_checksum": hashlib.sha256(Path(record.pptx_path).read_bytes()).hexdigest(),
+            "approval_status": "pending",
+            "client_release_authorised": False,
+        }
+        receipt_path.write_text(json.dumps(payload, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        return payload
 
     @staticmethod
     def _validate_existing(
@@ -162,6 +200,7 @@ class GrowthBlueprintDeliverableWorker:
         *,
         commercial_model: Mapping[str, Any],
         source_register: Mapping[str, Any],
+        slides_export: Mapping[str, Any],
         replay: bool,
         elapsed_seconds: float,
     ) -> dict[str, Any]:
@@ -170,15 +209,16 @@ class GrowthBlueprintDeliverableWorker:
             "commercial_model": dict(commercial_model),
             "source_register": dict(source_register),
             "editable_pptx": record.pptx_path,
+            "editable_google_slides": dict(slides_export),
             "review_pdf": record.pdf_path,
             "visual_qa": record.visual_qa.to_dict(),
             "execution_evidence": {
                 "executor": "tony-local-artifact-tool",
                 "codex_dependency": False,
                 "elapsed_seconds": round(elapsed_seconds, 3),
-                "provider_calls": 0,
+                "provider_calls": 1,
                 "estimated_provider_cost_gbp": 0.0,
-                "cost_basis": "Deterministic local modelling, rendering, PDF assembly and rendered-slide review; excludes local compute and sunk upstream research/generation cost.",
+                "cost_basis": "Deterministic local modelling, rendering, PDF assembly and rendered-slide review plus one authenticated native Google Slides import; excludes local compute and sunk upstream research/generation cost.",
             },
             "proposed_client_release": {
                 "status": "pending_human_approval",
@@ -196,6 +236,8 @@ class GrowthBlueprintDeliverableWorker:
 def build_growth_blueprint_deliverable_worker(
     root: str | Path,
     environ: Mapping[str, str] | None = None,
+    *,
+    native_slides_importer: NativeSlidesImporter | None = None,
 ) -> WorkerAdapter | None:
     env = os.environ if environ is None else environ
     mode = str(env.get("NARRATIIVE_DOCUMENT_WORKER_MODE") or "").strip().casefold()
@@ -240,4 +282,5 @@ def build_growth_blueprint_deliverable_worker(
         renderer=renderer,
         store=FileDeliverableStore(scoped_root / "deliverable-records"),
         output_root=scoped_root / "deliverables",
+        native_slides_importer=native_slides_importer,
     )
