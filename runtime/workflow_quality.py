@@ -806,6 +806,24 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
     return _result(checks)
 
 
+def sketchbook_v2_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    slides = output.get("editable_google_slides") or {}
+    qa = output.get("visual_qa") or {}
+    return _result({
+        "contract_is_v2": output.get("contract_version") == "2.0.0",
+        "fieldwork_lineage_is_exact": isinstance(output.get("fieldwork_handoff"), Mapping)
+        and bool(output["fieldwork_handoff"].get("artifact_id"))
+        and bool(output["fieldwork_handoff"].get("checksum")),
+        "native_google_slides_is_editable": isinstance(slides, Mapping)
+        and str(slides.get("presentation_url") or "").startswith("https://docs.google.com/presentation/d/")
+        and slides.get("mime_type") == "application/vnd.google-apps.presentation",
+        "review_pdf_is_present": bool(output.get("review_pdf")),
+        "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed",
+        "human_gate_is_preserved": output.get("approval_status") == "pending_human_review"
+        and output.get("client_release_authorised") is False,
+    })
+
+
 def campaign_world_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
     """Validate a Campaign World against the canonical v1 creative contract."""
     world = output.get("campaign_world")

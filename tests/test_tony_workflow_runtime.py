@@ -116,7 +116,7 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 environ={},
             )
             registry_ids = {item.workflow_id for item in runtime.coordinator.registry.all()}
-            self.assertEqual(len(registry_ids), 15)
+            self.assertEqual(len(registry_ids), 16)
             runtime.enqueue(
                 "growth_diagnostic_to_blueprint_lite",
                 "safe-blueprint-run",

@@ -470,6 +470,20 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
     approval_required=True,
 )
 
+SKETCHBOOK_V2_PRODUCTION = _workflow(
+    "sketchbook_v2_production",
+    _step(
+        "produce_sketchbook_v2",
+        capability="sketchbook_generation",
+        inputs=("approved_fieldwork_handoff", "client_manifest", "sketchbook_pages"),
+        outputs=("contract_version", "specification_checksum", "fieldwork_handoff", "editable_google_slides", "editable_pptx", "review_pdf", "visual_qa", "approval_status", "client_release_authorised"),
+        quality="sketchbook_v2_quality_gate",
+        approval_required=True,
+        max_attempts=1,
+    ),
+    approval_required=True,
+)
+
 GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD = WorkflowDefinition(
     workflow_id="growth_blueprint_to_campaign_world",
     stages=(
@@ -636,6 +650,7 @@ NARRATIIVE_PRODUCTION_WORKFLOWS = (
     STRATEGY_THESIS_TO_GROWTH_BLUEPRINT,
     RESEARCH_TO_GROWTH_BLUEPRINT,
     GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION,
+    SKETCHBOOK_V2_PRODUCTION,
     GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD,
     CAMPAIGN_WORLD_TO_CREATIVE_BIBLE,
     CREATIVE_BIBLE_TO_ASSET_PRODUCTION,

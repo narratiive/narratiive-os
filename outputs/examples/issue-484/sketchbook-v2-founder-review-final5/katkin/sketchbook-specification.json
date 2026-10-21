@@ -1,0 +1,120 @@
+{
+  "contract_version": "2.0.0",
+  "fieldwork_handoff": {
+    "artifact_id": "katkin-fieldwork-v4-founder-review",
+    "checksum": "7afbf42cdbdeae92a725d56ced07fc8a0b1a39aad18a3c1675d03b3c19ffd725",
+    "approval_status": "approved"
+  },
+  "client_manifest": {
+    "client_id": "katkin",
+    "client_name": "KatKin",
+    "version": "1.0",
+    "palette": {
+      "ink": "#17131E",
+      "paper": "#F7F1E9",
+      "accent": "#FF6854",
+      "secondary": "#644579",
+      "muted": "#7A707D",
+      "rule": "#D9CED8",
+      "white": "#FFFDFC"
+    },
+    "display_typeface": "Arial",
+    "body_typeface": "Arial",
+    "imagery_rules": [
+      "client-specific focal crop"
+    ],
+    "product_rules": [
+      "no unsupported claims"
+    ],
+    "rights_and_provenance": [
+      "AI-generated internal creative illustration"
+    ],
+    "hero": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-sketchbook/assets/sketchbook/katkin/evidence-led-feeding-world-v1.png"
+  },
+  "pages": [
+    {
+      "type": "creative_proposition",
+      "proposition_line_1": "DECIDE WITH",
+      "proposition_line_2": "EVIDENCE.",
+      "emotional_payoff": "Then feed with confidence — turning proof into a useful transition, not another claim.",
+      "commercial_role": "support trial-to-subscription",
+      "approved_strategy_reference": "fieldwork-katkin-v4",
+      "hero_image": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-sketchbook/assets/sketchbook/katkin/evidence-led-feeding-world-v1.png",
+      "hero_alt": "Illustrative cat parent preparing fresh food in a bright kitchen"
+    },
+    {
+      "type": "audience_profile",
+      "audience_name": "THE CAREFUL SWITCHER",
+      "human_truth": "She wants confidence in the change, not another category claim.",
+      "wants": "A clear reason to choose and continue fresh feeding.",
+      "hesitates": "Price, freezer space, routine change and uncertain proof.",
+      "moves_when": "Evidence answers the decision and the transition feels manageable.",
+      "validation_status": "SOURCE HYPOTHESIS / VALIDATE WITH FIRST-PARTY RESEARCH",
+      "portrait": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-sketchbook/assets/sketchbook/katkin/evidence-led-feeding-world-v1.png",
+      "portrait_alt": "Generated audience illustration; not a customer",
+      "creative_job": "make the change observable"
+    },
+    {
+      "type": "visual_world",
+      "art_direction_statement": "PROGRESS, MADE VISIBLE.",
+      "hero_reference": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-sketchbook/assets/sketchbook/katkin/evidence-led-feeding-world-v1.png",
+      "hero_alt": "Calm evidence-led feeding routine",
+      "setting_rule": "Real homes. Morning routines. The cat present as an active participant.",
+      "legibility_rule": "One decision, one proof signal and one next step in every frame.",
+      "avoid_list": [
+        "clinical theatre",
+        "miracle claims",
+        "generic pet joy"
+      ],
+      "palette": {
+        "ink": "#17131E",
+        "paper": "#F7F1E9",
+        "accent": "#FF6854",
+        "secondary": "#644579",
+        "muted": "#7A707D",
+        "rule": "#D9CED8",
+        "white": "#FFFDFC"
+      }
+    },
+    {
+      "type": "campaign_territory",
+      "territory_name": "THE DECISION SYSTEM",
+      "territory_role": "Turn science into a calm, useful guide at the moment commitment can lapse.",
+      "hero_copy": "WHAT DO WE KNOW?\nWHAT DO WE DO NEXT?",
+      "repeatable_construction": [
+        "Name the decision",
+        "Show the evidence",
+        "Make the next step observable"
+      ],
+      "evidence_label": "ILLUSTRATIVE CONCEPT / NOT APPROVED",
+      "hero_execution": "native editable type",
+      "commercial_objective": "Support trial-to-subscription conversion without claiming a result."
+    },
+    {
+      "type": "campaign_executions",
+      "heading": "ONE SYSTEM. THREE DECISION MOMENTS.",
+      "intro": "Each application answers a real question, marks the next step and preserves the evidence boundary.",
+      "applications": [
+        {
+          "channel": "TRIAL GUIDE",
+          "headline": "IS FRESH FEEDING RIGHT FOR MY CAT?",
+          "purpose": "A sourced proof ladder before first purchase.",
+          "status": "ILLUSTRATIVE / NOT LIVE"
+        },
+        {
+          "channel": "ONBOARDING CRM",
+          "headline": "DAY 4: WHAT PROGRESS CAN LOOK LIKE",
+          "purpose": "Observable transition guidance, not a promised outcome.",
+          "status": "ILLUSTRATIVE / NOT SENT"
+        },
+        {
+          "channel": "ACCOUNT + RETAIL",
+          "headline": "YOUR NEXT USEFUL STEP",
+          "purpose": "A consistent decision aid across owned and retail moments.",
+          "status": "ILLUSTRATIVE / NOT BUILT"
+        }
+      ],
+      "activation_status": "CREATIVE ILLUSTRATION / NO LIVE MEDIA"
+    }
+  ]
+}
