@@ -1,0 +1,32 @@
+{
+  "pptx": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-fieldwork/outputs/examples/issue-484/katkin-fieldwork-v4-founder-review/katkin-internal-FIELDWORK-v4.pptx",
+  "pdf": "/Users/admin/.codex/.chatgpt-projects/g-p-682f3fd7b90481918bdbadb2bcca26de/issue-484-fieldwork/outputs/examples/issue-484/katkin-fieldwork-v4-founder-review/katkin-internal-FIELDWORK-v4.pdf",
+  "visual_qa": {
+    "status": "passed",
+    "checks": {
+      "pptx_exists": true,
+      "pdf_exists": true,
+      "slide_count": true,
+      "source_labels_present": true,
+      "editorial_arc_is_complete": true,
+      "visual_forms_are_intentional": true,
+      "no_visible_machine_runtime_artefacts": true,
+      "conclusion_led_headlines": true,
+      "source_provenance_retained": true,
+      "readable_citations_present": true,
+      "claim_status_is_visible": true,
+      "quantified_commercial_model_present": true,
+      "source_register_present": true,
+      "strategic_source_unchanged": true,
+      "canonical_schema_v3_slide_roles_are_preserved": true,
+      "canonical_schema_v3_slide_roles_are_substantive": true,
+      "package_integrity": true,
+      "layout_validation": true,
+      "no_overflow_or_overlap": true,
+      "rendered_slide_review_passed": true
+    },
+    "findings": []
+  },
+  "execution_truth": "Tony production components executed locally; Google Slides import is performed separately through the authenticated connector.",
+  "client_release_authorised": false
+}

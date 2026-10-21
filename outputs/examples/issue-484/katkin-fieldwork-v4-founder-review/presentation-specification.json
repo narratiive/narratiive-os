@@ -1,0 +1,1288 @@
+{
+  "client_id": "katkin-internal",
+  "notes": [
+    "INTERNAL REVIEW DRAFT — HUMAN APPROVAL REQUIRED",
+    "Commercial scenarios are illustrative calculations from sourced inputs and explicit assumptions.",
+    "Readable slide citations resolve to the governed companion source register; detailed lineage remains in speaker notes."
+  ],
+  "slides": [
+    {
+      "body": "KatKin has raised significant growth capital and reports scale claims via trade press, while first-party conversion, transition and retention data remain unavailable.",
+      "citation_labels": [
+        "K1"
+      ],
+      "claim_status": "EVIDENCE",
+      "content_data": {
+        "assumptions": [],
+        "baseline": "Reported scale claims; customer economics unavailable",
+        "fieldwork_role": "commercial_position_today",
+        "growth_question": "Which customer decision currently limits retained feeding?",
+        "visual_treatment": "Current position with capital, reported scale and first-party inputs to confirm."
+      },
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 1,
+      "source_notes": [
+        "K1: Source captured in KatKin research case — The Grocer reported in December 2025 that KatKin raised £37.4 million in (2026-10-18), https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article"
+      ],
+      "takeaway": "Capital and scale claims exist, but customer economics don't.",
+      "title": "The commercial position today",
+      "visual_treatment": "thesis"
+    },
+    {
+      "body": "Indexed sensitivity shows the effect of 10% more qualified visits, 10% higher first-purchase conversion and 10% more realised revenue per acquired customer. It is not a KatKin forecast.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "ILLUSTRATIVE SCENARIO",
+      "content_data": {
+        "assumptions": [
+          "Each multiplier is illustrative at 1.10.",
+          "Existing-customer revenue is excluded.",
+          "Replace the index with approved first-party baselines."
+        ],
+        "commercial_model": {
+          "baseline": {
+            "first_purchase_conversion_rate": 1,
+            "new_customer_cohort_revenue": 100,
+            "qualified_visits": 100,
+            "realized_revenue_per_acquired_customer": 1
+          },
+          "contract_version": "4.0.0",
+          "currency": "INDEX",
+          "existing_customer_revenue": {
+            "status": "excluded_from_new_customer_cohort"
+          },
+          "inputs": [
+            {
+              "input_id": "qualified_visits",
+              "source_ids": [],
+              "status": "illustrative",
+              "value": 100
+            },
+            {
+              "input_id": "first_purchase_conversion_rate",
+              "source_ids": [],
+              "status": "illustrative",
+              "value": 1
+            },
+            {
+              "input_id": "realized_revenue_per_acquired_customer",
+              "source_ids": [],
+              "status": "illustrative",
+              "value": 1
+            }
+          ],
+          "limitations": [
+            "Not a company forecast.",
+            "No first-party baseline supplied."
+          ],
+          "model_type": "new_customer_cohort",
+          "other_channels": [],
+          "output_metric": "revenue_index",
+          "period": "12 months",
+          "population": "new customers acquired during the period",
+          "scenarios": [
+            {
+              "assumptions": [
+                "Equal 10% sensitivities are illustrative only."
+              ],
+              "classification": "illustrative_scenario",
+              "conversion_multiplier": 1.1,
+              "incremental_new_customer_cohort_revenue": 33,
+              "name": "Indexed sensitivity",
+              "new_customer_cohort_revenue": 133,
+              "qualified_visits_multiplier": 1.1,
+              "revenue_per_customer_multiplier": 1.1,
+              "uplift_percent": 33.1
+            }
+          ]
+        },
+        "dominant_gain": "+33.1%",
+        "fieldwork_role": "twelve_month_opportunity",
+        "scope": "modelled new-customer cohort only",
+        "visual_treatment": "Indexed baseline 100 against a 133.1 sensitivity for the modelled new-customer cohort."
+      },
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 2,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "A proof-to-decision journey could compound three customer behaviours.",
+      "title": "The 12-month opportunity",
+      "visual_treatment": "thesis"
+    },
+    {
+      "body": "Qualified trial conversion, transition completion, early retained feeding and retail-to-owned conversion together form the growth path; public evidence confirms their existence as mechanisms but not their current performance.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "INTERPRETATION",
+      "content_data": {
+        "assumptions": [],
+        "fieldwork_role": "where_gains_come_from",
+        "levers": [
+          {
+            "action": "Clarify who fresh feeding is for",
+            "behaviour": "More qualified visitors start a trial",
+            "commercial_consequence": "Higher first-purchase conversion",
+            "measure": "Qualified visit to trial rate"
+          },
+          {
+            "action": "Turn science into decision proof",
+            "behaviour": "More trialists can justify the change",
+            "commercial_consequence": "More completed transitions",
+            "measure": "Trial to subscription conversion"
+          },
+          {
+            "action": "Support the feeding transition",
+            "behaviour": "More new customers continue feeding",
+            "commercial_consequence": "More realised revenue per acquired customer",
+            "measure": "Early retained feeding and revenue per acquired customer"
+          }
+        ],
+        "visual_treatment": "Editable bridge showing the three non-additive mechanisms and their measures."
+      },
+      "evidence_refs": [
+        "K1",
+        "K2",
+        "K3"
+      ],
+      "layout_type": "question_frame",
+      "slide_no": 3,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Better qualification, clearer proof and a supported transition create the gain.",
+      "title": "Where the gains come from",
+      "visual_treatment": "question"
+    },
+    {
+      "body": "Committed cat parents weighing whether the price and operational change of frozen fresh food (freezer space, defrost routine) is justified by evidence. This is an assumption, not a verified segment, since no first-party cohort data exists.",
+      "citation_labels": [
+        "K2",
+        "K8"
+      ],
+      "claim_status": "HYPOTHESIS",
+      "content_data": {
+        "assumptions": [
+          "cohort-level trial-to-subscription conversion data",
+          "segment-level cancellation reasons",
+          "qualitative research confirming this audience priority"
+        ],
+        "buying_moment": "The decision window between completing a trial and committing to ongoing subscription, when price and transition friction become concrete.",
+        "fieldwork_role": "audience_opportunity",
+        "visual_treatment": "The trial-to-subscription decision moment with evidence and validation needs."
+      },
+      "evidence_refs": [
+        "K1",
+        "K6",
+        "K7"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 4,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2"
+      ],
+      "takeaway": "The highest-value moment is the trial-to-subscription transition, not acquisition.",
+      "title": "The audience opportunity",
+      "visual_treatment": "market"
+    },
+    {
+      "body": "Combining available capital, differentiated science and an unaddressed transition moment points to building a structured proof-to-decision journey as the next commercial investment, ahead of broader-reach marketing.",
+      "citation_labels": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "claim_status": "INTERPRETATION",
+      "content_data": {
+        "assumptions": [],
+        "fieldwork_role": "strategic_direction",
+        "first_action": "Instrument transition completion and independently verify the study",
+        "measure": "Trial-to-subscription conversion and early retained feeding",
+        "visual_treatment": "One strategic choice, first action and success measure."
+      },
+      "evidence_refs": [
+        "K1",
+        "K6",
+        "K7"
+      ],
+      "layout_type": "evidence_ladder",
+      "slide_no": 5,
+      "source_notes": [
+        "K1: Source captured in KatKin research case — The Grocer reported in December 2025 that KatKin raised £37.4 million in (2026-10-18), https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article",
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Build the decision system before scaling acquisition further.",
+      "title": "The strategic direction",
+      "visual_treatment": "market"
+    },
+    {
+      "body": "KatKin's scientific ambition and product-learning capability are harder to copy than convenience claims.",
+      "citation_labels": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "claim_status": "VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "layout_type": "tension_plus_journey_matrix",
+      "slide_no": 6,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K5: Source captured in KatKin research case — KatKin describes in-home taste panels and ongoing product testing, while (2026-10-18), https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy",
+        "K6: Source captured in KatKin research case — Untamed currently offers a low-cost trial, flexible delivery and whole-m (2026-10-18), https://untamed.com/products/try-now?step=cats-info"
+      ],
+      "takeaway": "Competitors own different trust and value cues; KatKin's combination remains a hypothesis.",
+      "title": "Competitive Landscape",
+      "visual_treatment": "competition"
+    },
+    {
+      "body": "Turn research into a useful decision system.",
+      "citation_labels": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "claim_status": "VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "layout_type": "sameness_audit",
+      "slide_no": 7,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K5: Source captured in KatKin research case — KatKin describes in-home taste panels and ongoing product testing, while (2026-10-18), https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy",
+        "K6: Source captured in KatKin research case — Untamed currently offers a low-cost trial, flexible delivery and whole-m (2026-10-18), https://untamed.com/products/try-now?step=cats-info"
+      ],
+      "takeaway": "KatKin needs a reason to be remembered, not another generic category claim.",
+      "title": "The Sea of Sameness",
+      "visual_treatment": "competition"
+    },
+    {
+      "body": "KatKin can grow by converting scientific evidence into a structured decision system operating across trial, transition and retention, rather than relying on claims alone to hold off copyable competitors.",
+      "citation_labels": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "audience": "Committed cat parents weighing price and routine change",
+        "competitor_miss": "Convenience and ingredient claims are increasingly shared",
+        "competitors": [
+          [
+            "Fresh category",
+            32,
+            42
+          ]
+        ],
+        "current_position": [
+          "KatKin today",
+          55,
+          66
+        ],
+        "future_position": [
+          "Decision system",
+          82,
+          84
+        ],
+        "market_gap": "Useful science at the decision moment",
+        "x_axis": [
+          "Claims",
+          "Decision proof"
+        ],
+        "y_axis": [
+          "Generic fresh",
+          "Cat-specific"
+        ]
+      },
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "market_gap_map",
+      "slide_no": 8,
+      "source_notes": [
+        "K1: Source captured in KatKin research case — The Grocer reported in December 2025 that KatKin raised £37.4 million in (2026-10-18), https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article",
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "The opportunity is a specific, reversible bet grounded in the evidence available.",
+      "title": "The Market Gap",
+      "visual_treatment": "opportunity"
+    },
+    {
+      "body": "KatKin's strongest difference is scientific ambition, but customers must still bridge price, freezer space, feeding transition and proof before that difference can create durable commercial value.",
+      "citation_labels": [
+        "K2",
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 9,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Trust and conversion are constrained by unresolved proof and proposition questions.",
+      "title": "Growth Constraint Diagnosis",
+      "visual_treatment": "constraint"
+    },
+    {
+      "body": "Proof must do practical work at trial and transition.",
+      "citation_labels": [
+        "K2",
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "provocation_page",
+      "slide_no": 10,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "A public trust contradiction can undermine a trust-dependent growth story.",
+      "title": "The Provocation",
+      "visual_treatment": "constraint"
+    },
+    {
+      "body": "Committed cat parents weighing whether the price and operational change of frozen fresh food (freezer space, defrost routine) is justified by evidence. This is an assumption, not a verified segment, since no first-party cohort data exists.",
+      "citation_labels": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "audience_reality_split",
+      "slide_no": 11,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Outside-in evidence cannot yet support confident buyer segmentation.",
+      "title": "Audience Reality",
+      "visual_treatment": "audience"
+    },
+    {
+      "body": "First-party performance data remains unavailable.",
+      "citation_labels": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "demand_pool_cards",
+      "slide_no": 12,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Potential buyer jobs are a research question, not a settled segment model.",
+      "title": "Audience Segments / Demand Pools",
+      "visual_treatment": "audience"
+    },
+    {
+      "body": "Committed cat parents weighing whether the price and operational change of frozen fresh food (freezer space, defrost routine) is justified by evidence. This is an assumption, not a verified segment, since no first-party cohort data exists.",
+      "citation_labels": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "customer_language": [
+          "Is the change worth the price and routine?",
+          "How will I know fresh feeding is working?"
+        ],
+        "interpretation": "Proof should resolve commitment, not merely create attention.",
+        "language_status": "HYPOTHESIS; FIRST-PARTY VALIDATION REQUIRED",
+        "signals": [
+          [
+            "PRICE MECHANICS",
+            "The recurring commitment is material."
+          ],
+          [
+            "SCIENCE ASSET",
+            "Comparative evidence exists but needs independent verification."
+          ],
+          [
+            "COMPETITION",
+            "Convenience and whole-meat claims are shared."
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "customer_evidence_board",
+      "slide_no": 13,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "The available customer signal is directional, small and self-selected.",
+      "title": "Customer Evidence Board",
+      "visual_treatment": "audience"
+    },
+    {
+      "body": "This is the moment science must function as a decision aid rather than a brand claim, or trials will lapse before retention is reached.",
+      "citation_labels": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "tension_plus_journey_matrix",
+      "slide_no": 14,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "The useful tension is between breadth of appeal and clarity of choice.",
+      "title": "Audience Tensions / Decision Context",
+      "visual_treatment": "audience"
+    },
+    {
+      "body": "KatKin's real difference is scientific ambition, but that ambition currently lives in marketing claims, not in the customer's path from trial to committed fresh feeding. Competitors already match convenience and ingredient claims.",
+      "citation_labels": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 15,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Different entry points may require different proof and proposition jobs.",
+      "title": "Category Entry Points",
+      "visual_treatment": "positioning"
+    },
+    {
+      "body": "KatKin's scientific ambition and product-learning capability are harder to copy than convenience claims.",
+      "citation_labels": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "claim_status": "VERIFIED EXTERNAL",
+      "content_data": {
+        "rows": [
+          [
+            "POSITION",
+            "Scientific ambition"
+          ],
+          [
+            "BENEFIT",
+            "A harder-to-copy source of difference"
+          ],
+          [
+            "PROOF GAP",
+            "Effectiveness is not yet proven"
+          ],
+          [
+            "EXPRESSION",
+            "Make the choice recognisable"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "layout_type": "brand_diagnosis_scorecard",
+      "slide_no": 16,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K5: Source captured in KatKin research case — KatKin describes in-home taste panels and ongoing product testing, while (2026-10-18), https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy",
+        "K6: Source captured in KatKin research case — Untamed currently offers a low-cost trial, flexible delivery and whole-m (2026-10-18), https://untamed.com/products/try-now?step=cats-info"
+      ],
+      "takeaway": "KatKin's current proposition is observable; its effectiveness is not proven.",
+      "title": "Current Brand Diagnosis",
+      "visual_treatment": "positioning"
+    },
+    {
+      "body": "KatKin's real difference is scientific ambition, but that ambition currently lives in marketing claims, not in the customer's path from trial to committed fresh feeding. Competitors already match convenience and ingredient claims.",
+      "citation_labels": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 17,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "The positioning hypothesis depends on resolving a credibility contradiction first.",
+      "title": "Positioning Problem",
+      "visual_treatment": "positioning"
+    },
+    {
+      "body": "KatKin's real difference is scientific ambition, but that ambition currently lives in marketing claims, not in the customer's path from trial to committed fresh feeding. Competitors already match convenience and ingredient claims.",
+      "citation_labels": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "rows": [
+          [
+            "POSITION",
+            "Help cat parents decide with evidence"
+          ],
+          [
+            "AUDIENCE",
+            "Committed cat parents weighing price and routine"
+          ],
+          [
+            "PROMISE",
+            "Make fresh feeding easier to start and sustain"
+          ],
+          [
+            "STATUS",
+            "Testable hypothesis — not a proven market fact"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "we_are_we_are_not_framework",
+      "slide_no": 18,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "The approved positioning is a testable strategic hypothesis, not a proven market fact.",
+      "title": "Strategic Positioning",
+      "visual_treatment": "positioning"
+    },
+    {
+      "body": "First-party performance data remains unavailable.",
+      "citation_labels": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "positions": [
+          [
+            "Today",
+            52,
+            68
+          ],
+          [
+            "Opportunity",
+            84,
+            88
+          ]
+        ],
+        "territory": "The trusted way to decide, start and stay with fresh feeding",
+        "x_axis": [
+          "Brand claim",
+          "Decision aid"
+        ],
+        "y_axis": [
+          "Category generic",
+          "Cat-specific"
+        ]
+      },
+      "evidence_refs": [
+        "K3",
+        "K8",
+        "K9"
+      ],
+      "layout_type": "positioning_map",
+      "slide_no": 19,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K8: Source captured in KatKin research case — The highest-value audience may be committed cat parents who want evidenc (2026-10-18), K2",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "KatKin should test ownable territory against real customer perception, not marketing copy alone.",
+      "title": "Positioning Map",
+      "visual_treatment": "positioning"
+    },
+    {
+      "body": "The narrative moves from deciding with evidence to transitioning with confidence and recognising progress.",
+      "citation_labels": [
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K9"
+      ],
+      "layout_type": "narrative_platform_framework",
+      "slide_no": 20,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "A clear proof journey can turn scientific ambition into a reason to continue.",
+      "title": "Narrative Platform",
+      "visual_treatment": "narrative"
+    },
+    {
+      "body": "Build every message around the decision, the supporting evidence and the next useful action.",
+      "citation_labels": [
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K3",
+        "K9"
+      ],
+      "layout_type": "message_architecture",
+      "slide_no": 21,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "One proof ladder can organise trial, transition and retained feeding.",
+      "title": "Core Message Architecture",
+      "visual_treatment": "narrative"
+    },
+    {
+      "body": "First-party performance data remains unavailable.",
+      "citation_labels": [
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "recurring_formats": [
+          "Decision guide",
+          "Transition check-in"
+        ],
+        "territories": [
+          [
+            "Decide with evidence",
+            "Trial",
+            "Price and proof",
+            "Verified science",
+            "Proof ladder"
+          ],
+          [
+            "Transition with confidence",
+            "Onboarding",
+            "Routine change",
+            "Practical guidance",
+            "Transition markers"
+          ],
+          [
+            "Recognise progress",
+            "Retention",
+            "Is it working?",
+            "Observed outcomes",
+            "Progress record"
+          ]
+        ],
+        "tone_motion_cues": [
+          "Direct and careful",
+          "Evidence before claim"
+        ],
+        "verbal_assets": [
+          "Decide with evidence",
+          "Fresh feeding, made observable"
+        ]
+      },
+      "evidence_refs": [
+        "K3",
+        "K9"
+      ],
+      "layout_type": "messaging_territories",
+      "slide_no": 22,
+      "source_notes": [
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Distinctiveness must be earned through proof, not asserted through tone.",
+      "title": "Messaging Territories / Distinctive Assets",
+      "visual_treatment": "narrative"
+    },
+    {
+      "body": "The cohort model separates qualified visits, first-purchase conversion and realised customer revenue. It does not claim total company revenue or profit.",
+      "citation_labels": [
+        "T1"
+      ],
+      "claim_status": "MODELLED REVENUE + ASSUMPTIONS",
+      "content_data": {
+        "baseline": {
+          "first_purchase_conversion_rate": 1,
+          "new_customer_cohort_revenue": 100,
+          "qualified_visits": 100,
+          "realized_revenue_per_acquired_customer": 1
+        },
+        "contract_version": "4.0.0",
+        "currency": "INDEX",
+        "existing_customer_revenue": {
+          "status": "excluded_from_new_customer_cohort"
+        },
+        "inputs": [
+          {
+            "input_id": "qualified_visits",
+            "source_ids": [],
+            "status": "illustrative",
+            "value": 100
+          },
+          {
+            "input_id": "first_purchase_conversion_rate",
+            "source_ids": [],
+            "status": "illustrative",
+            "value": 1
+          },
+          {
+            "input_id": "realized_revenue_per_acquired_customer",
+            "source_ids": [],
+            "status": "illustrative",
+            "value": 1
+          }
+        ],
+        "limitations": [
+          "Not a company forecast.",
+          "No first-party baseline supplied."
+        ],
+        "model_type": "new_customer_cohort",
+        "other_channels": [],
+        "output_metric": "revenue_index",
+        "period": "12 months",
+        "population": "new customers acquired during the period",
+        "scenarios": [
+          {
+            "assumptions": [
+              "Equal 10% sensitivities are illustrative only."
+            ],
+            "classification": "illustrative_scenario",
+            "conversion_multiplier": 1.1,
+            "incremental_new_customer_cohort_revenue": 33,
+            "name": "Indexed sensitivity",
+            "new_customer_cohort_revenue": 133,
+            "qualified_visits_multiplier": 1.1,
+            "revenue_per_customer_multiplier": 1.1,
+            "uplift_percent": 33.1
+          }
+        ]
+      },
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "commercial_model",
+      "slide_no": 23,
+      "source_notes": [
+        "T1: Narratiive — KatKin FIELDWORK founder argument (2026-10-18), governed repository artefact"
+      ],
+      "takeaway": "The selected scenario models index 133 for the defined new-customer cohort.",
+      "title": "Commercial Prize",
+      "visual_treatment": "commercial"
+    },
+    {
+      "body": "Instrument transition completion before scaling acquisition.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "items": [
+          [
+            "NOTICE",
+            "A specific feeding decision"
+          ],
+          [
+            "UNDERSTAND",
+            "What the evidence supports"
+          ],
+          [
+            "ACT",
+            "One low-risk next step"
+          ],
+          [
+            "LEARN",
+            "Cohort result against baseline"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "K2",
+        "K9"
+      ],
+      "layout_type": "attention_strategy",
+      "slide_no": 24,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Attention should make the specific proposition easier to notice and remember.",
+      "title": "Attention Strategy",
+      "visual_treatment": "activation"
+    },
+    {
+      "body": "First-party performance data remains unavailable.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K9"
+      ],
+      "layout_type": "channel_role_map",
+      "slide_no": 25,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Channels remain hypotheses until channel economics and conversion evidence are available.",
+      "title": "Channel Roles",
+      "visual_treatment": "activation"
+    },
+    {
+      "body": "Test the proof-to-decision journey against conversion and retained feeding.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K9"
+      ],
+      "layout_type": "channel_applications",
+      "slide_no": 26,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Execution should test the proposition architecture, not multiply generic content.",
+      "title": "Content / Campaign System",
+      "visual_treatment": "activation"
+    },
+    {
+      "body": "Show proof as a calm, legible guide rather than a dramatic claim.",
+      "citation_labels": [
+        "T1"
+      ],
+      "claim_status": "PROPOSED CREATIVE TERRITORY",
+      "content_data": {
+        "body": "Show proof as a calm, legible guide rather than a dramatic claim.",
+        "primary_phrase": "DECIDE WITH EVIDENCE",
+        "principles": [
+          [
+            "USEFUL",
+            "Answer a feeding decision"
+          ],
+          [
+            "CAREFUL",
+            "Separate evidence from claim"
+          ],
+          [
+            "OBSERVABLE",
+            "Show what progress means"
+          ]
+        ],
+        "secondary_phrase": "then feed with confidence",
+        "takeaway": "Decision proof can make KatKin's scientific ambition commercially useful.",
+        "title": "Make science useful at the decision moment"
+      },
+      "evidence_refs": [
+        "K2",
+        "K9"
+      ],
+      "layout_type": "creative_direction",
+      "slide_no": 27,
+      "source_notes": [
+        "T1: Narratiive — KatKin FIELDWORK founder argument (2026-10-18), governed repository artefact"
+      ],
+      "takeaway": "Decision proof can make KatKin's scientific ambition commercially useful.",
+      "title": "Creative Direction / Next-Phase Hook",
+      "visual_treatment": "activation"
+    },
+    {
+      "body": "Test the proof-to-decision journey against conversion and retained feeding.",
+      "citation_labels": [
+        "K2",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {},
+      "evidence_refs": [
+        "K2",
+        "K9"
+      ],
+      "layout_type": "constraint_priority_roadmap",
+      "slide_no": 28,
+      "source_notes": [
+        "K2: Source captured in KatKin research case — KatKin's current help centre states that a standard 28-day fresh-food pl (2026-10-18), https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Start with a capped, reversible test and a separate claims audit.",
+      "title": "Growth Priorities / 90-Day Activation Plan",
+      "visual_treatment": "activation"
+    },
+    {
+      "body": "Track recognition, shelf comprehension and earned search share before scaling; connect them to sell-through, CAC and retention once baselines exist.",
+      "citation_labels": [
+        "T1"
+      ],
+      "claim_status": "PROPOSED MEASUREMENT + EVIDENCE GAP",
+      "content_data": {},
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "priority_matrix_plus_measurement_stack",
+      "slide_no": 29,
+      "source_notes": [
+        "T1: Narratiive — KatKin FIELDWORK founder argument (2026-10-18), governed repository artefact"
+      ],
+      "takeaway": "Net value and payback remain unavailable until KatKin supplies actual margin, retention and implementation cost.",
+      "title": "Measurement Framework",
+      "visual_treatment": "measurement"
+    },
+    {
+      "body": "Build the decision system before scaling acquisition further.",
+      "citation_labels": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "claim_status": "ASSUMPTION + VERIFIED EXTERNAL",
+      "content_data": {
+        "lines": [
+          "Build the decision system",
+          "before scaling acquisition",
+          "Measure the transition first."
+        ],
+        "next_step": "Instrument trial-to-subscription conversion and independently verify the study before broader-reach investment.",
+        "source_register_entries": [
+          {
+            "applies_to_pages": [
+              1,
+              5,
+              8,
+              30
+            ],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K1"
+            ],
+            "location": "https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K1",
+            "title": "The Grocer reported in December 2025 that KatKin raised £37.4 million in"
+          },
+          {
+            "applies_to_pages": [
+              2,
+              3,
+              4,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              24,
+              25,
+              26,
+              28
+            ],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K2"
+            ],
+            "location": "https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K2",
+            "title": "KatKin's current help centre states that a standard 28-day fresh-food pl"
+          },
+          {
+            "applies_to_pages": [
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              30
+            ],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K3"
+            ],
+            "location": "https://www.katkin.com/articles/katkins-heat-damage-study",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K3",
+            "title": "KatKin's July 2026 company article says its 26-product heat-damage study"
+          },
+          {
+            "applies_to_pages": [],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K4"
+            ],
+            "location": "https://www.katkin.com/about-us",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K4",
+            "title": "KatKin presents itself as an uncompromising cat-health brand built aroun"
+          },
+          {
+            "applies_to_pages": [
+              6,
+              7,
+              16
+            ],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K5"
+            ],
+            "location": "https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K5",
+            "title": "KatKin describes in-home taste panels and ongoing product testing, while"
+          },
+          {
+            "applies_to_pages": [
+              6,
+              7,
+              16
+            ],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K6"
+            ],
+            "location": "https://untamed.com/products/try-now?step=cats-info",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K6",
+            "title": "Untamed currently offers a low-cost trial, flexible delivery and whole-m"
+          },
+          {
+            "applies_to_pages": [],
+            "classification": "verified_external",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K7"
+            ],
+            "location": "https://www.ukpetfood.org/static/22d36acc-68c9-4e38-b76cf7954eb33214/UK-Pet-Food-Annual-Report-2025.pdf",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K7",
+            "title": "The FCA-equivalent primary industry source is unavailable for pet-food p"
+          },
+          {
+            "applies_to_pages": [
+              4,
+              11,
+              12,
+              13,
+              14,
+              15,
+              17,
+              18,
+              19
+            ],
+            "classification": "assumption",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K8"
+            ],
+            "location": "K2",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K8",
+            "title": "The highest-value audience may be committed cat parents who want evidenc"
+          },
+          {
+            "applies_to_pages": [
+              2,
+              3,
+              5,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              24,
+              25,
+              26,
+              28,
+              30
+            ],
+            "classification": "assumption",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "K9"
+            ],
+            "location": "K2",
+            "publisher": "Source captured in KatKin research case",
+            "source_id": "K9",
+            "title": "A visible proof ladder from product evidence to feeding confidence and o"
+          },
+          {
+            "applies_to_pages": [
+              23,
+              27,
+              29
+            ],
+            "classification": "internal_strategy",
+            "date": "2026-10-18",
+            "evidence_refs": [
+              "T1"
+            ],
+            "location": "governed repository artefact",
+            "publisher": "Narratiive",
+            "source_id": "T1",
+            "title": "KatKin FIELDWORK founder argument"
+          }
+        ],
+        "source_register_summary": "SOURCE REGISTER / governed companion deliverable included"
+      },
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K9"
+      ],
+      "layout_type": "closing_mandate",
+      "slide_no": 30,
+      "source_notes": [
+        "K1: Source captured in KatKin research case — The Grocer reported in December 2025 that KatKin raised £37.4 million in (2026-10-18), https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article",
+        "K3: Source captured in KatKin research case — KatKin's July 2026 company article says its 26-product heat-damage study (2026-10-18), https://www.katkin.com/articles/katkins-heat-damage-study",
+        "K9: Source captured in KatKin research case — A visible proof ladder from product evidence to feeding confidence and o (2026-10-18), K2"
+      ],
+      "takeaway": "Make the proposition easier to trust, understand and choose before scaling activity.",
+      "title": "Strategic Principle / Closing Mandate",
+      "visual_treatment": "closing"
+    }
+  ],
+  "source_blueprint_id": "katkin-founder-argument",
+  "source_blueprint_version": 4,
+  "source_checksum": "6af392a75534c40c345e4e895b7cc2ff7c0ad1472df8f6c87ed60631b7b3f085",
+  "specification_id": "fieldwork-v4-katkin-example",
+  "status": "ready_for_production",
+  "strategic_source_unchanged": true,
+  "template_source": "Narratiive Blueprint canon v1 visual framework library and visual intelligence system; native PPTX template not present in repository",
+  "title": "FIELDWORK v4 — KatKin",
+  "workspace_id": "narratiive-internal"
+}

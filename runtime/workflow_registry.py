@@ -457,6 +457,7 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
             "commercial_model",
             "source_register",
             "editable_pptx",
+            "editable_google_slides",
             "review_pdf",
             "visual_qa",
             "execution_evidence",

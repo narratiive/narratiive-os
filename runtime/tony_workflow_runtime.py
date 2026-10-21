@@ -16,7 +16,7 @@ from runtime.creative_production_workflow_adapter import CreativeProductionWorkf
 from runtime.asset_delivery_preparation_worker import AssetDeliveryPreparationWorker
 from runtime.client_asset_delivery_adapter import ClientAssetDeliveryAdapter
 from runtime.delivery_follow_up_worker import DeliveryFollowUpPreparationWorker
-from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
+from runtime.growth_blueprint_deliverable_worker import NativeSlidesImporter, build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
@@ -651,6 +651,7 @@ def build_tony_workflow_runtime(
     dispatchers: Mapping[str, WorkerAdapter] | None = None,
     environ: Mapping[str, str] | None = None,
     quality_validators: Mapping[str, QualityValidator] | None = None,
+    native_slides_importer: NativeSlidesImporter | None = None,
 ) -> TonyWorkflowRuntime:
     """Compose the production workflow runtime without executing any work."""
 
@@ -669,7 +670,11 @@ def build_tony_workflow_runtime(
         client_id=client_id,
     )
     configured_dispatchers = dict(dispatchers) if dispatchers is not None else build_http_dispatchers(environ)
-    document_adapter = build_growth_blueprint_deliverable_worker(scoped_root, environ)
+    document_adapter = build_growth_blueprint_deliverable_worker(
+        scoped_root,
+        environ,
+        native_slides_importer=native_slides_importer,
+    )
     validators: dict[str, QualityValidator] = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
