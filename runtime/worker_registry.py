@@ -195,6 +195,7 @@ def build_tony_worker_registry(
     environ: Mapping[str, str] | None = None,
     research_adapter: WorkerAdapter | None = None,
     document_adapter: WorkerAdapter | None = None,
+    sketchbook_adapter: WorkerAdapter | None = None,
     campaign_world_triage_adapter: WorkerAdapter | None = None,
     creative_bible_triage_adapter: WorkerAdapter | None = None,
     production_planning_adapter: WorkerAdapter | None = None,
@@ -306,6 +307,24 @@ def build_tony_worker_registry(
                     selection_priority=5,
                 ),
                 document_adapter,
+            )
+        )
+
+    if sketchbook_adapter is not None:
+        registrations.append(
+            WorkerRegistration(
+                WorkerMetadata(
+                    worker_id="narratiive-sketchbook-v2-renderer",
+                    provider="narratiive-local-artifact-tool",
+                    capabilities=("sketchbook_generation",),
+                    availability=WorkerAvailability.AVAILABLE,
+                    side_effect_permissions=("preparation",),
+                    timeout_seconds=300,
+                    max_attempts=1,
+                    cost_class="local_runtime",
+                    selection_priority=5,
+                ),
+                sketchbook_adapter,
             )
         )
 
@@ -472,6 +491,8 @@ def build_tony_worker_registry(
     )
     if document_adapter is None:
         planned = (("document-generation-unavailable", ("document_generation", "deck_generation")), *planned)
+    if sketchbook_adapter is None:
+        planned = (("sketchbook-generation-unavailable", ("sketchbook_generation",)), *planned)
     if campaign_world_triage_adapter is None:
         planned = (("campaign-world-triage-unavailable", ("creative_quality_triage",)), *planned)
     if creative_bible_triage_adapter is None:

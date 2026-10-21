@@ -53,6 +53,7 @@ from runtime.workflow_quality import (
     production_planning_quality_gate,
     research_evidence_quality_gate,
     senior_strategist_review_quality_gate,
+    sketchbook_v2_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
     validate_operational_inputs,
@@ -652,6 +653,7 @@ def build_tony_workflow_runtime(
     environ: Mapping[str, str] | None = None,
     quality_validators: Mapping[str, QualityValidator] | None = None,
     native_slides_importer: NativeSlidesImporter | None = None,
+    sketchbook_adapter: WorkerAdapter | None = None,
 ) -> TonyWorkflowRuntime:
     """Compose the production workflow runtime without executing any work."""
 
@@ -687,6 +689,7 @@ def build_tony_workflow_runtime(
         "blueprint_director_quality_gate": blueprint_director_quality_gate,
         "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
+        "sketchbook_v2_quality_gate": sketchbook_v2_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
@@ -713,6 +716,7 @@ def build_tony_workflow_runtime(
                 fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
             ),
             document_adapter=document_adapter,
+            sketchbook_adapter=sketchbook_adapter,
             campaign_world_triage_adapter=CampaignWorldTriageWorker(),
             creative_bible_triage_adapter=CreativeBibleTriageWorker(),
             production_planning_adapter=CampaignProductionPlanningWorker(),

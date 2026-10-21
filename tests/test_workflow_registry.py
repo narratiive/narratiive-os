@@ -25,6 +25,7 @@ class WorkflowRegistryTests(unittest.TestCase):
             "strategy_thesis_to_growth_blueprint",
             "research_to_growth_blueprint",
             "growth_blueprint_deliverable_production",
+            "sketchbook_v2_production",
             "growth_blueprint_to_campaign_world",
             "campaign_world_to_creative_bible",
             "creative_bible_to_asset_production",
