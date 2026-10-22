@@ -40,6 +40,12 @@ class AgencyItem:
     blocked: bool = False
     blocks_agency_outcome: bool = False
     requires_matt: bool = False
+    entity_id: str = ""
+    aliases: tuple[str, ...] = ()
+    classification: str = "operational_exception"
+    significance: str = "P4"
+    why_matters: str = ""
+    action_deadline: str = ""
 
     def __post_init__(self) -> None:
         if not self.item_id.strip():
@@ -50,6 +56,8 @@ class AgencyItem:
             raise ValueError("Agency items require a status")
         if not self.next_action.strip():
             raise ValueError("Agency items require a next action")
+        if self.significance not in {"P0", "P1", "P2", "P3", "P4"}:
+            raise ValueError("Agency item significance must be P0-P4")
 
     @property
     def executive_visible(self) -> bool:
@@ -95,7 +103,10 @@ class AgencyState:
 
     @property
     def agency_blockers(self) -> tuple[AgencyItem, ...]:
-        return tuple(item for item in self.executive_items if item.blocked)
+        return tuple(
+            item for item in self.executive_items
+            if item.blocked and item.blocks_agency_outcome
+        )
 
     def items_for(self, area: AgencyArea) -> tuple[AgencyItem, ...]:
         return tuple(item for item in self.executive_items if item.area is area)

@@ -159,12 +159,51 @@ class InboundLead:
             f"lead_temperature:{self.lead_temperature}" if self.lead_temperature else "",
             f"notion:{self.notion_url}" if self.notion_url else "",
         )))
+        classification = self.briefing_classification()
+        significance = "P2" if classification == "verified_commercial_opportunity" else "P4"
         return AgencyItem(
             item_id=f"lead-{self.lead_id}", area=AgencyArea.COMMERCIAL,
             title=f"New lead: {label} ({' / '.join(qualifiers)})",
             status=self.status.casefold().replace(" ", "_") or "new", next_action=self.recommended_next_action,
             owner="Tony", evidence=evidence, requires_matt=False,
+            entity_id=self.lead_id,
+            aliases=tuple(filter(None, (self.contact, self.company, self.email, self.notion_url))),
+            classification=classification,
+            significance=significance,
+            why_matters=(
+                "A verified opportunity may create near-term commercial value."
+                if significance == "P2"
+                else "The record is not verified as a genuine commercial opportunity."
+            ),
         )
+
+    def briefing_classification(self) -> str:
+        text = " ".join(
+            (self.contact, self.company, self.email, self.source, self.status, self.notes)
+        ).casefold()
+        if self.disposition == "test" or any(
+            marker in text for marker in ("safe", "synthetic", "test only", ".invalid")
+        ):
+            return "test_or_rehearsal"
+        if self.disposition in {"spam", "duplicate", "internal", "deferred", "suppressed", "archived"}:
+            return self.disposition
+        if self.email.casefold().endswith("@narratiive.com") or any(
+            marker in self.source.casefold() for marker in ("internal", "administrative", "gmail")
+        ):
+            return "internal_or_administrative"
+        if not self.email.strip() or any(
+            marker in text for marker in ("casino", "crypto", "seo services", "guest post", "backlink")
+        ):
+            return "suspicious_or_unverified"
+        verified_statuses = {
+            "qualified", "discovery booked", "discovery complete", "proposal", "active opportunity"
+        }
+        verified_stages = {
+            "qualified", "discovery", "proposal", "negotiation", "won"
+        }
+        if self.status.strip().casefold() in verified_statuses or self.pipeline_stage.strip().casefold() in verified_stages:
+            return "verified_commercial_opportunity"
+        return "unverified_submission"
 
 
 class FileInboundLeadStore:

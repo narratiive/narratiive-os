@@ -7,6 +7,8 @@ from runtime.agency_state_projection import AgencyStateProjector
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.lead_attention import LeadAttentionService
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
+from runtime.agency_state import AgencyArea, AgencyItem
+from runtime.briefing_intelligence import FileBriefingDecisionRegister
 
 
 class LeadAttentionTests(unittest.TestCase):
@@ -54,6 +56,37 @@ class LeadAttentionTests(unittest.TestCase):
             {lead.lead_id for lead in FileInboundLeadStore(self.store.path).read()},
             {"suppressed", "archived", "complete", "active"},
         )
+
+    def test_non_lead_briefing_entity_is_resolved_and_suppressed_without_source_mutation(self):
+        register = FileBriefingDecisionRegister(self.store.path.parent / "decisions.jsonl")
+        workflow = AgencyItem(
+            "workflow-current",
+            AgencyArea.DELIVERY,
+            "Current account delivery",
+            "active",
+            "Complete the current evidence pack.",
+            entity_id="account-1",
+            aliases=("Account One",),
+            significance="P3",
+        )
+        service = LeadAttentionService(
+            self.store,
+            self.events,
+            decision_register=register,
+            entity_loader=lambda: (workflow,),
+        )
+
+        result = service.mutate(
+            "Account One",
+            "suppressed",
+            "Founder asked Tony to stop reporting this.",
+            decision_type="suppress",
+        )
+
+        self.assertTrue(result["ok"])
+        self.assertFalse(result["source_record_mutated"])
+        self.assertEqual(register.read()[0].entity_id, "account-1")
+        self.assertEqual({lead.lead_id for lead in self.store.read()}, {"safe-1", "real-1"})
 
 
 if __name__ == "__main__": unittest.main()

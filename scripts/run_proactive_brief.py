@@ -192,6 +192,7 @@ def run_brief(*, command: str, simulate_transport_failure: bool) -> dict[str, An
         key_store=key_store,
         record_event=recorder,
         max_attempts=int(os.getenv("TONY_PROACTIVE_MAX_ATTEMPTS", "3")),
+        record_delivered=executive_service.record_delivered_brief,
     )
     try:
         with WorkspaceDeliveryLock(_lock_path(workspace_runtime)):

@@ -24,7 +24,13 @@ from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
 from runtime.campaign_engine import CampaignIdentity
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.agency_state_projection import AgencyStateProjector
 from runtime.lead_attention import LeadAttentionService
+from runtime.briefing_intelligence import (
+    ExecutiveBriefingPipeline,
+    FileBriefingBaselineStore,
+    FileBriefingDecisionRegister,
+)
 from runtime.media_control import (
     CreativePlatformMapping,
     MediaConfigurationError,
@@ -463,8 +469,16 @@ class LeadAwareTonyApplication:
             else:
                 reference = str(request.get("reference") or "").strip()
                 if not reference: raise ValueError("reference is required")
-                mapping = {"ignore": "suppressed", "suppress": "suppressed", "mark_test": "test", "archive": "archived", "restore": "active", "watch": "watching"}
-                result = self.attention_service.mutate(reference, mapping.get(operation, operation), reason, actor)
+                mapping = {"ignore": "suppressed", "suppress": "suppressed", "mark_spam": "spam", "mark_internal": "internal", "mark_test": "test", "mark_duplicate": "duplicate", "defer": "deferred", "reclassify": "active", "archive": "archived", "restore": "active", "watch": "watching"}
+                decision_mapping = {"ignore": "suppress", "mark_spam": "spam", "mark_internal": "internal", "mark_test": "test", "mark_duplicate": "duplicate", "defer": "defer", "reclassify": "reclassify", "archive": "archive", "restore": "restore"}
+                result = self.attention_service.mutate(
+                    reference,
+                    mapping.get(operation, operation),
+                    reason,
+                    actor,
+                    decision_mapping.get(operation, operation),
+                    str(request.get("classification") or ""),
+                )
             return self._respond(start_response, HTTPStatus.OK, {**result, "reply": "Attention state updated." if result.get("ok") else "No attention state changed."})
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_attention_control", "message": str(exc)}})
@@ -845,15 +859,31 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     workspace_id = os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip() or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip() or "narratiive"
     lead_path = Path(os.getenv("TONY_INBOUND_LEADS_PATH", str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"))).resolve()
     lead_store = FileInboundLeadStore(lead_path)
-    attention_service = LeadAttentionService(lead_store, Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))))
+    decision_register = FileBriefingDecisionRegister(Path(os.getenv("TONY_BRIEFING_DECISION_REGISTER_PATH", str(REPOSITORY_ROOT / ".runtime" / "briefing-decision-register.jsonl"))))
+    briefing_pipeline = ExecutiveBriefingPipeline(
+        decision_register=decision_register,
+        baseline_store=FileBriefingBaselineStore(Path(os.getenv("TONY_BRIEFING_BASELINE_PATH", str(REPOSITORY_ROOT / ".runtime" / "briefing-last-delivered.json")))),
+    )
     authoritative_lead_loader = build_runtime_lead_loader(lead_store)
     visibility = ExecutiveVisibilityPolicy()
+    agency_projector = AgencyStateProjector()
+    attention_service = LeadAttentionService(
+        lead_store,
+        Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))),
+        decision_register=decision_register,
+        entity_loader=lambda: agency_projector.project(
+            app.command_service.mission_control_loader(),
+            visibility.visible_leads(authoritative_lead_loader()),
+            lead_source_available=True,
+        ).items,
+    )
     executive_service = TonyExecutiveCommandService(
         app.command_service,
         brief_archive=app.brief_archive,
         friday_record_loader=lambda: load_friday_review_records(records_root),
         workspace_id=workspace_id,
         inbound_lead_loader=lambda: visibility.visible_leads(authoritative_lead_loader()),
+        briefing_pipeline=briefing_pipeline,
     )
     capability_service = TonyCapabilityCommandService(executive_service)
     commercial_watch_service = TonyCommercialWatchCommandService(capability_service, store_path=Path(os.getenv("TONY_COMMERCIAL_COMMITMENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-commitments.json"))))

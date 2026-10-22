@@ -20,6 +20,7 @@ from runtime.friday_executive_review import (
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
 from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_command_service import CommandResponse, TonyCommandService
+from runtime.briefing_intelligence import ExecutiveBriefingPipeline
 
 
 ReviewRecordLoader = Callable[[], Iterable[dict[str, Any]]]
@@ -62,6 +63,7 @@ class TonyExecutiveCommandService:
         agency_projector: AgencyStateProjector | None = None,
         agency_brief_service: AgencyExecutiveBriefService | None = None,
         inbound_lead_loader: InboundLeadLoader | None = None,
+        briefing_pipeline: ExecutiveBriefingPipeline | None = None,
     ) -> None:
         self.command_service = command_service
         self.brief_service = brief_service or IntegratedExecutiveBriefService()
@@ -73,6 +75,7 @@ class TonyExecutiveCommandService:
         self.terminology_policy_loader = terminology_policy_loader or TerminologyPolicy.from_path
         self.clock = clock or datetime.now
         self.workspace_id = workspace_id
+        self.briefing_pipeline = briefing_pipeline
 
         self._lead_store_path: Path | None = None
         if inbound_lead_loader is None:
@@ -134,6 +137,9 @@ class TonyExecutiveCommandService:
                 leads,
                 lead_source_available=lead_source_available,
             )
+            if self.briefing_pipeline is not None:
+                state = self.briefing_pipeline.refine(state)
+                self.briefing_pipeline.validate(state)
             brief = self.agency_brief_service.build(state, period)
             source_message = brief.render_compact()
             source_violations = policy.scan(source_message)
@@ -163,12 +169,23 @@ class TonyExecutiveCommandService:
         data["terminology_rewritten"] = bool(source_violations)
         data["inbound_leads_loaded"] = len(leads)
         data["inbound_lead_source_available"] = lead_source_available
+        if self.briefing_pipeline is not None:
+            data["briefing_snapshot"] = self.briefing_pipeline.snapshot(
+                state, period=canonical_command
+            )
         return CommandResponse(
             command=canonical_command,
             status=brief.status,
             message=message,
             data=data,
         )
+
+    def record_delivered_brief(self, response: CommandResponse) -> None:
+        if self.briefing_pipeline is None:
+            return
+        snapshot = response.data.get("briefing_snapshot")
+        if isinstance(snapshot, dict):
+            self.briefing_pipeline.record_delivered(snapshot)
 
     @classmethod
     def _is_lead_query(cls, lowered: str) -> bool:
