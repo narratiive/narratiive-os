@@ -148,6 +148,29 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
 
         self.assertEqual(output.count("Lead capture unavailable"), 1)
 
+    def test_deduplication_retains_source_lineage(self):
+        first = item("shared-entity", title="Delivery exception")
+        second = AgencyItem(
+            "second-source",
+            AgencyArea.OPERATIONS,
+            "Same underlying exception",
+            "active",
+            "Resolve the verified current exception before Friday.",
+            evidence=("source:second",),
+            entity_id="shared-entity",
+            aliases=("Shared account",),
+            significance="P3",
+        )
+
+        refined = self.pipeline.refine(AgencyState.from_items("now", (first, second)))
+
+        self.assertEqual(len(refined.items), 1)
+        self.assertEqual(
+            set(refined.items[0].evidence),
+            {"workflow:current", "source:second"},
+        )
+        self.assertIn("Shared account", refined.items[0].aliases)
+
     def test_06_suppression_survives_a_new_pipeline_instance(self):
         self.register.append(BriefingDecision.create(
             entity_id="dismissed-entity",

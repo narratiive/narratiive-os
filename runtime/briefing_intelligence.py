@@ -217,7 +217,16 @@ class ExecutiveBriefingPipeline:
                 continue
             current = selected.get(identity)
             if current is None or self._rank(candidate) < self._rank(current):
-                selected[identity] = candidate
+                winner, other = candidate, current
+            else:
+                winner, other = current, candidate
+            if other is not None:
+                winner = replace(
+                    winner,
+                    evidence=tuple(dict.fromkeys((*winner.evidence, *other.evidence))),
+                    aliases=tuple(dict.fromkeys((*winner.aliases, *other.aliases))),
+                )
+            selected[identity] = winner
         ordered = sorted(selected.values(), key=lambda item: (self._rank(item), item.title.casefold()))
         return AgencyState.from_items(state.generated_at, ordered)
 

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Iterable, Mapping
 
 from runtime.agency_state import AgencyArea, AgencyItem, AgencyState
@@ -203,7 +204,16 @@ class AgencyStateProjector:
                 priority.get(current.significance, 4), 0 if current.requires_matt else 1, 0 if current.blocked else 1
             ) if current else None
             if current is None or rank < current_rank:
-                selected[key] = item
+                winner, other = item, current
+            else:
+                winner, other = current, item
+            if other is not None:
+                winner = replace(
+                    winner,
+                    evidence=tuple(dict.fromkeys((*winner.evidence, *other.evidence))),
+                    aliases=tuple(dict.fromkeys((*winner.aliases, *other.aliases))),
+                )
+            selected[key] = winner
         return tuple(selected.values())
 
     @classmethod
