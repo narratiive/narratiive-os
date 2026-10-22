@@ -19,7 +19,10 @@ from runtime.model_usage_budget import (
 
 class HostedModelBudgetGuardTests(unittest.TestCase):
     def _guard(self, root: Path, *, hard: str = "25", warning: str = "20") -> HostedModelBudgetGuard:
-        (root / "openclaw" / "agents").mkdir(parents=True, exist_ok=True)
+        for agent_id in ("tony", "research", "strategy"):
+            (root / "openclaw" / "agents" / agent_id / "sessions").mkdir(
+                parents=True, exist_ok=True
+            )
         return HostedModelBudgetGuard(
             openclaw_state_dir=root / "openclaw",
             direct_usage_ledger=root / "runtime" / "direct-api.jsonl",
@@ -129,9 +132,26 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
             self.assertEqual(snapshot.reserved_cost_usd, Decimal("0"))
             self.assertEqual(snapshot.usage.output_tokens, 1000)
 
+    def test_ambiguous_reservation_remains_charged_after_original_ttl(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            now = [datetime(2026, 10, 22, tzinfo=timezone.utc)]
+            guard = self._guard(root)
+            guard._now = lambda: now[0]
+            reservation = guard.reserve_capacity(reserve_usd=Decimal("2"), ttl_seconds=60)
+
+            guard.retain_ambiguous_reservation(reservation)
+            now[0] = datetime(2026, 10, 30, tzinfo=timezone.utc)
+
+            self.assertEqual(guard.snapshot().reserved_cost_usd, Decimal("2"))
+
     def test_environment_requires_both_limits(self) -> None:
         with self.assertRaises(ModelBudgetConfigurationError):
             HostedModelBudgetGuard.from_environment({"TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "25"})
+
+    def test_production_path_requires_limits(self) -> None:
+        with self.assertRaisesRegex(ModelBudgetConfigurationError, "required"):
+            HostedModelBudgetGuard.from_environment({}, required=True)
 
     def test_environment_resolves_supported_openclaw_state_locations(self) -> None:
         base = {
@@ -242,6 +262,53 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ModelBudgetConfigurationError, "input is invalid"):
                 self._guard(root).reserve_capacity()
+
+    def test_fractional_openclaw_usage_counter_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "responseId": "fractional-counter",
+                            "usage": {"input": 1.5, "output": 2, "cacheRead": 0, "cacheWrite": 0},
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "input is invalid"):
+                self._guard(root).reserve_capacity()
+
+    def test_missing_openclaw_usage_identity_or_timestamp_fails_closed(self) -> None:
+        for field in ("timestamp", "responseId"):
+            with self.subTest(field=field), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+                session.parent.mkdir(parents=True)
+                event = {
+                    "timestamp": "2026-10-22T10:00:00Z",
+                    "message": {
+                        "provider": "anthropic",
+                        "responseId": "response-1",
+                        "usage": {"input": 1, "output": 2, "cacheRead": 0, "cacheWrite": 0},
+                    },
+                }
+                if field == "timestamp":
+                    event.pop(field)
+                else:
+                    event["message"].pop(field)
+                    event.pop("id", None)
+                session.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+                with self.assertRaises(ModelBudgetConfigurationError):
+                    self._guard(root).reserve_capacity()
 
     def test_non_finite_budget_values_are_rejected(self) -> None:
         for value in ("Infinity", "NaN", "-Infinity"):

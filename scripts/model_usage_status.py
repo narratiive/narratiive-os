@@ -17,6 +17,7 @@ def main() -> int:
     guard = HostedModelBudgetGuard.from_environment(
         os.environ,
         repository_root=ROOT,
+        required=False,
     )
     if guard is None:
         print(json.dumps({"configured": False, "status": "spending_limits_not_configured"}, sort_keys=True))

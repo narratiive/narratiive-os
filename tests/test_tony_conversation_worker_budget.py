@@ -30,6 +30,7 @@ class TonyConversationWorkerBudgetTests(unittest.TestCase):
             budgeted_conversation_executor(executor, guard, ttl_seconds=120)("research this", "work-1")
 
         guard.release_reservation.assert_not_called()
+        guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
 
 
 if __name__ == "__main__":

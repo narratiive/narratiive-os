@@ -39,7 +39,9 @@ def budgeted_conversation_executor(
             result = executor(text, work_id)
         except Exception:
             # An ambiguous Gateway failure may still represent billed provider
-            # work. Retain capacity until the reservation expires.
+            # work. Charge it conservatively through month-end.
+            if guard is not None and reservation is not None:
+                guard.retain_ambiguous_reservation(reservation)
             raise
         else:
             if guard is not None and reservation is not None:
@@ -60,6 +62,7 @@ def build_worker() -> TonyConversationWorker:
     budget_guard = HostedModelBudgetGuard.from_environment(
         os.environ,
         repository_root=REPOSITORY_ROOT,
+        required=True,
     )
     telegram = TelegramSender(TelegramConfig.from_env(os.environ))
     return TonyConversationWorker(

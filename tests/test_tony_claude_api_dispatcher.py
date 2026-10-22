@@ -31,6 +31,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
             "TONY_DISPATCH_CLAUDE_MODE": "anthropic_api",
             "ANTHROPIC_API_KEY": "test-key",
             "TONY_DISPATCH_CLAUDE_MODEL": "claude-test-model",
+            "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled",
         }
 
     def _contract(self):
@@ -150,6 +151,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
 
         guard.release_reservation.assert_not_called()
         guard.settle_direct_usage.assert_not_called()
+        guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
 
     @mock.patch("runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment")
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
@@ -175,6 +177,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
 
         guard.release_reservation.assert_not_called()
         guard.settle_direct_usage.assert_not_called()
+        guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_long_form_strategy_and_discovery_work_uses_its_bounded_output_budget(self, urlopen):

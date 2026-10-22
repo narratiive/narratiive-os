@@ -49,7 +49,10 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 ["read", "write", "edit", "apply_patch", "web_fetch"],
             )
             self.assertIn("exec", agents["production"]["tools"]["deny"])
-            self.assertEqual(agents["operations"]["tools"]["allow"], ["read", "web_fetch"])
+            self.assertEqual(
+                set(agents["operations"]["tools"]["allow"]),
+                {"read", "web_fetch", "agents_list", "sessions_list", "sessions_history", "subagents", "narratiive_read_state"},
+            )
             self.assertEqual(agents["operations"]["sandbox"]["workspaceAccess"], "ro")
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 self.assertIn("web_fetch", agents[agent_id]["tools"]["allow"])

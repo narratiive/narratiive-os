@@ -165,6 +165,7 @@ class TonyRuntimeCompositionTests(unittest.TestCase):
             ), mock.patch.dict(
                 "os.environ",
                 {
+                    "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled",
                     "TONY_INBOUND_LEADS_PATH": str(root / "leads.json"),
                     "TONY_WORKFLOW_RUNTIME_ROOT": str(root / "workflows"),
                 },

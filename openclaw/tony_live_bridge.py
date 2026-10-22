@@ -344,7 +344,9 @@ class LeadAwareTonyApplication:
                     reply = self.agent_gateway.converse(text)
                 except Exception:
                     # The Gateway may have accepted and billed a request before a
-                    # timeout/disconnect. Keep its reservation until TTL expiry.
+                    # timeout/disconnect. Charge it conservatively through month-end.
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.retain_ambiguous_reservation(reservation)
                     raise
                 else:
                     if self.model_budget_guard is not None and reservation is not None:
@@ -1095,6 +1097,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     model_budget_guard = HostedModelBudgetGuard.from_environment(
         os.environ,
         repository_root=REPOSITORY_ROOT,
+        required=True,
     )
     model_budget_reserve_usd = (
         model_budget_guard.default_request_reserve_usd

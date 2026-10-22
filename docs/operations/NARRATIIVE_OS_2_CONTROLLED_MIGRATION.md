@@ -24,11 +24,12 @@ Configuration is stored in the existing mode-600 Narratiive runtime environment:
 - `TONY_HOSTED_MODEL_WARNING_USD`
 - `TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD`
 - `TONY_HOSTED_MODEL_REQUEST_RESERVE_USD`
+- `TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT=required`
 - optional per-million-token pricing overrides
 
 The local guard uses a mode-600, atomic cross-process reservation ledger and blocks new Telegram-to-OpenClaw reasoning and direct Anthropic preparation when committed usage plus live request reservations reaches the hard limit. Direct preparation reserves conservative prompt/cache and maximum-output cost before dispatch. It does not silently route consequential reasoning to Ollama.
 
-Tony's scheduled heartbeat is explicitly pinned to `ollama/qwen3.5:latest`, uses an isolated lightweight context, and therefore does not create unguarded hosted-model usage. Reset transcript archives are retained for 62 days so a complete calendar month's usage remains available to the guard even across session resets. Missing, unreadable, or malformed OpenClaw usage metadata fails closed. OpenClaw operator diagnostics and direct Gateway/API calls made outside the Tony bridge remain outside the local admission guard; they are manual engineering surfaces, not scheduled production paths, and their completed Anthropic usage is still included in accounting. The Anthropic workspace limit remains the authoritative provider-side ceiling for any such direct provider call.
+The scheduled Chief-of-Staff heartbeat runs on the existing read-only Operations agent, is explicitly pinned to `ollama/qwen3.5:latest`, and uses an isolated lightweight context. Its enforced tool surface cannot spawn or steer hosted specialists. Reset and deleted transcript archives are retained for 62 days so a complete calendar month's usage remains available across session lifecycle changes. Missing limits, hosted-agent session metadata, billing identity, timestamps, token counters, or readable source files fail closed on production paths. Ambiguous requests retain their conservative reservation through month-end. OpenClaw operator diagnostics and direct Gateway/API calls made outside the Tony bridge remain outside the local admission guard; they are manual engineering surfaces, not scheduled production paths, and their completed Anthropic usage is still included in accounting. The Anthropic workspace limit remains the authoritative provider-side ceiling for any such direct provider call.
 
 Run the local status check through the existing secured environment loader:
 

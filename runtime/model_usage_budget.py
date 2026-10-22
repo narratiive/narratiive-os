@@ -95,6 +95,7 @@ class HostedModelBudgetGuard:
         hard_limit_usd: Decimal,
         pricing: ModelPricing,
         default_request_reserve_usd: Decimal = Decimal("1"),
+        required_openclaw_agents: tuple[str, ...] = ("tony", "research", "strategy"),
         now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
     ) -> None:
         if warning_limit_usd <= 0 or hard_limit_usd <= 0:
@@ -109,6 +110,7 @@ class HostedModelBudgetGuard:
         self.hard_limit_usd = hard_limit_usd
         self.pricing = pricing
         self.default_request_reserve_usd = default_request_reserve_usd
+        self.required_openclaw_agents = required_openclaw_agents
         self.reservation_state = direct_usage_ledger.with_name("reservations.json")
         self.lock_path = direct_usage_ledger.with_name("budget.lock")
         self._now = now
@@ -119,11 +121,25 @@ class HostedModelBudgetGuard:
         env: Mapping[str, str] | None = None,
         *,
         repository_root: Path | None = None,
+        required: bool = False,
     ) -> "HostedModelBudgetGuard | None":
         active = os.environ if env is None else env
+        enforcement = str(
+            active.get("TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT") or "required"
+        ).strip().casefold()
+        if enforcement not in {"required", "disabled"}:
+            raise ModelBudgetConfigurationError(
+                "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT must be 'required' or 'disabled'"
+            )
+        if enforcement == "disabled":
+            return None
         hard_raw = str(active.get("TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD") or "").strip()
         warning_raw = str(active.get("TONY_HOSTED_MODEL_WARNING_USD") or "").strip()
         if not hard_raw and not warning_raw:
+            if required:
+                raise ModelBudgetConfigurationError(
+                    "hosted-model spending limits are required for this production path"
+                )
             return None
         if not hard_raw or not warning_raw:
             raise ModelBudgetConfigurationError(
@@ -227,6 +243,31 @@ class HostedModelBudgetGuard:
                 tuple(item for item in active if item.reservation_id != reservation.reservation_id)
             )
 
+    def retain_ambiguous_reservation(self, reservation: BudgetReservation) -> None:
+        """Keep a possibly billed request charged through the current billing month."""
+        now = self._now().astimezone(timezone.utc)
+        if now.month == 12:
+            period_end = datetime(now.year + 1, 1, 1, tzinfo=timezone.utc)
+        else:
+            period_end = datetime(now.year, now.month + 1, 1, tzinfo=timezone.utc)
+        with self._lock():
+            active = self._active_reservations(now, persist_pruned=False)
+            found = False
+            retained: list[BudgetReservation] = []
+            for item in active:
+                if item.reservation_id == reservation.reservation_id:
+                    found = True
+                    retained.append(
+                        BudgetReservation(item.reservation_id, item.amount_usd, period_end)
+                    )
+                else:
+                    retained.append(item)
+            if not found:
+                raise ModelBudgetConfigurationError(
+                    "ambiguous model budget reservation is missing"
+                )
+            self._write_reservations(retained)
+
     def record_direct_usage(
         self,
         *,
@@ -297,6 +338,12 @@ class HostedModelBudgetGuard:
             raise ModelBudgetConfigurationError(
                 "OpenClaw usage metadata directory is unavailable"
             )
+        for agent_id in self.required_openclaw_agents:
+            sessions_dir = agents_dir / agent_id / "sessions"
+            if not sessions_dir.is_dir() or not os.access(sessions_dir, os.R_OK | os.X_OK):
+                raise ModelBudgetConfigurationError(
+                    f"OpenClaw usage metadata for {agent_id} is unavailable"
+                )
         records: list[tuple[str, TokenUsage]] = []
         try:
             for path in agents_dir.glob("*/sessions/*.jsonl*"):
@@ -406,7 +453,9 @@ def token_usage_from_anthropic(payload: Mapping[str, Any]) -> TokenUsage:
 def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple[str, TokenUsage]]:
     try:
         handle = path.open(encoding="utf-8", errors="replace")
-    except FileNotFoundError:
+    except FileNotFoundError as exc:
+        if openclaw:
+            raise ModelBudgetConfigurationError("OpenClaw usage metadata disappeared during accounting") from exc
         return ()
     except OSError as exc:
         raise ModelBudgetConfigurationError("model usage metadata is unreadable") from exc
@@ -421,21 +470,27 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
                 raise ModelBudgetConfigurationError("model usage metadata contains invalid JSON") from exc
             if not isinstance(event, Mapping):
                 raise ModelBudgetConfigurationError("model usage metadata record is invalid")
-            timestamp = str(event.get("timestamp") if openclaw else event.get("recorded_at") or "")
-            if not timestamp.startswith(period + "-"):
-                continue
             message = event.get("message") if openclaw else event
             if not isinstance(message, Mapping):
                 continue
             provider = str(message.get("provider") or event.get("provider") or "").casefold()
             if provider != "anthropic":
                 continue
+            timestamp = str(event.get("timestamp") if openclaw else event.get("recorded_at") or "")
+            try:
+                occurred_at = datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
+            except ValueError as exc:
+                raise ModelBudgetConfigurationError("Anthropic usage timestamp is invalid") from exc
+            if occurred_at.tzinfo is None:
+                raise ModelBudgetConfigurationError("Anthropic usage timestamp must be timezone-aware")
+            if occurred_at.astimezone(timezone.utc).strftime("%Y-%m") != period:
+                continue
             usage = message.get("usage")
             if not isinstance(usage, Mapping):
                 raise ModelBudgetConfigurationError("Anthropic usage metadata is missing or invalid")
             response_id = str(message.get("responseId") or message.get("response_id") or event.get("id") or "")
             if not response_id:
-                continue
+                raise ModelBudgetConfigurationError("Anthropic usage response id is missing")
             records.append(
                 (
                     response_id,
@@ -462,15 +517,11 @@ def _deduplicated_usage(records: Iterable[tuple[str, TokenUsage]]) -> TokenUsage
 
 
 def _strict_non_negative_int(value: Any, label: str) -> int:
-    if isinstance(value, bool):
+    if isinstance(value, bool) or not isinstance(value, int):
         raise ModelBudgetConfigurationError(f"Anthropic response {label} is invalid")
-    try:
-        parsed = int(value)
-    except (TypeError, ValueError) as exc:
-        raise ModelBudgetConfigurationError(f"Anthropic response {label} is invalid") from exc
-    if parsed < 0:
+    if value < 0:
         raise ModelBudgetConfigurationError(f"Anthropic response {label} cannot be negative")
-    return parsed
+    return value
 
 
 def _decimal(value: str, label: str) -> Decimal:

@@ -103,6 +103,7 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
         self.assertTrue(status.startswith("503"))
         self.assertEqual(payload["error"]["code"], "openclaw_conversation_unavailable")
         budget_guard.release_reservation.assert_not_called()
+        budget_guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
         base._handle_telegram_command.assert_not_called()
 
     def test_openclaw_no_reply_sentinel_never_becomes_telegram_silence(self):

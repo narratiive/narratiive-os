@@ -194,7 +194,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
 
         fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
-        heartbeat = agents["tony"]["heartbeat"]["prompt"]
+        heartbeat = agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("sessions_list", heartbeat)
         self.assertIn("persistent OpenClaw specialist assignments", heartbeat)
         self.assertIn("subagents", heartbeat)
