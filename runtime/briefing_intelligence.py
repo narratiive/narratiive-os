@@ -212,7 +212,6 @@ class ExecutiveBriefingPipeline:
             if (
                 unchanged
                 and candidate.significance != "P0"
-                and not candidate.requires_matt
                 and not (decision and decision.decision_type in {BriefingDecisionType.RESTORE, BriefingDecisionType.RECLASSIFY})
             ):
                 continue
@@ -281,6 +280,7 @@ class ExecutiveBriefingPipeline:
             "requires_matt": item.requires_matt,
             "evidence": item.evidence,
             "significance": item.significance,
+            "action_deadline": item.action_deadline,
         }
         return hashlib.sha256(
             json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")

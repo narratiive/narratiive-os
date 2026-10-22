@@ -171,6 +171,25 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
 
         self.assertEqual(self.pipeline.refine(AgencyState.from_items("later", (item(),))).items, ())
 
+    def test_unchanged_founder_decision_is_not_repeated_without_a_new_deadline(self):
+        approval = AgencyItem(
+            "approval-unchanged",
+            AgencyArea.DELIVERY,
+            "Approve the current delivery",
+            "decision_required",
+            "Approve or reject the current evidence-backed delivery by Friday.",
+            owner="Matt",
+            evidence=("workflow:approval",),
+            requires_matt=True,
+            significance="P1",
+            why_matters="The current delivery is waiting at its human gate.",
+            action_deadline="Friday",
+        )
+        first = self.pipeline.refine(AgencyState.from_items("first", (approval,)))
+        self.baseline.store(self.pipeline.snapshot(first, period="morning"))
+
+        self.assertEqual(self.pipeline.refine(AgencyState.from_items("later", (approval,))).items, ())
+
     def test_08_new_critical_issue_overrides_prior_suppression(self):
         self.register.append(BriefingDecision.create(
             entity_id="entity-1",
