@@ -99,6 +99,7 @@
           "every": "1h",
           "model": "ollama/qwen3.5:latest",
           "target": "last",
+          "directPolicy": "allow",
           "lightContext": true,
           "isolatedSession": true,
           "timeoutSeconds": 120,
@@ -110,10 +111,10 @@
           "prompt": "Run Narratiive's read-only proactive Chief of Staff monitor. Use only bounded Narratiive state views: executive_brief and open_work before deciding whether a material business priority or stalled executive action needs attention; current_leads for pipeline claims; and recent_execution before claiming a consequential action happened or worked. Surface a concise alert only for material completed work needing review, stalled/failed/blocked delegated work, an evidence-backed priority, or a concrete founder decision. Never inspect conversation histories, infer status from old chat memory, or claim external execution without returned Narratiive evidence. Do not send messages, spawn or steer agents, make calendar commitments, mutate Notion, or perform any consequential action. If nothing materially needs attention, reply HEARTBEAT_OK."
         },
         "tools": {
-          "profile": "coding",
-          "allow": ["read", "web_fetch", "narratiive_read_state"],
+          "profile": "minimal",
+          "alsoAllow": ["read", "web_fetch", "narratiive_read_state"],
           "sandbox": {"tools": {"alsoAllow": ["web_fetch", "narratiive-control-plane"]}},
-          "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"]
+          "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "session_status", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"]
         }
       }
     ]

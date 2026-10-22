@@ -66,6 +66,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         heartbeat = self.agents["operations"]["heartbeat"]
         self.assertEqual(heartbeat["every"], "1h")
         self.assertEqual(heartbeat["model"], "ollama/qwen3.5:latest")
+        self.assertEqual(heartbeat["directPolicy"], "allow")
         self.assertEqual(heartbeat["target"], "last")
         self.assertTrue(heartbeat["lightContext"])
         self.assertTrue(heartbeat["isolatedSession"])
@@ -104,14 +105,15 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("bounded workspace research belongs with the specialist agents", contract)
 
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
-        additions = set(self.agents["operations"]["tools"]["allow"])
+        additions = set(self.agents["operations"]["tools"]["alsoAllow"])
         sandbox_additions = set(
             self.agents["operations"]["tools"]["sandbox"]["tools"]["alsoAllow"]
         )
         denied = set(self.agents["operations"]["tools"]["deny"])
+        self.assertEqual(self.agents["operations"]["tools"]["profile"], "minimal")
         self.assertEqual(additions, {"read", "web_fetch", "narratiive_read_state"})
         self.assertEqual(sandbox_additions, {"web_fetch", "narratiive-control-plane"})
-        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
+        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "session_status", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
         prompt = self.agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
@@ -166,7 +168,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_operations_is_read_only_while_other_specialists_may_prepare_reversible_workspace_artifacts(self):
         self.assertEqual(self.agents["operations"]["sandbox"]["workspaceAccess"], "ro")
         self.assertEqual(
-            set(self.agents["operations"]["tools"]["allow"]),
+            set(self.agents["operations"]["tools"]["alsoAllow"]),
             {"read", "web_fetch", "narratiive_read_state"},
         )
         self.assertTrue({"write", "edit", "apply_patch"}.issubset(self.agents["operations"]["tools"]["deny"]))

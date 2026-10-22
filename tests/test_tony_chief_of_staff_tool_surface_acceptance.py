@@ -87,7 +87,8 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertNotIn("read", tools["alsoAllow"])
         self.assertIn("read", agents["research"]["tools"]["allow"])
         self.assertIn("write", agents["research"]["tools"]["allow"])
-        self.assertIn("read", agents["operations"]["tools"]["allow"])
+        self.assertEqual(agents["operations"]["tools"]["profile"], "minimal")
+        self.assertIn("read", agents["operations"]["tools"]["alsoAllow"])
 
     def test_specialist_status_uses_persistent_sessions_current_tree_and_bounded_history(self) -> None:
         prompt = (ROOT / "openclaw" / "workspace-templates" / "tony" / "AGENTS.md").read_text(encoding="utf-8")

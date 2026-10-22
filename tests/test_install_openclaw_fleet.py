@@ -54,7 +54,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 set(agents["tony"]["subagents"]["allowAgents"]),
                 {"research", "strategy", "creative-director", "production", "operations"},
             )
-            for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
+            for agent_id in ("research", "strategy", "creative-director", "production"):
                 self.assertEqual(agents[agent_id]["tools"]["profile"], "coding")
             self.assertEqual(
                 agents["production"]["tools"]["allow"],
@@ -62,16 +62,22 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             )
             self.assertIn("exec", agents["production"]["tools"]["deny"])
             self.assertEqual(
-                set(agents["operations"]["tools"]["allow"]),
+                set(agents["operations"]["tools"]["alsoAllow"]),
                 {"read", "web_fetch", "narratiive_read_state"},
             )
+            self.assertEqual(agents["operations"]["tools"]["profile"], "minimal")
+            self.assertEqual(agents["operations"]["heartbeat"]["directPolicy"], "allow")
+            self.assertIn("session_status", agents["operations"]["tools"]["deny"])
             self.assertEqual(
                 set(agents["operations"]["tools"]["sandbox"]["tools"]["alsoAllow"]),
                 {"web_fetch", "narratiive-control-plane"},
             )
             self.assertEqual(agents["operations"]["sandbox"]["workspaceAccess"], "ro")
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
-                self.assertIn("web_fetch", agents[agent_id]["tools"]["allow"])
+                allowed = agents[agent_id]["tools"].get(
+                    "allow", agents[agent_id]["tools"].get("alsoAllow", [])
+                )
+                self.assertIn("web_fetch", allowed)
                 self.assertIn("web_fetch", agents[agent_id]["tools"]["sandbox"]["tools"]["alsoAllow"])
             self.assertEqual(agents["personal"]["workspace"], "~/.openclaw/workspace-personal")
             self.assertEqual(set(merged["plugins"]["allow"]), {"existing-safe-plugin", CONTROL_PLANE_PLUGIN_ID})
