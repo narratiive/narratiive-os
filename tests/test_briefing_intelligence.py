@@ -186,6 +186,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
 
         result = restarted.refine(AgencyState.from_items("later", (item("dismissed-entity"),)))
         self.assertEqual(result.items, ())
+        self.assertEqual(self.decisions_path.stat().st_mode & 0o777, 0o600)
 
     def test_07_unchanged_issue_is_not_repeated(self):
         state = AgencyState.from_items("first", (item(),))

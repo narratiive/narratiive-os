@@ -101,7 +101,13 @@ class FileBriefingDecisionRegister:
 
     def append(self, decision: BriefingDecision) -> BriefingDecision:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        with self.path.open("a", encoding="utf-8") as handle:
+        descriptor = os.open(
+            self.path,
+            os.O_WRONLY | os.O_CREAT | os.O_APPEND,
+            0o600,
+        )
+        os.chmod(self.path, 0o600)
+        with os.fdopen(descriptor, "a", encoding="utf-8") as handle:
             handle.write(json.dumps(decision.to_dict(), sort_keys=True) + "\n")
             handle.flush()
             os.fsync(handle.fileno())
