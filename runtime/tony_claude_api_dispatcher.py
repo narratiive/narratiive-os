@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
+from pathlib import Path
 from typing import Any, Mapping
 from urllib import request
+
+from runtime.model_usage_budget import HostedModelBudgetGuard, token_usage_from_anthropic
 
 
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
@@ -61,6 +65,11 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     if timeout_seconds <= 0:
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS must be greater than zero")
 
+    budget_guard = HostedModelBudgetGuard.from_environment(
+        environ,
+        repository_root=Path(__file__).resolve().parents[1],
+    )
+
     def dispatch(contract: dict[str, Any]) -> dict[str, Any]:
         _validate_safe_contract(contract)
         prompt = _render_prompt(contract)
@@ -75,6 +84,13 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             }
             else max_tokens
         )
+        if budget_guard is not None:
+            maximum_output_cost = (
+                Decimal(request_max_tokens)
+                * budget_guard.pricing.output_usd_per_mtok
+                / Decimal(1_000_000)
+            )
+            budget_guard.require_capacity(reserve_usd=maximum_output_cost)
         payload = {
             "model": model,
             "max_tokens": request_max_tokens,
@@ -99,6 +115,14 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             raise RuntimeError("Claude API response must be a JSON object")
         if returned.get("error"):
             raise RuntimeError(f"Claude API returned an error: {returned['error']}")
+
+        if budget_guard is not None and returned.get("id"):
+            budget_guard.record_direct_usage(
+                provider="anthropic",
+                model=str(returned.get("model") or model),
+                response_id=str(returned["id"]),
+                usage=token_usage_from_anthropic(returned),
+            )
 
         text = _response_text(returned)
         if not text:

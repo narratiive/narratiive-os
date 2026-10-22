@@ -1,6 +1,7 @@
 {
   "agents": {
     "defaults": {
+      "utilityModel": "ollama/qwen3.5:latest",
       "subagents": {
         "requireAgentId": true,
         "maxConcurrent": 4,
@@ -117,6 +118,22 @@
     ]
   },
   "tools": {
+    "loopDetection": {
+      "enabled": true,
+      "historySize": 30,
+      "warningThreshold": 10,
+      "criticalThreshold": 20,
+      "unknownToolThreshold": 10,
+      "globalCircuitBreakerThreshold": 30,
+      "detectors": {
+        "genericRepeat": true,
+        "knownPollNoProgress": true,
+        "pingPong": true
+      },
+      "postCompactionGuard": {
+        "windowSize": 3
+      }
+    },
     "sessions": {"visibility": "all"},
     "agentToAgent": {
       "enabled": true,

@@ -6,6 +6,7 @@ import shlex
 import hashlib
 import hmac
 import re
+from decimal import Decimal, InvalidOperation
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -96,6 +97,7 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
+from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -219,6 +221,8 @@ class LeadAwareTonyApplication:
         tiktok_oauth: TikTokOAuthService | None = None,
         meta_oauth: MetaOAuthService | None = None,
         mission_control_web: MissionControlWebApplication | None = None,
+        model_budget_guard: HostedModelBudgetGuard | None = None,
+        model_budget_reserve_usd: Decimal = Decimal("1"),
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -232,6 +236,8 @@ class LeadAwareTonyApplication:
         self.tiktok_oauth = tiktok_oauth
         self.meta_oauth = meta_oauth
         self.mission_control_web = mission_control_web
+        self.model_budget_guard = model_budget_guard
+        self.model_budget_reserve_usd = model_budget_reserve_usd
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -328,6 +334,8 @@ class LeadAwareTonyApplication:
                         },
                     }
                     return self._respond(start_response, status, payload)
+                if self.model_budget_guard is not None:
+                    self.model_budget_guard.require_capacity(reserve_usd=self.model_budget_reserve_usd)
                 reply = self.agent_gateway.converse(text)
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":
                     reply = (
@@ -344,6 +352,12 @@ class LeadAwareTonyApplication:
                     "message": reply,
                     "data": {"runtime": "openclaw", "external_action_taken": False},
                 }
+        except ModelBudgetExceeded as exc:
+            return self._respond(
+                start_response,
+                HTTPStatus.TOO_MANY_REQUESTS,
+                {"ok": False, "error": {"code": "hosted_model_budget_exceeded", "message": str(exc)}},
+            )
         except TonyAgentGatewayError as exc:
             return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "openclaw_conversation_unavailable", "message": str(exc)}})
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -1066,6 +1080,16 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         load_operator_snapshot,
         workflow_root=workflow_runtime_root,
     )
+    model_budget_guard = HostedModelBudgetGuard.from_environment(
+        os.environ,
+        repository_root=REPOSITORY_ROOT,
+    )
+    try:
+        model_budget_reserve_usd = Decimal(os.getenv("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD", "1"))
+    except InvalidOperation as exc:
+        raise ValueError("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD must be a decimal number") from exc
+    if model_budget_reserve_usd < 0:
+        raise ValueError("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD cannot be negative")
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -1083,6 +1107,8 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
         meta_oauth=MetaOAuthService.from_environment(os.environ),
         mission_control_web=mission_control_web,
+        model_budget_guard=model_budget_guard,
+        model_budget_reserve_usd=model_budget_reserve_usd,
     )
 
 

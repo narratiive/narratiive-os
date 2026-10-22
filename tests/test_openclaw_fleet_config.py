@@ -40,6 +40,15 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertNotIn("ownership", self.config["agents"])
         self.assertEqual(set(self.agents), {"tony", *SPECIALISTS})
 
+    def test_routine_utility_work_is_local_and_tool_loops_are_bounded(self):
+        self.assertEqual(self.config["agents"]["defaults"]["utilityModel"], "ollama/qwen3.5:latest")
+        guard = self.config["tools"]["loopDetection"]
+        self.assertTrue(guard["enabled"])
+        self.assertLess(guard["warningThreshold"], guard["criticalThreshold"])
+        self.assertLess(guard["criticalThreshold"], guard["globalCircuitBreakerThreshold"])
+        self.assertTrue(all(guard["detectors"].values()))
+        self.assertEqual(guard["postCompactionGuard"]["windowSize"], 3)
+
     def test_tony_can_delegate_only_to_canonical_specialists(self):
         self.assertEqual(self.agents["tony"]["model"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(set(self.agents["tony"]["subagents"]["allowAgents"]), set(SPECIALISTS))
