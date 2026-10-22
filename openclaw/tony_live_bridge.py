@@ -6,6 +6,7 @@ import shlex
 import hashlib
 import hmac
 import re
+from decimal import Decimal
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -96,6 +97,7 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
+from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -219,6 +221,8 @@ class LeadAwareTonyApplication:
         tiktok_oauth: TikTokOAuthService | None = None,
         meta_oauth: MetaOAuthService | None = None,
         mission_control_web: MissionControlWebApplication | None = None,
+        model_budget_guard: HostedModelBudgetGuard | None = None,
+        model_budget_reserve_usd: Decimal = Decimal("1"),
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -232,6 +236,8 @@ class LeadAwareTonyApplication:
         self.tiktok_oauth = tiktok_oauth
         self.meta_oauth = meta_oauth
         self.mission_control_web = mission_control_web
+        self.model_budget_guard = model_budget_guard
+        self.model_budget_reserve_usd = model_budget_reserve_usd
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -328,7 +334,23 @@ class LeadAwareTonyApplication:
                         },
                     }
                     return self._respond(start_response, status, payload)
-                reply = self.agent_gateway.converse(text)
+                reservation = None
+                if self.model_budget_guard is not None:
+                    reservation = self.model_budget_guard.reserve_capacity(
+                        reserve_usd=self.model_budget_reserve_usd,
+                        ttl_seconds=int(self.agent_gateway.config.work_timeout_seconds) + 60,
+                    )
+                try:
+                    reply = self.agent_gateway.converse(text)
+                except Exception:
+                    # The Gateway may have accepted and billed a request before a
+                    # timeout/disconnect. Charge it conservatively through month-end.
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.retain_ambiguous_reservation(reservation)
+                    raise
+                else:
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.release_reservation(reservation)
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":
                     reply = (
                         "I’m here, but I don’t have a verified update I can stand behind yet. "
@@ -344,6 +366,12 @@ class LeadAwareTonyApplication:
                     "message": reply,
                     "data": {"runtime": "openclaw", "external_action_taken": False},
                 }
+        except ModelBudgetExceeded as exc:
+            return self._respond(
+                start_response,
+                HTTPStatus.TOO_MANY_REQUESTS,
+                {"ok": False, "error": {"code": "hosted_model_budget_exceeded", "message": str(exc)}},
+            )
         except TonyAgentGatewayError as exc:
             return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "openclaw_conversation_unavailable", "message": str(exc)}})
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -1066,6 +1094,16 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         load_operator_snapshot,
         workflow_root=workflow_runtime_root,
     )
+    model_budget_guard = HostedModelBudgetGuard.from_environment(
+        os.environ,
+        repository_root=REPOSITORY_ROOT,
+        required=True,
+    )
+    model_budget_reserve_usd = (
+        model_budget_guard.default_request_reserve_usd
+        if model_budget_guard is not None
+        else Decimal("1")
+    )
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -1083,6 +1121,8 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
         meta_oauth=MetaOAuthService.from_environment(os.environ),
         mission_control_web=mission_control_web,
+        model_budget_guard=model_budget_guard,
+        model_budget_reserve_usd=model_budget_reserve_usd,
     )
 
 

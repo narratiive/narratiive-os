@@ -24,7 +24,14 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 "channels": {"telegram": {"enabled": True}},
                 "agents": {
                     "list": [
-                        {"id": "tony", "model": "ollama/qwen3.5"},
+                        {
+                            "id": "tony",
+                            "model": "ollama/qwen3.5",
+                            "heartbeat": {
+                                "every": "1h",
+                                "prompt": "Inspect sessions_list, sessions_history and subagents.",
+                            },
+                        },
                         {"id": "personal", "workspace": "~/.openclaw/workspace-personal"},
                     ]
                 },
@@ -38,6 +45,11 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             self.assertNotIn("ownership", merged["agents"])
             agents = {agent["id"]: agent for agent in merged["agents"]["list"]}
             self.assertEqual(agents["tony"]["model"], "anthropic/claude-sonnet-4-6")
+            self.assertNotIn("heartbeat", agents["tony"])
+            self.assertEqual(
+                [agent["id"] for agent in agents.values() if "heartbeat" in agent],
+                ["operations"],
+            )
             self.assertEqual(
                 set(agents["tony"]["subagents"]["allowAgents"]),
                 {"research", "strategy", "creative-director", "production", "operations"},
@@ -49,7 +61,10 @@ class OpenClawFleetInstallTests(unittest.TestCase):
                 ["read", "write", "edit", "apply_patch", "web_fetch"],
             )
             self.assertIn("exec", agents["production"]["tools"]["deny"])
-            self.assertEqual(agents["operations"]["tools"]["allow"], ["read", "web_fetch"])
+            self.assertEqual(
+                set(agents["operations"]["tools"]["allow"]),
+                {"read", "web_fetch", "narratiive_read_state"},
+            )
             self.assertEqual(agents["operations"]["sandbox"]["workspaceAccess"], "ro")
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):
                 self.assertIn("web_fetch", agents[agent_id]["tools"]["allow"])

@@ -194,16 +194,16 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
 
         fleet = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
         agents = {agent["id"]: agent for agent in fleet["agents"]["list"]}
-        heartbeat = agents["tony"]["heartbeat"]["prompt"]
-        self.assertIn("sessions_list", heartbeat)
-        self.assertIn("persistent OpenClaw specialist assignments", heartbeat)
-        self.assertIn("subagents", heartbeat)
-        self.assertIn("narratiive_read_state", heartbeat)
+        heartbeat = agents["operations"]["heartbeat"]["prompt"]
+        self.assertNotIn("sessions_list", heartbeat)
+        self.assertNotIn("sessions_history", heartbeat)
+        self.assertIn("bounded Narratiive state views", heartbeat)
+        self.assertNotIn("subagents", heartbeat)
+        self.assertIn("executive_brief", heartbeat)
         self.assertTrue(all(tool not in heartbeat for tool in LEGACY_STATE_TOOLS))
-        self.assertIn("view executive_brief", heartbeat)
-        self.assertIn("view open_work", heartbeat)
-        self.assertIn("view current_leads", heartbeat)
-        self.assertIn("view recent_execution", heartbeat)
+        self.assertIn("open_work", heartbeat)
+        self.assertIn("current_leads", heartbeat)
+        self.assertIn("recent_execution", heartbeat)
 
 
 if __name__ == "__main__":

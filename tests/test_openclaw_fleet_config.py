@@ -40,6 +40,15 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertNotIn("ownership", self.config["agents"])
         self.assertEqual(set(self.agents), {"tony", *SPECIALISTS})
 
+    def test_routine_utility_work_is_local_and_tool_loops_are_bounded(self):
+        self.assertEqual(self.config["agents"]["defaults"]["utilityModel"], "ollama/qwen3.5:latest")
+        guard = self.config["tools"]["loopDetection"]
+        self.assertTrue(guard["enabled"])
+        self.assertLess(guard["warningThreshold"], guard["criticalThreshold"])
+        self.assertLess(guard["criticalThreshold"], guard["globalCircuitBreakerThreshold"])
+        self.assertTrue(all(guard["detectors"].values()))
+        self.assertEqual(guard["postCompactionGuard"]["windowSize"], 3)
+
     def test_tony_can_delegate_only_to_canonical_specialists(self):
         self.assertEqual(self.agents["tony"]["model"], "anthropic/claude-sonnet-4-6")
         self.assertEqual(set(self.agents["tony"]["subagents"]["allowAgents"]), set(SPECIALISTS))
@@ -53,28 +62,29 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("Use the exact returned `agentId` in `sessions_spawn`", contract)
         self.assertIn("runtime configuration blocker", contract)
 
-    def test_tony_heartbeat_is_bounded_proactive_and_only_tony_runs_it(self):
-        heartbeat = self.agents["tony"]["heartbeat"]
+    def test_read_only_operations_heartbeat_is_bounded_proactive_and_unique(self):
+        heartbeat = self.agents["operations"]["heartbeat"]
         self.assertEqual(heartbeat["every"], "1h")
+        self.assertEqual(heartbeat["model"], "ollama/qwen3.5:latest")
         self.assertEqual(heartbeat["target"], "last")
-        self.assertFalse(heartbeat["lightContext"])
+        self.assertTrue(heartbeat["lightContext"])
         self.assertTrue(heartbeat["isolatedSession"])
         self.assertEqual(heartbeat["activeHours"], {"start": "07:00", "end": "22:00", "timezone": "Europe/London"})
         prompt = heartbeat["prompt"]
         self.assertIn("proactive Chief of Staff", prompt)
-        self.assertIn("sessions_list", prompt)
-        self.assertIn("persistent OpenClaw specialist assignments", prompt)
-        self.assertIn("subagents", prompt)
+        self.assertNotIn("sessions_list", prompt)
+        self.assertNotIn("sessions_history", prompt)
+        self.assertIn("bounded Narratiive state views", prompt)
+        self.assertNotIn("subagents", prompt)
         self.assertIn("stalled/failed/blocked", prompt)
         self.assertIn("HEARTBEAT_OK", prompt)
-        self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
-        self.assertIn("Never infer status from old chat memory", prompt)
-        self.assertIn("narratiive_read_state", prompt)
-        self.assertIn("view executive_brief", prompt)
-        self.assertIn("view open_work", prompt)
+        self.assertIn("claim external execution without returned Narratiive evidence", prompt)
+        self.assertIn("infer status from old chat memory", prompt)
+        self.assertIn("executive_brief", prompt)
+        self.assertIn("open_work", prompt)
         self.assertTrue(all(tool not in prompt for tool in LEGACY_STATE_TOOLS))
         self.assertNotIn("heartbeat", self.config["agents"]["defaults"])
-        for agent_id in SPECIALISTS:
+        for agent_id in {"tony", *SPECIALISTS} - {"operations"}:
             with self.subTest(agent_id=agent_id):
                 self.assertNotIn("heartbeat", self.agents[agent_id])
 
@@ -94,14 +104,11 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("bounded workspace research belongs with the specialist agents", contract)
 
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
-        additions = set(self.agents["tony"]["tools"]["alsoAllow"])
-        denied = set(self.agents["tony"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_yield", "subagents"}:
-            self.assertIn(required, additions)
-        self.assertNotIn("sessions_list", denied)
-        self.assertIn("session_status", denied)
-        self.assertTrue({"exec", "process", "gateway", "cron", "nodes"}.issubset(denied))
-        prompt = self.agents["tony"]["heartbeat"]["prompt"]
+        additions = set(self.agents["operations"]["tools"]["allow"])
+        denied = set(self.agents["operations"]["tools"]["deny"])
+        self.assertEqual(additions, {"read", "web_fetch", "narratiive_read_state"})
+        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
+        prompt = self.agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
 
@@ -154,7 +161,10 @@ class OpenClawFleetConfigTests(unittest.TestCase):
 
     def test_operations_is_read_only_while_other_specialists_may_prepare_reversible_workspace_artifacts(self):
         self.assertEqual(self.agents["operations"]["sandbox"]["workspaceAccess"], "ro")
-        self.assertEqual(set(self.agents["operations"]["tools"]["allow"]), {"read", "web_fetch"})
+        self.assertEqual(
+            set(self.agents["operations"]["tools"]["allow"]),
+            {"read", "web_fetch", "narratiive_read_state"},
+        )
         self.assertTrue({"write", "edit", "apply_patch"}.issubset(self.agents["operations"]["tools"]["deny"]))
         for agent_id in ("research", "strategy", "creative-director", "production"):
             with self.subTest(agent_id=agent_id):

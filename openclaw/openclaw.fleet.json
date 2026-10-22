@@ -1,6 +1,7 @@
 {
   "agents": {
     "defaults": {
+      "utilityModel": "ollama/qwen3.5:latest",
       "subagents": {
         "requireAgentId": true,
         "maxConcurrent": 4,
@@ -15,19 +16,6 @@
         "name": "Tony",
         "model": "anthropic/claude-sonnet-4-6",
         "workspace": "~/.openclaw/workspace-tony",
-        "heartbeat": {
-          "every": "1h",
-          "target": "last",
-          "lightContext": false,
-          "isolatedSession": true,
-          "timeoutSeconds": 120,
-          "activeHours": {
-            "start": "07:00",
-            "end": "22:00",
-            "timezone": "Europe/London"
-          },
-          "prompt": "Act as Narratiive's proactive Chief of Staff. Inspect persistent OpenClaw specialist assignments with sessions_list and current requester-tree child activity with subagents; these are different views, and an empty subagents result does not mean persistent specialist work is absent. For persistent work, keep only sessions owned by the canonical Research, Strategy, Creative Director, Production and Operations agents or in category Narratiive specialists, and use bounded sessions_history only when you need the latest evidence or blocker. Use Narratiive control-plane state reads when current business truth matters. Check narratiive_read_state with view executive_brief and view open_work before deciding whether there is a material business priority or stalled executive action; use view current_leads for pipeline claims and view recent_execution before claiming a consequential action happened or worked. Surface a concise alert only when a specialist has completed material work that needs review, a delegated task is stalled/failed/blocked, an evidence-backed business priority materially needs attention, or there is a concrete next decision for Matt. Never infer status from old chat memory and never claim external execution without returned Narratiive evidence. Do not send messages, make calendar commitments, mutate Notion, or perform other consequential external actions. If nothing materially needs attention, reply HEARTBEAT_OK."
-        },
         "subagents": {
           "delegationMode": "prefer",
           "allowAgents": ["research", "strategy", "creative-director", "production", "operations"],
@@ -107,16 +95,46 @@
         "name": "Operations Agent",
         "workspace": "~/.openclaw/workspace-operations",
         "sandbox": {"mode": "all", "scope": "agent", "workspaceAccess": "ro"},
+        "heartbeat": {
+          "every": "1h",
+          "model": "ollama/qwen3.5:latest",
+          "target": "last",
+          "lightContext": true,
+          "isolatedSession": true,
+          "timeoutSeconds": 120,
+          "activeHours": {
+            "start": "07:00",
+            "end": "22:00",
+            "timezone": "Europe/London"
+          },
+          "prompt": "Run Narratiive's read-only proactive Chief of Staff monitor. Use only bounded Narratiive state views: executive_brief and open_work before deciding whether a material business priority or stalled executive action needs attention; current_leads for pipeline claims; and recent_execution before claiming a consequential action happened or worked. Surface a concise alert only for material completed work needing review, stalled/failed/blocked delegated work, an evidence-backed priority, or a concrete founder decision. Never inspect conversation histories, infer status from old chat memory, or claim external execution without returned Narratiive evidence. Do not send messages, spawn or steer agents, make calendar commitments, mutate Notion, or perform any consequential action. If nothing materially needs attention, reply HEARTBEAT_OK."
+        },
         "tools": {
           "profile": "coding",
-          "allow": ["read", "web_fetch"],
+          "allow": ["read", "web_fetch", "narratiive_read_state"],
           "sandbox": {"tools": {"alsoAllow": ["web_fetch"]}},
-          "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_spawn"]
+          "deny": ["write", "edit", "apply_patch", "exec", "process", "browser", "message", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"]
         }
       }
     ]
   },
   "tools": {
+    "loopDetection": {
+      "enabled": true,
+      "historySize": 30,
+      "warningThreshold": 10,
+      "criticalThreshold": 20,
+      "unknownToolThreshold": 10,
+      "globalCircuitBreakerThreshold": 30,
+      "detectors": {
+        "genericRepeat": true,
+        "knownPollNoProgress": true,
+        "pingPong": true
+      },
+      "postCompactionGuard": {
+        "windowSize": 3
+      }
+    },
     "sessions": {"visibility": "all"},
     "agentToAgent": {
       "enabled": true,
@@ -128,9 +146,9 @@
     "dmScope": "per-channel-peer",
     "maintenance": {
       "mode": "enforce",
-      "pruneAfter": "30d",
+      "pruneAfter": "62d",
       "maxEntries": 500,
-      "resetArchiveRetention": "30d"
+      "resetArchiveRetention": "62d"
     }
   }
 }
