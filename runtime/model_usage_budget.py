@@ -488,9 +488,10 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
             usage = message.get("usage")
             if not isinstance(usage, Mapping):
                 raise ModelBudgetConfigurationError("Anthropic usage metadata is missing or invalid")
-            response_id = str(message.get("responseId") or message.get("response_id") or event.get("id") or "")
-            if not response_id:
-                raise ModelBudgetConfigurationError("Anthropic usage response id is missing")
+            raw_response_id = message.get("responseId")
+            if raw_response_id is None:
+                raw_response_id = message.get("response_id")
+            response_id = _strict_response_id(raw_response_id)
             records.append(
                 (
                     response_id,
@@ -507,13 +508,25 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
 
 def _deduplicated_usage(records: Iterable[tuple[str, TokenUsage]]) -> TokenUsage:
     total = TokenUsage()
-    seen: set[str] = set()
+    seen: dict[str, TokenUsage] = {}
     for response_id, usage in records:
         if response_id in seen:
+            if seen[response_id] != usage:
+                raise ModelBudgetConfigurationError(
+                    "Anthropic usage response id has conflicting token metadata"
+                )
             continue
-        seen.add(response_id)
+        seen[response_id] = usage
         total += usage
     return total
+
+
+def _strict_response_id(value: Any) -> str:
+    if not isinstance(value, str) or not value.strip():
+        raise ModelBudgetConfigurationError(
+            "Anthropic usage response id is missing or invalid"
+        )
+    return value.strip()
 
 
 def _strict_non_negative_int(value: Any, label: str) -> int:

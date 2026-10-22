@@ -310,6 +310,58 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
                 with self.assertRaises(ModelBudgetConfigurationError):
                     self._guard(root).reserve_capacity()
 
+    def test_invalid_openclaw_usage_identity_fails_closed_without_event_id_fallback(self) -> None:
+        for response_id in (123, True, "   ", None):
+            with self.subTest(response_id=response_id), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+                session.parent.mkdir(parents=True)
+                message = {
+                    "provider": "anthropic",
+                    "usage": {"input": 1, "output": 2, "cacheRead": 0, "cacheWrite": 0},
+                }
+                if response_id is not None:
+                    message["responseId"] = response_id
+                event = {
+                    "id": "generic-event-id-must-not-be-used",
+                    "timestamp": "2026-10-22T10:00:00Z",
+                    "message": message,
+                }
+                session.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+                with self.assertRaisesRegex(ModelBudgetConfigurationError, "response id"):
+                    self._guard(root).reserve_capacity()
+
+    def test_duplicate_response_id_with_conflicting_usage_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.parent.mkdir(parents=True)
+            records = []
+            for input_tokens in (1, 2):
+                records.append(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "responseId": "duplicate-response",
+                            "usage": {
+                                "input": input_tokens,
+                                "output": 0,
+                                "cacheRead": 0,
+                                "cacheWrite": 0,
+                            },
+                        },
+                    }
+                )
+            session.write_text(
+                "".join(json.dumps(record) + "\n" for record in records),
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "conflicting"):
+                self._guard(root).reserve_capacity()
+
     def test_non_finite_budget_values_are_rejected(self) -> None:
         for value in ("Infinity", "NaN", "-Infinity"):
             with self.subTest(value=value):

@@ -134,9 +134,10 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             if returned.get("error"):
                 raise RuntimeError(f"Claude API returned an error: {returned['error']}")
             if budget_guard is not None and reservation is not None:
-                response_id = str(returned.get("id") or "").strip()
-                if not response_id:
+                raw_response_id = returned.get("id")
+                if not isinstance(raw_response_id, str) or not raw_response_id.strip():
                     raise RuntimeError("Claude API response is missing its billing response id")
+                response_id = raw_response_id.strip()
                 budget_guard.settle_direct_usage(
                     reservation,
                     provider="anthropic",
