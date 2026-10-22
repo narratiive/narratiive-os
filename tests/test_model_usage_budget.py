@@ -132,6 +132,27 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
         with self.assertRaises(ModelBudgetConfigurationError):
             HostedModelBudgetGuard.from_environment({"TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "25"})
 
+    def test_existing_unreadable_usage_metadata_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            ledger = root / "runtime" / "direct-api.jsonl"
+            ledger.mkdir(parents=True)
+            guard = self._guard(root)
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "usage metadata is unreadable"):
+                guard.reserve_capacity()
+
+    def test_non_finite_budget_values_are_rejected(self) -> None:
+        for value in ("Infinity", "NaN", "-Infinity"):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(ModelBudgetConfigurationError, "finite decimal"):
+                    HostedModelBudgetGuard.from_environment(
+                        {
+                            "TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": value,
+                            "TONY_HOSTED_MODEL_WARNING_USD": "20",
+                        }
+                    )
+
     def test_anthropic_usage_conversion(self) -> None:
         usage = token_usage_from_anthropic(
             {

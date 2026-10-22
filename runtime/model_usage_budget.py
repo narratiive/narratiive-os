@@ -394,8 +394,10 @@ def token_usage_from_anthropic(payload: Mapping[str, Any]) -> TokenUsage:
 def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple[str, TokenUsage]]:
     try:
         handle = path.open(encoding="utf-8", errors="replace")
-    except OSError:
+    except FileNotFoundError:
         return ()
+    except OSError as exc:
+        raise ModelBudgetConfigurationError("model usage metadata is unreadable") from exc
     records: list[tuple[str, TokenUsage]] = []
     with handle:
         for line in handle:
@@ -458,6 +460,8 @@ def _decimal(value: str, label: str) -> Decimal:
         parsed = Decimal(value)
     except InvalidOperation as exc:
         raise ModelBudgetConfigurationError(f"{label} must be a decimal number") from exc
+    if not parsed.is_finite():
+        raise ModelBudgetConfigurationError(f"{label} must be a finite decimal number")
     if parsed < 0:
         raise ModelBudgetConfigurationError(f"{label} cannot be negative")
     return parsed
