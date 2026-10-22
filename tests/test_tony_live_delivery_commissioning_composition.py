@@ -18,8 +18,16 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 
 
 class TonyLiveDeliveryCommissioningCompositionTests(unittest.TestCase):
+    def setUp(self):
+        budget_factory = mock.patch.object(
+            tony_live_bridge.HostedModelBudgetGuard, "from_environment", return_value=None
+        )
+        budget_factory.start()
+        self.addCleanup(budget_factory.stop)
+
     def _env(self, tmp):
         return {
+            "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled",
             "TONY_INBOUND_LEADS_PATH": str(Path(tmp) / "leads.json"),
             "TONY_AGENCY_FOCUS_CONTEXT_PATH": str(Path(tmp) / "focus.json"),
             "TONY_EXECUTIVE_OUTCOMES_PATH": str(Path(tmp) / "outcomes.json"),

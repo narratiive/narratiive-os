@@ -129,6 +129,7 @@ class ProactiveExecutiveDeliveryService:
         record_event: EventRecorder,
         clock: Clock | None = None,
         max_attempts: int = 3,
+        record_delivered: Callable[[CommandResponse], None] | None = None,
     ) -> None:
         if max_attempts < 1:
             raise ValueError("max_attempts must be at least 1")
@@ -139,6 +140,7 @@ class ProactiveExecutiveDeliveryService:
         self.clock = clock or datetime.now
         self.max_attempts = max_attempts
         self.dispatcher = IdempotentDispatcher(key_store=key_store)
+        self.record_delivered = record_delivered
 
     def deliver(
         self,
@@ -195,6 +197,8 @@ class ProactiveExecutiveDeliveryService:
         )
         if outcome.status == "sent":
             self.dispatcher.mark_used(delivery_key)
+            if self.record_delivered is not None:
+                self.record_delivered(response)
             result = ProactiveDeliveryResult(
                 delivery_key=delivery_key,
                 status="delivered",

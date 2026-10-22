@@ -244,6 +244,12 @@ class GitHubConfig:
 
 
 class GitHubAPI(Protocol):
+    def list_repositories(self) -> list[Mapping[str, Any]]: ...
+
+    def get_repository_content(
+        self, repository: str, path: str = ""
+    ) -> Mapping[str, Any] | list[Mapping[str, Any]]: ...
+
     def list_open_pull_requests(self) -> list[Mapping[str, Any]]: ...
 
     def list_open_issues(self) -> list[Mapping[str, Any]]: ...
@@ -283,6 +289,32 @@ class GitHubRESTClient:
             f"/repos/{self.config.repository}/pulls",
             {"state": "open", "sort": "updated", "direction": "desc"},
         )
+
+    def list_repositories(self) -> list[Mapping[str, Any]]:
+        return self._get_pages(
+            "/user/repos",
+            {
+                "affiliation": "owner,collaborator,organization_member",
+                "sort": "full_name",
+                "direction": "asc",
+            },
+        )
+
+    def get_repository_content(
+        self, repository: str, path: str = ""
+    ) -> Mapping[str, Any] | list[Mapping[str, Any]]:
+        repository = _required_text(repository, "repository")
+        if not re.fullmatch(r"[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+", repository):
+            raise GitHubWorkError("GitHub repository name is invalid")
+        clean_path = str(path or "").strip().strip("/")
+        encoded_path = urllib.parse.quote(clean_path, safe="/")
+        suffix = f"/{encoded_path}" if encoded_path else "/"
+        value = self._get(f"/repos/{repository}/contents{suffix}")
+        if isinstance(value, Mapping):
+            return value
+        if isinstance(value, list) and all(isinstance(item, Mapping) for item in value):
+            return value
+        raise GitHubWorkError("GitHub repository content response has an invalid shape")
 
     def list_open_issues(self) -> list[Mapping[str, Any]]:
         return self._get_pages(

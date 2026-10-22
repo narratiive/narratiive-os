@@ -51,6 +51,12 @@ def _agent_list(agents: dict[str, Any]) -> list[dict[str, Any]]:
 def _merge_managed_agent(existing: dict[str, Any], managed: dict[str, Any]) -> dict[str, Any]:
     """Merge one managed agent and remove obsolete exclusive policy fields."""
     merged = deep_merge(existing, managed)
+    # The pre-migration fleet scheduled its proactive heartbeat on hosted Tony.
+    # The controlled migration moves the sole managed heartbeat to local,
+    # read-only Operations, so omission here is an intentional deletion rather
+    # than an unrelated setting to preserve.
+    if str(managed.get("id") or "").strip() == "tony" and "heartbeat" not in managed:
+        merged.pop("heartbeat", None)
     managed_tools = managed.get("tools")
     merged_tools = merged.get("tools")
     if isinstance(managed_tools, dict) and isinstance(merged_tools, dict):

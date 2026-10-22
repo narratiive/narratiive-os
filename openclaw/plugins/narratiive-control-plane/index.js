@@ -59,9 +59,10 @@ const WORKFLOW_SCHEMA = {
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {
-  operation: { type: "string", enum: ["ignore", "suppress", "mark_test", "archive", "restore", "watch", "show", "list", "archive_safe_tests", "suppress_safe_tests"] },
+  operation: { type: "string", enum: ["ignore", "suppress", "mark_spam", "mark_internal", "mark_test", "mark_duplicate", "defer", "reclassify", "archive", "restore", "watch", "show", "list", "archive_safe_tests", "suppress_safe_tests"] },
   reference: { type: "string", minLength: 1, maxLength: 500 },
   reason: { type: "string", maxLength: 1000 },
+  classification: { type: "string", maxLength: 200 },
   scope: { type: "string", enum: ["visible", "suppressed", "test", "archived", "all"] },
 };
 
@@ -267,7 +268,7 @@ function workflowControlTool() {
 }
 
 function attentionControlTool() {
-  return { name: "narratiive_manage_attention", description: "Manage reversible internal lead attention state. Use for explicit SAFE/test suppression, archive, restore and listing; ambiguous references fail safely. This never contacts anyone or performs an external action.", parameters: schema(ATTENTION_SCHEMA, ["operation"]), async execute(_id, params) {
+  return { name: "narratiive_manage_attention", description: "Manage reversible briefing attention for a current lead, delivery, workflow or operational entity. Use explicit suppress, spam, internal, test, duplicate, defer, archive, reclassify or restore decisions; ambiguous references fail safely. This never deletes source data, contacts anyone or performs an external action.", parameters: schema(ATTENTION_SCHEMA, ["operation"]), async execute(_id, params) {
     try {
       const url = controlPlaneUrl().replace(/\/control-plane$/, "/attention/control"); const token = resolveBridgeToken(); const headers = { "content-type": "application/json" }; if (token) headers.authorization = `Bearer ${token}`;
       const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(params || {}), signal: AbortSignal.timeout(controlPlaneTimeoutMs()) }); const payload = await response.json(); return renderToolResult(payload);

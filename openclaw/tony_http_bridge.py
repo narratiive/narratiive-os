@@ -16,6 +16,11 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from runtime.campaign_engine import FileCampaignEngineRepository
+from runtime.briefing_intelligence import (
+    ExecutiveBriefingPipeline,
+    FileBriefingBaselineStore,
+    FileBriefingDecisionRegister,
+)
 from runtime.composition import RuntimeComponents, compose_local_runtime
 from runtime.engineering_handoff import EngineeringHandoffSnapshot
 from runtime.engineering_orchestrator import EngineeringRunSnapshot
@@ -663,11 +668,30 @@ def compose_tony_runtime(
             workspace_id=canonical_workspace,
         ).list_states,
     )
+    briefing_pipeline = ExecutiveBriefingPipeline(
+        decision_register=FileBriefingDecisionRegister(
+            Path(
+                os.getenv(
+                    "TONY_BRIEFING_DECISION_REGISTER_PATH",
+                    str(repository_root / ".runtime" / "briefing-decision-register.jsonl"),
+                )
+            )
+        ),
+        baseline_store=FileBriefingBaselineStore(
+            Path(
+                os.getenv(
+                    "TONY_BRIEFING_BASELINE_PATH",
+                    str(repository_root / ".runtime" / "briefing-last-delivered.json"),
+                )
+            )
+        ),
+    )
     executive_service = TonyExecutiveCommandService(
         command_service,
         brief_archive=brief_archive,
         inbound_lead_loader=lambda: visibility.visible_leads(lead_loader()),
         workspace_id=canonical_workspace,
+        briefing_pipeline=briefing_pipeline,
     )
     return TonyRuntimeComposition(
         workspace_id=canonical_workspace,
