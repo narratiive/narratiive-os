@@ -74,7 +74,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertIn("proactive Chief of Staff", prompt)
         self.assertIn("sessions_list", prompt)
         self.assertIn("persistent OpenClaw specialist assignments", prompt)
-        self.assertIn("subagents", prompt)
+        self.assertNotIn("subagents", prompt)
         self.assertIn("stalled/failed/blocked", prompt)
         self.assertIn("HEARTBEAT_OK", prompt)
         self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
@@ -106,9 +106,9 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         additions = set(self.agents["operations"]["tools"]["allow"])
         denied = set(self.agents["operations"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_list", "sessions_history", "subagents", "narratiive_read_state"}:
+        for required in {"agents_list", "sessions_list", "sessions_history", "narratiive_read_state"}:
             self.assertIn(required, additions)
-        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_spawn", "sessions_send"}.issubset(denied))
+        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
         prompt = self.agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
@@ -164,7 +164,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(self.agents["operations"]["sandbox"]["workspaceAccess"], "ro")
         self.assertEqual(
             set(self.agents["operations"]["tools"]["allow"]),
-            {"read", "web_fetch", "agents_list", "sessions_list", "sessions_history", "subagents", "narratiive_read_state"},
+            {"read", "web_fetch", "agents_list", "sessions_list", "sessions_history", "narratiive_read_state"},
         )
         self.assertTrue({"write", "edit", "apply_patch"}.issubset(self.agents["operations"]["tools"]["deny"]))
         for agent_id in ("research", "strategy", "creative-director", "production"):

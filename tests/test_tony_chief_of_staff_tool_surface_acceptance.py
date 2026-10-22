@@ -197,7 +197,7 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         heartbeat = agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("sessions_list", heartbeat)
         self.assertIn("persistent OpenClaw specialist assignments", heartbeat)
-        self.assertIn("subagents", heartbeat)
+        self.assertNotIn("subagents", heartbeat)
         self.assertIn("narratiive_read_state", heartbeat)
         self.assertTrue(all(tool not in heartbeat for tool in LEGACY_STATE_TOOLS))
         self.assertIn("view executive_brief", heartbeat)
