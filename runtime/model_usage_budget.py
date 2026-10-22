@@ -292,11 +292,21 @@ class HostedModelBudgetGuard:
         self.direct_usage_ledger.chmod(0o600)
 
     def _openclaw_usage(self, period: str) -> TokenUsage:
+        agents_dir = self.openclaw_state_dir / "agents"
+        if not agents_dir.is_dir() or not os.access(agents_dir, os.R_OK | os.X_OK):
+            raise ModelBudgetConfigurationError(
+                "OpenClaw usage metadata directory is unavailable"
+            )
         records: list[tuple[str, TokenUsage]] = []
-        for path in self.openclaw_state_dir.glob("agents/*/sessions/*.jsonl*"):
-            if ".trajectory.jsonl" in path.name or path.name.endswith(".lock"):
-                continue
-            records.extend(_usage_records(path, period, openclaw=True))
+        try:
+            for path in agents_dir.glob("*/sessions/*.jsonl*"):
+                if ".trajectory.jsonl" in path.name or path.name.endswith(".lock"):
+                    continue
+                records.extend(_usage_records(path, period, openclaw=True))
+        except OSError as exc:
+            raise ModelBudgetConfigurationError(
+                "OpenClaw usage metadata directory is unreadable"
+            ) from exc
         return _deduplicated_usage(records)
 
     def _direct_usage(self, period: str) -> TokenUsage:
@@ -430,10 +440,10 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
                 (
                     response_id,
                     TokenUsage(
-                        input_tokens=_non_negative_int(usage.get("input")),
-                        output_tokens=_non_negative_int(usage.get("output")),
-                        cache_read_tokens=_non_negative_int(usage.get("cacheRead")),
-                        cache_write_tokens=_non_negative_int(usage.get("cacheWrite")),
+                        input_tokens=_strict_non_negative_int(usage.get("input"), "input"),
+                        output_tokens=_strict_non_negative_int(usage.get("output"), "output"),
+                        cache_read_tokens=_strict_non_negative_int(usage.get("cacheRead"), "cacheRead"),
+                        cache_write_tokens=_strict_non_negative_int(usage.get("cacheWrite"), "cacheWrite"),
                     ),
                 )
             )
@@ -449,14 +459,6 @@ def _deduplicated_usage(records: Iterable[tuple[str, TokenUsage]]) -> TokenUsage
         seen.add(response_id)
         total += usage
     return total
-
-
-def _non_negative_int(value: Any) -> int:
-    try:
-        parsed = int(value or 0)
-    except (TypeError, ValueError):
-        return 0
-    return max(0, parsed)
 
 
 def _strict_non_negative_int(value: Any, label: str) -> int:

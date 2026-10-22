@@ -19,6 +19,7 @@ from runtime.model_usage_budget import (
 
 class HostedModelBudgetGuardTests(unittest.TestCase):
     def _guard(self, root: Path, *, hard: str = "25", warning: str = "20") -> HostedModelBudgetGuard:
+        (root / "openclaw" / "agents").mkdir(parents=True, exist_ok=True)
         return HostedModelBudgetGuard(
             openclaw_state_dir=root / "openclaw",
             direct_usage_ledger=root / "runtime" / "direct-api.jsonl",
@@ -181,6 +182,21 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
             with self.assertRaisesRegex(ModelBudgetConfigurationError, "invalid JSON"):
                 self._guard(root).reserve_capacity()
 
+    def test_missing_openclaw_usage_directory_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guard = HostedModelBudgetGuard(
+                openclaw_state_dir=root / "missing-openclaw",
+                direct_usage_ledger=root / "runtime" / "direct-api.jsonl",
+                warning_limit_usd=Decimal("20"),
+                hard_limit_usd=Decimal("25"),
+                pricing=ModelPricing(Decimal("3"), Decimal("15"), Decimal("0.30"), Decimal("6")),
+                now=lambda: datetime(2026, 10, 22, tzinfo=timezone.utc),
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "directory is unavailable"):
+                guard.reserve_capacity()
+
     def test_invalid_anthropic_usage_shape_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -202,6 +218,29 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ModelBudgetConfigurationError, "usage metadata"):
+                self._guard(root).reserve_capacity()
+
+    def test_invalid_openclaw_usage_counters_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "responseId": "broken-counter",
+                            "usage": {"input": "invalid", "output": 2, "cacheRead": 0, "cacheWrite": 0},
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "input is invalid"):
                 self._guard(root).reserve_capacity()
 
     def test_non_finite_budget_values_are_rejected(self) -> None:

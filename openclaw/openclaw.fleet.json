@@ -148,7 +148,7 @@
       "mode": "enforce",
       "pruneAfter": "30d",
       "maxEntries": 500,
-      "resetArchiveRetention": "30d"
+      "resetArchiveRetention": "62d"
     }
   }
 }
