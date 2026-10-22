@@ -67,7 +67,7 @@ class OpenClawFleetInstallTests(unittest.TestCase):
             )
             self.assertEqual(
                 set(agents["operations"]["tools"]["sandbox"]["tools"]["alsoAllow"]),
-                {"web_fetch", "narratiive_read_state"},
+                {"web_fetch", "narratiive-control-plane"},
             )
             self.assertEqual(agents["operations"]["sandbox"]["workspaceAccess"], "ro")
             for agent_id in ("research", "strategy", "creative-director", "production", "operations"):

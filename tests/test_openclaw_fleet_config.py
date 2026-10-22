@@ -110,7 +110,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         )
         denied = set(self.agents["operations"]["tools"]["deny"])
         self.assertEqual(additions, {"read", "web_fetch", "narratiive_read_state"})
-        self.assertEqual(sandbox_additions, {"web_fetch", "narratiive_read_state"})
+        self.assertEqual(sandbox_additions, {"web_fetch", "narratiive-control-plane"})
         self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
         prompt = self.agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
