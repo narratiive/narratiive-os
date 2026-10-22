@@ -72,16 +72,16 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(heartbeat["activeHours"], {"start": "07:00", "end": "22:00", "timezone": "Europe/London"})
         prompt = heartbeat["prompt"]
         self.assertIn("proactive Chief of Staff", prompt)
-        self.assertIn("sessions_list", prompt)
-        self.assertIn("persistent OpenClaw specialist assignments", prompt)
+        self.assertNotIn("sessions_list", prompt)
+        self.assertNotIn("sessions_history", prompt)
+        self.assertIn("bounded Narratiive state views", prompt)
         self.assertNotIn("subagents", prompt)
         self.assertIn("stalled/failed/blocked", prompt)
         self.assertIn("HEARTBEAT_OK", prompt)
-        self.assertIn("never claim external execution without returned Narratiive evidence", prompt)
-        self.assertIn("Never infer status from old chat memory", prompt)
-        self.assertIn("narratiive_read_state", prompt)
-        self.assertIn("view executive_brief", prompt)
-        self.assertIn("view open_work", prompt)
+        self.assertIn("claim external execution without returned Narratiive evidence", prompt)
+        self.assertIn("infer status from old chat memory", prompt)
+        self.assertIn("executive_brief", prompt)
+        self.assertIn("open_work", prompt)
         self.assertTrue(all(tool not in prompt for tool in LEGACY_STATE_TOOLS))
         self.assertNotIn("heartbeat", self.config["agents"]["defaults"])
         for agent_id in {"tony", *SPECIALISTS} - {"operations"}:
@@ -106,9 +106,8 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_heartbeat_has_native_read_only_control_plane_plugin_but_no_consequential_tools(self):
         additions = set(self.agents["operations"]["tools"]["allow"])
         denied = set(self.agents["operations"]["tools"]["deny"])
-        for required in {"agents_list", "sessions_list", "sessions_history", "narratiive_read_state"}:
-            self.assertIn(required, additions)
-        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
+        self.assertEqual(additions, {"read", "web_fetch", "narratiive_read_state"})
+        self.assertTrue({"exec", "process", "gateway", "cron", "nodes", "sessions_list", "sessions_history", "sessions_spawn", "sessions_send", "subagents"}.issubset(denied))
         prompt = self.agents["operations"]["heartbeat"]["prompt"]
         self.assertIn("Do not send messages", prompt)
         self.assertIn("mutate Notion", prompt)
@@ -164,7 +163,7 @@ class OpenClawFleetConfigTests(unittest.TestCase):
         self.assertEqual(self.agents["operations"]["sandbox"]["workspaceAccess"], "ro")
         self.assertEqual(
             set(self.agents["operations"]["tools"]["allow"]),
-            {"read", "web_fetch", "agents_list", "sessions_list", "sessions_history", "narratiive_read_state"},
+            {"read", "web_fetch", "narratiive_read_state"},
         )
         self.assertTrue({"write", "edit", "apply_patch"}.issubset(self.agents["operations"]["tools"]["deny"]))
         for agent_id in ("research", "strategy", "creative-director", "production"):

@@ -26,12 +26,19 @@ class _Response:
 
 
 class TonyClaudeAPIDispatcherTests(unittest.TestCase):
+    def setUp(self):
+        budget_factory = mock.patch(
+            "runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment",
+            return_value=None,
+        )
+        budget_factory.start()
+        self.addCleanup(budget_factory.stop)
+
     def _env(self):
         return {
             "TONY_DISPATCH_CLAUDE_MODE": "anthropic_api",
             "ANTHROPIC_API_KEY": "test-key",
             "TONY_DISPATCH_CLAUDE_MODEL": "claude-test-model",
-            "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled",
         }
 
     def _contract(self):

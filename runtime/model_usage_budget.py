@@ -131,6 +131,10 @@ class HostedModelBudgetGuard:
             raise ModelBudgetConfigurationError(
                 "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT must be 'required' or 'disabled'"
             )
+        if enforcement == "disabled" and required:
+            raise ModelBudgetConfigurationError(
+                "hosted-model budget enforcement cannot be disabled on a required production path"
+            )
         if enforcement == "disabled":
             return None
         hard_raw = str(active.get("TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD") or "").strip()
@@ -183,7 +187,9 @@ class HostedModelBudgetGuard:
         now = self._now().astimezone(timezone.utc)
         period = now.strftime("%Y-%m")
         with self._lock():
-            usage = self._openclaw_usage(period) + self._direct_usage(period)
+            usage = _deduplicated_usage(
+                (*self._openclaw_records(period), *self._direct_records(period))
+            )
             reservations = self._active_reservations(now, persist_pruned=True)
         return ModelBudgetSnapshot(
             period=period,
@@ -219,7 +225,9 @@ class HostedModelBudgetGuard:
         now = self._now().astimezone(timezone.utc)
         period = now.strftime("%Y-%m")
         with self._lock():
-            usage = self._openclaw_usage(period) + self._direct_usage(period)
+            usage = _deduplicated_usage(
+                (*self._openclaw_records(period), *self._direct_records(period))
+            )
             reservations = self._active_reservations(now, persist_pruned=False)
             committed = self.pricing.cost(usage)
             pending = sum((item.amount_usd for item in reservations), Decimal("0"))
@@ -276,6 +284,7 @@ class HostedModelBudgetGuard:
         response_id: str,
         usage: TokenUsage,
     ) -> None:
+        response_id = _strict_response_id(response_id)
         record = {
             "recorded_at": self._now().astimezone(timezone.utc).isoformat(),
             "provider": provider,
@@ -300,9 +309,18 @@ class HostedModelBudgetGuard:
         response_id: str,
         usage: TokenUsage,
     ) -> None:
+        response_id = _strict_response_id(response_id)
         record = self._direct_record(provider, model, response_id, usage)
         with self._lock():
-            self._append_direct_record(record)
+            period = self._now().astimezone(timezone.utc).strftime("%Y-%m")
+            existing = (*self._openclaw_records(period), *self._direct_records(period))
+            matches = [item_usage for item_id, item_usage in existing if item_id == response_id]
+            if any(item_usage != usage for item_usage in matches):
+                raise ModelBudgetConfigurationError(
+                    "Anthropic usage response id has conflicting token metadata"
+                )
+            if not matches:
+                self._append_direct_record(record)
             active = self._active_reservations(self._now().astimezone(timezone.utc), persist_pruned=False)
             self._write_reservations(
                 tuple(item for item in active if item.reservation_id != reservation.reservation_id)
@@ -332,7 +350,7 @@ class HostedModelBudgetGuard:
             os.fsync(handle.fileno())
         self.direct_usage_ledger.chmod(0o600)
 
-    def _openclaw_usage(self, period: str) -> TokenUsage:
+    def _openclaw_records(self, period: str) -> tuple[tuple[str, TokenUsage], ...]:
         agents_dir = self.openclaw_state_dir / "agents"
         if not agents_dir.is_dir() or not os.access(agents_dir, os.R_OK | os.X_OK):
             raise ModelBudgetConfigurationError(
@@ -354,10 +372,10 @@ class HostedModelBudgetGuard:
             raise ModelBudgetConfigurationError(
                 "OpenClaw usage metadata directory is unreadable"
             ) from exc
-        return _deduplicated_usage(records)
+        return tuple(records)
 
-    def _direct_usage(self, period: str) -> TokenUsage:
-        return _deduplicated_usage(_usage_records(self.direct_usage_ledger, period, openclaw=False))
+    def _direct_records(self, period: str) -> tuple[tuple[str, TokenUsage], ...]:
+        return tuple(_usage_records(self.direct_usage_ledger, period, openclaw=False))
 
     @contextmanager
     def _lock(self):
@@ -473,7 +491,17 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
             message = event.get("message") if openclaw else event
             if not isinstance(message, Mapping):
                 continue
-            provider = str(message.get("provider") or event.get("provider") or "").casefold()
+            raw_provider = message.get("provider")
+            if raw_provider is None and not openclaw:
+                raw_provider = event.get("provider")
+            usage_present = "usage" in message
+            if not isinstance(raw_provider, str) or not raw_provider.strip():
+                if usage_present:
+                    raise ModelBudgetConfigurationError(
+                        "model usage provider identity is missing or invalid"
+                    )
+                continue
+            provider = raw_provider.strip().casefold()
             if provider != "anthropic":
                 continue
             timestamp = str(event.get("timestamp") if openclaw else event.get("recorded_at") or "")

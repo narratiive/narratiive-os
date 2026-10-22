@@ -36,6 +36,13 @@ from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
 class TonyLiveBridgeTests(unittest.TestCase):
+    def setUp(self):
+        budget_factory = mock.patch.object(
+            tony_live_bridge.HostedModelBudgetGuard, "from_environment", return_value=None
+        )
+        budget_factory.start()
+        self.addCleanup(budget_factory.stop)
+
     def _build(self,tmp,extra=None):
         base_app=mock.Mock(); base_service=mock.Mock(); base_app.command_service=base_service; base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
         env={"TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT":"disabled","TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json"),"TONY_AGENCY_FOCUS_CONTEXT_PATH":str(Path(tmp)/"focus.json"),"TONY_EXECUTIVE_OUTCOMES_PATH":str(Path(tmp)/"outcomes.json"),"TONY_EXECUTIVE_LEARNING_PATH":str(Path(tmp)/"learning.json"),"TONY_POST_SEND_NOTION_SYNC_PATH":str(Path(tmp)/"post-send.json"),"TONY_MEETING_BOOKING_PATH":str(Path(tmp)/"meeting.json"),"TONY_POST_BOOKING_NOTION_SYNC_PATH":str(Path(tmp)/"booking-sync.json"),"TONY_DISCOVERY_OUTCOME_TRACKING_PATH":str(Path(tmp)/"discovery.json"),"TONY_POST_DISCOVERY_COMMERCIAL_PATH":str(Path(tmp)/"post-discovery.json"),"TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH":str(Path(tmp)/"proposal.json"),"TONY_PROPOSAL_OUTCOME_TRACKING_PATH":str(Path(tmp)/"proposal-outcome.json"),"TONY_COMMERCIAL_CLOSE_PATH":str(Path(tmp)/"close.json"),"TONY_DELIVERY_BOOTSTRAP_PATH":str(Path(tmp)/"delivery.json"),"TONY_DRIVE_DELIVERY_WORKSPACE_PATH":str(Path(tmp)/"drive.json"),"TONY_DELIVERY_COMMISSIONING_PATH":str(Path(tmp)/"commission.json"),"TONY_DELIVERY_BLUEPRINT_REVIEW_PATH":str(Path(tmp)/"blueprint-review.json"),"TONY_BLUEPRINT_CLIENT_DELIVERY_PATH":str(Path(tmp)/"blueprint-delivery.json"),"TONY_BLUEPRINT_DELIVERY_NOTION_SYNC_PATH":str(Path(tmp)/"blueprint-delivery-sync.json"),"TONY_BLUEPRINT_CLIENT_FEEDBACK_PATH":str(Path(tmp)/"blueprint-feedback.json"),"TONY_BLUEPRINT_REVISION_CYCLE_PATH":str(Path(tmp)/"blueprint-revision.json"),"TONY_BLUEPRINT_REVISION_PERSISTENCE_PATH":str(Path(tmp)/"blueprint-revision-persistence.json")}; env.update(extra or {})

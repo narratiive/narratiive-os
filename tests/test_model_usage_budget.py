@@ -153,6 +153,12 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
         with self.assertRaisesRegex(ModelBudgetConfigurationError, "required"):
             HostedModelBudgetGuard.from_environment({}, required=True)
 
+    def test_production_path_rejects_explicit_enforcement_disablement(self) -> None:
+        with self.assertRaisesRegex(ModelBudgetConfigurationError, "cannot be disabled"):
+            HostedModelBudgetGuard.from_environment(
+                {"TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled"}, required=True
+            )
+
     def test_environment_resolves_supported_openclaw_state_locations(self) -> None:
         base = {
             "TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "25",
@@ -361,6 +367,77 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ModelBudgetConfigurationError, "conflicting"):
                 self._guard(root).reserve_capacity()
+
+    def test_usage_bearing_record_with_invalid_provider_fails_closed(self) -> None:
+        for provider in (None, True, "   "):
+            with self.subTest(provider=provider), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+                session.parent.mkdir(parents=True)
+                message = {
+                    "responseId": "ambiguous-provider",
+                    "usage": {"input": 1, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                }
+                if provider is not None:
+                    message["provider"] = provider
+                session.write_text(
+                    json.dumps({"timestamp": "2026-10-22T10:00:00Z", "message": message}) + "\n",
+                    encoding="utf-8",
+                )
+
+                with self.assertRaisesRegex(ModelBudgetConfigurationError, "provider identity"):
+                    self._guard(root).reserve_capacity()
+
+    def test_conflicting_response_id_across_openclaw_and_direct_ledger_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guard = self._guard(root)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "responseId": "cross-source",
+                            "usage": {"input": 1, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            guard.record_direct_usage(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                response_id="cross-source",
+                usage=TokenUsage(input_tokens=2),
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "conflicting"):
+                guard.snapshot()
+
+    def test_settlement_detects_conflict_before_releasing_reservation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            guard = self._guard(Path(directory))
+            guard.record_direct_usage(
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                response_id="settlement-conflict",
+                usage=TokenUsage(input_tokens=1),
+            )
+            reservation = guard.reserve_capacity(reserve_usd=Decimal("2"))
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "conflicting"):
+                guard.settle_direct_usage(
+                    reservation,
+                    provider="anthropic",
+                    model="claude-sonnet-4-6",
+                    response_id="settlement-conflict",
+                    usage=TokenUsage(input_tokens=2),
+                )
+
+            self.assertEqual(guard.snapshot().reserved_cost_usd, Decimal("2"))
 
     def test_non_finite_budget_values_are_rejected(self) -> None:
         for value in ("Infinity", "NaN", "-Infinity"):
