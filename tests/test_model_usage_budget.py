@@ -228,6 +228,18 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
         )
         self.assertEqual(usage, TokenUsage(1, 2, 3, 4))
 
+    def test_anthropic_usage_conversion_rejects_missing_or_invalid_metadata(self) -> None:
+        for payload in (
+            {},
+            {"usage": None},
+            {"usage": {"input_tokens": 1}},
+            {"usage": {"input_tokens": "invalid", "output_tokens": 2}},
+            {"usage": {"input_tokens": 1, "output_tokens": -1}},
+        ):
+            with self.subTest(payload=payload):
+                with self.assertRaises(ModelBudgetConfigurationError):
+                    token_usage_from_anthropic(payload)
+
 
 if __name__ == "__main__":
     unittest.main()

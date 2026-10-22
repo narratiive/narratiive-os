@@ -65,8 +65,9 @@ class OpenClawFleetConfigTests(unittest.TestCase):
     def test_tony_heartbeat_is_bounded_proactive_and_only_tony_runs_it(self):
         heartbeat = self.agents["tony"]["heartbeat"]
         self.assertEqual(heartbeat["every"], "1h")
+        self.assertEqual(heartbeat["model"], "ollama/qwen3.5:latest")
         self.assertEqual(heartbeat["target"], "last")
-        self.assertFalse(heartbeat["lightContext"])
+        self.assertTrue(heartbeat["lightContext"])
         self.assertTrue(heartbeat["isolatedSession"])
         self.assertEqual(heartbeat["activeHours"], {"start": "07:00", "end": "22:00", "timezone": "Europe/London"})
         prompt = heartbeat["prompt"]

@@ -20,7 +20,7 @@ class TonyConversationWorkerBudgetTests(unittest.TestCase):
         executor.assert_called_once_with("research this", "work-1")
         guard.release_reservation.assert_called_once_with(reservation)
 
-    def test_durable_openclaw_execution_releases_reservation_on_failure(self) -> None:
+    def test_durable_openclaw_execution_retains_reservation_on_ambiguous_failure(self) -> None:
         guard = mock.Mock()
         reservation = object()
         guard.reserve_capacity.return_value = reservation
@@ -29,7 +29,7 @@ class TonyConversationWorkerBudgetTests(unittest.TestCase):
         with self.assertRaisesRegex(RuntimeError, "failed"):
             budgeted_conversation_executor(executor, guard, ttl_seconds=120)("research this", "work-1")
 
-        guard.release_reservation.assert_called_once_with(reservation)
+        guard.release_reservation.assert_not_called()
 
 
 if __name__ == "__main__":

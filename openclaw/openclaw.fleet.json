@@ -18,8 +18,9 @@
         "workspace": "~/.openclaw/workspace-tony",
         "heartbeat": {
           "every": "1h",
+          "model": "ollama/qwen3.5:latest",
           "target": "last",
-          "lightContext": false,
+          "lightContext": true,
           "isolatedSession": true,
           "timeoutSeconds": 120,
           "activeHours": {

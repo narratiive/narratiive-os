@@ -36,10 +36,15 @@ def budgeted_conversation_executor(
         if guard is not None:
             reservation = guard.reserve_capacity(ttl_seconds=ttl_seconds)
         try:
-            return executor(text, work_id)
-        finally:
+            result = executor(text, work_id)
+        except Exception:
+            # An ambiguous Gateway failure may still represent billed provider
+            # work. Retain capacity until the reservation expires.
+            raise
+        else:
             if guard is not None and reservation is not None:
                 guard.release_reservation(reservation)
+            return result
 
     return execute
 

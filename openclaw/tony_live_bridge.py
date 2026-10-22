@@ -342,7 +342,11 @@ class LeadAwareTonyApplication:
                     )
                 try:
                     reply = self.agent_gateway.converse(text)
-                finally:
+                except Exception:
+                    # The Gateway may have accepted and billed a request before a
+                    # timeout/disconnect. Keep its reservation until TTL expiry.
+                    raise
+                else:
                     if self.model_budget_guard is not None and reservation is not None:
                         self.model_budget_guard.release_reservation(reservation)
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":

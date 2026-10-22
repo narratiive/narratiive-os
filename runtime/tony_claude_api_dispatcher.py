@@ -124,26 +124,25 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             },
             method="POST",
         )
-        try:
-            with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
-                raw = response.read().decode("utf-8")
-            returned = json.loads(raw or "{}")
-            if not isinstance(returned, dict):
-                raise RuntimeError("Claude API response must be a JSON object")
-            if budget_guard is not None and reservation is not None and returned.get("id"):
-                budget_guard.settle_direct_usage(
-                    reservation,
-                    provider="anthropic",
-                    model=str(returned.get("model") or model),
-                    response_id=str(returned["id"]),
-                    usage=token_usage_from_anthropic(returned),
-                )
-                reservation = None
-            if returned.get("error"):
-                raise RuntimeError(f"Claude API returned an error: {returned['error']}")
-        finally:
-            if budget_guard is not None and reservation is not None:
-                budget_guard.release_reservation(reservation)
+        with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
+            raw = response.read().decode("utf-8")
+        returned = json.loads(raw or "{}")
+        if not isinstance(returned, dict):
+            raise RuntimeError("Claude API response must be a JSON object")
+        if returned.get("error"):
+            raise RuntimeError(f"Claude API returned an error: {returned['error']}")
+        if budget_guard is not None and reservation is not None:
+            response_id = str(returned.get("id") or "").strip()
+            if not response_id:
+                raise RuntimeError("Claude API response is missing its billing response id")
+            budget_guard.settle_direct_usage(
+                reservation,
+                provider="anthropic",
+                model=str(returned.get("model") or model),
+                response_id=response_id,
+                usage=token_usage_from_anthropic(returned),
+            )
+            reservation = None
 
         text = _response_text(returned)
         if not text:

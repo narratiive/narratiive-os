@@ -380,12 +380,16 @@ class HostedModelBudgetGuard:
 def token_usage_from_anthropic(payload: Mapping[str, Any]) -> TokenUsage:
     usage = payload.get("usage")
     if not isinstance(usage, Mapping):
-        return TokenUsage()
+        raise ModelBudgetConfigurationError("Anthropic response usage metadata is missing or invalid")
     return TokenUsage(
-        input_tokens=_non_negative_int(usage.get("input_tokens")),
-        output_tokens=_non_negative_int(usage.get("output_tokens")),
-        cache_read_tokens=_non_negative_int(usage.get("cache_read_input_tokens")),
-        cache_write_tokens=_non_negative_int(usage.get("cache_creation_input_tokens")),
+        input_tokens=_strict_non_negative_int(usage.get("input_tokens"), "input_tokens"),
+        output_tokens=_strict_non_negative_int(usage.get("output_tokens"), "output_tokens"),
+        cache_read_tokens=_strict_non_negative_int(
+            usage.get("cache_read_input_tokens", 0), "cache_read_input_tokens"
+        ),
+        cache_write_tokens=_strict_non_negative_int(
+            usage.get("cache_creation_input_tokens", 0), "cache_creation_input_tokens"
+        ),
     )
 
 
@@ -453,6 +457,18 @@ def _non_negative_int(value: Any) -> int:
     except (TypeError, ValueError):
         return 0
     return max(0, parsed)
+
+
+def _strict_non_negative_int(value: Any, label: str) -> int:
+    if isinstance(value, bool):
+        raise ModelBudgetConfigurationError(f"Anthropic response {label} is invalid")
+    try:
+        parsed = int(value)
+    except (TypeError, ValueError) as exc:
+        raise ModelBudgetConfigurationError(f"Anthropic response {label} is invalid") from exc
+    if parsed < 0:
+        raise ModelBudgetConfigurationError(f"Anthropic response {label} cannot be negative")
+    return parsed
 
 
 def _decimal(value: str, label: str) -> Decimal:

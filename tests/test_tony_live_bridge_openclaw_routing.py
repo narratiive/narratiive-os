@@ -93,10 +93,16 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             app, base, gateway = self._app(tmp)
             gateway.converse.side_effect = TonyAgentGatewayError("gateway unavailable")
+            gateway.config.work_timeout_seconds = 30
+            budget_guard = mock.Mock()
+            reservation = object()
+            budget_guard.reserve_capacity.return_value = reservation
+            app.model_budget_guard = budget_guard
             status, payload = self._request(app, "Tony. What should I be working on?")
 
         self.assertTrue(status.startswith("503"))
         self.assertEqual(payload["error"]["code"], "openclaw_conversation_unavailable")
+        budget_guard.release_reservation.assert_not_called()
         base._handle_telegram_command.assert_not_called()
 
     def test_openclaw_no_reply_sentinel_never_becomes_telegram_silence(self):
