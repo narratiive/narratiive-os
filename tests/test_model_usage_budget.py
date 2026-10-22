@@ -132,6 +132,35 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
         with self.assertRaises(ModelBudgetConfigurationError):
             HostedModelBudgetGuard.from_environment({"TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "25"})
 
+    def test_environment_resolves_supported_openclaw_state_locations(self) -> None:
+        base = {
+            "TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "25",
+            "TONY_HOSTED_MODEL_WARNING_USD": "20",
+        }
+        self.assertEqual(
+            HostedModelBudgetGuard.from_environment(
+                {**base, "OPENCLAW_HOME": "/srv/openclaw"}
+            ).openclaw_state_dir,
+            Path("/srv/openclaw/.openclaw"),
+        )
+        self.assertEqual(
+            HostedModelBudgetGuard.from_environment(
+                {**base, "OPENCLAW_CONFIG_PATH": "/srv/state/config.json"}
+            ).openclaw_state_dir,
+            Path("/srv/state"),
+        )
+        self.assertEqual(
+            HostedModelBudgetGuard.from_environment(
+                {
+                    **base,
+                    "OPENCLAW_HOME": "/ignored",
+                    "OPENCLAW_CONFIG_PATH": "/ignored/config.json",
+                    "OPENCLAW_STATE_DIR": "/srv/explicit",
+                }
+            ).openclaw_state_dir,
+            Path("/srv/explicit"),
+        )
+
     def test_existing_unreadable_usage_metadata_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -141,6 +170,39 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ModelBudgetConfigurationError, "usage metadata is unreadable"):
                 guard.reserve_capacity()
+
+    def test_malformed_usage_metadata_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text("{incomplete\n", encoding="utf-8")
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "invalid JSON"):
+                self._guard(root).reserve_capacity()
+
+    def test_invalid_anthropic_usage_shape_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "one.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "responseId": "broken-usage",
+                            "usage": "unknown",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "usage metadata"):
+                self._guard(root).reserve_capacity()
 
     def test_non_finite_budget_values_are_rejected(self) -> None:
         for value in ("Infinity", "NaN", "-Infinity"):

@@ -6,7 +6,7 @@ import shlex
 import hashlib
 import hmac
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -1092,12 +1092,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         os.environ,
         repository_root=REPOSITORY_ROOT,
     )
-    try:
-        model_budget_reserve_usd = Decimal(os.getenv("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD", "1"))
-    except InvalidOperation as exc:
-        raise ValueError("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD must be a decimal number") from exc
-    if model_budget_reserve_usd < 0:
-        raise ValueError("TONY_HOSTED_MODEL_REQUEST_RESERVE_USD cannot be negative")
+    model_budget_reserve_usd = (
+        model_budget_guard.default_request_reserve_usd
+        if model_budget_guard is not None
+        else Decimal("1")
+    )
     return LeadAwareTonyApplication(
         app,
         lead_store,

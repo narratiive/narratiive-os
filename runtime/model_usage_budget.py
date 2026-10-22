@@ -130,9 +130,7 @@ class HostedModelBudgetGuard:
                 "both TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD and TONY_HOSTED_MODEL_WARNING_USD are required"
             )
         root = repository_root or Path(__file__).resolve().parents[1]
-        state_dir = Path(
-            str(active.get("OPENCLAW_STATE_DIR") or Path.home() / ".openclaw")
-        ).expanduser()
+        state_dir = _openclaw_state_dir(active)
         ledger = Path(
             str(
                 active.get("TONY_HOSTED_MODEL_USAGE_LEDGER")
@@ -401,12 +399,14 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
     records: list[tuple[str, TokenUsage]] = []
     with handle:
         for line in handle:
+            if not line.strip():
+                continue
             try:
                 event = json.loads(line)
-            except (json.JSONDecodeError, TypeError):
-                continue
+            except (json.JSONDecodeError, TypeError) as exc:
+                raise ModelBudgetConfigurationError("model usage metadata contains invalid JSON") from exc
             if not isinstance(event, Mapping):
-                continue
+                raise ModelBudgetConfigurationError("model usage metadata record is invalid")
             timestamp = str(event.get("timestamp") if openclaw else event.get("recorded_at") or "")
             if not timestamp.startswith(period + "-"):
                 continue
@@ -418,7 +418,7 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
                 continue
             usage = message.get("usage")
             if not isinstance(usage, Mapping):
-                continue
+                raise ModelBudgetConfigurationError("Anthropic usage metadata is missing or invalid")
             response_id = str(message.get("responseId") or message.get("response_id") or event.get("id") or "")
             if not response_id:
                 continue
@@ -465,3 +465,16 @@ def _decimal(value: str, label: str) -> Decimal:
     if parsed < 0:
         raise ModelBudgetConfigurationError(f"{label} cannot be negative")
     return parsed
+
+
+def _openclaw_state_dir(env: Mapping[str, str]) -> Path:
+    explicit_state = str(env.get("OPENCLAW_STATE_DIR") or "").strip()
+    if explicit_state:
+        return Path(explicit_state).expanduser()
+    explicit_config = str(env.get("OPENCLAW_CONFIG_PATH") or "").strip()
+    if explicit_config:
+        return Path(explicit_config).expanduser().parent
+    explicit_home = str(env.get("OPENCLAW_HOME") or "").strip()
+    if explicit_home:
+        return Path(explicit_home).expanduser() / ".openclaw"
+    return Path.home() / ".openclaw"
