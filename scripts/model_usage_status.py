@@ -26,6 +26,7 @@ def main() -> int:
         "configured": True,
         "period": snapshot.period,
         "estimated_cost_usd": str(snapshot.estimated_cost_usd.quantize(Decimal("0.01"))),
+        "reserved_cost_usd": str(snapshot.reserved_cost_usd.quantize(Decimal("0.01"))),
         "warning_limit_usd": str(snapshot.warning_limit_usd),
         "hard_limit_usd": str(snapshot.hard_limit_usd),
         "warning_reached": snapshot.warning_reached,

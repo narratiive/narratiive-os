@@ -84,13 +84,29 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             }
             else max_tokens
         )
+        reservation = None
         if budget_guard is not None:
+            estimated_input_tokens = (len(prompt.encode("utf-8")) + 2) // 3
+            conservative_input_rate = max(
+                budget_guard.pricing.input_usd_per_mtok,
+                budget_guard.pricing.cache_write_usd_per_mtok,
+            )
             maximum_output_cost = (
                 Decimal(request_max_tokens)
                 * budget_guard.pricing.output_usd_per_mtok
                 / Decimal(1_000_000)
             )
-            budget_guard.require_capacity(reserve_usd=maximum_output_cost)
+            estimated_input_cost = (
+                Decimal(estimated_input_tokens) * conservative_input_rate / Decimal(1_000_000)
+            )
+            reservation = budget_guard.reserve_capacity(
+                reserve_usd=(
+                    budget_guard.default_request_reserve_usd
+                    + estimated_input_cost
+                    + maximum_output_cost
+                ),
+                ttl_seconds=timeout_seconds + 60,
+            )
         payload = {
             "model": model,
             "max_tokens": request_max_tokens,
@@ -108,21 +124,26 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             },
             method="POST",
         )
-        with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
-            raw = response.read().decode("utf-8")
-        returned = json.loads(raw or "{}")
-        if not isinstance(returned, dict):
-            raise RuntimeError("Claude API response must be a JSON object")
-        if returned.get("error"):
-            raise RuntimeError(f"Claude API returned an error: {returned['error']}")
-
-        if budget_guard is not None and returned.get("id"):
-            budget_guard.record_direct_usage(
-                provider="anthropic",
-                model=str(returned.get("model") or model),
-                response_id=str(returned["id"]),
-                usage=token_usage_from_anthropic(returned),
-            )
+        try:
+            with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
+                raw = response.read().decode("utf-8")
+            returned = json.loads(raw or "{}")
+            if not isinstance(returned, dict):
+                raise RuntimeError("Claude API response must be a JSON object")
+            if budget_guard is not None and reservation is not None and returned.get("id"):
+                budget_guard.settle_direct_usage(
+                    reservation,
+                    provider="anthropic",
+                    model=str(returned.get("model") or model),
+                    response_id=str(returned["id"]),
+                    usage=token_usage_from_anthropic(returned),
+                )
+                reservation = None
+            if returned.get("error"):
+                raise RuntimeError(f"Claude API returned an error: {returned['error']}")
+        finally:
+            if budget_guard is not None and reservation is not None:
+                budget_guard.release_reservation(reservation)
 
         text = _response_text(returned)
         if not text:

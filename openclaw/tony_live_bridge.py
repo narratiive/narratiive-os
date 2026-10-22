@@ -334,9 +334,17 @@ class LeadAwareTonyApplication:
                         },
                     }
                     return self._respond(start_response, status, payload)
+                reservation = None
                 if self.model_budget_guard is not None:
-                    self.model_budget_guard.require_capacity(reserve_usd=self.model_budget_reserve_usd)
-                reply = self.agent_gateway.converse(text)
+                    reservation = self.model_budget_guard.reserve_capacity(
+                        reserve_usd=self.model_budget_reserve_usd,
+                        ttl_seconds=int(self.agent_gateway.config.work_timeout_seconds) + 60,
+                    )
+                try:
+                    reply = self.agent_gateway.converse(text)
+                finally:
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.release_reservation(reservation)
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":
                     reply = (
                         "I’m here, but I don’t have a verified update I can stand behind yet. "

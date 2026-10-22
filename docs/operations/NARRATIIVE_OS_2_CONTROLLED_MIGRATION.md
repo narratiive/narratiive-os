@@ -26,7 +26,7 @@ Configuration is stored in the existing mode-600 Narratiive runtime environment:
 - `TONY_HOSTED_MODEL_REQUEST_RESERVE_USD`
 - optional per-million-token pricing overrides
 
-The local guard blocks new Telegram-to-OpenClaw reasoning and direct Anthropic preparation when the current estimate plus its request reserve reaches the hard limit. It does not silently route consequential reasoning to Ollama. The Anthropic workspace limit remains the authoritative provider-side ceiling for calls that originate inside OpenClaw itself, including scheduled heartbeats.
+The local guard uses a mode-600, atomic cross-process reservation ledger and blocks new Telegram-to-OpenClaw reasoning and direct Anthropic preparation when committed usage plus live request reservations reaches the hard limit. Direct preparation reserves conservative prompt/cache and maximum-output cost before dispatch. It does not silently route consequential reasoning to Ollama. The Anthropic workspace limit remains the authoritative provider-side ceiling for calls that originate inside OpenClaw itself, including scheduled heartbeats.
 
 Run the local status check through the existing secured environment loader:
 

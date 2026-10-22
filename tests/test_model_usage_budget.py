@@ -50,6 +50,30 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
             self.assertEqual(snapshot.usage, TokenUsage(100, 200, 300, 400))
             self.assertEqual(snapshot.period, "2026-10")
 
+    def test_counts_openclaw_retained_deleted_and_reset_transcripts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sessions = root / "openclaw" / "agents" / "tony" / "sessions"
+            sessions.mkdir(parents=True)
+            for index, suffix in enumerate((".jsonl.deleted.2026-10-20", ".jsonl.reset.2026-10-21"), 1):
+                (sessions / f"retained-{index}{suffix}").write_text(
+                    json.dumps(
+                        {
+                            "timestamp": f"2026-10-{10 + index}T10:00:00Z",
+                            "message": {
+                                "provider": "anthropic",
+                                "responseId": f"retained-{index}",
+                                "usage": {"input": index, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                            },
+                        }
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+            (sessions / "ignored.trajectory.jsonl").write_text("not transcript metadata\n", encoding="utf-8")
+
+            self.assertEqual(self._guard(root).snapshot().usage.input_tokens, 3)
+
     def test_direct_usage_is_append_only_private_and_included(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -71,6 +95,38 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
 
             with self.assertRaisesRegex(ModelBudgetExceeded, "will not silently fall back"):
                 guard.require_capacity(reserve_usd=Decimal("1"))
+
+    def test_capacity_reservations_are_shared_across_guard_instances(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            first = self._guard(root, hard="3", warning="1")
+            second = self._guard(root, hard="3", warning="1")
+
+            reservation = first.reserve_capacity(reserve_usd=Decimal("2"))
+            with self.assertRaises(ModelBudgetExceeded):
+                second.reserve_capacity(reserve_usd=Decimal("1"))
+
+            first.release_reservation(reservation)
+            replacement = second.reserve_capacity(reserve_usd=Decimal("1"))
+            self.assertEqual(second.snapshot().reserved_cost_usd, Decimal("1"))
+            second.release_reservation(replacement)
+
+    def test_settling_direct_usage_atomically_replaces_reservation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            guard = self._guard(Path(directory))
+            reservation = guard.reserve_capacity(reserve_usd=Decimal("2"))
+
+            guard.settle_direct_usage(
+                reservation,
+                provider="anthropic",
+                model="claude-sonnet-4-6",
+                response_id="settled-1",
+                usage=TokenUsage(output_tokens=1000),
+            )
+
+            snapshot = guard.snapshot()
+            self.assertEqual(snapshot.reserved_cost_usd, Decimal("0"))
+            self.assertEqual(snapshot.usage.output_tokens, 1000)
 
     def test_environment_requires_both_limits(self) -> None:
         with self.assertRaises(ModelBudgetConfigurationError):
