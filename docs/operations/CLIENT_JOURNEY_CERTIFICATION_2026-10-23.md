@@ -35,7 +35,7 @@ production path.
 
 ## Evidence summary
 
-- The repository suite passed 1,819 tests on the certification branch.
+- The repository suite passed 1,822 tests on the certification branch.
 - A focused 44-test client-journey suite passed on the deployed-code lineage.
 - The isolated FIELDWORK v4 plus SKETCHBOOK v2 branch passed 1,792 tests without
   modifying or merging that branch.

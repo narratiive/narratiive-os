@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS, latest_artifact
 
 
@@ -33,9 +34,11 @@ class WorkflowActionPreviewService:
         self,
         workflow_root: str | Path,
         gmail_dispatcher: Callable[[dict[str, Any]], dict[str, Any]] | None,
+        terminology_policy: TerminologyPolicy | None = None,
     ) -> None:
         self.workflow_root = Path(workflow_root).resolve()
         self.gmail_dispatcher = gmail_dispatcher
+        self.terminology_policy = terminology_policy or TerminologyPolicy.from_path()
 
     def artifact_detail(self, state: WorkflowState) -> dict[str, Any]:
         artifact, output = self._artifact_output(state)
@@ -90,7 +93,9 @@ class WorkflowActionPreviewService:
             raise WorkflowActionPreviewError("approved artefact has no polished human-review PDF")
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
-        body = _resolve_simulation_body(source_body, recipient_name)
+        body = self.terminology_policy.render_customer_facing(
+            _resolve_simulation_body(source_body, recipient_name)
+        )
         action = {
             "kind": "simulated_growth_sprint_proposal_email",
             "simulation_mode": True,
@@ -101,7 +106,9 @@ class WorkflowActionPreviewService:
             "recipient_email": INTERNAL_REVIEW_ADDRESS,
             "cc": [],
             "bcc": [],
-            "subject": f"{company} — Growth Sprint Proposal",
+            "subject": self.terminology_policy.render_customer_facing(
+                f"{company} — Growth Sprint Proposal"
+            ),
             "body_description": _body_description(body),
             "full_body": body,
             "body_source_field": "draft_client_communication",
