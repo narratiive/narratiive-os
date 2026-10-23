@@ -218,13 +218,20 @@ class TerminologyPolicy:
         protected_phrases: Iterable[str] = (),
     ) -> list[TerminologyViolation]:
         """Find terms that must not pass through a customer-facing boundary."""
-        violations = self.scan(text)
         protected_spans = tuple(
             match.span()
             for phrase in protected_phrases
             if str(phrase).strip()
             for match in self._pattern(str(phrase).strip()).finditer(text)
         )
+        violations = [
+            violation
+            for violation in self.scan(text)
+            if not any(
+                start <= violation.start and violation.end <= end
+                for start, end in protected_spans
+            )
+        ]
         for entry in self.customer_facing_aliases:
             for match in self._product_label_pattern(entry["term"]).finditer(text):
                 if any(start <= match.start() and match.end() <= end for start, end in protected_spans):

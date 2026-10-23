@@ -72,6 +72,13 @@ class TerminologyPolicyTests(unittest.TestCase):
             [],
         )
         self.assertEqual(
+            self.policy.scan_customer_facing(
+                "Opportunity Card Labs needs Groundwork",
+                protected_phrases=("Opportunity Card Labs",),
+            ),
+            [],
+        )
+        self.assertEqual(
             [item.term for item in self.policy.scan_customer_facing("Blueprint Lite Executive Summary")],
             ["Blueprint Lite"],
         )
