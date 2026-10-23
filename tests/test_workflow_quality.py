@@ -515,7 +515,15 @@ class WorkflowQualityTests(unittest.TestCase):
         )
         result = growth_sprint_proposal_quality_gate(legacy_name)
         self.assertFalse(result["passed"])
-        self.assertIn("draft client communication uses current product names", result["failed_checks"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
+
+        legacy_review_field = proposal_output()
+        legacy_review_field["commercial_proposal_inputs"]["investment_recommendation"] = (
+            "Within the authorised Growth Sprint range, exact figure for human approval"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_review_field)
+        self.assertFalse(result["passed"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
 
         proper_name = proposal_output()
         proper_name["draft_client_communication"] += " Growth Sprint Labs remains the named client in this synthetic example."
