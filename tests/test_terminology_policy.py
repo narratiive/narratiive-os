@@ -50,6 +50,11 @@ class TerminologyPolicyTests(unittest.TestCase):
         self.assertEqual(self.policy.render_owned_product_copy("Blueprint  Lite is ready"), "Groundwork is ready")
         self.assertEqual(self.policy.render_owned_product_copy("Blueprint\nLite is ready"), "Groundwork is ready")
         self.assertEqual(self.policy.rewrite("Blueprint Lite Labs"), "Blueprint Lite Labs")
+        self.assertEqual(
+            self.policy.render_owned_product_copy("Prepare Blueprint Lite for Blueprint Lite Labs"),
+            "Prepare Groundwork for Blueprint Lite Labs",
+        )
+        self.assertEqual(self.policy.scan_customer_facing("Blueprint Lite Labs"), [])
 
     def test_rejects_duplicate_customer_facing_aliases(self) -> None:
         with self.assertRaisesRegex(ValueError, "Duplicate customer-facing alias"):

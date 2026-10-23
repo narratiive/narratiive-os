@@ -55,6 +55,10 @@ def policy() -> TerminologyPolicy:
                 {"term": "Growth Blueprint", "use": "Canonical product name."}
             ],
             "unsettled_terms": [],
+            "customer_facing_aliases": [
+                {"term": "Blueprint Lite", "replacement": "Groundwork", "rationale": "Approved customer name"},
+                {"term": "Growth Sprint", "replacement": "Fieldwork", "rationale": "Approved customer name"},
+            ],
             "retired_terms": [
                 {
                     "term": "strategy session",
@@ -124,6 +128,24 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
         self.assertEqual(response.status, "error")
         self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
         self.assertIn("policy checksum mismatch", response.message)
+
+    def test_active_internal_workflow_labels_render_without_changing_client_name(self):
+        base_snapshot = snapshot()
+        active = replace(
+            base_snapshot.workstreams[0],
+            title="Blueprint Lite for Growth Sprint Labs",
+            next_action="Prepare Growth Sprint Proposal",
+        )
+        service = TonyExecutiveCommandService(
+            StubCommandService(lambda: replace(base_snapshot, workstreams=(active,))),
+            terminology_policy_loader=policy,
+        )
+
+        response = service.execute("/morning", [])
+
+        self.assertEqual(response.status, "healthy")
+        self.assertIn("Groundwork for Growth Sprint Labs", response.message)
+        self.assertIn("Fieldwork Proposal", response.message)
 
 
 if __name__ == "__main__":

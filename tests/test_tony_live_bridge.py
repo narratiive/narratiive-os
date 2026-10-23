@@ -69,12 +69,12 @@ class TonyLiveBridgeTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp,mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",{"TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT":"disabled","TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json")},clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader,loader)
     def test_telegram_formats_owned_labels_without_mutating_canonical_data(self):
-        data={"blockers":["Review Blueprint Lite"],"approvals_required":["Approve Growth Sprint Proposal"],"workstreams":[]}
+        data={"blockers":["Review Blueprint Lite for Growth Sprint Labs"],"approvals_required":["Approve Growth Sprint Proposal"],"workstreams":[]}
         response=CommandResponse(command="mission",status="ok",message="Mission Control ready.",data=data)
         reply=tony_live_bridge.TonyHTTPBridge._format_telegram_reply(response)
-        self.assertIn("Review Groundwork",reply)
+        self.assertIn("Review Groundwork for Growth Sprint Labs",reply)
         self.assertIn("Approve Fieldwork Proposal",reply)
-        self.assertEqual(data["blockers"],["Review Blueprint Lite"])
+        self.assertEqual(data["blockers"],["Review Blueprint Lite for Growth Sprint Labs"])
         self.assertEqual(data["approvals_required"],["Approve Growth Sprint Proposal"])
     def test_lead_ingestion_is_authenticated_and_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:

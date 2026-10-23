@@ -170,6 +170,16 @@ class TerminologyPolicy:
         flexible_term = r"\s+".join(re.escape(part) for part in term.split())
         return re.compile(rf"(?<!\w){flexible_term}(?!\w)", re.IGNORECASE)
 
+    @staticmethod
+    def _product_label_pattern(term: str) -> re.Pattern[str]:
+        """Match a product label while excluding a likely proper-name continuation."""
+        flexible_term = r"\s+".join(re.escape(part) for part in term.split())
+        owned_suffixes = "Proposal|Assessment|Review|Engagement|Artefact|Artifact|Workflow"
+        return re.compile(
+            rf"(?<!\w)(?i:{flexible_term})(?!\w)"
+            rf"(?!\s+(?!(?:{owned_suffixes})\b)[A-Z][\w&'’.-]*)"
+        )
+
     def scan(self, text: str) -> list[TerminologyViolation]:
         violations: list[TerminologyViolation] = []
         for entry in self.retired_terms:
@@ -192,7 +202,7 @@ class TerminologyPolicy:
         """Find terms that must not pass through a customer-facing boundary."""
         violations = self.scan(text)
         for entry in self.customer_facing_aliases:
-            for match in self._pattern(entry["term"]).finditer(text):
+            for match in self._product_label_pattern(entry["term"]).finditer(text):
                 violations.append(
                     TerminologyViolation(
                         entry["term"],
@@ -224,5 +234,5 @@ class TerminologyPolicy:
         """Render system-owned product copy; never pass evidence or client-authored text."""
         rendered = text
         for entry in self.customer_facing_aliases:
-            rendered = self._pattern(entry["term"]).sub(entry["replacement"], rendered)
+            rendered = self._product_label_pattern(entry["term"]).sub(entry["replacement"], rendered)
         return self.rewrite(rendered)
