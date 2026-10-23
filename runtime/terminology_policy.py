@@ -220,8 +220,8 @@ class TerminologyPolicy:
             rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
         return rewritten
 
-    def render_customer_facing(self, text: str) -> str:
-        """Apply approved aliases at a presentation boundary, then retired-term rewrites."""
+    def render_owned_product_copy(self, text: str) -> str:
+        """Render system-owned product copy; never pass evidence or client-authored text."""
         rendered = text
         for entry in self.customer_facing_aliases:
             rendered = self._pattern(entry["term"]).sub(entry["replacement"], rendered)

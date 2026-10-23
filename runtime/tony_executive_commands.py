@@ -143,8 +143,8 @@ class TonyExecutiveCommandService:
             brief = self.agency_brief_service.build(state, period)
             source_message = brief.render_compact()
             source_violations = policy.scan(source_message)
-            message = policy.render_customer_facing(source_message)
-            violations = policy.scan(message)
+            message = policy.rewrite(source_message)
+            violations = policy.scan_customer_facing(message)
             if violations:
                 terms = ", ".join(sorted({item.term for item in violations}))
                 raise ValueError(

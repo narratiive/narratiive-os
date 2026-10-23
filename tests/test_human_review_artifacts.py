@@ -109,6 +109,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
 
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()
+        output["growth_problem_or_opportunity"] = "Growth Sprint Labs needs a clearer category position."
         output.update(
             {
                 "provider": "DO-NOT-SHOW-PROVIDER",
@@ -149,7 +150,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
             self.assertIn("Fieldwork Proposal", visible)
-            self.assertNotIn("Growth Sprint", visible)
+            self.assertIn("Growth Sprint Labs", visible)
             self.assertIn("Proposed workstreams", visible)
             for internal_value in (
                 "DO-NOT-SHOW-PROVIDER",

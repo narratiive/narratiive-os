@@ -38,7 +38,6 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
-from runtime.terminology_policy import TerminologyPolicy
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
@@ -281,9 +280,9 @@ class HumanReviewPresentationService:
 def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> ReviewDocumentPlan:
     company = _company_name(state)
     if state.workflow_id == "growth_diagnostic_to_blueprint_lite":
-        return _customer_facing_plan(_blueprint_lite_plan(company, output))
+        return _blueprint_lite_plan(company, output)
     if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-        return _customer_facing_plan(_growth_sprint_plan(company, output))
+        return _growth_sprint_plan(company, output)
     if state.workflow_id in {
         "growth_sprint_to_research_engine",
         "blueprint_lite_to_discovery_preparation",
@@ -296,34 +295,6 @@ def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> Review
         return _growth_blueprint_plan(company, output)
     raise HumanReviewArtifactError(
         f"no human review presentation contract is registered for {state.workflow_id}"
-    )
-
-
-def _customer_facing_plan(plan: ReviewDocumentPlan) -> ReviewDocumentPlan:
-    """Render a new review copy without changing its authoritative source artefact."""
-    policy = TerminologyPolicy.from_path()
-    render = policy.render_customer_facing
-    sections = tuple(
-        ReviewSection(
-            heading=render(section.heading),
-            body=tuple(render(item) for item in section.body),
-            items=tuple(render(item) for item in section.items),
-            cards=tuple(
-                (render(title), tuple(render(item) for item in items))
-                for title, items in section.cards
-            ),
-        )
-        for section in plan.sections
-    )
-    return ReviewDocumentPlan(
-        product=render(plan.product),
-        gate_label=plan.gate_label,
-        company=plan.company,
-        subtitle=render(plan.subtitle),
-        sections=sections,
-        focus_points=tuple(render(item) for item in plan.focus_points),
-        decision_prompt=render(plan.decision_prompt),
-        next_if_approved=render(plan.next_if_approved),
     )
 
 

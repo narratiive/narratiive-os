@@ -93,9 +93,14 @@ class WorkflowActionPreviewService:
             raise WorkflowActionPreviewError("approved artefact has no polished human-review PDF")
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
-        body = self.terminology_policy.render_customer_facing(
-            _resolve_simulation_body(source_body, recipient_name)
-        )
+        body = _resolve_simulation_body(source_body, recipient_name)
+        aliases = self.terminology_policy.scan_customer_facing(body)
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise WorkflowActionPreviewError(
+                "approved draft client communication requires a new exact version using current customer-facing names: "
+                + terms
+            )
         action = {
             "kind": "simulated_growth_sprint_proposal_email",
             "simulation_mode": True,
@@ -106,9 +111,7 @@ class WorkflowActionPreviewService:
             "recipient_email": INTERNAL_REVIEW_ADDRESS,
             "cc": [],
             "bcc": [],
-            "subject": self.terminology_policy.render_customer_facing(
-                f"{company} — Growth Sprint Proposal"
-            ),
+            "subject": f"{company} — Fieldwork Proposal",
             "body_description": _body_description(body),
             "full_body": body,
             "body_source_field": "draft_client_communication",

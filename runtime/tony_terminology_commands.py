@@ -44,10 +44,11 @@ class TonyTerminologyCommandService:
             response = self.media_commands.execute(command, objects)
         else:
             response = self.conversation_router.execute(command, objects)
-        rewritten_message = self.policy.render_customer_facing(response.message)
+        # A response may contain client facts or proper names. Retired vocabulary
+        # can be rewritten, but aliases require the producing service to emit the
+        # approved customer label rather than mutating evidence at this boundary.
+        rewritten_message = self.policy.rewrite(response.message)
         rewritten_data = self._rewrite_value(response.data)
-        if rewritten_message == response.message and rewritten_data == response.data:
-            return response
         remaining = self.policy.scan_customer_facing(rewritten_message)
         remaining.extend(self.policy.scan_many(self._strings("", rewritten_data)))
         if remaining:
@@ -63,6 +64,8 @@ class TonyTerminologyCommandService:
                     "policy_version": self.policy.version,
                 },
             )
+        if rewritten_message == response.message and rewritten_data == response.data:
+            return response
 
         return CommandResponse(
             command=response.command,
