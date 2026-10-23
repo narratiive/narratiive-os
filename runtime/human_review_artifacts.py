@@ -17,7 +17,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from html import escape
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -38,7 +38,7 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
-from runtime.terminology_policy import TerminologyPolicy
+from runtime.terminology_policy import TerminologyPolicy, customer_identity_phrases
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
@@ -213,7 +213,14 @@ class HumanReviewPresentationService:
         if state.workflow_id == "growth_blueprint_deliverable_production":
             return self._ingest_growth_blueprint_review(state=state, source=source, output=output)
         plan = build_review_plan(state, output)
-        _validate_review_plan(plan)
+        _validate_review_plan(
+            plan,
+            protected_phrases=customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+                client_id=state.client_id,
+            ),
+        )
         pdf_bytes, pages = NarratiiveReviewPDFRenderer().render(plan)
         return self.store.persist(
             state=state,
@@ -266,7 +273,14 @@ class HumanReviewPresentationService:
                 "Growth Blueprint review PDF exposes internal field names: " + ", ".join(leaked)
             )
         plan = _produced_growth_blueprint_plan(_company_name(state), output)
-        _validate_review_plan(plan)
+        _validate_review_plan(
+            plan,
+            protected_phrases=customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+                client_id=state.client_id,
+            ),
+        )
         return self.store.persist(
             state=state,
             source=source,
@@ -799,17 +813,12 @@ def _telegram_notification(plan: ReviewDocumentPlan) -> str:
 
 
 def _company_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    for value in (
-        payload.get("company"),
-        payload.get("company_name"),
-        (payload.get("commercial_context") or {}).get("company") if isinstance(payload.get("commercial_context"), Mapping) else None,
-        (payload.get("company_context") or {}).get("name") if isinstance(payload.get("company_context"), Mapping) else None,
-        (payload.get("client_context") or {}).get("name") if isinstance(payload.get("client_context"), Mapping) else None,
-    ):
-        if _clean_text(value):
-            return _clean_text(value)
-    return state.entity_id or state.client_id
+    identities = customer_identity_phrases(
+        state.input_payload,
+        entity_id=state.entity_id,
+        client_id=state.client_id,
+    )
+    return _clean_text(identities[0]) if identities else state.client_id
 
 
 def _workstream_cards(value: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -874,7 +883,11 @@ def _p(value: str) -> str:
     return escape(_clean_text(value)).replace("\n", "<br/>")
 
 
-def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
+def _validate_review_plan(
+    plan: ReviewDocumentPlan,
+    *,
+    protected_phrases: Iterable[str] = (),
+) -> None:
     visible_text = " ".join(
         (
             plan.product,
@@ -892,7 +905,7 @@ def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
     )
     aliases = TerminologyPolicy.from_path().scan_customer_facing(
         visible_text,
-        protected_phrases=(plan.company,),
+        protected_phrases=protected_phrases,
     )
     if aliases:
         terms = ", ".join(dict.fromkeys(item.term for item in aliases))

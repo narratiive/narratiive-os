@@ -85,7 +85,8 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 checksum=hashlib.sha256(encoded).hexdigest(),
             )
             workflow_state = state("growth_diagnostic_to_blueprint_lite")
-            workflow_state.input_payload["company"] = "Blueprint Lite"
+            workflow_state.input_payload.pop("company", None)
+            workflow_state.input_payload["client_context"] = {"company_name": "Blueprint Lite"}
             review = HumanReviewPresentationService(
                 HumanReviewArtifactStore(root / "reviews")
             ).produce(state=workflow_state, source=source, output=output)

@@ -25,11 +25,8 @@ from runtime.worker_registry import (
     WorkerMetadata,
     WorkerRegistration,
 )
-from runtime.workflow_execution_coordinator import (
-    FileWorkflowArtifactStore,
-    WorkflowExecutionCoordinator,
-    _protected_customer_identities,
-)
+from runtime.terminology_policy import customer_identity_phrases
+from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, WorkflowExecutionCoordinator
 from runtime.workflow_registry import WorkflowRegistry
 
 
@@ -45,13 +42,16 @@ class ProtectedCustomerIdentityTests(unittest.TestCase):
             },
         )
         self.assertEqual(
-            _protected_customer_identities(state),
+            customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+            ),
             (
                 "Top Level Company",
-                "growth-sprint-technologies",
                 "Growth Sprint Technologies",
                 "Blueprint Lite",
                 "Nested Client Ltd",
+                "growth-sprint-technologies",
             ),
         )
 

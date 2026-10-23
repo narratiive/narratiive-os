@@ -4,9 +4,27 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "proposition" / "terminology.json"
+
+
+def customer_identity_phrases(
+    payload: Mapping[str, Any],
+    *,
+    entity_id: str = "",
+    client_id: str = "",
+) -> tuple[str, ...]:
+    """Return every supported explicit customer identity in stable precedence order."""
+    values: list[Any] = [payload.get("company"), payload.get("company_name")]
+    for field in ("commercial_context", "company_context", "client_context"):
+        context = payload.get(field)
+        if isinstance(context, Mapping):
+            values.extend((context.get("company"), context.get("company_name"), context.get("name")))
+    values.extend((entity_id, client_id))
+    return tuple(
+        dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())
+    )
 
 
 @dataclass(frozen=True)

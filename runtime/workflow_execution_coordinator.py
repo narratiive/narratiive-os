@@ -27,6 +27,7 @@ from runtime.worker_registry import (
 from runtime.workflow_registry import WorkflowRegistry
 from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_quality import growth_sprint_proposal_quality_gate
+from runtime.terminology_policy import customer_identity_phrases
 from runtime.workflow_run_identity import downstream_run_id
 
 
@@ -38,18 +39,6 @@ _BOUNDED_STRATEGY_CONTEXT_FIELDS: dict[str, tuple[str, ...]] = {
     "strategic_synthesis_to_strategy_thesis": ("contradictions_and_gaps", "open_inputs", "_lineage"),
     "strategy_thesis_to_growth_blueprint": ("evidence_and_uncertainty", "_lineage"),
 }
-
-
-def _protected_customer_identities(state: WorkflowState) -> tuple[str, ...]:
-    payload = state.input_payload
-    values: list[Any] = [payload.get("company"), payload.get("company_name"), state.entity_id]
-    for field in ("commercial_context", "company_context", "client_context"):
-        context = payload.get(field)
-        if isinstance(context, Mapping):
-            values.extend((context.get("company"), context.get("company_name"), context.get("name")))
-    return tuple(
-        dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())
-    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -405,7 +394,11 @@ class WorkflowExecutionCoordinator:
                         quality = dict(
                             validator(
                                 output,
-                                protected_customer_identities=_protected_customer_identities(state),
+                                protected_customer_identities=customer_identity_phrases(
+                                    state.input_payload,
+                                    entity_id=state.entity_id,
+                                    client_id=state.client_id,
+                                ),
                             )
                         )
                     else:
