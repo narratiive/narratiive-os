@@ -68,17 +68,14 @@ class TonyLiveBridgeTests(unittest.TestCase):
         base_app=mock.Mock(); base_service=mock.Mock(); loader=mock.Mock(); base_service.mission_control_loader=loader; base_app.command_service=base_service; base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
         with tempfile.TemporaryDirectory() as tmp,mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",{"TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT":"disabled","TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json")},clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader,loader)
-    def test_telegram_formats_owned_labels_without_mutating_canonical_data(self):
+    def test_telegram_preserves_persisted_mission_text(self):
         data={"blockers":["Review Blueprint Lite for Growth Sprint Labs"],"approvals_required":["Approve Growth Sprint Proposal"],"workstreams":[]}
         response=CommandResponse(command="mission",status="ok",message="Mission Control ready.",data=data)
         reply=tony_live_bridge.TonyHTTPBridge._format_telegram_reply(response)
-        self.assertIn("Review Groundwork for Growth Sprint Labs",reply)
-        self.assertIn("Approve Fieldwork Proposal",reply)
+        self.assertIn("Review Blueprint Lite for Growth Sprint Labs",reply)
+        self.assertIn("Approve Growth Sprint Proposal",reply)
         self.assertEqual(data["blockers"],["Review Blueprint Lite for Growth Sprint Labs"])
         self.assertEqual(data["approvals_required"],["Approve Growth Sprint Proposal"])
-    def test_workflow_telegram_reply_uses_customer_labels_without_changing_company_name(self):
-        reply=tony_live_bridge.protect_owned_telegram_output("Growth Sprint Labs — Blueprint Lite: awaiting approval for Growth Sprint Proposal.")
-        self.assertEqual(reply,"Growth Sprint Labs — Groundwork: awaiting approval for Fieldwork Proposal.")
     def test_lead_ingestion_is_authenticated_and_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             base_app=mock.Mock(); base_app.bridge_token="secret"; base_app.command_service=mock.Mock(); base_app.brief_archive=mock.Mock(); store=tony_live_bridge.FileInboundLeadStore(Path(tmp)/"leads.json"); app=tony_live_bridge.LeadAwareTonyApplication(base_app,store); payload=json.dumps({"lead_id":"lead-1","contact":"Steve","company":"Steve Company","source":"Growth Diagnostic","status":"New"}).encode(); environ={"REQUEST_METHOD":"POST","PATH_INFO":"/leads/ingest","CONTENT_LENGTH":str(len(payload)),"CONTENT_TYPE":"application/json","HTTP_AUTHORIZATION":"Bearer secret","wsgi.input":io.BytesIO(payload)}; status={}; response=app(environ,lambda value,headers:status.update(value=value,headers=headers)); self.assertTrue(status["value"].startswith("200")); self.assertTrue(json.loads(b"".join(response))["ok"])

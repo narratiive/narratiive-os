@@ -184,9 +184,11 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertFalse(portfolio.data["external_action_taken"])
         by_client = {item["client_id"]: item for item in portfolio.data["clients"]}
         self.assertEqual(by_client["safe-client"]["current_gate"], 1)
+        self.assertEqual(by_client["safe-client"]["current_phase"], "Groundwork")
         self.assertEqual(by_client["safe-client"]["journey_status"], "awaiting_human_approval")
         self.assertEqual(by_client["safe-client-two"]["journey_status"], "in_progress")
         self.assertEqual(by_client["safe-client-two"]["run_count"], 1)
+        self.assertIn("Groundwork", portfolio.message)
 
     def test_campaign_portfolio_is_restart_safe_and_does_not_mutate_runs(self) -> None:
         before = {

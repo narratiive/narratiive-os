@@ -93,7 +93,6 @@ from runtime.tony_post_discovery_proposal_execution import TonyPostDiscoveryProp
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
-from runtime.terminology_policy import TerminologyPolicy
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
@@ -102,13 +101,6 @@ from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceed
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
-
-
-def protect_owned_telegram_output(value: str) -> str:
-    """Apply customer product labels to system-owned workflow copy only."""
-
-    rendered = TerminologyPolicy.from_path().render_owned_product_copy(value)
-    return protect_telegram_output(rendered)
 
 _WORKFLOW_DECISION_TARGET = re.compile(
     r"\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|"
@@ -315,11 +307,12 @@ class LeadAwareTonyApplication:
                     principal = supplied_principal if supplied_principal == self.authorised_principal_id else ""
                     response = self.workflow_command_service.execute(text, (), principal_id=principal)
                     status = HTTPStatus.OK
+                    rendered_message = protect_telegram_output(response.message)
                     payload = {
                         "ok": response.status != "error",
-                        "reply": protect_owned_telegram_output(response.message),
-                        "message": protect_owned_telegram_output(response.message),
                         **response.to_dict(),
+                        "reply": rendered_message,
+                        "message": rendered_message,
                     }
                 else:
                     status, payload = self.base._handle_telegram_command(text)
