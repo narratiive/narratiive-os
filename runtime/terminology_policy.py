@@ -167,7 +167,8 @@ class TerminologyPolicy:
 
     @staticmethod
     def _pattern(term: str) -> re.Pattern[str]:
-        return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
+        flexible_term = r"\s+".join(re.escape(part) for part in term.split())
+        return re.compile(rf"(?<!\w){flexible_term}(?!\w)", re.IGNORECASE)
 
     def scan(self, text: str) -> list[TerminologyViolation]:
         violations: list[TerminologyViolation] = []
@@ -207,16 +208,21 @@ class TerminologyPolicy:
         return [violation for text in texts for violation in self.scan_customer_facing(text)]
 
     def rewrite(self, text: str) -> str:
-        """Render customer-facing aliases and retired terms safely.
+        """Rewrite retired terminology into current descriptive language.
 
         A policy-supplied replacement is preferred. Where a retired term has no
         explicit replacement, use a deliberately generic description rather than
         blocking an otherwise useful Tony response.
         """
         rewritten = text
-        for entry in self.customer_facing_aliases:
-            rewritten = self._pattern(entry["term"]).sub(entry["replacement"], rewritten)
         for entry in self.retired_terms:
             replacement = str(entry.get("replacement") or "current Narratiive approach").strip()
             rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
         return rewritten
+
+    def render_customer_facing(self, text: str) -> str:
+        """Apply approved aliases at a presentation boundary, then retired-term rewrites."""
+        rendered = text
+        for entry in self.customer_facing_aliases:
+            rendered = self._pattern(entry["term"]).sub(entry["replacement"], rendered)
+        return self.rewrite(rendered)

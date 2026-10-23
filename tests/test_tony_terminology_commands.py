@@ -52,10 +52,16 @@ class TonyTerminologyCommandTests(unittest.TestCase):
         self.assertNotIn("Growth Sprint", str(result.data))
 
     def test_renders_customer_facing_alias_without_mutating_source_response(self) -> None:
-        response = CommandResponse(command="status", status="ok", message="Blueprint Lite is ready.", data={})
+        response = CommandResponse(
+            command="status",
+            status="ok",
+            message="Blueprint Lite is ready.",
+            data={"product": "Blueprint Lite", "approval_evidence": "Reviewed Blueprint Lite v1"},
+        )
         service = TonyTerminologyCommandService(StubService(response), self.policy)
         result = service.execute("/status", ())
         self.assertEqual(result.message, "Groundwork is ready.")
+        self.assertEqual(result.data, response.data)
         self.assertEqual(response.message, "Blueprint Lite is ready.")
 
     def test_vocabulary_returns_repository_policy_without_delegation(self) -> None:

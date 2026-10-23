@@ -137,7 +137,7 @@ class FilePromptRegistry:
         return sorted(versions, key=lambda item: item.version)
 
     def _validate_content(self, content: str) -> None:
-        violations = self.terminology_policy.scan_customer_facing(content)
+        violations = self.terminology_policy.scan(content)
         if not violations:
             return
         terms = sorted({violation.term for violation in violations}, key=str.casefold)
