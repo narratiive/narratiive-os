@@ -55,22 +55,26 @@ class AgencyExecutiveBrief:
             if self.status != "blocked"
             else "The agency has a critical outcome-level blocker requiring attention."
         )
-        lines = [heading, f"Agency status: {status_sentence}"]
-        if self.material_changes:
-            self._append(lines, "Material changes", self.material_changes)
-        else:
-            lines.append("Material changes: none since the previous successfully delivered briefing.")
-        self._append(lines, "Commercial", self.commercial)
-        self._append(lines, "Clients", self.clients)
-        self._append(lines, "Delivery", self.delivery)
-        self._append(lines, "Finance", self.finance)
-        self._append(lines, "Operations", self.operations)
-        self._append(lines, "Automation", self.automation)
-        self._append(lines, "Agency blockers", self.agency_blockers)
-        self._append(lines, "Founder decisions required", self.matt_actions)
-        self._append(lines, "Tony's recommended next actions", self.recommended_actions)
+        delivery = self._unique(
+            self.clients
+            + self.delivery
+            + self.finance
+            + self.operations
+            + self.automation
+            + self.agency_blockers
+        )
+        commercial = self.commercial or (
+            "Confirmed: no material commercial change since the previous successfully delivered briefing.",
+        )
+        decisions = self.matt_actions or ("None confirmed.",)
+        priorities = self.recommended_actions[:3] or (self.recommendation,)
+        lines = [heading, f"1. Agency status — {status_sentence}"]
+        self._append(lines, "2. Commercial opportunities — what changed and why it matters", commercial)
+        self._append(lines, "3. Delivery — progress and material blockers", delivery or ("No material change confirmed.",))
+        self._append(lines, "4. Decisions required — explicit founder approvals", decisions)
+        self._append(lines, "5. Recommended priorities", priorities)
         if self.internal_platform_note:
-            lines.append(f"Internal systems: {self.internal_platform_note}")
+            lines.append(f"Supporting note: {self.internal_platform_note}")
         output = "\n".join(lines)
         if len(output) <= limit:
             return output
@@ -78,10 +82,12 @@ class AgencyExecutiveBrief:
 
     @staticmethod
     def _append(lines: list[str], heading: str, values: tuple[str, ...]) -> None:
-        if not values:
-            return
-        lines.append(f"{heading}:")
+        lines.append(heading)
         lines.extend(f"- {value}" for value in values)
+
+    @staticmethod
+    def _unique(values: tuple[str, ...]) -> tuple[str, ...]:
+        return tuple(dict.fromkeys(values))
 
 
 class AgencyExecutiveBriefService:
@@ -172,11 +178,11 @@ class AgencyExecutiveBriefService:
 
     @staticmethod
     def _line(item: AgencyItem) -> str:
-        evidence = item.evidence[0] if item.evidence else "No source reference available"
+        certainty = "Confirmed" if item.evidence else "Assumption"
         why = item.why_matters or "This materially affects the current agency plan."
         return (
-            f"[{item.significance}] {item.title}. Why it matters: {why} "
-            f"Evidence: {evidence}. Recommended action: {item.next_action}"
+            f"{certainty}: {item.title}. Why it matters: {why} "
+            f"Recommended action: {item.next_action}"
         )
 
     @staticmethod

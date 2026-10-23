@@ -25,6 +25,7 @@ from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
 from runtime.campaign_engine import CampaignIdentity
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.inbound_lead_alerts import InboundLeadAlertJournal, InboundLeadAlertService
 from runtime.agency_state_projection import AgencyStateProjector
 from runtime.lead_attention import LeadAttentionService
 from runtime.briefing_intelligence import (
@@ -98,6 +99,8 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
+from runtime.proactive_executive_delivery import FileDeliveryKeyStore
+from openclaw.telegram_outbound import TelegramConfig, TelegramSender
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -223,6 +226,7 @@ class LeadAwareTonyApplication:
         mission_control_web: MissionControlWebApplication | None = None,
         model_budget_guard: HostedModelBudgetGuard | None = None,
         model_budget_reserve_usd: Decimal = Decimal("1"),
+        inbound_alert_service: InboundLeadAlertService | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -238,6 +242,7 @@ class LeadAwareTonyApplication:
         self.mission_control_web = mission_control_web
         self.model_budget_guard = model_budget_guard
         self.model_budget_reserve_usd = model_budget_reserve_usd
+        self.inbound_alert_service = inbound_alert_service
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -815,6 +820,11 @@ class LeadAwareTonyApplication:
                 # retries from becoming separate Tony leads and preparation jobs.
                 payload = dict(payload)
                 payload["lead_id"] = source_submission_id
+            if diagnostic:
+                payload = dict(payload)
+                for field in ("selected_service", "service_preference", "business_challenge", "challenge"):
+                    if diagnostic.get(field) not in (None, ""):
+                        payload[field] = diagnostic[field]
             lead = InboundLead.from_mapping(payload)
             self.lead_store.upsert(lead)
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -823,7 +833,7 @@ class LeadAwareTonyApplication:
             return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
 
         preparation = None
-        if self.blueprint_lite_service is not None:
+        if self.blueprint_lite_service is not None and lead.should_prepare_groundwork():
             try:
                 preparation_payload = request if isinstance(request.get("lead"), dict) else payload
                 preparation = self.blueprint_lite_service.enqueue_and_start(lead, preparation_payload)
@@ -836,16 +846,27 @@ class LeadAwareTonyApplication:
                     "external_action_taken": False,
                 }
 
+        alert = None
+        if self.inbound_alert_service is not None:
+            alert = self.inbound_alert_service.deliver(lead)
+
         response: dict[str, Any] = {
             "ok": True,
             "status": "lead_ingested",
             "lead_id": lead.lead_id,
             "contact": lead.contact,
             "source": lead.source,
+            "selected_service": lead.selected_service,
         }
         if preparation is not None:
             response["preparation_status"] = preparation.get("state", "unknown")
             response["preparation"] = preparation
+        elif not lead.should_prepare_groundwork():
+            response["preparation_status"] = "not_applicable_for_selected_service"
+        if alert is not None:
+            response["alert_status"] = alert.status
+            if alert.receipt:
+                response["alert_receipt"] = alert.receipt
         return self._respond(start_response, HTTPStatus.OK, response)
 
     @staticmethod
@@ -1105,6 +1126,24 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         if model_budget_guard is not None
         else Decimal("1")
     )
+    inbound_alert_root = Path(
+        os.getenv(
+            "TONY_INBOUND_ALERT_ROOT",
+            str(REPOSITORY_ROOT / ".runtime" / "inbound-lead-alerts"),
+        )
+    ).resolve()
+
+    def send_inbound_alert(chat_id: str, text: str) -> dict[str, Any]:
+        return TelegramSender(TelegramConfig.from_env(os.environ)).send(chat_id, text)
+
+    inbound_alert_service = InboundLeadAlertService(
+        send_message=send_inbound_alert,
+        chat_id=os.getenv("TONY_TELEGRAM_CHAT_ID", ""),
+        key_store=FileDeliveryKeyStore(inbound_alert_root / "delivery-keys.json"),
+        journal=InboundLeadAlertJournal(inbound_alert_root / "events.jsonl"),
+        lock_path=inbound_alert_root / "delivery.lock",
+        max_attempts=int(os.getenv("TONY_INBOUND_ALERT_MAX_ATTEMPTS", "3")),
+    )
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -1124,6 +1163,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         mission_control_web=mission_control_web,
         model_budget_guard=model_budget_guard,
         model_budget_reserve_usd=model_budget_reserve_usd,
+        inbound_alert_service=inbound_alert_service,
     )
 
 

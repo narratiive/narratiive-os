@@ -60,6 +60,27 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.lead_temperature, "Hot")
         self.assertEqual(lead.recommended_next_action, "Prepare for discovery.")
 
+    def test_website_fieldwork_preference_is_preserved_and_not_routed_to_groundwork(self):
+        lead = InboundLead.from_mapping({
+            "lead_id": "inbound-controlled-1",
+            "contact": "Controlled Prospect",
+            "company": "Controlled Company",
+            "email": "prospect@controlled.test",
+            "source": "Website",
+            "selected_service": "fieldwork",
+            "business_challenge": "Growth has slowed despite continued marketing investment.",
+        })
+
+        self.assertEqual(lead.selected_service, "FIELDWORK")
+        self.assertEqual(
+            lead.business_challenge,
+            "Growth has slowed despite continued marketing investment.",
+        )
+        self.assertIn("DISCOVERY", lead.recommended_next_action)
+        self.assertNotIn("Blueprint Lite", lead.recommended_next_action)
+        self.assertFalse(lead.should_prepare_groundwork())
+        self.assertEqual(lead.briefing_classification(), "legitimate_inbound_enquiry")
+
 
 if __name__ == "__main__":
     unittest.main()

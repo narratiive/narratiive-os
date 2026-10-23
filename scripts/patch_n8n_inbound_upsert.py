@@ -64,6 +64,8 @@ const sourceSubmissionId = String(suppliedLeadId || `inbound-${stableHash(body)}
 const requestedSource = String(body.source || '').trim().toLowerCase();
 const sourceType = requestedSource === 'email'
   ? 'Email'
+  : ['website', 'website_enquiry'].includes(requestedSource)
+    ? 'Website'
   : isTally
     ? 'Tally'
     : 'Growth Diagnostic';
@@ -91,6 +93,10 @@ const sourceType = requestedSource === 'email'
     : 'Growth Diagnostic';
 """.rstrip()
         code = code.replace(source_anchor, f"{source_anchor}{source_type}", 1)
+    code = code.replace(
+        "const sourceType = requestedSource === 'email'\n  ? 'Email'\n  : isTally\n    ? 'Tally'\n    : 'Growth Diagnostic';",
+        "const sourceType = requestedSource === 'email'\n  ? 'Email'\n  : ['website', 'website_enquiry'].includes(requestedSource)\n    ? 'Website'\n  : isTally\n    ? 'Tally'\n    : 'Growth Diagnostic';",
+    )
     old_expression = """  lead_id:
     body.lead_id ||
     body.leadId ||
@@ -105,6 +111,48 @@ const sourceType = requestedSource === 'email'
         "source: isTally ? 'Tally' : 'Growth Diagnostic',",
         "source: sourceType,",
     )
+    if "function parseWebsiteEnquiry" not in code:
+        anchor = "const firstName = tallyValue('first name', 'firstname');"
+        if anchor not in code:
+            anchor = "const lead = {"
+        if anchor not in code:
+            raise ValueError("normaliser contract changed; website-message anchor is missing")
+        parser = """
+function parseWebsiteEnquiry(message) {
+  const text = String(message || '').trim();
+  const match = text.match(/^Service preference:\\s*([^—\\n]+?)(?:\\s*—\\s*([^\\n]+))?(?:\\n+([\\s\\S]*))?$/i);
+  if (!match) return { selectedService: '', serviceLabel: '', challenge: text };
+  return {
+    selectedService: String(match[1] || '').trim().toUpperCase(),
+    serviceLabel: String(match[2] || '').trim(),
+    challenge: String(match[3] || '').trim(),
+  };
+}
+
+const websiteEnquiry = parseWebsiteEnquiry(body.message);
+
+"""
+        code = code.replace(anchor, f"{parser}{anchor}", 1)
+    if "selected_service:" not in code:
+        code = code.replace(
+            "  source: sourceType,",
+            "  source: sourceType,\n\n  selected_service: body.selected_service || body.selectedService || websiteEnquiry.selectedService || '',\n\n  service_preference_label: websiteEnquiry.serviceLabel || '',",
+            1,
+        )
+    challenge = """  challenge:
+    body.challenge ||
+    tallyValue(
+      'biggest growth challenge',
+      'growth challenge',
+      'challenge'
+    ) ||
+    '',"""
+    if challenge in code:
+        code = code.replace(
+            challenge,
+            challenge.replace("    '',", "    websiteEnquiry.challenge ||\n    '',"),
+            1,
+        )
     if "inbound_message_id:" not in code:
         code = code.replace(
             "  lead_id: sourceSubmissionId,",
@@ -152,6 +200,16 @@ def _patch_create_node(node: dict[str, Any], credential_id: str) -> None:
             '    "Source Submission ID": {\n      rich_text: [{ text: { content: $(\'Normalise Diagnostic Payload1\').first().json.lead_id } }]\n    },\n    "Inbound Message ID": {\n      rich_text: [{ text: { content: $(\'Normalise Diagnostic Payload1\').first().json.inbound_message_id || "" } }]\n    },',
             1,
         )
+    if '"Selected Service"' not in body:
+        anchor = "    Contact: {"
+        if anchor not in body:
+            raise ValueError("Notion create payload contact contract changed")
+        addition = """    "Selected Service": {
+      rich_text: [{ text: { content: $('Normalise Diagnostic Payload1').first().json.selected_service || "" } }]
+    },
+
+"""
+        body = body.replace(anchor, f"{addition}{anchor}", 1)
     body = body.replace("$json.", "$('Normalise Diagnostic Payload1').first().json.")
     body = body.replace(
         "$('Normalise Diagnostic Payload1').first().json.source === \"Tally\" ? \"Tally\" : \"Growth Diagnostic\"",
@@ -159,11 +217,19 @@ def _patch_create_node(node: dict[str, Any], credential_id: str) -> None:
     )
     body = body.replace(
         'name: "New Diagnostic"',
+        'name: ["Email", "Website"].includes($(\'Normalise Diagnostic Payload1\').first().json.source) ? "Email Enquiry" : "New Diagnostic"',
+    )
+    body = body.replace(
         'name: $(\'Normalise Diagnostic Payload1\').first().json.source === "Email" ? "Email Enquiry" : "New Diagnostic"',
+        'name: ["Email", "Website"].includes($(\'Normalise Diagnostic Payload1\').first().json.source) ? "Email Enquiry" : "New Diagnostic"',
     )
     body = body.replace(
         "$('Normalise Diagnostic Payload1').first().json.source === \"Tally\"\n                ? \"Tally inbound enquiry.\"\n                : \"Growth Diagnostic completed.\"",
         "$('Normalise Diagnostic Payload1').first().json.source === \"Email\"\n                ? \"Person-to-person email enquiry received. No reply has been sent.\"\n                : $('Normalise Diagnostic Payload1').first().json.source === \"Tally\"\n                  ? \"Tally inbound enquiry.\"\n                  : \"Growth Diagnostic completed.\"",
+    )
+    body = body.replace(
+        "$('Normalise Diagnostic Payload1').first().json.source === \"Email\"\n                ? \"Person-to-person email enquiry received. No reply has been sent.\"\n                : $('Normalise Diagnostic Payload1').first().json.source === \"Tally\"\n                  ? \"Tally inbound enquiry.\"\n                  : \"Growth Diagnostic completed.\"",
+        "$('Normalise Diagnostic Payload1').first().json.source === \"Email\"\n                ? \"Person-to-person email enquiry received. No reply has been sent.\"\n                : $('Normalise Diagnostic Payload1').first().json.source === \"Tally\"\n                  ? \"Tally inbound enquiry.\"\n                  : $('Normalise Diagnostic Payload1').first().json.source === \"Website\"\n                    ? \"Website enquiry received for \" + String($('Normalise Diagnostic Payload1').first().json.selected_service || \"an unstated service\") + \".\"\n                    : \"Growth Diagnostic completed.\"",
     )
     node["parameters"]["jsonBody"] = body
 
