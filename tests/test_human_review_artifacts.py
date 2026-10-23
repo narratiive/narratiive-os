@@ -13,6 +13,7 @@ from runtime.human_review_artifacts import (
     HumanReviewArtifactStore,
     HumanReviewPresentationService,
     NarratiiveReviewPDFRenderer,
+    RENDERER_VERSION,
     build_review_plan,
 )
 from runtime.models import ArtifactRef, WorkflowState
@@ -165,6 +166,45 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             self.assertEqual(manifest["source_artifact_id"], source.artifact_id)
             self.assertEqual(manifest["source_artifact_checksum"], source.checksum)
             self.assertEqual(manifest["checksum"], hashlib.sha256(Path(review.location).read_bytes()).hexdigest())
+
+    def test_customer_naming_renderer_version_coexists_with_historical_review(self) -> None:
+        output = proposal_output()
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-versioned-source",
+                artifact_type="growth_sprint_proposal",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            workflow_state = state("discovery_evidence_to_growth_sprint_proposal")
+            store = HumanReviewArtifactStore(root / "reviews")
+            plan = build_review_plan(workflow_state, output)
+            old_pdf, old_pages = NarratiiveReviewPDFRenderer().render(plan)
+            historical = store.persist(
+                state=workflow_state,
+                source=source,
+                plan=plan,
+                pdf_bytes=old_pdf,
+                page_count=old_pages,
+                renderer_version="2",
+            )
+
+            current = HumanReviewPresentationService(store).produce(
+                state=workflow_state,
+                source=source,
+                output=output,
+            )
+
+            self.assertEqual(RENDERER_VERSION, "3")
+            self.assertEqual(historical.renderer_version, "2")
+            self.assertEqual(current.renderer_version, "3")
+            self.assertNotEqual(historical.review_artifact_id, current.review_artifact_id)
+            self.assertTrue(Path(historical.location).is_file())
+            self.assertTrue(Path(current.location).is_file())
 
     def test_produced_growth_blueprint_reuses_qa_passed_presentation_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

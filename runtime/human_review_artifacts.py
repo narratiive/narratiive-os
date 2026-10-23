@@ -42,7 +42,7 @@ from runtime.terminology_policy import TerminologyPolicy
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
-RENDERER_VERSION = "2"
+RENDERER_VERSION = "3"
 BLUEPRINT_PRESENTATION_RENDERER_ID = "narratiive-growth-blueprint-presentation"
 BLUEPRINT_PRESENTATION_RENDERER_VERSION = "1"
 PDF_MIME_TYPE = "application/pdf"
