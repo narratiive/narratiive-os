@@ -172,12 +172,15 @@ class TerminologyPolicy:
 
     @staticmethod
     def _product_label_pattern(term: str) -> re.Pattern[str]:
-        """Match a product label while excluding a likely proper-name continuation."""
+        """Match a product label while excluding an organisation-style proper name."""
         flexible_term = r"\s+".join(re.escape(part) for part in term.split())
-        owned_suffixes = "Proposal|Assessment|Review|Engagement|Artefact|Artifact|Workflow"
+        proper_name_suffixes = (
+            "Labs?|Studios?|Agency|Group|Collective|Company|Co|Ltd|Limited|LLP|PLC|Inc|"
+            "Incorporated|LLC|Partners|Ventures|Holdings|Capital|Foundation"
+        )
         return re.compile(
             rf"(?<!\w)(?i:{flexible_term})(?!\w)"
-            rf"(?!\s+(?!(?:{owned_suffixes})\b)[A-Z][\w&'’.-]*)"
+            rf"(?!\s+(?i:{proper_name_suffixes})\b)"
         )
 
     def scan(self, text: str) -> list[TerminologyViolation]:
