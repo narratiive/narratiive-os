@@ -49,7 +49,7 @@ class TonyTerminologyCommandService:
         # approved customer label rather than mutating evidence at this boundary.
         rewritten_message = self.policy.rewrite(response.message)
         rewritten_data = self._rewrite_value(response.data)
-        remaining = self.policy.scan_customer_facing(rewritten_message)
+        remaining = self.policy.scan(rewritten_message)
         remaining.extend(self.policy.scan_many(self._strings("", rewritten_data)))
         if remaining:
             return CommandResponse(

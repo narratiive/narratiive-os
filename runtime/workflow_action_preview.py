@@ -102,7 +102,10 @@ class WorkflowActionPreviewService:
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
         body = _resolve_simulation_body(source_body, recipient_name)
-        aliases = self.terminology_policy.scan_customer_facing(body)
+        aliases = self.terminology_policy.scan_customer_facing(
+            body,
+            protected_phrases=(company,),
+        )
         if aliases:
             terms = ", ".join(dict.fromkeys(item.term for item in aliases))
             raise WorkflowActionPreviewError(

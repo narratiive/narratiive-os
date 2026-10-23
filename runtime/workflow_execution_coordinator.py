@@ -26,6 +26,7 @@ from runtime.worker_registry import (
 )
 from runtime.workflow_registry import WorkflowRegistry
 from runtime.workflow_handoffs import build_next_workflow_inputs
+from runtime.workflow_quality import growth_sprint_proposal_quality_gate
 from runtime.workflow_run_identity import downstream_run_id
 
 
@@ -388,7 +389,23 @@ class WorkflowExecutionCoordinator:
             elif stage.quality_contract:
                 validator = self.quality_validators.get(stage.quality_contract)
                 try:
-                    quality = dict(validator(output))
+                    if validator is growth_sprint_proposal_quality_gate:
+                        identities = tuple(
+                            dict.fromkeys(
+                                str(value).strip()
+                                for value in (
+                                    state.input_payload.get("company"),
+                                    state.input_payload.get("company_name"),
+                                    state.entity_id,
+                                )
+                                if str(value or "").strip()
+                            )
+                        )
+                        quality = dict(
+                            validator(output, protected_customer_identities=identities)
+                        )
+                    else:
+                        quality = dict(validator(output))
                     quality["passed"] = quality.get("passed") is True
                 except Exception as exc:
                     quality = {

@@ -526,8 +526,13 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
 
         proper_name = proposal_output()
-        proper_name["draft_client_communication"] += " Growth Sprint Labs remains the named client in this synthetic example."
-        self.assertTrue(growth_sprint_proposal_quality_gate(proper_name)["passed"])
+        proper_name["draft_client_communication"] += " Growth Sprint Technologies remains the named client in this synthetic example."
+        self.assertTrue(
+            growth_sprint_proposal_quality_gate(
+                proper_name,
+                protected_customer_identities=("Growth Sprint Technologies",),
+            )["passed"]
+        )
 
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {

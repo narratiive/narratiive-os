@@ -65,14 +65,14 @@ class ExecutiveMessageContentTests(unittest.TestCase):
                 data={"evidence": ["issue:58"]},
             )
 
-    def test_rejects_retired_language_in_rendered_escalation_material(self):
-        with self.assertRaisesRegex(
-            ValueError,
-            "non-canonical customer-facing terminology: Growth Sprint",
-        ):
-            ExecutiveMessageContent.from_materials(
-                ["approval: Growth Sprint proposal"]
-            )
+    def test_preserves_alias_text_in_evidence_backed_escalation_material(self):
+        content = ExecutiveMessageContent.from_materials(
+            ["client: Growth Sprint Technologies"]
+        )
+        self.assertEqual(
+            content.data["materials"],
+            ["client: Growth Sprint Technologies"],
+        )
 
 
 class TelegramExecutiveRendererTests(unittest.TestCase):

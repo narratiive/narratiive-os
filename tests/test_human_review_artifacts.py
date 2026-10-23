@@ -68,6 +68,29 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                     output=output,
                 )
 
+    def test_review_preserves_an_exact_alias_as_the_known_company_identity(self) -> None:
+        output = blueprint_output()
+        output["central_diagnosis"] = (
+            "Blueprint Lite has a commercially important positioning gap that should be tested in Discovery."
+        )
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-company-named-blueprint-lite",
+                artifact_type="blueprint_lite",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            workflow_state = state("growth_diagnostic_to_blueprint_lite")
+            workflow_state.input_payload["company"] = "Blueprint Lite"
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(state=workflow_state, source=source, output=output)
+            self.assertTrue(Path(review.location).is_file())
+
     def test_minimum_document_products_have_explicit_review_contracts(self) -> None:
         cases = (
             ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Groundwork"),
@@ -164,10 +187,12 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 location=str(source_path),
                 checksum=hashlib.sha256(encoded).hexdigest(),
             )
+            workflow_state = state("discovery_evidence_to_growth_sprint_proposal")
+            workflow_state.input_payload["company"] = "Growth Sprint Labs"
             review = HumanReviewPresentationService(
                 HumanReviewArtifactStore(root / "reviews")
             ).produce(
-                state=state("discovery_evidence_to_growth_sprint_proposal"),
+                state=workflow_state,
                 source=source,
                 output=output,
             )

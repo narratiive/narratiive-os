@@ -890,7 +890,10 @@ def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
             *(item for section in plan.sections for _, items in section.cards for item in items),
         )
     )
-    aliases = TerminologyPolicy.from_path().scan_customer_facing(visible_text)
+    aliases = TerminologyPolicy.from_path().scan_customer_facing(
+        visible_text,
+        protected_phrases=(plan.company,),
+    )
     if aliases:
         terms = ", ".join(dict.fromkeys(item.term for item in aliases))
         raise HumanReviewArtifactError(

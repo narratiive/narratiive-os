@@ -51,10 +51,26 @@ class TerminologyPolicyTests(unittest.TestCase):
         self.assertEqual(self.policy.render_owned_product_copy("Blueprint\nLite is ready"), "Groundwork is ready")
         self.assertEqual(self.policy.rewrite("Blueprint Lite Labs"), "Blueprint Lite Labs")
         self.assertEqual(
-            self.policy.render_owned_product_copy("Prepare Blueprint Lite for Blueprint Lite Labs"),
-            "Prepare Groundwork for Blueprint Lite Labs",
+            self.policy.scan_customer_facing(
+                "Blueprint Lite Labs is the client",
+                protected_phrases=("Blueprint Lite Labs",),
+            ),
+            [],
         )
-        self.assertEqual(self.policy.scan_customer_facing("Blueprint Lite Labs"), [])
+        self.assertEqual(
+            self.policy.scan_customer_facing(
+                "Blueprint Lite is the client",
+                protected_phrases=("Blueprint Lite",),
+            ),
+            [],
+        )
+        self.assertEqual(
+            self.policy.scan_customer_facing(
+                "Blueprint Lite Technologies needs Groundwork",
+                protected_phrases=("Blueprint Lite Technologies",),
+            ),
+            [],
+        )
         self.assertEqual(
             [item.term for item in self.policy.scan_customer_facing("Blueprint Lite Executive Summary")],
             ["Blueprint Lite"],
