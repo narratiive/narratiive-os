@@ -220,6 +220,10 @@ class HumanReviewPresentationService:
                 entity_id=state.entity_id,
                 client_id=state.client_id,
             ),
+            enforce_customer_facing_names=state.workflow_id in {
+                "growth_diagnostic_to_blueprint_lite",
+                "discovery_evidence_to_growth_sprint_proposal",
+            },
         )
         pdf_bytes, pages = NarratiiveReviewPDFRenderer().render(plan)
         return self.store.persist(
@@ -291,6 +295,7 @@ class HumanReviewPresentationService:
         _validate_review_plan(
             plan,
             protected_phrases=protected_phrases,
+            enforce_customer_facing_names=True,
         )
         return self.store.persist(
             state=state,
@@ -898,6 +903,7 @@ def _validate_review_plan(
     plan: ReviewDocumentPlan,
     *,
     protected_phrases: Iterable[str] = (),
+    enforce_customer_facing_names: bool = False,
 ) -> None:
     visible_text = " ".join(
         (
@@ -914,15 +920,16 @@ def _validate_review_plan(
             *(item for section in plan.sections for _, items in section.cards for item in items),
         )
     )
-    aliases = TerminologyPolicy.from_path().scan_customer_facing(
-        visible_text,
-        protected_phrases=protected_phrases,
-    )
-    if aliases:
-        terms = ", ".join(dict.fromkeys(item.term for item in aliases))
-        raise HumanReviewArtifactError(
-            "review presentation requires current customer-facing product names: " + terms
+    if enforce_customer_facing_names:
+        aliases = TerminologyPolicy.from_path().scan_customer_facing(
+            visible_text,
+            protected_phrases=protected_phrases,
         )
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise HumanReviewArtifactError(
+                "review presentation requires current customer-facing product names: " + terms
+            )
     visible = visible_text.casefold()
     leaked = sorted(field for field in PROHIBITED_VISIBLE_FIELDS if field in visible)
     if leaked:

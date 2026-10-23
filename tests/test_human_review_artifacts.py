@@ -111,6 +111,33 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 self.assertTrue(plan.decision_prompt)
                 self.assertTrue(plan.next_if_approved)
 
+    def test_internal_discovery_review_preserves_canonical_source_names(self) -> None:
+        output = discovery_output()
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-internal-discovery",
+                artifact_type="discovery_preparation",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(
+                state=state("blueprint_lite_to_discovery_preparation"),
+                source=source,
+                output=output,
+            )
+
+            visible = "\n".join(
+                page.extract_text() or "" for page in PdfReader(review.location).pages
+            )
+            self.assertIn("Blueprint Lite", visible)
+
     def test_strategy_thesis_review_is_a_gate_three_decision_document(self) -> None:
         plan = build_review_plan(
             state("strategic_synthesis_to_strategy_thesis"),
