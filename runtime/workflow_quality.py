@@ -7,6 +7,7 @@ from collections.abc import Mapping
 from typing import Any
 
 from runtime.external_action_truth import no_asserted_external_action
+from runtime.terminology_policy import TerminologyPolicy
 
 
 _FALSE_ACTION_MARKERS = (
@@ -208,6 +209,7 @@ def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str
 
 def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
     commercial = output.get("commercial_proposal_inputs")
+    draft_client_communication = output.get("draft_client_communication")
     checks = {
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
@@ -217,7 +219,11 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
         "growth_blueprint_outputs_are_explicit": _meaningful_list(output.get("expected_growth_blueprint_outputs"), minimum=5),
         "commercial_inputs_are_pending_human_approval": _commercial_inputs(commercial),
         "assumptions_and_dependencies_are_explicit": _meaningful_list(output.get("assumptions_and_dependencies"), minimum=2),
-        "draft_client_communication_is_reviewable": _bounded_text(output.get("draft_client_communication"), 60, 500),
+        "draft_client_communication_is_reviewable": _bounded_text(draft_client_communication, 60, 500),
+        "draft_client_communication_uses_current_product_names": (
+            isinstance(draft_client_communication, str)
+            and not TerminologyPolicy.from_path().scan_customer_facing(draft_client_communication)
+        ),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
         "no_false_external_execution_claim": _no_false_action(output),
     }

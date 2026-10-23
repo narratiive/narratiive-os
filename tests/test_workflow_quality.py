@@ -509,6 +509,18 @@ class WorkflowQualityTests(unittest.TestCase):
         denied["draft_client_communication"] += " No email sent; this remains internal."
         self.assertTrue(growth_sprint_proposal_quality_gate(denied)["passed"])
 
+        legacy_name = proposal_output()
+        legacy_name["draft_client_communication"] = legacy_name["draft_client_communication"].replace(
+            "Fieldwork engagement", "Growth Sprint engagement"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_name)
+        self.assertFalse(result["passed"])
+        self.assertIn("draft client communication uses current product names", result["failed_checks"])
+
+        proper_name = proposal_output()
+        proper_name["draft_client_communication"] += " Growth Sprint Labs remains the named client in this synthetic example."
+        self.assertTrue(growth_sprint_proposal_quality_gate(proper_name)["passed"])
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {
