@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.definitions import (
@@ -27,8 +28,32 @@ from runtime.worker_registry import (
 from runtime.workflow_execution_coordinator import (
     FileWorkflowArtifactStore,
     WorkflowExecutionCoordinator,
+    _protected_customer_identities,
 )
 from runtime.workflow_registry import WorkflowRegistry
+
+
+class ProtectedCustomerIdentityTests(unittest.TestCase):
+    def test_collects_supported_top_level_and_nested_customer_names(self) -> None:
+        state = SimpleNamespace(
+            entity_id="growth-sprint-technologies",
+            input_payload={
+                "company": "Top Level Company",
+                "commercial_context": {"company": "Growth Sprint Technologies"},
+                "company_context": {"name": "Blueprint Lite"},
+                "client_context": {"company_name": "Nested Client Ltd"},
+            },
+        )
+        self.assertEqual(
+            _protected_customer_identities(state),
+            (
+                "Top Level Company",
+                "growth-sprint-technologies",
+                "Growth Sprint Technologies",
+                "Blueprint Lite",
+                "Nested Client Ltd",
+            ),
+        )
 
 
 def _stage(

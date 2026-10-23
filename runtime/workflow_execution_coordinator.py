@@ -40,6 +40,18 @@ _BOUNDED_STRATEGY_CONTEXT_FIELDS: dict[str, tuple[str, ...]] = {
 }
 
 
+def _protected_customer_identities(state: WorkflowState) -> tuple[str, ...]:
+    payload = state.input_payload
+    values: list[Any] = [payload.get("company"), payload.get("company_name"), state.entity_id]
+    for field in ("commercial_context", "company_context", "client_context"):
+        context = payload.get(field)
+        if isinstance(context, Mapping):
+            values.extend((context.get("company"), context.get("company_name"), context.get("name")))
+    return tuple(
+        dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class ExecutionOutcome:
     run_id: str
@@ -390,19 +402,11 @@ class WorkflowExecutionCoordinator:
                 validator = self.quality_validators.get(stage.quality_contract)
                 try:
                     if validator is growth_sprint_proposal_quality_gate:
-                        identities = tuple(
-                            dict.fromkeys(
-                                str(value).strip()
-                                for value in (
-                                    state.input_payload.get("company"),
-                                    state.input_payload.get("company_name"),
-                                    state.entity_id,
-                                )
-                                if str(value or "").strip()
-                            )
-                        )
                         quality = dict(
-                            validator(output, protected_customer_identities=identities)
+                            validator(
+                                output,
+                                protected_customer_identities=_protected_customer_identities(state),
+                            )
                         )
                     else:
                         quality = dict(validator(output))
