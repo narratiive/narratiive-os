@@ -38,6 +38,7 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.terminology_policy import TerminologyPolicy
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
@@ -874,11 +875,10 @@ def _p(value: str) -> str:
 
 
 def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
-    visible = " ".join(
+    visible_text = " ".join(
         (
             plan.product,
             plan.gate_label,
-            plan.company,
             plan.subtitle,
             plan.decision_prompt,
             plan.next_if_approved,
@@ -889,7 +889,14 @@ def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
             *(title for section in plan.sections for title, _ in section.cards),
             *(item for section in plan.sections for _, items in section.cards for item in items),
         )
-    ).casefold()
+    )
+    aliases = TerminologyPolicy.from_path().scan_customer_facing(visible_text)
+    if aliases:
+        terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+        raise HumanReviewArtifactError(
+            "review presentation requires current customer-facing product names: " + terms
+        )
+    visible = visible_text.casefold()
     leaked = sorted(field for field in PROHIBITED_VISIBLE_FIELDS if field in visible)
     if leaked:
         raise HumanReviewArtifactError(

@@ -129,12 +129,12 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
         self.assertEqual(response.data["error_code"], "executive_brief_untrusted")
         self.assertIn("policy checksum mismatch", response.message)
 
-    def test_active_internal_workflow_labels_render_without_changing_client_name(self):
+    def test_evidence_backed_alias_text_is_not_rewritten_as_a_product_label(self):
         base_snapshot = snapshot()
         active = replace(
             base_snapshot.workstreams[0],
-            title="Blueprint Lite for Growth Sprint Labs",
-            next_action="Prepare Growth Sprint Proposal",
+            title="Client initiative Growth Sprint",
+            next_action="Review the client's Growth Sprint evidence",
         )
         service = TonyExecutiveCommandService(
             StubCommandService(lambda: replace(base_snapshot, workstreams=(active,))),
@@ -144,8 +144,8 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
         response = service.execute("/morning", [])
 
         self.assertEqual(response.status, "healthy")
-        self.assertIn("Groundwork for Growth Sprint Labs", response.message)
-        self.assertIn("Fieldwork Proposal", response.message)
+        self.assertIn("Client initiative Growth Sprint", response.message)
+        self.assertIn("client's Growth Sprint evidence", response.message)
 
 
 if __name__ == "__main__":

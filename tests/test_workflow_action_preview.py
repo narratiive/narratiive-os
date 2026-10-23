@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -173,6 +174,28 @@ class WorkflowActionPreviewTests(unittest.TestCase):
         self.assertTrue(base64.b64decode(send_payload["attachments"][0]["content_base64"]).startswith(b"%PDF"))
         state = self.runtime.runs.load_run(run_id)
         self.assertNotEqual(state.input_payload.get("contact_email"), "hello@narratiive.com")
+
+    def test_preview_rejects_a_historical_review_renderer(self):
+        run_id = self._proposal_run()
+        self.service.execute(f"/deliver-review {run_id}", [])
+        token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        self.service.execute(
+            f"/approve {run_id} because approved exact proposal",
+            [], principal_id="telegram:123", inputs={"approval_token": token},
+        )
+        manifest_path = next((self.root / "human-review-artifacts").rglob("manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["renderer_version"] = "2"
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+        preview = self.service.execute(
+            f"/action-preview {run_id}",
+            [],
+            inputs={"simulation_mode": True, "delivery_override": "hello@narratiive.com"},
+        )
+
+        self.assertEqual(preview.status, "error")
+        self.assertIn("current immutable human-review PDF", preview.message)
 
 
 if __name__ == "__main__":
