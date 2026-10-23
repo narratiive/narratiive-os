@@ -264,9 +264,24 @@ class HumanReviewPresentationService:
         pdf_bytes = review_path.read_bytes()
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
-            visible = "\n".join(page.extract_text() or "" for page in reader.pages).casefold()
+            visible_text = "\n".join(page.extract_text() or "" for page in reader.pages)
         except Exception as exc:
             raise HumanReviewArtifactError("Growth Blueprint review PDF is unreadable") from exc
+        protected_phrases = customer_identity_phrases(
+            state.input_payload,
+            entity_id=state.entity_id,
+            client_id=state.client_id,
+        )
+        aliases = TerminologyPolicy.from_path().scan_customer_facing(
+            visible_text,
+            protected_phrases=protected_phrases,
+        )
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise HumanReviewArtifactError(
+                "Growth Blueprint review PDF requires current customer-facing product names: " + terms
+            )
+        visible = visible_text.casefold()
         leaked = sorted(field for field in PROHIBITED_VISIBLE_FIELDS if field in visible)
         if leaked:
             raise HumanReviewArtifactError(
@@ -275,11 +290,7 @@ class HumanReviewPresentationService:
         plan = _produced_growth_blueprint_plan(_company_name(state), output)
         _validate_review_plan(
             plan,
-            protected_phrases=customer_identity_phrases(
-                state.input_payload,
-                entity_id=state.entity_id,
-                client_id=state.client_id,
-            ),
+            protected_phrases=protected_phrases,
         )
         return self.store.persist(
             state=state,

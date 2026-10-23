@@ -4,6 +4,7 @@ import hashlib
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from pypdf import PdfReader
@@ -314,6 +315,55 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             self.assertEqual(review.product, "Narratiive Growth Blueprint")
             self.assertEqual(output["approval_status"], "pending")
             self.assertFalse(output["external_action_taken"])
+
+    def test_produced_growth_blueprint_rejects_legacy_product_label_in_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_plan = build_review_plan(
+                state("research_to_growth_blueprint"), growth_blueprint_output()
+            )
+            source_plan = replace(source_plan, subtitle="Blueprint Lite strategic presentation")
+            produced_pdf, _ = NarratiiveReviewPDFRenderer().render(source_plan)
+            produced_path = root / "deliverables" / "growth-blueprint.pdf"
+            produced_path.parent.mkdir(parents=True)
+            produced_path.write_bytes(produced_pdf)
+            output = {
+                "presentation_specification": {
+                    "slides": [{"takeaway": "The strategic source is approved."}]
+                },
+                "editable_pptx": str(root / "deliverables" / "growth-blueprint.pptx"),
+                "review_pdf": str(produced_path),
+                "visual_qa": {
+                    "status": "passed",
+                    "checks": {"no_visible_machine_runtime_artefacts": True},
+                },
+                "proposed_client_release": {"status": "not_approved"},
+                "approval_status": "pending",
+                "external_action_taken": False,
+            }
+            encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            source_path = root / "artifacts" / "deliverable-output.json"
+            source_path.parent.mkdir(parents=True)
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-legacy-blueprint-deliverable",
+                artifact_type="workflow_step_output",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+
+            with self.assertRaisesRegex(
+                HumanReviewArtifactError,
+                "current customer-facing product names: Blueprint Lite",
+            ):
+                HumanReviewPresentationService(
+                    HumanReviewArtifactStore(root / "human-review-artifacts"),
+                    allowed_source_root=root,
+                ).produce(
+                    state=state("growth_blueprint_deliverable_production"),
+                    source=source,
+                    output=output,
+                )
 
 
 if __name__ == "__main__":
