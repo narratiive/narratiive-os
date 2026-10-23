@@ -37,7 +37,7 @@ SKETCHBOOK v2 remain unmerged draft candidates.
 
 ## Evidence summary
 
-- Naming/review code commit `f2b681122f2cba9104388e56a10b7af7984003c3`
+- Naming/review code commit `989610726d4b5f553aa36e020358bd5be18d9928`
   passed `python -m unittest discover -s tests` with 1,829 tests on 23 October
   2026. PR #492 records the exact-head CI result and independent review history.
 - The combined compatibility worktree used current runtime base
