@@ -3,10 +3,11 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 from runtime.external_action_truth import no_asserted_external_action
+from runtime.terminology_policy import TerminologyPolicy
 
 
 _FALSE_ACTION_MARKERS = (
@@ -206,8 +207,27 @@ def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str
     return _result(checks)
 
 
-def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+def growth_sprint_proposal_quality_gate(
+    output: Mapping[str, Any],
+    *,
+    protected_customer_identities: tuple[str, ...] = (),
+) -> Mapping[str, Any]:
     commercial = output.get("commercial_proposal_inputs")
+    draft_client_communication = output.get("draft_client_communication")
+    customer_visible_values = tuple(
+        output.get(field)
+        for field in (
+            "discovery_synthesis",
+            "growth_problem_or_opportunity",
+            "why_further_strategic_work_is_justified",
+            "proposed_scope",
+            "workstreams_and_questions",
+            "expected_growth_blueprint_outputs",
+            "commercial_proposal_inputs",
+            "draft_client_communication",
+            "assumptions_and_dependencies",
+        )
+    )
     checks = {
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
@@ -217,7 +237,14 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
         "growth_blueprint_outputs_are_explicit": _meaningful_list(output.get("expected_growth_blueprint_outputs"), minimum=5),
         "commercial_inputs_are_pending_human_approval": _commercial_inputs(commercial),
         "assumptions_and_dependencies_are_explicit": _meaningful_list(output.get("assumptions_and_dependencies"), minimum=2),
-        "draft_client_communication_is_reviewable": _bounded_text(output.get("draft_client_communication"), 60, 500),
+        "draft_client_communication_is_reviewable": _bounded_text(draft_client_communication, 60, 500),
+        "customer_visible_proposal_uses_current_product_names": (
+            isinstance(draft_client_communication, str)
+            and not TerminologyPolicy.from_path().scan_customer_facing_many(
+                _string_values(customer_visible_values),
+                protected_phrases=protected_customer_identities,
+            )
+        ),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
         "no_false_external_execution_claim": _no_false_action(output),
     }
@@ -1048,6 +1075,17 @@ def _meaningful(value: Any) -> bool:
     if isinstance(value, (list, tuple)):
         return any(_meaningful(item) for item in value)
     return value is not None
+
+
+def _string_values(value: Any) -> Iterator[str]:
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, Mapping):
+        for item in value.values():
+            yield from _string_values(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _string_values(item)
 
 
 def _substantive_text(value: Any, *, minimum_words: int) -> bool:

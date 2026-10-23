@@ -4,9 +4,34 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "proposition" / "terminology.json"
+
+
+def customer_identity_phrases(
+    payload: Mapping[str, Any],
+    *,
+    entity_id: str = "",
+    client_id: str = "",
+) -> tuple[str, ...]:
+    """Return every supported explicit customer identity in stable precedence order."""
+    values: list[Any] = [payload.get("company"), payload.get("company_name")]
+    for field in ("commercial_context", "company_context", "client_context"):
+        context = payload.get(field)
+        if isinstance(context, Mapping):
+            values.extend(
+                (
+                    context.get("company"),
+                    context.get("company_name"),
+                    context.get("brand_name"),
+                    context.get("name"),
+                )
+            )
+    values.extend((entity_id, client_id))
+    return tuple(
+        dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())
+    )
 
 
 @dataclass(frozen=True)
@@ -25,6 +50,7 @@ class TerminologyPolicy:
         self.version_note = payload["version_note"].strip()
         self.approved_terms = tuple(payload.get("approved_terms", ()))
         self.unsettled_terms = tuple(payload.get("unsettled_terms", ()))
+        self.customer_facing_aliases = tuple(payload.get("customer_facing_aliases", ()))
         self.retired_terms = tuple(payload["retired_terms"])
 
     @classmethod
@@ -53,6 +79,7 @@ class TerminologyPolicy:
             name_field="concept",
             detail_field="rule",
         )
+        TerminologyPolicy._validate_aliases(payload.get("customer_facing_aliases", []))
 
         entries = payload.get("retired_terms")
         if not isinstance(entries, list) or not entries:
@@ -99,6 +126,28 @@ class TerminologyPolicy:
         return " ".join(value.split()).casefold()
 
     @staticmethod
+    def _validate_aliases(entries: object) -> None:
+        if not isinstance(entries, list):
+            raise ValueError("Terminology policy customer_facing_aliases must be a list")
+        seen: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError("Each customer_facing_aliases entry must be an object")
+            term = entry.get("term")
+            replacement = entry.get("replacement")
+            rationale = entry.get("rationale")
+            if not isinstance(term, str) or not term.strip():
+                raise ValueError("Each customer_facing_aliases entry requires term")
+            if not isinstance(replacement, str) or not replacement.strip():
+                raise ValueError(f"Customer-facing alias '{term}' requires replacement")
+            if not isinstance(rationale, str) or not rationale.strip():
+                raise ValueError(f"Customer-facing alias '{term}' requires rationale")
+            key = TerminologyPolicy._normalise_name(term)
+            if key in seen:
+                raise ValueError(f"Duplicate customer-facing alias: {term}")
+            seen.add(key)
+
+    @staticmethod
     def _reject_collection_overlap(
         left: dict[str, str],
         right: dict[str, str],
@@ -143,7 +192,13 @@ class TerminologyPolicy:
 
     @staticmethod
     def _pattern(term: str) -> re.Pattern[str]:
-        return re.compile(rf"(?<!\w){re.escape(term)}(?!\w)", re.IGNORECASE)
+        flexible_term = r"\s+".join(re.escape(part) for part in term.split())
+        return re.compile(rf"(?<!\w){flexible_term}(?!\w)", re.IGNORECASE)
+
+    @staticmethod
+    def _product_label_pattern(term: str) -> re.Pattern[str]:
+        """Match a product label; known identities are protected by the caller."""
+        return TerminologyPolicy._pattern(term)
 
     def scan(self, text: str) -> list[TerminologyViolation]:
         violations: list[TerminologyViolation] = []
@@ -163,6 +218,55 @@ class TerminologyPolicy:
     def scan_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
         return [violation for text in texts for violation in self.scan(text)]
 
+    def scan_customer_facing(
+        self,
+        text: str,
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> list[TerminologyViolation]:
+        """Find terms that must not pass through a customer-facing boundary."""
+        protected_spans = tuple(
+            match.span()
+            for phrase in protected_phrases
+            if str(phrase).strip()
+            for match in self._pattern(str(phrase).strip()).finditer(text)
+        )
+        violations = [
+            violation
+            for violation in self.scan(text)
+            if not any(
+                start <= violation.start and violation.end <= end
+                for start, end in protected_spans
+            )
+        ]
+        for entry in self.customer_facing_aliases:
+            for match in self._product_label_pattern(entry["term"]).finditer(text):
+                if any(start <= match.start() and match.end() <= end for start, end in protected_spans):
+                    continue
+                violations.append(
+                    TerminologyViolation(
+                        entry["term"],
+                        match.start(),
+                        match.end(),
+                        entry["replacement"],
+                        entry["rationale"],
+                    )
+                )
+        return sorted(violations, key=lambda item: (item.start, item.end))
+
+    def scan_customer_facing_many(
+        self,
+        texts: Iterable[str],
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> list[TerminologyViolation]:
+        protected = tuple(protected_phrases)
+        return [
+            violation
+            for text in texts
+            for violation in self.scan_customer_facing(text, protected_phrases=protected)
+        ]
+
     def rewrite(self, text: str) -> str:
         """Rewrite retired terminology into current descriptive language.
 
@@ -175,3 +279,20 @@ class TerminologyPolicy:
             replacement = str(entry.get("replacement") or "current Narratiive approach").strip()
             rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
         return rewritten
+
+    def render_owned_product_copy(
+        self,
+        text: str,
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> str:
+        """Render system-owned product copy; never pass evidence or client-authored text."""
+        rendered = text
+        violations = self.scan_customer_facing(
+            text,
+            protected_phrases=protected_phrases,
+        )
+        for violation in reversed(violations):
+            replacement = str(violation.replacement or "current Narratiive approach").strip()
+            rendered = rendered[: violation.start] + replacement + rendered[violation.end :]
+        return rendered

@@ -143,6 +143,9 @@ class TonyExecutiveCommandService:
             brief = self.agency_brief_service.build(state, period)
             source_message = brief.render_compact()
             source_violations = policy.scan(source_message)
+            # The rendered brief includes client-authored and evidence-backed text.
+            # Only retired language may be normalised here; customer aliases must
+            # be emitted by the system-owned projection labels before interpolation.
             message = policy.rewrite(source_message)
             violations = policy.scan(message)
             if violations:
@@ -166,7 +169,7 @@ class TonyExecutiveCommandService:
         data = brief.to_dict()
         data["agency_state"] = state.to_dict()
         data["terminology_policy_version"] = policy.version
-        data["terminology_rewritten"] = bool(source_violations)
+        data["terminology_rewritten"] = source_message != message
         data["inbound_leads_loaded"] = len(leads)
         data["inbound_lead_source_available"] = lead_source_available
         if self.briefing_pipeline is not None:

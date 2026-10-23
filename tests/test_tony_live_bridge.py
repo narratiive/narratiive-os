@@ -32,6 +32,7 @@ from runtime.tony_post_discovery_commercial import TonyPostDiscoveryCommercialCo
 from runtime.tony_post_discovery_proposal_execution import TonyPostDiscoveryProposalExecutionCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
+from runtime.tony_command_service import CommandResponse
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 
@@ -67,6 +68,14 @@ class TonyLiveBridgeTests(unittest.TestCase):
         base_app=mock.Mock(); base_service=mock.Mock(); loader=mock.Mock(); base_service.mission_control_loader=loader; base_app.command_service=base_service; base_app.bridge_token=""; base_app.brief_archive=mock.Mock()
         with tempfile.TemporaryDirectory() as tmp,mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",{"TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT":"disabled","TONY_INBOUND_LEADS_PATH":str(Path(tmp)/"leads.json")},clear=True): app=tony_live_bridge.build_app()
         self.assertIs(app.command_service.mission_control_loader,loader)
+    def test_telegram_preserves_persisted_mission_text(self):
+        data={"blockers":["Review Blueprint Lite for Growth Sprint Labs"],"approvals_required":["Approve Growth Sprint Proposal"],"workstreams":[]}
+        response=CommandResponse(command="mission",status="ok",message="Mission Control ready.",data=data)
+        reply=tony_live_bridge.TonyHTTPBridge._format_telegram_reply(response)
+        self.assertIn("Review Blueprint Lite for Growth Sprint Labs",reply)
+        self.assertIn("Approve Growth Sprint Proposal",reply)
+        self.assertEqual(data["blockers"],["Review Blueprint Lite for Growth Sprint Labs"])
+        self.assertEqual(data["approvals_required"],["Approve Growth Sprint Proposal"])
     def test_lead_ingestion_is_authenticated_and_persisted(self):
         with tempfile.TemporaryDirectory() as tmp:
             base_app=mock.Mock(); base_app.bridge_token="secret"; base_app.command_service=mock.Mock(); base_app.brief_archive=mock.Mock(); store=tony_live_bridge.FileInboundLeadStore(Path(tmp)/"leads.json"); app=tony_live_bridge.LeadAwareTonyApplication(base_app,store); payload=json.dumps({"lead_id":"lead-1","contact":"Steve","company":"Steve Company","source":"Growth Diagnostic","status":"New"}).encode(); environ={"REQUEST_METHOD":"POST","PATH_INFO":"/leads/ingest","CONTENT_LENGTH":str(len(payload)),"CONTENT_TYPE":"application/json","HTTP_AUTHORIZATION":"Bearer secret","wsgi.input":io.BytesIO(payload)}; status={}; response=app(environ,lambda value,headers:status.update(value=value,headers=headers)); self.assertTrue(status["value"].startswith("200")); self.assertTrue(json.loads(b"".join(response))["ok"])

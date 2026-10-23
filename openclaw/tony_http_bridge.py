@@ -298,7 +298,11 @@ class TonyHTTPBridge:
                 lines.append("Next work:")
                 for item in actionable[:5]:
                     suffix = f" — BLOCKED: {item.get('blocker')}" if item.get("blocker") else ""
-                    lines.append(f"- {item.get('title', 'Untitled')}: {item.get('next_action', 'No action')}{suffix}")
+                    visible = (
+                        f"- {item.get('title', 'Untitled')}: "
+                        f"{item.get('next_action', 'No action')}{suffix}"
+                    )
+                    lines.append(visible)
         elif response.command in {"status", "progress", "progress_update"}:
             lines.append(f"Campaigns: {data.get('campaign_count', 0)}")
             lines.append(f"Blocked: {data.get('blocked_count', 0)}")

@@ -4,15 +4,18 @@ import hashlib
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from pypdf import PdfReader
 
 from runtime.human_review_artifacts import (
     BLUEPRINT_PRESENTATION_RENDERER_ID,
+    HumanReviewArtifactError,
     HumanReviewArtifactStore,
     HumanReviewPresentationService,
     NarratiiveReviewPDFRenderer,
+    RENDERER_VERSION,
     build_review_plan,
 )
 from runtime.models import ArtifactRef, WorkflowState
@@ -38,10 +41,63 @@ def state(workflow_id: str) -> WorkflowState:
 
 
 class HumanReviewArtifactContractTests(unittest.TestCase):
+    def test_groundwork_review_rejects_legacy_product_label_in_body_copy(self) -> None:
+        output = blueprint_output()
+        output["central_diagnosis"] = (
+            "The Blueprint Lite identifies a commercially important positioning gap that should be tested in Discovery."
+        )
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-legacy-groundwork-copy",
+                artifact_type="blueprint_lite",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(
+                state=state("growth_diagnostic_to_blueprint_lite"),
+                source=source,
+                output=output,
+            )
+            visible = "\n".join(
+                page.extract_text() or "" for page in PdfReader(review.location).pages
+            )
+            self.assertIn("The Groundwork identifies", visible)
+            self.assertNotIn("Blueprint Lite", visible)
+
+    def test_review_preserves_an_exact_alias_as_the_known_company_identity(self) -> None:
+        output = blueprint_output()
+        output["central_diagnosis"] = (
+            "Blueprint Lite has a commercially important positioning gap that should be tested in Discovery."
+        )
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-company-named-blueprint-lite",
+                artifact_type="blueprint_lite",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            workflow_state = state("growth_diagnostic_to_blueprint_lite")
+            workflow_state.input_payload.pop("company", None)
+            workflow_state.input_payload["client_context"] = {"company_name": "Blueprint Lite"}
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(state=workflow_state, source=source, output=output)
+            self.assertTrue(Path(review.location).is_file())
+
     def test_minimum_document_products_have_explicit_review_contracts(self) -> None:
         cases = (
-            ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Blueprint Lite"),
-            ("discovery_evidence_to_growth_sprint_proposal", proposal_output(), "Growth Sprint Proposal"),
+            ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Groundwork"),
+            ("discovery_evidence_to_growth_sprint_proposal", proposal_output(), "Fieldwork Proposal"),
             ("blueprint_lite_to_discovery_preparation", discovery_output(), "Research and Strategy Review"),
             ("strategic_synthesis_to_strategy_thesis", strategy_thesis_output(), "Strategy Thesis"),
             ("strategy_thesis_to_growth_blueprint", growth_blueprint_output(), "Narratiive Growth Blueprint"),
@@ -55,6 +111,33 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 self.assertGreaterEqual(len(plan.sections), 4)
                 self.assertTrue(plan.decision_prompt)
                 self.assertTrue(plan.next_if_approved)
+
+    def test_internal_discovery_review_preserves_canonical_source_names(self) -> None:
+        output = discovery_output()
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-internal-discovery",
+                artifact_type="discovery_preparation",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(
+                state=state("blueprint_lite_to_discovery_preparation"),
+                source=source,
+                output=output,
+            )
+
+            visible = "\n".join(
+                page.extract_text() or "" for page in PdfReader(review.location).pages
+            )
+            self.assertIn("Blueprint Lite", visible)
 
     def test_strategy_thesis_review_is_a_gate_three_decision_document(self) -> None:
         plan = build_review_plan(
@@ -108,6 +191,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
 
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()
+        output["growth_problem_or_opportunity"] = "Growth Sprint Labs needs a clearer category position."
         output.update(
             {
                 "provider": "DO-NOT-SHOW-PROVIDER",
@@ -133,10 +217,12 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 location=str(source_path),
                 checksum=hashlib.sha256(encoded).hexdigest(),
             )
+            workflow_state = state("discovery_evidence_to_growth_sprint_proposal")
+            workflow_state.input_payload["company"] = "Growth Sprint Labs"
             review = HumanReviewPresentationService(
                 HumanReviewArtifactStore(root / "reviews")
             ).produce(
-                state=state("discovery_evidence_to_growth_sprint_proposal"),
+                state=workflow_state,
                 source=source,
                 output=output,
             )
@@ -147,7 +233,8 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             visible = "\n".join(
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
-            self.assertIn("Growth Sprint Proposal", visible)
+            self.assertIn("Fieldwork Proposal", visible)
+            self.assertIn("Growth Sprint Labs", visible)
             self.assertIn("Proposed workstreams", visible)
             for internal_value in (
                 "DO-NOT-SHOW-PROVIDER",
@@ -164,6 +251,45 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             self.assertEqual(manifest["source_artifact_id"], source.artifact_id)
             self.assertEqual(manifest["source_artifact_checksum"], source.checksum)
             self.assertEqual(manifest["checksum"], hashlib.sha256(Path(review.location).read_bytes()).hexdigest())
+
+    def test_customer_naming_renderer_version_coexists_with_historical_review(self) -> None:
+        output = proposal_output()
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-versioned-source",
+                artifact_type="growth_sprint_proposal",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            workflow_state = state("discovery_evidence_to_growth_sprint_proposal")
+            store = HumanReviewArtifactStore(root / "reviews")
+            plan = build_review_plan(workflow_state, output)
+            old_pdf, old_pages = NarratiiveReviewPDFRenderer().render(plan)
+            historical = store.persist(
+                state=workflow_state,
+                source=source,
+                plan=plan,
+                pdf_bytes=old_pdf,
+                page_count=old_pages,
+                renderer_version="2",
+            )
+
+            current = HumanReviewPresentationService(store).produce(
+                state=workflow_state,
+                source=source,
+                output=output,
+            )
+
+            self.assertEqual(RENDERER_VERSION, "3")
+            self.assertEqual(historical.renderer_version, "2")
+            self.assertEqual(current.renderer_version, "3")
+            self.assertNotEqual(historical.review_artifact_id, current.review_artifact_id)
+            self.assertTrue(Path(historical.location).is_file())
+            self.assertTrue(Path(current.location).is_file())
 
     def test_produced_growth_blueprint_reuses_qa_passed_presentation_pdf(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -217,6 +343,55 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             self.assertEqual(review.product, "Narratiive Growth Blueprint")
             self.assertEqual(output["approval_status"], "pending")
             self.assertFalse(output["external_action_taken"])
+
+    def test_produced_growth_blueprint_rejects_legacy_product_label_in_pdf(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_plan = build_review_plan(
+                state("research_to_growth_blueprint"), growth_blueprint_output()
+            )
+            source_plan = replace(source_plan, subtitle="Blueprint Lite strategic presentation")
+            produced_pdf, _ = NarratiiveReviewPDFRenderer().render(source_plan)
+            produced_path = root / "deliverables" / "growth-blueprint.pdf"
+            produced_path.parent.mkdir(parents=True)
+            produced_path.write_bytes(produced_pdf)
+            output = {
+                "presentation_specification": {
+                    "slides": [{"takeaway": "The strategic source is approved."}]
+                },
+                "editable_pptx": str(root / "deliverables" / "growth-blueprint.pptx"),
+                "review_pdf": str(produced_path),
+                "visual_qa": {
+                    "status": "passed",
+                    "checks": {"no_visible_machine_runtime_artefacts": True},
+                },
+                "proposed_client_release": {"status": "not_approved"},
+                "approval_status": "pending",
+                "external_action_taken": False,
+            }
+            encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            source_path = root / "artifacts" / "deliverable-output.json"
+            source_path.parent.mkdir(parents=True)
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-legacy-blueprint-deliverable",
+                artifact_type="workflow_step_output",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+
+            with self.assertRaisesRegex(
+                HumanReviewArtifactError,
+                "current customer-facing product names: Blueprint Lite",
+            ):
+                HumanReviewPresentationService(
+                    HumanReviewArtifactStore(root / "human-review-artifacts"),
+                    allowed_source_root=root,
+                ).produce(
+                    state=state("growth_blueprint_deliverable_production"),
+                    source=source,
+                    output=output,
+                )
 
 
 if __name__ == "__main__":
