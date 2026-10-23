@@ -20,7 +20,14 @@ def customer_identity_phrases(
     for field in ("commercial_context", "company_context", "client_context"):
         context = payload.get(field)
         if isinstance(context, Mapping):
-            values.extend((context.get("company"), context.get("company_name"), context.get("name")))
+            values.extend(
+                (
+                    context.get("company"),
+                    context.get("company_name"),
+                    context.get("brand_name"),
+                    context.get("name"),
+                )
+            )
     values.extend((entity_id, client_id))
     return tuple(
         dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())

@@ -38,7 +38,10 @@ class ProtectedCustomerIdentityTests(unittest.TestCase):
                 "company": "Top Level Company",
                 "commercial_context": {"company": "Growth Sprint Technologies"},
                 "company_context": {"name": "Blueprint Lite"},
-                "client_context": {"company_name": "Nested Client Ltd"},
+                "client_context": {
+                    "company_name": "Nested Client Ltd",
+                    "brand_name": "Opportunity Card Labs",
+                },
             },
         )
         self.assertEqual(
@@ -51,6 +54,7 @@ class ProtectedCustomerIdentityTests(unittest.TestCase):
                 "Growth Sprint Technologies",
                 "Blueprint Lite",
                 "Nested Client Ltd",
+                "Opportunity Card Labs",
                 "growth-sprint-technologies",
             ),
         )
