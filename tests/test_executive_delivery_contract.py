@@ -57,7 +57,7 @@ class ExecutiveMessageContentTests(unittest.TestCase):
     def test_rejects_retired_language_in_executive_brief(self):
         with self.assertRaisesRegex(
             ValueError,
-            "retired terminology: Opportunity Card",
+            "non-canonical customer-facing terminology: Opportunity Card",
         ):
             ExecutiveMessageContent.from_command_response(
                 command="morning",
@@ -68,7 +68,7 @@ class ExecutiveMessageContentTests(unittest.TestCase):
     def test_rejects_retired_language_in_rendered_escalation_material(self):
         with self.assertRaisesRegex(
             ValueError,
-            "retired terminology: Growth Sprint",
+            "non-canonical customer-facing terminology: Growth Sprint",
         ):
             ExecutiveMessageContent.from_materials(
                 ["approval: Growth Sprint proposal"]

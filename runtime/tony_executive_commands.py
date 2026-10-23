@@ -166,7 +166,7 @@ class TonyExecutiveCommandService:
         data = brief.to_dict()
         data["agency_state"] = state.to_dict()
         data["terminology_policy_version"] = policy.version
-        data["terminology_rewritten"] = bool(source_violations)
+        data["terminology_rewritten"] = source_message != message
         data["inbound_leads_loaded"] = len(leads)
         data["inbound_lead_source_available"] = lead_source_available
         if self.briefing_pipeline is not None:

@@ -15,6 +15,9 @@ class TerminologyPolicyTests(unittest.TestCase):
             "unsettled_terms": [
                 {"concept": "Paid engagement", "rule": "Use descriptive language"},
             ],
+            "customer_facing_aliases": [
+                {"term": "Blueprint Lite", "replacement": "Groundwork", "rationale": "Approved customer name"},
+            ],
             "retired_terms": [
                 {"term": "Opportunity Card", "replacement": None, "rationale": "Retired"},
                 {"term": "Growth Sprint", "replacement": None, "rationale": "Superseded"},
@@ -33,7 +36,29 @@ class TerminologyPolicyTests(unittest.TestCase):
         self.assertEqual(self.policy.version_note, "Initial canonical terminology policy.")
         self.assertEqual(self.policy.approved_terms[0]["term"], "Growth Blueprint")
         self.assertEqual(self.policy.unsettled_terms[0]["concept"], "Paid engagement")
+        self.assertEqual(self.policy.customer_facing_aliases[0]["replacement"], "Groundwork")
         self.assertEqual(self.policy.retired_terms[0]["term"], "Opportunity Card")
+
+    def test_rewrites_customer_facing_alias_without_retiring_internal_term(self) -> None:
+        self.assertEqual(self.policy.scan("Blueprint Lite is ready"), [])
+        self.assertEqual(
+            [item.term for item in self.policy.scan_customer_facing("Blueprint Lite is ready")],
+            ["Blueprint Lite"],
+        )
+        self.assertEqual(self.policy.rewrite("Blueprint Lite is ready"), "Groundwork is ready")
+
+    def test_rejects_duplicate_customer_facing_aliases(self) -> None:
+        with self.assertRaisesRegex(ValueError, "Duplicate customer-facing alias"):
+            TerminologyPolicy({
+                "version": "1",
+                "version_note": "Test policy.",
+                "status": "active",
+                "customer_facing_aliases": [
+                    {"term": "Blueprint Lite", "replacement": "Groundwork", "rationale": "One"},
+                    {"term": "blueprint lite", "replacement": "Groundwork", "rationale": "Two"},
+                ],
+                "retired_terms": [{"term": "Old Name", "rationale": "Retired"}],
+            })
 
     def test_rejects_missing_version_note(self) -> None:
         with self.assertRaisesRegex(ValueError, "requires a version_note"):

@@ -29,6 +29,9 @@ class TonyTerminologyCommandTests(unittest.TestCase):
             "unsettled_terms": [
                 {"concept": "Paid engagement", "rule": "Use descriptive language"}
             ],
+            "customer_facing_aliases": [
+                {"term": "Blueprint Lite", "replacement": "Groundwork", "rationale": "Approved customer name"}
+            ],
             "retired_terms": [
                 {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "Superseded"}
             ],
@@ -47,6 +50,13 @@ class TonyTerminologyCommandTests(unittest.TestCase):
         self.assertEqual(result.message, "Ready.")
         self.assertEqual(result.data["next"], ["Start paid commercial engagement"])
         self.assertNotIn("Growth Sprint", str(result.data))
+
+    def test_renders_customer_facing_alias_without_mutating_source_response(self) -> None:
+        response = CommandResponse(command="status", status="ok", message="Blueprint Lite is ready.", data={})
+        service = TonyTerminologyCommandService(StubService(response), self.policy)
+        result = service.execute("/status", ())
+        self.assertEqual(result.message, "Groundwork is ready.")
+        self.assertEqual(response.message, "Blueprint Lite is ready.")
 
     def test_vocabulary_returns_repository_policy_without_delegation(self) -> None:
         response = CommandResponse(command="status", status="ok", message="unused", data={})

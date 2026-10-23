@@ -25,6 +25,7 @@ class TerminologyPolicy:
         self.version_note = payload["version_note"].strip()
         self.approved_terms = tuple(payload.get("approved_terms", ()))
         self.unsettled_terms = tuple(payload.get("unsettled_terms", ()))
+        self.customer_facing_aliases = tuple(payload.get("customer_facing_aliases", ()))
         self.retired_terms = tuple(payload["retired_terms"])
 
     @classmethod
@@ -53,6 +54,7 @@ class TerminologyPolicy:
             name_field="concept",
             detail_field="rule",
         )
+        TerminologyPolicy._validate_aliases(payload.get("customer_facing_aliases", []))
 
         entries = payload.get("retired_terms")
         if not isinstance(entries, list) or not entries:
@@ -97,6 +99,28 @@ class TerminologyPolicy:
     @staticmethod
     def _normalise_name(value: str) -> str:
         return " ".join(value.split()).casefold()
+
+    @staticmethod
+    def _validate_aliases(entries: object) -> None:
+        if not isinstance(entries, list):
+            raise ValueError("Terminology policy customer_facing_aliases must be a list")
+        seen: set[str] = set()
+        for entry in entries:
+            if not isinstance(entry, dict):
+                raise ValueError("Each customer_facing_aliases entry must be an object")
+            term = entry.get("term")
+            replacement = entry.get("replacement")
+            rationale = entry.get("rationale")
+            if not isinstance(term, str) or not term.strip():
+                raise ValueError("Each customer_facing_aliases entry requires term")
+            if not isinstance(replacement, str) or not replacement.strip():
+                raise ValueError(f"Customer-facing alias '{term}' requires replacement")
+            if not isinstance(rationale, str) or not rationale.strip():
+                raise ValueError(f"Customer-facing alias '{term}' requires rationale")
+            key = TerminologyPolicy._normalise_name(term)
+            if key in seen:
+                raise ValueError(f"Duplicate customer-facing alias: {term}")
+            seen.add(key)
 
     @staticmethod
     def _reject_collection_overlap(
@@ -163,14 +187,35 @@ class TerminologyPolicy:
     def scan_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
         return [violation for text in texts for violation in self.scan(text)]
 
+    def scan_customer_facing(self, text: str) -> list[TerminologyViolation]:
+        """Find terms that must not pass through a customer-facing boundary."""
+        violations = self.scan(text)
+        for entry in self.customer_facing_aliases:
+            for match in self._pattern(entry["term"]).finditer(text):
+                violations.append(
+                    TerminologyViolation(
+                        entry["term"],
+                        match.start(),
+                        match.end(),
+                        entry["replacement"],
+                        entry["rationale"],
+                    )
+                )
+        return sorted(violations, key=lambda item: (item.start, item.end))
+
+    def scan_customer_facing_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
+        return [violation for text in texts for violation in self.scan_customer_facing(text)]
+
     def rewrite(self, text: str) -> str:
-        """Rewrite retired terminology into current descriptive language.
+        """Render customer-facing aliases and retired terms safely.
 
         A policy-supplied replacement is preferred. Where a retired term has no
         explicit replacement, use a deliberately generic description rather than
         blocking an otherwise useful Tony response.
         """
         rewritten = text
+        for entry in self.customer_facing_aliases:
+            rewritten = self._pattern(entry["term"]).sub(entry["replacement"], rewritten)
         for entry in self.retired_terms:
             replacement = str(entry.get("replacement") or "current Narratiive approach").strip()
             rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
