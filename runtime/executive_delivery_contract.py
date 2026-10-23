@@ -12,7 +12,10 @@ VALID_EXECUTIVE_MESSAGE_KINDS = {"brief", "escalation"}
 
 def _reject_retired_language(*texts: str) -> None:
     policy = TerminologyPolicy.from_path()
-    violations = policy.scan_customer_facing_many(texts)
+    # Executive material can contain evidence-backed client and initiative names.
+    # Customer aliases are rendered by their producing services; this boundary
+    # only rejects vocabulary that is retired in every context.
+    violations = policy.scan_many(texts)
     if not violations:
         return
     terms = ", ".join(dict.fromkeys(violation.term for violation in violations))

@@ -143,8 +143,11 @@ class TonyExecutiveCommandService:
             brief = self.agency_brief_service.build(state, period)
             source_message = brief.render_compact()
             source_violations = policy.scan(source_message)
-            message = policy.render_owned_product_copy(source_message)
-            violations = policy.scan_customer_facing(message)
+            # The rendered brief includes client-authored and evidence-backed text.
+            # Only retired language may be normalised here; customer aliases must
+            # be emitted by the system-owned projection labels before interpolation.
+            message = policy.rewrite(source_message)
+            violations = policy.scan(message)
             if violations:
                 terms = ", ".join(sorted({item.term for item in violations}))
                 raise ValueError(

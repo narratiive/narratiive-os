@@ -4,9 +4,34 @@ import json
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable, Mapping
 
 DEFAULT_POLICY_PATH = Path(__file__).resolve().parents[1] / "knowledge" / "proposition" / "terminology.json"
+
+
+def customer_identity_phrases(
+    payload: Mapping[str, Any],
+    *,
+    entity_id: str = "",
+    client_id: str = "",
+) -> tuple[str, ...]:
+    """Return every supported explicit customer identity in stable precedence order."""
+    values: list[Any] = [payload.get("company"), payload.get("company_name")]
+    for field in ("commercial_context", "company_context", "client_context"):
+        context = payload.get(field)
+        if isinstance(context, Mapping):
+            values.extend(
+                (
+                    context.get("company"),
+                    context.get("company_name"),
+                    context.get("brand_name"),
+                    context.get("name"),
+                )
+            )
+    values.extend((entity_id, client_id))
+    return tuple(
+        dict.fromkeys(str(value).strip() for value in values if str(value or "").strip())
+    )
 
 
 @dataclass(frozen=True)
@@ -172,16 +197,8 @@ class TerminologyPolicy:
 
     @staticmethod
     def _product_label_pattern(term: str) -> re.Pattern[str]:
-        """Match a product label while excluding an organisation-style proper name."""
-        flexible_term = r"\s+".join(re.escape(part) for part in term.split())
-        proper_name_suffixes = (
-            "Labs?|Studios?|Agency|Group|Collective|Company|Co|Ltd|Limited|LLP|PLC|Inc|"
-            "Incorporated|LLC|Partners|Ventures|Holdings|Capital|Foundation"
-        )
-        return re.compile(
-            rf"(?<!\w)(?i:{flexible_term})(?!\w)"
-            rf"(?!\s+(?i:{proper_name_suffixes})\b)"
-        )
+        """Match a product label; known identities are protected by the caller."""
+        return TerminologyPolicy._pattern(term)
 
     def scan(self, text: str) -> list[TerminologyViolation]:
         violations: list[TerminologyViolation] = []
@@ -201,11 +218,31 @@ class TerminologyPolicy:
     def scan_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
         return [violation for text in texts for violation in self.scan(text)]
 
-    def scan_customer_facing(self, text: str) -> list[TerminologyViolation]:
+    def scan_customer_facing(
+        self,
+        text: str,
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> list[TerminologyViolation]:
         """Find terms that must not pass through a customer-facing boundary."""
-        violations = self.scan(text)
+        protected_spans = tuple(
+            match.span()
+            for phrase in protected_phrases
+            if str(phrase).strip()
+            for match in self._pattern(str(phrase).strip()).finditer(text)
+        )
+        violations = [
+            violation
+            for violation in self.scan(text)
+            if not any(
+                start <= violation.start and violation.end <= end
+                for start, end in protected_spans
+            )
+        ]
         for entry in self.customer_facing_aliases:
             for match in self._product_label_pattern(entry["term"]).finditer(text):
+                if any(start <= match.start() and match.end() <= end for start, end in protected_spans):
+                    continue
                 violations.append(
                     TerminologyViolation(
                         entry["term"],
@@ -217,8 +254,18 @@ class TerminologyPolicy:
                 )
         return sorted(violations, key=lambda item: (item.start, item.end))
 
-    def scan_customer_facing_many(self, texts: Iterable[str]) -> list[TerminologyViolation]:
-        return [violation for text in texts for violation in self.scan_customer_facing(text)]
+    def scan_customer_facing_many(
+        self,
+        texts: Iterable[str],
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> list[TerminologyViolation]:
+        protected = tuple(protected_phrases)
+        return [
+            violation
+            for text in texts
+            for violation in self.scan_customer_facing(text, protected_phrases=protected)
+        ]
 
     def rewrite(self, text: str) -> str:
         """Rewrite retired terminology into current descriptive language.

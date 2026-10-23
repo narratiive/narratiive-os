@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from runtime.models import ArtifactRef, WorkflowState, WorkflowStatus
+from runtime.terminology_policy import customer_identity_phrases
 from runtime.human_review_artifacts import (
     HumanReviewArtifact,
     HumanReviewArtifactStore,
@@ -380,16 +381,12 @@ def _artifact_version(artifact: ArtifactRef) -> str:
 
 
 def _company_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    for value in (
-        payload.get("company"),
-        payload.get("company_name"),
-        (payload.get("commercial_context") or {}).get("company") if isinstance(payload.get("commercial_context"), Mapping) else None,
-        (payload.get("client_context") or {}).get("name") if isinstance(payload.get("client_context"), Mapping) else None,
-    ):
-        if str(value or "").strip():
-            return str(value).strip()
-    return state.entity_id or state.client_id
+    identities = customer_identity_phrases(
+        state.input_payload,
+        entity_id=state.entity_id,
+        client_id=state.client_id,
+    )
+    return identities[0] if identities else state.client_id
 
 
 def _email_body(company: str, review: HumanReviewArtifact) -> str:

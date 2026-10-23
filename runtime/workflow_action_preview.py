@@ -10,7 +10,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from runtime.models import ArtifactRef, WorkflowState
-from runtime.terminology_policy import TerminologyPolicy
+from runtime.terminology_policy import TerminologyPolicy, customer_identity_phrases
+from runtime.human_review_artifacts import RENDERER_ID, RENDERER_VERSION
 from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS, latest_artifact
 
 
@@ -91,10 +92,24 @@ class WorkflowActionPreviewService:
         review = self._review_artifact(state, artifact)
         if not review:
             raise WorkflowActionPreviewError("approved artefact has no polished human-review PDF")
+        if (
+            review.get("renderer_id") != RENDERER_ID
+            or review.get("renderer_version") != RENDERER_VERSION
+        ):
+            raise WorkflowActionPreviewError(
+                "approved artefact requires a current immutable human-review PDF before client action preview"
+            )
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
         body = _resolve_simulation_body(source_body, recipient_name)
-        aliases = self.terminology_policy.scan_customer_facing(body)
+        aliases = self.terminology_policy.scan_customer_facing(
+            body,
+            protected_phrases=customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+                client_id=state.client_id,
+            ),
+        )
         if aliases:
             terms = ", ".join(dict.fromkeys(item.term for item in aliases))
             raise WorkflowActionPreviewError(
@@ -327,13 +342,12 @@ def _artifact_version(artifact: ArtifactRef) -> str:
 
 
 def _company_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    contexts = [payload.get("commercial_context"), payload.get("client_context")]
-    values = [payload.get("company"), payload.get("company_name")]
-    for context in contexts:
-        if isinstance(context, Mapping):
-            values.extend((context.get("company"), context.get("name")))
-    return next((str(value).strip() for value in values if str(value or "").strip()), state.client_id)
+    identities = customer_identity_phrases(
+        state.input_payload,
+        entity_id=state.entity_id,
+        client_id=state.client_id,
+    )
+    return identities[0] if identities else state.client_id
 
 
 def _intended_recipient_name(state: WorkflowState, company: str) -> str:

@@ -207,7 +207,11 @@ def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str
     return _result(checks)
 
 
-def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+def growth_sprint_proposal_quality_gate(
+    output: Mapping[str, Any],
+    *,
+    protected_customer_identities: tuple[str, ...] = (),
+) -> Mapping[str, Any]:
     commercial = output.get("commercial_proposal_inputs")
     draft_client_communication = output.get("draft_client_communication")
     customer_visible_values = tuple(
@@ -237,7 +241,8 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
         "customer_visible_proposal_uses_current_product_names": (
             isinstance(draft_client_communication, str)
             and not TerminologyPolicy.from_path().scan_customer_facing_many(
-                _string_values(customer_visible_values)
+                _string_values(customer_visible_values),
+                protected_phrases=protected_customer_identities,
             )
         ),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
