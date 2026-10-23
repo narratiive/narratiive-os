@@ -57,17 +57,18 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 location=str(source_path),
                 checksum=hashlib.sha256(encoded).hexdigest(),
             )
-            with self.assertRaisesRegex(
-                HumanReviewArtifactError,
-                "current customer-facing product names: Blueprint Lite",
-            ):
-                HumanReviewPresentationService(
-                    HumanReviewArtifactStore(root / "reviews")
-                ).produce(
-                    state=state("growth_diagnostic_to_blueprint_lite"),
-                    source=source,
-                    output=output,
-                )
+            review = HumanReviewPresentationService(
+                HumanReviewArtifactStore(root / "reviews")
+            ).produce(
+                state=state("growth_diagnostic_to_blueprint_lite"),
+                source=source,
+                output=output,
+            )
+            visible = "\n".join(
+                page.extract_text() or "" for page in PdfReader(review.location).pages
+            )
+            self.assertIn("The Groundwork identifies", visible)
+            self.assertNotIn("Blueprint Lite", visible)
 
     def test_review_preserves_an_exact_alias_as_the_known_company_identity(self) -> None:
         output = blueprint_output()

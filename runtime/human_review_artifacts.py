@@ -14,7 +14,7 @@ import json
 import os
 import re
 import tempfile
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from html import escape
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -213,13 +213,16 @@ class HumanReviewPresentationService:
         if state.workflow_id == "growth_blueprint_deliverable_production":
             return self._ingest_growth_blueprint_review(state=state, source=source, output=output)
         plan = build_review_plan(state, output)
+        protected_phrases = customer_identity_phrases(
+            state.input_payload,
+            entity_id=state.entity_id,
+            client_id=state.client_id,
+        )
+        if state.workflow_id == "growth_diagnostic_to_blueprint_lite":
+            plan = _render_customer_facing_plan(plan, protected_phrases=protected_phrases)
         _validate_review_plan(
             plan,
-            protected_phrases=customer_identity_phrases(
-                state.input_payload,
-                entity_id=state.entity_id,
-                client_id=state.client_id,
-            ),
+            protected_phrases=protected_phrases,
             enforce_customer_facing_names=state.workflow_id in {
                 "growth_diagnostic_to_blueprint_lite",
                 "discovery_evidence_to_growth_sprint_proposal",
@@ -936,6 +939,41 @@ def _validate_review_plan(
         raise HumanReviewArtifactError(
             "review presentation contains internal field names: " + ", ".join(leaked)
         )
+
+
+def _render_customer_facing_plan(
+    plan: ReviewDocumentPlan,
+    *,
+    protected_phrases: Iterable[str] = (),
+) -> ReviewDocumentPlan:
+    policy = TerminologyPolicy.from_path()
+    protected = tuple(protected_phrases)
+
+    def render(value: str) -> str:
+        return policy.render_owned_product_copy(value, protected_phrases=protected)
+
+    return replace(
+        plan,
+        product=render(plan.product),
+        gate_label=render(plan.gate_label),
+        subtitle=render(plan.subtitle),
+        sections=tuple(
+            replace(
+                section,
+                heading=render(section.heading),
+                body=tuple(render(item) for item in section.body),
+                items=tuple(render(item) for item in section.items),
+                cards=tuple(
+                    (render(title), tuple(render(item) for item in items))
+                    for title, items in section.cards
+                ),
+            )
+            for section in plan.sections
+        ),
+        focus_points=tuple(render(item) for item in plan.focus_points),
+        decision_prompt=render(plan.decision_prompt),
+        next_if_approved=render(plan.next_if_approved),
+    )
 
 
 def _safe_path_component(value: str, field_name: str) -> str:

@@ -280,9 +280,19 @@ class TerminologyPolicy:
             rewritten = self._pattern(entry["term"]).sub(replacement, rewritten)
         return rewritten
 
-    def render_owned_product_copy(self, text: str) -> str:
+    def render_owned_product_copy(
+        self,
+        text: str,
+        *,
+        protected_phrases: Iterable[str] = (),
+    ) -> str:
         """Render system-owned product copy; never pass evidence or client-authored text."""
         rendered = text
-        for entry in self.customer_facing_aliases:
-            rendered = self._product_label_pattern(entry["term"]).sub(entry["replacement"], rendered)
-        return self.rewrite(rendered)
+        violations = self.scan_customer_facing(
+            text,
+            protected_phrases=protected_phrases,
+        )
+        for violation in reversed(violations):
+            replacement = str(violation.replacement or "current Narratiive approach").strip()
+            rendered = rendered[: violation.start] + replacement + rendered[violation.end :]
+        return rendered
