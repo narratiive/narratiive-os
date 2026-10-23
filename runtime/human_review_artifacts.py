@@ -38,6 +38,7 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.terminology_policy import TerminologyPolicy
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
@@ -280,9 +281,9 @@ class HumanReviewPresentationService:
 def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> ReviewDocumentPlan:
     company = _company_name(state)
     if state.workflow_id == "growth_diagnostic_to_blueprint_lite":
-        return _blueprint_lite_plan(company, output)
+        return _customer_facing_plan(_blueprint_lite_plan(company, output))
     if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-        return _growth_sprint_plan(company, output)
+        return _customer_facing_plan(_growth_sprint_plan(company, output))
     if state.workflow_id in {
         "growth_sprint_to_research_engine",
         "blueprint_lite_to_discovery_preparation",
@@ -295,6 +296,34 @@ def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> Review
         return _growth_blueprint_plan(company, output)
     raise HumanReviewArtifactError(
         f"no human review presentation contract is registered for {state.workflow_id}"
+    )
+
+
+def _customer_facing_plan(plan: ReviewDocumentPlan) -> ReviewDocumentPlan:
+    """Render a new review copy without changing its authoritative source artefact."""
+    policy = TerminologyPolicy.from_path()
+    render = policy.render_customer_facing
+    sections = tuple(
+        ReviewSection(
+            heading=render(section.heading),
+            body=tuple(render(item) for item in section.body),
+            items=tuple(render(item) for item in section.items),
+            cards=tuple(
+                (render(title), tuple(render(item) for item in items))
+                for title, items in section.cards
+            ),
+        )
+        for section in plan.sections
+    )
+    return ReviewDocumentPlan(
+        product=render(plan.product),
+        gate_label=plan.gate_label,
+        company=plan.company,
+        subtitle=render(plan.subtitle),
+        sections=sections,
+        focus_points=tuple(render(item) for item in plan.focus_points),
+        decision_prompt=render(plan.decision_prompt),
+        next_if_approved=render(plan.next_if_approved),
     )
 
 
@@ -544,7 +573,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
     )
     focus = (
         challenge,
-        f"The proposed Sprint is organised around {workstream_count} workstreams and {question_count} strategic questions.",
+        f"The proposed Fieldwork is organised around {workstream_count} workstreams and {question_count} strategic questions.",
         f"Indicative timing: {timeline or 'To be confirmed through review.'}",
         f"Commercial status: {investment or 'Pending human review.'}",
     )
@@ -558,11 +587,11 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
             ),
         ),
         ReviewSection("Why this matters now", body=(justification,)),
-        ReviewSection("What the Growth Sprint will answer", items=tuple(item for _, questions in workstreams for item in questions)),
+        ReviewSection("What the Fieldwork will answer", items=tuple(item for _, questions in workstreams for item in questions)),
         ReviewSection("Proposed workstreams", cards=workstreams, items=scope),
         ReviewSection("What the Growth Blueprint will deliver", items=deliverables),
         ReviewSection(
-            "How the Sprint will work / indicative timing",
+            "How the Fieldwork will work / indicative timing",
             body=(f"Indicative timing: {timeline or 'To be confirmed through review.'}",),
             items=(
                 "Align the evidence and the decisions the work must unlock.",
@@ -578,7 +607,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
         ReviewSection("Key assumptions or evidence gaps", items=assumptions),
     )
     return ReviewDocumentPlan(
-        product="Growth Sprint Proposal",
+        product="Fieldwork Proposal",
         gate_label="GATE 2",
         company=company,
         subtitle="A focused strategic engagement to resolve the choices that must precede research, positioning and the Narratiive Growth Blueprint.",
@@ -597,7 +626,7 @@ def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocum
     gaps = _text_list(output.get("evidence_gaps"))
     questions = _text_list(output.get("questions_to_answer_next"))
     return ReviewDocumentPlan(
-        product="Blueprint Lite",
+        product="Groundwork",
         gate_label="GATE 1",
         company=company,
         subtitle="A concise strategic read on the current growth tension and the opportunity worth validating next.",

@@ -40,8 +40,8 @@ def state(workflow_id: str) -> WorkflowState:
 class HumanReviewArtifactContractTests(unittest.TestCase):
     def test_minimum_document_products_have_explicit_review_contracts(self) -> None:
         cases = (
-            ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Blueprint Lite"),
-            ("discovery_evidence_to_growth_sprint_proposal", proposal_output(), "Growth Sprint Proposal"),
+            ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Groundwork"),
+            ("discovery_evidence_to_growth_sprint_proposal", proposal_output(), "Fieldwork Proposal"),
             ("blueprint_lite_to_discovery_preparation", discovery_output(), "Research and Strategy Review"),
             ("strategic_synthesis_to_strategy_thesis", strategy_thesis_output(), "Strategy Thesis"),
             ("strategy_thesis_to_growth_blueprint", growth_blueprint_output(), "Narratiive Growth Blueprint"),
@@ -147,7 +147,8 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             visible = "\n".join(
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
-            self.assertIn("Growth Sprint Proposal", visible)
+            self.assertIn("Fieldwork Proposal", visible)
+            self.assertNotIn("Growth Sprint", visible)
             self.assertIn("Proposed workstreams", visible)
             for internal_value in (
                 "DO-NOT-SHOW-PROVIDER",

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
 import base64
+import io
 import tempfile
 import unittest
 from pathlib import Path
+
+from pypdf import PdfReader
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
@@ -137,6 +140,10 @@ class WorkflowActionPreviewTests(unittest.TestCase):
         self.assertNotIn("[Founder name]", preview.data["full_body"])
         self.assertNotIn("DRAFT — INTERNAL", preview.data["full_body"])
         self.assertTrue(preview.data["attachments"][0]["filename"].endswith(".pdf"))
+        attachment_pdf = base64.b64decode(self.gmail_calls[0]["payload"]["attachments"][0]["content_base64"])
+        attachment_text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(attachment_pdf)).pages)
+        self.assertIn("Fieldwork Proposal", attachment_text)
+        self.assertNotIn("Growth Sprint", attachment_text)
 
         stale = self.service.execute(
             f"/execute-action {run_id} because Matt approved the displayed simulation",
