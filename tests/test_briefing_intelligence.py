@@ -232,7 +232,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
     def test_09_no_material_changes_produces_an_explicit_short_result(self):
         brief = AgencyExecutiveBriefService().build(AgencyState.from_items("now", ()))
 
-        self.assertIn("Material changes: none", brief.render_compact())
+        self.assertIn("no material commercial change", brief.render_compact())
         self.assertEqual(brief.recommended_actions, ())
 
     def test_10_blocked_workflow_does_not_mark_whole_agency_blocked(self):
