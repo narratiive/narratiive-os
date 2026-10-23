@@ -81,6 +81,28 @@ class InboundLeadTests(unittest.TestCase):
         self.assertFalse(lead.should_prepare_groundwork())
         self.assertEqual(lead.briefing_classification(), "legitimate_inbound_enquiry")
 
+    def test_new_challenge_field_cannot_hide_test_or_spam_markers(self):
+        base = {
+            "contact": "Controlled Prospect",
+            "company": "Controlled Company",
+            "email": "prospect@controlled.test",
+            "source": "Website",
+            "selected_service": "FIELDWORK",
+        }
+        rehearsal = InboundLead.from_mapping({
+            **base,
+            "lead_id": "rehearsal-1",
+            "business_challenge": "SAFE TEST ONLY — do not contact",
+        })
+        spam = InboundLead.from_mapping({
+            **base,
+            "lead_id": "spam-1",
+            "business_challenge": "We sell SEO services and backlinks",
+        })
+
+        self.assertEqual(rehearsal.briefing_classification(), "test_or_rehearsal")
+        self.assertEqual(spam.briefing_classification(), "suspicious_or_unverified")
+
 
 if __name__ == "__main__":
     unittest.main()

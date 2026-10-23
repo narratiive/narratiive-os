@@ -1142,7 +1142,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         key_store=FileDeliveryKeyStore(inbound_alert_root / "delivery-keys.json"),
         journal=InboundLeadAlertJournal(inbound_alert_root / "events.jsonl"),
         lock_path=inbound_alert_root / "delivery.lock",
-        max_attempts=int(os.getenv("TONY_INBOUND_ALERT_MAX_ATTEMPTS", "3")),
+        max_attempts=int(os.getenv("TONY_INBOUND_ALERT_MAX_ATTEMPTS", "1")),
     )
     return LeadAwareTonyApplication(
         app,

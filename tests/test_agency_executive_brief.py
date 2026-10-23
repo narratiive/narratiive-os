@@ -98,6 +98,41 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         self.assertNotIn("l6TysPR86l5VAoXc", output)
         self.assertNotIn("database_field", output)
 
+    def test_long_delivery_detail_cannot_truncate_decisions_or_priorities(self):
+        long_text = "Material delivery detail " * 80
+        state = AgencyState.from_items(
+            "2026-07-29T08:00:00Z",
+            tuple(
+                AgencyItem(
+                    f"delivery-{index}",
+                    AgencyArea.DELIVERY,
+                    long_text,
+                    "active",
+                    long_text,
+                    evidence=(f"source:{index}",),
+                )
+                for index in range(8)
+            )
+            + (
+                AgencyItem(
+                    "founder-decision",
+                    AgencyArea.CLIENTS,
+                    "Approve the exact client direction",
+                    "decision_required",
+                    "Approve or reject the exact client direction.",
+                    requires_matt=True,
+                    evidence=("approval:pending",),
+                ),
+            ),
+        )
+
+        output = AgencyExecutiveBriefService().build(state).render_compact()
+
+        self.assertLessEqual(len(output), 3500)
+        self.assertIn("4. Decisions required", output)
+        self.assertIn("Approve the exact client direction", output)
+        self.assertIn("5. Recommended priorities", output)
+
     def test_empty_agency_state_recommends_commercial_action_not_repository_work(self):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())
         brief = AgencyExecutiveBriefService().build(state)

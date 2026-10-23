@@ -11,14 +11,14 @@ from runtime.proactive_executive_delivery import FileDeliveryKeyStore
 
 
 class InboundLeadAlertTests(unittest.TestCase):
-    def _service(self, root: Path, sender, *, attempts: int = 3) -> InboundLeadAlertService:
+    def _service(self, root: Path, sender) -> InboundLeadAlertService:
         return InboundLeadAlertService(
             send_message=sender,
             chat_id="founder-chat",
             key_store=FileDeliveryKeyStore(root / "keys.json"),
             journal=InboundLeadAlertJournal(root / "events.jsonl"),
             lock_path=root / "delivery.lock",
-            max_attempts=attempts,
+            max_attempts=1,
         )
 
     @staticmethod
@@ -56,10 +56,14 @@ class InboundLeadAlertTests(unittest.TestCase):
             events = [json.loads(line) for line in (root / "events.jsonl").read_text().splitlines()]
             self.assertEqual(
                 [event["event_type"] for event in events],
-                ["inbound_lead_alert.delivered", "inbound_lead_alert.duplicate_suppressed"],
+                [
+                    "inbound_lead_alert.delivery_started",
+                    "inbound_lead_alert.delivered",
+                    "inbound_lead_alert.duplicate_suppressed",
+                ],
             )
 
-    def test_missing_acknowledgement_is_retried_and_logged_as_failure(self) -> None:
+    def test_missing_acknowledgement_is_logged_without_a_blind_retry(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             calls: list[str] = []
@@ -68,15 +72,39 @@ class InboundLeadAlertTests(unittest.TestCase):
                 calls.append("attempt")
                 return {"provider": "telegram"}
 
-            result = self._service(root, send, attempts=2).deliver(self._lead())
+            service = self._service(root, send)
+            result = service.deliver(self._lead())
+            replay = service.deliver(self._lead())
 
             self.assertEqual(result.status, "delivery_failed")
-            self.assertEqual(result.attempts, 2)
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(result.attempts, 1)
+            self.assertEqual(replay.status, "duplicate_suppressed")
+            self.assertEqual(len(calls), 1)
             self.assertIn("acknowledgement", result.error)
-            event = json.loads((root / "events.jsonl").read_text().splitlines()[-1])
-            self.assertEqual(event["event_type"], "inbound_lead_alert.delivery_failed")
-            self.assertFalse((root / "keys.json").exists())
+            event_types = [
+                json.loads(line)["event_type"]
+                for line in (root / "events.jsonl").read_text().splitlines()
+            ]
+            self.assertIn("inbound_lead_alert.delivery_failed", event_types)
+            self.assertEqual(event_types[-1], "inbound_lead_alert.duplicate_suppressed")
+            self.assertTrue((root / "keys.json").exists())
+
+    def test_uncertain_timeout_is_not_retried_or_replayed(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            calls: list[str] = []
+
+            def send(_chat_id: str, _message: str) -> dict[str, str]:
+                calls.append("attempt")
+                raise TimeoutError("outcome unknown")
+
+            service = self._service(root, send)
+            failed = service.deliver(self._lead())
+            replay = service.deliver(self._lead())
+
+            self.assertEqual(failed.status, "delivery_failed")
+            self.assertEqual(replay.status, "duplicate_suppressed")
+            self.assertEqual(calls, ["attempt"])
 
 
 if __name__ == "__main__":

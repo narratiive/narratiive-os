@@ -1,7 +1,7 @@
 # Narratiive OS Product Canon
 
 Status: Governance index to existing canon
-Version: 1.1.0
+Version: 1.2.0
 
 This document locates and protects existing product truth. It does not replace
 the canonical files it references.
@@ -27,15 +27,15 @@ the canonical files it references.
 ## Customer-facing client journey names
 
 `docs/product/CLIENT_JOURNEY_NAMING_CANON_V1.md` is the authoritative
-customer-facing naming contract approved by Matt on 22 October 2026. The
+customer-facing naming contract updated by Matt on 23 October 2026. The
 customer-facing journey is:
 
-`Growth Diagnostic → Groundwork → Discovery → Proposal → Fieldwork → Sketchbook → Activation`
+`Groundwork → Discovery → Fieldwork → Sketchbook → Launchpad`
 
 Groundwork is the existing Blueprint Lite pre-sales assessment. Fieldwork is
 the paid strategic engagement that produces the Growth Blueprint. Sketchbook
 is the existing governed creative-strategy and development path downstream of
-approved Fieldwork. Activation is downstream campaign execution and does not
+approved Fieldwork. Launchpad is downstream campaign execution and does not
 inherit approval from an earlier stage.
 
 This naming layer does not rename internal workflow IDs, lifecycle values,
@@ -243,6 +243,13 @@ Never edit a checksum-locked component without updating its governed version and
 manifest through the established import/version process.
 
 ## Canon change log
+
+### 1.2.0 — 23 October 2026
+
+- Replaced Activation with Launchpad in new customer-facing and founder-facing
+  copy under Matt's explicit terminology decision.
+- Preserved Activation as an internal and historical compatibility term without
+  migrating workflow identifiers or records.
 
 ### 1.1.0 — 22 October 2026
 

@@ -244,7 +244,16 @@ class InboundLead:
 
     def briefing_classification(self) -> str:
         text = " ".join(
-            (self.contact, self.company, self.email, self.source, self.status, self.notes)
+            (
+                self.contact,
+                self.company,
+                self.email,
+                self.source,
+                self.status,
+                self.notes,
+                self.business_challenge,
+                self.selected_service,
+            )
         ).casefold()
         if self.disposition == "test" or any(
             marker in text for marker in ("safe", "synthetic", "test only", ".invalid")

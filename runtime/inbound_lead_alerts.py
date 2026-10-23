@@ -47,6 +47,20 @@ class InboundLeadAlertJournal:
             handle.flush()
             os.fsync(handle.fileno())
 
+    def has_delivery_started(self, delivery_key: str) -> bool:
+        if not self.path.is_file():
+            return False
+        try:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+            events = (json.loads(line) for line in lines if line.strip())
+            return any(
+                event.get("delivery_key") == delivery_key
+                and event.get("event_type") == "inbound_lead_alert.delivery_started"
+                for event in events
+            )
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"inbound alert journal is corrupt: {self.path}") from exc
+
 
 class InboundLeadAlertService:
     """Send one founder alert from the event-driven lead-ingest boundary."""
@@ -59,11 +73,11 @@ class InboundLeadAlertService:
         key_store: DeliveryKeyStore,
         journal: InboundLeadAlertJournal,
         lock_path: Path,
-        max_attempts: int = 3,
+        max_attempts: int = 1,
         clock: Callable[[], datetime] | None = None,
     ) -> None:
-        if max_attempts < 1:
-            raise ValueError("max_attempts must be at least 1")
+        if max_attempts != 1:
+            raise ValueError("Telegram inbound alerts use one at-most-once send attempt")
         self.send_message = send_message
         self.chat_id = chat_id.strip()
         self.key_store = key_store
@@ -84,41 +98,42 @@ class InboundLeadAlertService:
             )
         try:
             with WorkspaceDeliveryLock(self.lock_path):
-                if self.key_store.contains(key):
+                if self.key_store.contains(key) or self.journal.has_delivery_started(key):
                     return self._record(
                         InboundLeadAlertResult("duplicate_suppressed", key, lead.lead_id, 0)
                     )
-                last_error: Exception | None = None
-                for attempt in range(1, self.max_attempts + 1):
-                    try:
-                        receipt = self.send_message(self.chat_id, self.render(lead))
-                    except Exception as exc:  # transport adapters expose different errors
-                        last_error = exc
-                        continue
-                    message_id = str(receipt.get("message_id") or "").strip()
-                    if not message_id:
-                        last_error = RuntimeError("Telegram did not return a delivery acknowledgement")
-                        continue
-                    self.key_store.add(key)
+                self._record(InboundLeadAlertResult("delivery_started", key, lead.lead_id, 0))
+                self.key_store.add(key)
+                try:
+                    provider_receipt = self.send_message(self.chat_id, self.render(lead))
+                except Exception as exc:  # an uncertain send must never be replayed blindly
+                    return self._record(
+                        InboundLeadAlertResult("delivery_failed", key, lead.lead_id, 1, error=str(exc))
+                    )
+                message_id = str(provider_receipt.get("message_id") or "").strip()
+                if not message_id:
                     return self._record(
                         InboundLeadAlertResult(
-                            "delivered", key, lead.lead_id, attempt, receipt=dict(receipt)
+                            "delivery_failed",
+                            key,
+                            lead.lead_id,
+                            1,
+                            error="Telegram did not return a delivery acknowledgement",
                         )
                     )
+                receipt = {
+                    "provider": str(provider_receipt.get("provider") or "telegram"),
+                    "message_id": message_id,
+                    "date": provider_receipt.get("date"),
+                }
                 return self._record(
-                    InboundLeadAlertResult(
-                        "delivery_failed",
-                        key,
-                        lead.lead_id,
-                        self.max_attempts,
-                        error=str(last_error or "unknown Telegram delivery failure"),
-                    )
+                    InboundLeadAlertResult("delivered", key, lead.lead_id, 1, receipt=receipt)
                 )
         except ProactiveDeliveryLockContended as exc:
             return self._record(
                 InboundLeadAlertResult("already_running", key, lead.lead_id, 0, error=str(exc))
             )
-        except ProactiveDeliveryLockError as exc:
+        except (ProactiveDeliveryLockError, RuntimeError) as exc:
             return self._record(
                 InboundLeadAlertResult("delivery_failed", key, lead.lead_id, 0, error=str(exc))
             )

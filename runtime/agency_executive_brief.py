@@ -62,19 +62,34 @@ class AgencyExecutiveBrief:
             + self.operations
             + self.automation
             + self.agency_blockers
-        )
-        commercial = self.commercial or (
+        )[:3]
+        commercial = self._unique(self.material_changes + self.commercial)[:3] or (
             "Confirmed: no material commercial change since the previous successfully delivered briefing.",
         )
-        decisions = self.matt_actions or ("None confirmed.",)
+        decisions = self.matt_actions[:3] or ("None confirmed.",)
         priorities = self.recommended_actions[:3] or (self.recommendation,)
+        sections = (
+            ("2. Commercial opportunities — what changed and why it matters", commercial),
+            ("3. Delivery — progress and material blockers", delivery or ("No material change confirmed.",)),
+            ("4. Decisions required — explicit founder approvals", decisions),
+            ("5. Recommended priorities", priorities),
+        )
         lines = [heading, f"1. Agency status — {status_sentence}"]
-        self._append(lines, "2. Commercial opportunities — what changed and why it matters", commercial)
-        self._append(lines, "3. Delivery — progress and material blockers", delivery or ("No material change confirmed.",))
-        self._append(lines, "4. Decisions required — explicit founder approvals", decisions)
-        self._append(lines, "5. Recommended priorities", priorities)
+        for section_heading, values in sections:
+            self._append(
+                lines,
+                section_heading,
+                tuple(self._compact(value, 220) for value in values),
+            )
         if self.internal_platform_note:
-            lines.append(f"Supporting note: {self.internal_platform_note}")
+            lines.append(f"Supporting note: {self._compact(self.internal_platform_note, 180)}")
+        output = "\n".join(lines)
+        if len(output) <= limit:
+            return output
+        item_budget = max(24, (limit - 310) // len(sections))
+        lines = [heading, f"1. Agency status — {self._compact(status_sentence, item_budget)}"]
+        for section_heading, values in sections:
+            self._append(lines, section_heading, (self._compact(values[0], item_budget),))
         output = "\n".join(lines)
         if len(output) <= limit:
             return output
@@ -88,6 +103,13 @@ class AgencyExecutiveBrief:
     @staticmethod
     def _unique(values: tuple[str, ...]) -> tuple[str, ...]:
         return tuple(dict.fromkeys(values))
+
+    @staticmethod
+    def _compact(value: str, limit: int) -> str:
+        text = " ".join(value.split())
+        if len(text) <= limit:
+            return text
+        return text[: limit - 1].rstrip() + "…"
 
 
 class AgencyExecutiveBriefService:

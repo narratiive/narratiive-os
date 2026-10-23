@@ -14,27 +14,27 @@ ROOT = Path(__file__).resolve().parents[1]
 class ClientJourneyNamingContractTests(unittest.TestCase):
     def test_customer_names_are_versioned_and_map_to_existing_products(self) -> None:
         contract = (ROOT / "docs/product/CLIENT_JOURNEY_NAMING_CANON_V1.md").read_text(encoding="utf-8")
-        self.assertIn("Version: 1.0.0", contract)
-        self.assertIn("Decision: Matt, 22 October 2026", contract)
+        self.assertIn("Version: 1.1.0", contract)
+        self.assertIn("Decision: Matt, 23 October 2026", contract)
         for customer_name, implementation in (
             ("`Groundwork`", "Blueprint Lite pre-sales assessment"),
             ("`Fieldwork`", "The paid strategic engagement"),
             ("`Sketchbook`", "The existing Campaign World"),
-            ("`Activation`", "Downstream campaign execution"),
+            ("`Launchpad`", "Downstream campaign execution"),
         ):
             self.assertRegex(
                 contract,
                 rf"\| {re.escape(customer_name)} \| {re.escape(implementation)}",
             )
-        self.assertIn("Activation is outside", contract)
+        self.assertIn("Launchpad remains outside", contract)
 
     def test_terminology_policy_approves_customer_names_without_losing_internal_terms(self) -> None:
         policy = json.loads((ROOT / "knowledge/proposition/terminology.json").read_text(encoding="utf-8"))
-        self.assertEqual(policy["version"], "1.2.0")
+        self.assertEqual(policy["version"], "1.3.0")
         approved = {item["term"]: item["use"] for item in policy["approved_terms"]}
-        for term in ("Groundwork", "Fieldwork", "Sketchbook", "Activation"):
+        for term in ("Groundwork", "Fieldwork", "Sketchbook", "Launchpad"):
             self.assertIn(term, approved)
-        for term in ("Growth Sprint", "Growth Blueprint", "Campaign World", "Creative Bible"):
+        for term in ("Activation", "Growth Sprint", "Growth Blueprint", "Campaign World", "Creative Bible"):
             self.assertIn(term, approved)
         retired = {item["term"]: item for item in policy["retired_terms"]}
         self.assertNotIn("Growth Sprint", retired)
