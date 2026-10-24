@@ -19,6 +19,7 @@ from openclaw.tony_http_bridge import (
     build_app as build_base_app,
 )
 from openclaw.mission_control_web import MissionControlWebApplication
+from runtime.mission_control_sources import read_marketing, read_n8n_executions, read_operator_leads
 from runtime.executive_memory import ExecutiveMemoryStore
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
@@ -1028,13 +1029,15 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
                 pass
         return operator_projector.project(
             states=workflow_backend.list_states(),
-            leads=lead_store.read(),
+            leads=read_operator_leads(os.environ, lead_store),
             system_snapshot=system,
         )
 
     mission_control_web = MissionControlWebApplication(
         load_operator_snapshot,
         workflow_root=workflow_runtime_root,
+        operations_loader=lambda: read_n8n_executions(os.environ),
+        marketing_loader=lambda: read_marketing(os.environ),
     )
     return LeadAwareTonyApplication(
         app,

@@ -56,14 +56,16 @@ class FileWorkflowEvidenceReader:
         self.root = Path(root).resolve()
 
     def events(self, state: WorkflowState) -> tuple[WorkflowEvent, ...]:
-        matches = list(self.root.glob(f"*/events/{state.run_id}.jsonl"))
-        if len(matches) != 1:
+        scope = hashlib.sha256(f"{state.workspace_id}:{state.client_id}".encode()).hexdigest()[:24]
+        path = self.root / scope / "events" / f"{state.run_id}.jsonl"
+        if Path(state.run_id).name != state.run_id or not path.is_file():
             return ()
+        path.resolve().relative_to((self.root / scope / "events").resolve())
         result: list[WorkflowEvent] = []
-        for line in matches[0].read_text(encoding="utf-8").splitlines():
+        for line in path.read_text(encoding="utf-8").splitlines():
             if line.strip():
                 event = WorkflowEvent.from_dict(json.loads(line))
-                if event.workspace_id == state.workspace_id:
+                if event.workspace_id == state.workspace_id and event.run_id == state.run_id:
                     result.append(event)
         return tuple(result)
 
@@ -124,7 +126,7 @@ class OperatorMissionControlProjector:
         live = [item for item in opportunities if not item["synthetic"]]
         active = [item for item in live if item["lifecycle_stage"] != "complete"]
         needs_you = [self._queue_item(item) for item in live if item["requires_matt"]]
-        attention = [item for item in live if item["attention_state"] in {"blocked", "waiting_externally", "failed", "stale"}]
+        attention = [item for item in live if item["attention_state"] in {"blocked", "waiting_externally", "failed", "stale", "stalled", "unverified"}]
         activity = sorted(
             (event for item in opportunities for event in item["activity"]),
             key=lambda item: item["occurred_at"], reverse=True,
@@ -151,6 +153,17 @@ class OperatorMissionControlProjector:
             "needs_you": needs_you,
             "attention": attention,
             "activity": activity,
+            "operations": {
+                "runs": [{**run, "company": item["company"], "opportunity_id": item["id"]} for item in opportunities for run in item["runs"]],
+                "blockers": [
+                    {"company": item["company"], "opportunity_id": item["id"],
+                     "owner": run["owner"], "reason": reason, "run_id": run["run_id"],
+                     "next_action": run["next_action"], "status": "open"}
+                    for item in opportunities for run in item["runs"]
+                    for reason in run["issues"]
+                ],
+                "tony": {"state": "unknown", "evidence": "Workflow activity is not a live Tony heartbeat."},
+            },
             "capabilities": {"read_only": True, "approvals": False, "external_actions": False},
         }
 
@@ -209,12 +222,26 @@ class OperatorMissionControlProjector:
         )
         attention = "failed" if failed else "waiting_externally" if waiting_externally else "blocked" if blocker else "matt_required" if requires_matt else "stalled" if stalled else "retrying" if retrying else "queued" if queued else "running" if latest and latest.status.value == "active" else "complete" if lifecycle == "complete" else "ready"
         owner = "Matt" if requires_matt else self._owner(latest)
-        artefacts = self._artefacts(runs)
-        events = [self._event_item(state, event, name) for state in runs for event in self.evidence.events(state)]
+        evidence_errors = []
+        run_events = {}
+        for state in runs:
+            try:
+                run_events[state.run_id] = self.evidence.events(state)
+            except (OSError, ValueError, KeyError, TypeError):
+                run_events[state.run_id] = ()
+                evidence_errors.append(f"Event history unreadable for {state.run_id}; inspect the canonical journal.")
+        artefacts = self._artefacts(runs, run_events)
+        events = [self._event_item(state, event, name) for state in runs for event in run_events[state.run_id]]
         events = [event for event in events if event is not None]
         events.sort(key=lambda item: item["occurred_at"], reverse=True)
         next_action = latest.current_proposed_next_action() if latest else (lead.recommended_next_action if lead else None)
         current_activity = self._activity(latest, attention) if latest else "Opportunity recorded"
+        run_details = [self._run_detail(state, run_events[state.run_id]) for state in runs]
+        issues = evidence_errors + [issue for run in run_details for issue in run["issues"]]
+        if latest and latest.status.value == "complete" and not run_details[-1]["completion_verified"]:
+            attention = "unverified"
+            current_activity = "Completion recorded; evidence incomplete"
+        successful_events = [event for event in events if event["event_type"] in {"stage.completed", "workflow.outputs_promoted", "workflow.approved", "approval.granted"}]
         return {
             "id": key,
             "company": name,
@@ -232,10 +259,15 @@ class OperatorMissionControlProjector:
             "attention_state": attention,
             "updated_at": latest.updated_at if latest else (lead.created_at if lead else ""),
             "last_meaningful_event": events[0]["label"] if events else (current_activity if latest else "Lead recorded"),
-            "journey": self._journey(lifecycle, runs),
+            "journey": self._journey(lifecycle, runs, run_details),
             "artefacts": artefacts,
             "quality_history": self._quality_history(runs),
-            "activity": events[:12],
+            "activity": events,
+            "profile": {"summary": lead.ai_summary if lead else "", "source": lead.source if lead else "unknown", "notion_url": lead.notion_url if lead else ""},
+            "runs": run_details,
+            "evidence_issues": issues,
+            "last_successful_activity_at": successful_events[0]["occurred_at"] if successful_events else None,
+            "readiness": "blocked" if issues or blocker else "awaiting_approval" if requires_matt else "not_verified",
             "acquisition_path": "inbound" if lead and lead.source.strip().casefold() in {"tally", "growth diagnostic", "website"} else "unknown",
             "evidence": [f"workflow:{state.run_id}" for state in runs] + ([f"lead:{lead.lead_id}"] if lead else []),
         }
@@ -316,16 +348,79 @@ class OperatorMissionControlProjector:
             return state.stage(state.current_stage_id).started_at or state.created_at
         return state.created_at
 
-    def _journey(self, lifecycle: str, runs: list[WorkflowState]) -> list[dict[str, str]]:
+    def _journey(self, lifecycle: str, runs: list[WorkflowState], details: list[dict[str, Any]]) -> list[dict[str, str]]:
         current = LIFECYCLE.index(lifecycle)
-        journey = [{"id": item, "label": item.replace("_", " ").title(), "state": "complete" if i < current else "active" if i == current else "not_started"} for i, item in enumerate(LIFECYCLE)]
+        verified = {run["run_id"] for run in details if run["completion_verified"]}
+        journey = []
+        for i, item in enumerate(LIFECYCLE):
+            matching = [run for run in runs if WORKFLOW_STAGE.get(run.workflow_id, "delivery" if run.workflow_id in DELIVERY_STEPS else "") == item]
+            status = "complete" if matching and all(run.run_id in verified for run in matching) else "active" if i == current else "unknown" if i < current else "not_started"
+            journey.append({"id": item, "label": item.replace("_", " ").title(), "state": status})
         if lifecycle == "delivery":
             for state in runs:
                 if state.workflow_id in DELIVERY_STEPS:
-                    journey.append({"id": state.workflow_id, "label": DELIVERY_STEPS[state.workflow_id], "state": "blocked" if state.status.value in {"blocked", "failed"} else "active" if state.status.value in {"active", "awaiting_approval"} else "complete"})
+                    journey.append({"id": state.workflow_id, "label": DELIVERY_STEPS[state.workflow_id], "state": "blocked" if state.status.value in {"blocked", "failed"} else "complete" if state.run_id in verified else "unknown" if state.status.value == "complete" else "active"})
         return journey
 
-    def _artefacts(self, runs: list[WorkflowState]) -> list[dict[str, Any]]:
+    def _run_detail(self, state: WorkflowState, events: tuple[WorkflowEvent, ...]) -> dict[str, Any]:
+        issues = []
+        if not events:
+            issues.append("No readable scoped workflow event history.")
+        steps = []
+        for stage in state.stages:
+            verified_files = bool(stage.output_artifacts)
+            for artifact in stage.output_artifacts:
+                path = Path(artifact.location)
+                valid = self._within_scope(path, state) and bool(artifact.checksum)
+                if valid:
+                    try:
+                        valid = hashlib.sha256(path.read_bytes()).hexdigest() == artifact.checksum
+                    except OSError:
+                        valid = False
+                verified_files = verified_files and valid
+            completion_event = any(
+                event.event_type == "stage.completed"
+                and event.payload.get("stage_id") == stage.stage_id
+                and event.payload.get("output_artifact_ids") == [item.artifact_id for item in stage.output_artifacts]
+                for event in events
+            )
+            verified = stage.status.value == "completed" and verified_files and completion_event and (stage.quality_result or {}).get("passed") is True
+            if stage.status.value == "completed" and not verified:
+                issues.append(f"{stage.stage_id}: completion lacks output/checksum, quality or stage-completed event evidence.")
+            if stage.blocker or stage.failure_reason:
+                issues.append(stage.blocker or stage.failure_reason)
+            steps.append({"stage_id": stage.stage_id, "owner": stage.agent_ref,
+                          "status": stage.status.value, "completion_verified": verified,
+                          "quality_passed": (stage.quality_result or {}).get("passed"),
+                          "output_verified": verified_files, "retry_count": stage.retry_count,
+                          "attempt_count": len(stage.attempts), "revision_count": stage.revision_count,
+                          "started_at": stage.started_at, "completed_at": stage.completed_at,
+                          "blocker": stage.blocker or stage.failure_reason,
+                          "artifact_ids": [item.artifact_id for item in stage.output_artifacts]})
+        if state.blocker and state.blocker not in issues:
+            issues.append(state.blocker)
+        latest_artifact = next((stage.output_artifacts[-1] for stage in reversed(state.stages) if stage.output_artifacts), None)
+        approval = state.approval_history[-1] if state.approval_history else {}
+        binding = approval.get("approval_binding") or {}
+        approval_verified = not state.approval_required or bool(
+            state.approval_status == "approved" and latest_artifact
+            and approval.get("approver") and approval.get("rationale") and approval.get("approved_at")
+            and binding.get("artifact_id") == latest_artifact.artifact_id
+            and binding.get("artifact_checksum") == latest_artifact.checksum
+            and any(event.event_type == "approval.granted" and event.payload == approval for event in events)
+        )
+        if state.status.value == "complete" and not approval_verified:
+            issues.append("Completion lacks recorded human approval evidence.")
+        return {"run_id": state.run_id, "workflow_id": state.workflow_id,
+                "status": state.status.value, "owner": self._owner(state),
+                "updated_at": state.updated_at, "stages": steps,
+                "completion_verified": state.status.value == "complete" and bool(steps) and all(step["completion_verified"] for step in steps) and approval_verified and not issues,
+                "approval_status": state.approval_status,
+                "external_action_taken": state.external_action_taken,
+                "next_action": state.current_proposed_next_action() or "Inspect the recorded workflow evidence through Tony.",
+                "issues": list(dict.fromkeys(issues))}
+
+    def _artefacts(self, runs: list[WorkflowState], run_events: Mapping[str, tuple[WorkflowEvent, ...]]) -> list[dict[str, Any]]:
         items: list[dict[str, Any]] = []
         versions: dict[str, int] = defaultdict(int)
         for state in runs:
@@ -343,15 +438,25 @@ class OperatorMissionControlProjector:
                     if not location.is_absolute():
                         location = Path.cwd() / location
                     safe = self._within_scope(location, state)
+                    approval_status = "not_recorded"
+                    if state.approval_status == "pending" and artifact == next((step.output_artifacts[-1] for step in reversed(state.stages) if step.output_artifacts), None):
+                        approval_status = "pending"
+                    for decision in state.approval_history:
+                        binding = decision.get("approval_binding") or {}
+                        if binding.get("artifact_id") == artifact.artifact_id and binding.get("artifact_checksum") == artifact.checksum:
+                            if decision.get("approver") and decision.get("approved_at") and any(event.event_type == "approval.granted" and event.payload == decision for event in run_events[state.run_id]):
+                                approval_status = "approved"
+                            elif decision.get("reviewer"):
+                                approval_status = "rejected"
                     items.append({
                         "artifact_id": artifact.artifact_id, "name": title, "type": artifact.artifact_type,
                         "version": version, "created_at": stage.completed_at or state.updated_at,
                         "producer": stage.agent_ref, "quality_status": "passed" if passed else "failed" if artifact.artifact_type == "worker_attempt_output" else "not_recorded",
-                        "approval_status": state.approval_status, "checksum": artifact.checksum,
+                        "approval_status": approval_status, "checksum": artifact.checksum,
                         "location": artifact.location, "open_url": f"/mission-control/artifact?artifact_id={artifact.artifact_id}" if safe else None,
                         "parent_artifact_ids": list(artifact.metadata.get("parent_artifact_ids", [])),
                     })
-        return items
+        return list({item["artifact_id"]: item for item in items}.values())
 
     def _within_scope(self, path: Path, state: WorkflowState) -> bool:
         scope = hashlib.sha256(
@@ -383,13 +488,14 @@ class OperatorMissionControlProjector:
             "stage.completed": "Workflow stage completed", "stage.quality_recorded": "Quality review recorded",
             "workflow.outputs_promoted": "Governed output promoted", "workflow.handoff_created": "Next workflow commissioned",
             "workflow.approved": "Human approval recorded", "workflow.blocked": "Workflow blocked",
+            "approval.granted": "Human approval recorded", "approval.requested": "Human review requested",
         }
         label = labels.get(event.event_type)
         if not label:
-            return None
+            label = event.event_type.replace(".", " · ").replace("_", " ")
         if event.event_type == "stage.quality_recorded":
             label = "Quality gate passed" if event.payload.get("passed") else "Quality review failed"
-        return {"event_id": event.event_id, "company": company, "label": label, "occurred_at": event.occurred_at, "run_id": state.run_id}
+        return {"event_id": event.event_id, "event_type": event.event_type, "company": company, "label": label, "occurred_at": event.occurred_at, "run_id": state.run_id}
 
     @staticmethod
     def _queue_item(item: Mapping[str, Any]) -> dict[str, Any]:
@@ -403,6 +509,8 @@ class OperatorMissionControlProjector:
                 continue
             state = str(item.get("state", "unknown"))
             if state not in VALID_CONNECTION_STATES:
+                state = "unknown"
+            if state == "connected" and not item.get("evidence"):
                 state = "unknown"
             result.append({"name": item.get("name"), "state": state, "evidence": item.get("evidence"), "last_checked_at": item.get("last_checked_at")})
         return result
