@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import inspect
 import json
 import os
 import tempfile
@@ -393,7 +394,7 @@ class WorkflowExecutionCoordinator:
                     if stage.quality_contract in {
                         "blueprint_lite_quality_gate",
                         "growth_sprint_proposal_quality_gate",
-                    }:
+                    } and "protected_customer_identities" in inspect.signature(validator).parameters:
                         quality = dict(
                             validator(
                                 output,
