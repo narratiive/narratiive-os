@@ -1,8 +1,8 @@
 # Inbound Growth Journey
 
 Status: Canonical execution contract
-Version: 1.0
-Decision: Matt, 27 August 2026
+Version: 1.1
+Decision: Matt, 27 August 2026; customer-facing naming amendment approved 22 October 2026
 
 ## Objective
 
@@ -11,6 +11,18 @@ Run one coherent customer journey from the website Growth Diagnostic to a commis
 Canonical journey:
 
 `Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
+
+Customer-facing journey:
+
+`Growth Diagnostic → Groundwork → Discovery → Proposal → Fieldwork → Sketchbook → Activation`
+
+The customer-facing names are compatibility labels over the existing journey:
+Groundwork is Blueprint Lite; Fieldwork is the paid strategic engagement that
+produces the Growth Blueprint; Sketchbook is the governed creative-strategy and
+development path; Activation is downstream execution. Internal workflow IDs,
+states, artefact names and historical records remain unchanged. The complete
+mapping and change history are governed by
+`docs/product/CLIENT_JOURNEY_NAMING_CANON_V1.md`.
 
 ## System ownership
 
@@ -198,3 +210,12 @@ For successful test cases prove:
 `website submission → persisted lead → downstream event → Blueprint Lite generation → review gate → approved delivery → Discovery state → post-Discovery proposal state → Growth Sprint acceptance handoff fixture`
 
 The test must verify no duplicate lead, artefact or email is created when the same event is replayed.
+
+## Change log
+
+### 1.1 — 22 October 2026
+
+- Added the approved customer-facing journey terminology without changing the
+  executable workflow, persisted states or historical identifiers.
+- Kept Activation outside the certified pre-activation journey and subject to
+  its own downstream approvals.

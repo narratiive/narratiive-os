@@ -1,8 +1,12 @@
 from __future__ import annotations
 
 import json
+from decimal import Decimal
+from pathlib import Path
 from typing import Any, Mapping
 from urllib import request
+
+from runtime.model_usage_budget import HostedModelBudgetGuard, token_usage_from_anthropic
 
 
 DEFAULT_ANTHROPIC_VERSION = "2023-06-01"
@@ -61,6 +65,12 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
     if timeout_seconds <= 0:
         raise ClaudeDispatcherConfigError("TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS must be greater than zero")
 
+    budget_guard = HostedModelBudgetGuard.from_environment(
+        environ,
+        repository_root=Path(__file__).resolve().parents[1],
+        required=True,
+    )
+
     def dispatch(contract: dict[str, Any]) -> dict[str, Any]:
         _validate_safe_contract(contract)
         prompt = _render_prompt(contract)
@@ -75,6 +85,29 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             }
             else max_tokens
         )
+        reservation = None
+        if budget_guard is not None:
+            estimated_input_tokens = (len(prompt.encode("utf-8")) + 2) // 3
+            conservative_input_rate = max(
+                budget_guard.pricing.input_usd_per_mtok,
+                budget_guard.pricing.cache_write_usd_per_mtok,
+            )
+            maximum_output_cost = (
+                Decimal(request_max_tokens)
+                * budget_guard.pricing.output_usd_per_mtok
+                / Decimal(1_000_000)
+            )
+            estimated_input_cost = (
+                Decimal(estimated_input_tokens) * conservative_input_rate / Decimal(1_000_000)
+            )
+            reservation = budget_guard.reserve_capacity(
+                reserve_usd=(
+                    budget_guard.default_request_reserve_usd
+                    + estimated_input_cost
+                    + maximum_output_cost
+                ),
+                ttl_seconds=timeout_seconds + 60,
+            )
         payload = {
             "model": model,
             "max_tokens": request_max_tokens,
@@ -92,13 +125,31 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             },
             method="POST",
         )
-        with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
-            raw = response.read().decode("utf-8")
-        returned = json.loads(raw or "{}")
-        if not isinstance(returned, dict):
-            raise RuntimeError("Claude API response must be a JSON object")
-        if returned.get("error"):
-            raise RuntimeError(f"Claude API returned an error: {returned['error']}")
+        try:
+            with request.urlopen(req, timeout=timeout_seconds) as response:  # nosec B310 - Anthropic URL is explicit operator config
+                raw = response.read().decode("utf-8")
+            returned = json.loads(raw or "{}")
+            if not isinstance(returned, dict):
+                raise RuntimeError("Claude API response must be a JSON object")
+            if returned.get("error"):
+                raise RuntimeError(f"Claude API returned an error: {returned['error']}")
+            if budget_guard is not None and reservation is not None:
+                raw_response_id = returned.get("id")
+                if not isinstance(raw_response_id, str) or not raw_response_id.strip():
+                    raise RuntimeError("Claude API response is missing its billing response id")
+                response_id = raw_response_id.strip()
+                budget_guard.settle_direct_usage(
+                    reservation,
+                    provider="anthropic",
+                    model=str(returned.get("model") or model),
+                    response_id=response_id,
+                    usage=token_usage_from_anthropic(returned),
+                )
+                reservation = None
+        except Exception:
+            if budget_guard is not None and reservation is not None:
+                budget_guard.retain_ambiguous_reservation(reservation)
+            raise
 
         text = _response_text(returned)
         if not text:
@@ -171,18 +222,18 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
 
 _GENERAL_RETURN_CONTRACT = (
         "Return exactly one JSON object and no markdown fences. Use task-specific fields where appropriate. "
-        "For Blueprint Lite work, follow the canonical inbound product boundary: diagnostic inputs must be represented faithfully; "
+        "For Blueprint Lite workflow work, call the product Groundwork in all human-readable output values while preserving required internal JSON field names; follow the canonical inbound product boundary: diagnostic inputs must be represented faithfully; "
         "separate facts, interpretations and hypotheses; include selective outside-in evidence; identify one company-specific growth tension; "
         "offer one consequential but provisional opportunity; include meaningful questions to answer next; and stop at a human-review-ready internal artefact. "
         "Return blueprint_lite, diagnostic_signals_used, diagnostic_input_coverage, source_backed_evidence (or sources), evidence_gaps, "
         "fact_interpretation_hypothesis_lineage, growth_tension, provisional_opportunity, questions_to_answer_next, quality_gate, and recommendation containing advance, revise, or stop. "
-        "blueprint_lite is required and must contain the substantive, personalised free strategic follow-up itself; a status note, summary of other fields, or statement that an artefact was prepared is not a Blueprint Lite and must not substitute for it. "
+        "blueprint_lite is required and must contain the substantive, personalised free Groundwork itself; a status note, summary of other fields, or statement that an artefact was prepared is not Groundwork and must not substitute for it. "
         "fact_interpretation_hypothesis_lineage must be an object using the exact singular keys fact, interpretation, and hypothesis; each value must contain the evidence-linked statements for that class. "
         "Put each named Blueprint Lite field at the top level of the returned object; do not nest them inside work_product, result, or output. "
         "diagnostic_input_coverage must follow the deterministic diagnostic_input_coverage_assessment supplied in target context. It assesses only whether the submitted diagnostic fields are present: challenge, overall score, category scores, main blockage, recommended actions, and raw answers. "
         "Do not mark diagnostic input coverage incomplete because company size, industry, segment, a real website, LinkedIn, customer evidence, market evidence, or recommended next action is unavailable; record those research and context limitations under evidence_gaps instead. "
         "quality_gate.human_review_ready may be true only when the diagnostic input coverage is complete and the returned Blueprint Lite satisfies the requested evidence discipline. "
-        "Do not turn Blueprint Lite into the paid Growth Blueprint, a proposal, or a client send. "
+        "Do not turn Groundwork into the paid Growth Blueprint, a proposal, or a client send. "
         "For Growth Blueprint work, include growth_blueprint, sources (or source_backed_evidence), evidence_gaps, narratiive_fit, "
         "strategic_growth_opportunity, and recommendation containing advance, revise, or stop. "
         "For outreach preparation, include email_subject, email_body, and optional creative_brief. "

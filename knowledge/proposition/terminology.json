@@ -1,7 +1,7 @@
 {
   "policy_id": "narratiive_terminology",
-  "version": "1.1.0",
-  "version_note": "Retired Narratiive terms are rewritten into approved descriptive language rather than blocking Tony outputs.",
+  "version": "1.2.0",
+  "version_note": "Approved the customer-facing Groundwork, Fieldwork, Sketchbook and Activation journey while preserving internal and historical identifiers.",
   "status": "active",
   "owner": "Narratiive",
   "governance": {
@@ -12,16 +12,23 @@
   "approved_terms": [
     {"term": "Narratiive OS", "use": "The operating system and repository-backed business infrastructure."},
     {"term": "Tony", "use": "The Chief-of-Staff interface and orchestration layer."},
-    {"term": "Growth Blueprint", "use": "The canonical strategic output defined by the Blueprint registry."},
-    {"term": "Campaign World", "use": "The approved post-Blueprint creative platform output."},
-    {"term": "Creative Bible", "use": "The executional creative system derived from an approved Campaign World."}
+    {"term": "Groundwork", "use": "The customer-facing name for the existing Blueprint Lite pre-sales assessment; internal identifiers and historical records remain unchanged."},
+    {"term": "Fieldwork", "use": "The customer-facing name for the paid strategic engagement that produces the Growth Blueprint."},
+    {"term": "Sketchbook", "use": "The customer-facing name for the existing governed creative-strategy and development process downstream of approved Fieldwork."},
+    {"term": "Activation", "use": "The customer-facing name for downstream campaign execution, which retains separate production and external-action approvals."},
+    {"term": "Growth Sprint", "use": "An internal and historical compatibility label only; use Fieldwork in all new customer-facing copy."},
+    {"term": "Growth Blueprint", "use": "The canonical strategic artefact produced within Fieldwork and defined by the Blueprint registry."},
+    {"term": "Campaign World", "use": "The internal approved post-Blueprint creative platform output within Sketchbook."},
+    {"term": "Creative Bible", "use": "The internal executional creative system derived from an approved Campaign World within Sketchbook."}
   ],
   "unsettled_terms": [
-    {"concept": "Personalised prospecting asset", "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."},
-    {"concept": "Paid commercial engagement", "rule": "Do not invent or revive an engagement label; use descriptive language until an approved name is versioned here."}
+    {"concept": "Personalised prospecting asset", "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."}
+  ],
+  "customer_facing_aliases": [
+    {"term": "Blueprint Lite", "replacement": "Groundwork", "rationale": "Groundwork is the approved customer-facing name; the Blueprint Lite identifier remains unchanged internally."},
+    {"term": "Growth Sprint", "replacement": "Fieldwork", "rationale": "Fieldwork is the approved customer-facing engagement name; the Growth Sprint identifier remains valid internally and historically."}
   ],
   "retired_terms": [
-    {"term": "Opportunity Card", "replacement": "personalised prospecting asset", "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."},
-    {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "The phrase has been superseded and is not an approved commercial engagement name."}
+    {"term": "Opportunity Card", "replacement": "personalised prospecting asset", "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."}
   ]
 }

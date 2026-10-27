@@ -6,6 +6,7 @@ import signal
 import sys
 import time
 from pathlib import Path
+from typing import Callable
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
@@ -18,9 +19,36 @@ from runtime.tony_conversation_work import (  # noqa: E402
     TonyConversationWorker,
 )
 from runtime.tony_dispatch_adapters import build_http_dispatchers  # noqa: E402
+from runtime.model_usage_budget import HostedModelBudgetGuard  # noqa: E402
 from runtime.tony_promised_work import TonyPromisedWorkWorker  # noqa: E402
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend  # noqa: E402
 from runtime.workspaces import WorkspaceNotFound, WorkspaceRuntimeManager  # noqa: E402
+
+
+def budgeted_conversation_executor(
+    executor: Callable[[str, str], str],
+    guard: HostedModelBudgetGuard | None,
+    *,
+    ttl_seconds: int,
+) -> Callable[[str, str], str]:
+    def execute(text: str, work_id: str) -> str:
+        reservation = None
+        if guard is not None:
+            reservation = guard.reserve_capacity(ttl_seconds=ttl_seconds)
+        try:
+            result = executor(text, work_id)
+        except Exception:
+            # An ambiguous Gateway failure may still represent billed provider
+            # work. Charge it conservatively through month-end.
+            if guard is not None and reservation is not None:
+                guard.retain_ambiguous_reservation(reservation)
+            raise
+        else:
+            if guard is not None and reservation is not None:
+                guard.release_reservation(reservation)
+            return result
+
+    return execute
 
 
 def build_worker() -> TonyConversationWorker:
@@ -31,10 +59,19 @@ def build_worker() -> TonyConversationWorker:
         )
     ).resolve()
     gateway = build_gateway()
+    budget_guard = HostedModelBudgetGuard.from_environment(
+        os.environ,
+        repository_root=REPOSITORY_ROOT,
+        required=True,
+    )
     telegram = TelegramSender(TelegramConfig.from_env(os.environ))
     return TonyConversationWorker(
         FileConversationWorkStore(root),
-        gateway.converse_for_work,
+        budgeted_conversation_executor(
+            gateway.converse_for_work,
+            budget_guard,
+            ttl_seconds=int(gateway.config.work_timeout_seconds) + 60,
+        ),
         telegram.send,
         lease_seconds=int(os.getenv("TONY_CONVERSATION_LEASE_SECONDS", "2100")),
         max_attempts=int(os.getenv("TONY_CONVERSATION_MAX_ATTEMPTS", "3")),

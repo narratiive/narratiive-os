@@ -32,7 +32,7 @@ def _lifecycle(client_id: str) -> ClientLifecycleRecord:
 
 def _blueprint_output() -> dict[str, object]:
     return {
-        "blueprint_lite": "A substantive evidence-disciplined Blueprint Lite with a clear growth argument.",
+        "blueprint_lite": "A substantive evidence-disciplined Groundwork with a clear growth argument.",
         "diagnostic_signals_used": ["Overall score", "Main blockage", "Raw answer evidence"],
         "diagnostic_input_coverage": {"complete": True},
         "source_backed_evidence": [{"source": "https://example.com", "fact": "Reserved example domain"}],
@@ -163,7 +163,7 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 "blueprint_lite_to_discovery_preparation",
                 "safe-discovery-run",
                 {
-                    "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite.",
+                    "blueprint_lite": "A substantive SAFE synthetic Groundwork.",
                     "diagnostic_evidence": {"source": "synthetic"},
                     "company_context": {"name": "SAFE Synthetic Company"},
                 },
@@ -193,7 +193,7 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                         "notes": "SAFE synthetic discovery notes with unresolved questions.",
                         "sources": [{"source_id": "meeting-1", "source_type": "notes", "location": "meeting:synthetic"}],
                     },
-                    "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite.",
+                    "blueprint_lite": "A substantive SAFE synthetic Groundwork.",
                     "commercial_context": {"company": "SAFE Synthetic Company"},
                 },
                 entity_id="safe-lead",

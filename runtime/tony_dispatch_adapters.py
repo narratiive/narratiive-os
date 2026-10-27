@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import sqlite3
+import base64
+import binascii
 from pathlib import Path
 from typing import Any, Mapping
 from urllib import request
@@ -208,6 +210,61 @@ class _GitHubReadDispatcher:
         except (TypeError, ValueError):
             max_results = 10
         resource = str(target.get("resource") or "overview").strip().casefold()
+        operation = str(contract.get("operation") or "").strip().casefold()
+        configured_owner = self.config.repository.split("/", 1)[0]
+        requested_owner = str(target.get("owner") or configured_owner).strip()
+        if requested_owner != configured_owner:
+            raise GitHubWorkError("GitHub repository reads are limited to the configured owner")
+
+        if resource in {"repositories", "repos"} or (
+            operation == "list" and "owner" in target
+        ):
+            repositories = [
+                item
+                for item in self.client.list_repositories()
+                if str(item.get("full_name") or "").startswith(f"{configured_owner}/")
+            ][:max_results]
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": f"github:{configured_owner}:repositories",
+                "owner": configured_owner,
+                "repositories": [self._normalise_repository(item) for item in repositories],
+                "record_ids": [str(item.get("full_name")) for item in repositories],
+                "summary": "Accessible GitHub repositories were read without mutation.",
+            }
+
+        repository_target = str(
+            target.get("repository")
+            or target.get("full_name")
+            or target.get("repo")
+            or ""
+        ).strip()
+        if resource in {"content", "contents", "file"} or (
+            operation in {"get_content", "fetch", "retrieve"} and repository_target
+        ):
+            repository = repository_target
+            if not repository:
+                raise GitHubWorkError("GitHub content reads require a repository")
+            if "/" not in repository:
+                repository = f"{requested_owner}/{repository}"
+            if repository.split("/", 1)[0] != configured_owner:
+                raise GitHubWorkError("GitHub repository reads are limited to the configured owner")
+            path = str(target.get("path") or "").strip()
+            content = self.client.get_repository_content(repository, path)
+            normalised = self._normalise_content(content, max_results=max_results)
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": f"github:{repository}:content:{path or '/'}",
+                "repository": repository,
+                "path": path,
+                "content": normalised,
+                "summary": "GitHub repository content was read without mutation.",
+            }
+
         pull_number = target.get("pull_number")
         if pull_number is not None:
             try:
@@ -249,6 +306,42 @@ class _GitHubReadDispatcher:
             for key in ("id", "number", "name", "title", "state", "status", "conclusion", "html_url", "updated_at")
             if item.get(key) not in (None, "")
         }
+
+    @staticmethod
+    def _normalise_repository(item: Mapping[str, Any]) -> dict[str, Any]:
+        return {
+            key: item.get(key)
+            for key in ("id", "name", "full_name", "private", "html_url", "default_branch", "updated_at")
+            if item.get(key) not in (None, "")
+        }
+
+    @staticmethod
+    def _normalise_content(
+        content: Mapping[str, Any] | list[Mapping[str, Any]], *, max_results: int
+    ) -> dict[str, Any] | list[dict[str, Any]]:
+        if isinstance(content, list):
+            return [
+                {
+                    key: item.get(key)
+                    for key in ("name", "path", "type", "size", "sha", "html_url", "download_url")
+                    if item.get(key) not in (None, "")
+                }
+                for item in content[:max_results]
+            ]
+        result = {
+            key: content.get(key)
+            for key in ("name", "path", "type", "size", "sha", "html_url", "download_url")
+            if content.get(key) not in (None, "")
+        }
+        encoded = content.get("content")
+        if content.get("encoding") == "base64" and isinstance(encoded, str):
+            try:
+                decoded = base64.b64decode(encoded, validate=False)
+            except (binascii.Error, ValueError):
+                decoded = b""
+            if decoded and len(decoded) <= 262_144:
+                result["text"] = decoded.decode("utf-8", errors="replace")
+        return result
 
 
 class _N8NReadDispatcher:
