@@ -23,6 +23,7 @@ from runtime.worker_registry import (
 )
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
+from runtime.terminology_policy import TerminologyPolicy
 
 
 DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
@@ -636,7 +637,7 @@ class TonyInboundBlueprintLiteService:
     def _instruction(lead: InboundLead) -> str:
         subject = lead.company or lead.contact
         return (
-            f"Prepare the canonical Blueprint Lite for {subject} from the completed Growth Diagnostic input package supplied in target context. "
+            f"Prepare the canonical internal Blueprint Lite workflow artefact for {subject}, whose customer-facing product name is Groundwork, from the completed Growth Diagnostic input package supplied in target context. "
             "This is reversible internal preparation only. Do not send anything. "
             "Use only the supplied diagnostic evidence and genuinely verified public sources. Use the exact verified_research_evidence supplied in "
             "target context; never invent, replace or imply a source that is not present there. Preserve source lineage and clearly separate facts, "
@@ -647,7 +648,7 @@ class TonyInboundBlueprintLiteService:
             "evidence supports proceeding to a human review; otherwise state the supported alternative. Set quality_gate.human_review_ready to true "
             "only when the returned evidence is ready for human review. Explicitly report whether the supplied diagnostic package contains enough information to represent the "
             "diagnostic faithfully; do not silently fill missing diagnostic inputs. Identify one company-specific growth tension, one consequential "
-            "but provisional opportunity, and 3–4 meaningful questions to answer next. Produce only the internal human-review-ready Blueprint Lite "
+            "but provisional opportunity, and 3–4 meaningful questions to answer next. Preserve the internal blueprint_lite JSON field name, but use Groundwork—not Blueprint Lite—in every value that can appear in the human-review document. Produce only the internal human-review-ready Groundwork "
             "defined by the canonical product contract. Do not create the paid Growth Blueprint, share a file, update Notion, create a Calendar event, "
             "book Discovery, or change any external state."
         )
@@ -665,6 +666,20 @@ class TonyInboundBlueprintLiteService:
         returned_gate = evidence.get("quality_gate") if isinstance(evidence.get("quality_gate"), dict) else {}
         coverage = evidence.get("diagnostic_input_coverage") if isinstance(evidence.get("diagnostic_input_coverage"), dict) else {}
         recommendation = str(evidence.get("recommendation") or "").strip().casefold()
+        review_values = tuple(
+            _strings(evidence.get(field))
+            for field in (
+                "blueprint_lite",
+                "central_diagnosis",
+                "source_backed_evidence",
+                "evidence_gaps",
+                "growth_tension",
+                "provisional_opportunity",
+                "questions_to_answer_next",
+            )
+        )
+        visible_texts = tuple(text for group in review_values for text in group)
+        naming_current = not TerminologyPolicy.from_path().scan_customer_facing_many(visible_texts)
 
         checks = {
             "blueprint_lite_present": _meaningful(evidence.get("blueprint_lite")),
@@ -678,6 +693,7 @@ class TonyInboundBlueprintLiteService:
             "three_to_four_next_questions": questions_ok,
             "worker_marks_human_review_ready": returned_gate.get("human_review_ready") is True,
             "recommendation_is_advance": recommendation == "advance",
+            "customer_facing_naming_current": naming_current,
             "no_false_external_execution_claim": no_asserted_external_action(evidence, _FALSE_EXECUTION_MARKERS),
         }
         failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
@@ -812,6 +828,16 @@ def _diagnostic_input_coverage(payload: Mapping[str, Any]) -> dict[str, Any]:
     }
     missing = [name for name, value in required.items() if not _meaningful(value)]
     return {"complete": not missing, "missing_inputs": missing}
+
+
+def _strings(value: Any) -> tuple[str, ...]:
+    if isinstance(value, str):
+        return (value,)
+    if isinstance(value, Mapping):
+        return tuple(text for nested in value.values() for text in _strings(nested))
+    if isinstance(value, (list, tuple, set)):
+        return tuple(text for nested in value for text in _strings(nested))
+    return ()
 
 
 def _meaningful(value: Any) -> bool:

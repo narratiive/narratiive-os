@@ -563,7 +563,7 @@ class WorkflowQualityTests(unittest.TestCase):
                         "content_hash": "safe-hash",
                     }],
                 },
-                "blueprint_lite": "Synthetic Blueprint Lite",
+                "blueprint_lite": "Synthetic Groundwork",
                 "commercial_context": {},
             },
         )

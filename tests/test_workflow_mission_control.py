@@ -15,7 +15,7 @@ from runtime.inbound_leads import InboundLead
 
 def _blueprint_output() -> dict:
     return {
-        "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite with a clear strategic point of view.",
+        "blueprint_lite": "A substantive SAFE synthetic Groundwork with a clear strategic point of view.",
         "diagnostic_signals_used": ["overall score", "main blockage"],
         "diagnostic_input_coverage": {"complete": True},
         "source_backed_evidence": [

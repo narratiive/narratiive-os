@@ -72,7 +72,7 @@ def lifecycle(client_id: str) -> ClientLifecycleRecord:
 
 def blueprint_output() -> dict:
     return {
-        "blueprint_lite": "A substantive synthetic Blueprint Lite with a clear strategic point of view.",
+        "blueprint_lite": "A substantive synthetic Groundwork with a clear strategic point of view.",
         "diagnostic_signals_used": ["overall score", "main blockage"],
         "diagnostic_input_coverage": {"complete": True},
         "source_backed_evidence": [{"source": "https://example.invalid", "fact": "Synthetic evidence"}],
