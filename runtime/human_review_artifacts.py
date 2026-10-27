@@ -17,7 +17,7 @@ import tempfile
 from dataclasses import asdict, dataclass
 from html import escape
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any, Iterable, Mapping, Sequence
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
@@ -38,10 +38,11 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.terminology_policy import TerminologyPolicy, customer_identity_phrases
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
-RENDERER_VERSION = "2"
+RENDERER_VERSION = "3"
 BLUEPRINT_PRESENTATION_RENDERER_ID = "narratiive-growth-blueprint-presentation"
 BLUEPRINT_PRESENTATION_RENDERER_VERSION = "1"
 PDF_MIME_TYPE = "application/pdf"
@@ -212,7 +213,19 @@ class HumanReviewPresentationService:
         if state.workflow_id == "growth_blueprint_deliverable_production":
             return self._ingest_growth_blueprint_review(state=state, source=source, output=output)
         plan = build_review_plan(state, output)
-        _validate_review_plan(plan)
+        protected_phrases = customer_identity_phrases(
+            state.input_payload,
+            entity_id=state.entity_id,
+            client_id=state.client_id,
+        )
+        _validate_review_plan(
+            plan,
+            protected_phrases=protected_phrases,
+            enforce_customer_facing_names=state.workflow_id in {
+                "growth_diagnostic_to_blueprint_lite",
+                "discovery_evidence_to_growth_sprint_proposal",
+            },
+        )
         pdf_bytes, pages = NarratiiveReviewPDFRenderer().render(plan)
         return self.store.persist(
             state=state,
@@ -256,16 +269,35 @@ class HumanReviewPresentationService:
         pdf_bytes = review_path.read_bytes()
         try:
             reader = PdfReader(io.BytesIO(pdf_bytes))
-            visible = "\n".join(page.extract_text() or "" for page in reader.pages).casefold()
+            visible_text = "\n".join(page.extract_text() or "" for page in reader.pages)
         except Exception as exc:
             raise HumanReviewArtifactError("Growth Blueprint review PDF is unreadable") from exc
+        protected_phrases = customer_identity_phrases(
+            state.input_payload,
+            entity_id=state.entity_id,
+            client_id=state.client_id,
+        )
+        aliases = TerminologyPolicy.from_path().scan_customer_facing(
+            visible_text,
+            protected_phrases=protected_phrases,
+        )
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise HumanReviewArtifactError(
+                "Growth Blueprint review PDF requires current customer-facing product names: " + terms
+            )
+        visible = visible_text.casefold()
         leaked = sorted(field for field in PROHIBITED_VISIBLE_FIELDS if field in visible)
         if leaked:
             raise HumanReviewArtifactError(
                 "Growth Blueprint review PDF exposes internal field names: " + ", ".join(leaked)
             )
         plan = _produced_growth_blueprint_plan(_company_name(state), output)
-        _validate_review_plan(plan)
+        _validate_review_plan(
+            plan,
+            protected_phrases=protected_phrases,
+            enforce_customer_facing_names=True,
+        )
         return self.store.persist(
             state=state,
             source=source,
@@ -544,7 +576,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
     )
     focus = (
         challenge,
-        f"The proposed Sprint is organised around {workstream_count} workstreams and {question_count} strategic questions.",
+        f"The proposed Fieldwork is organised around {workstream_count} workstreams and {question_count} strategic questions.",
         f"Indicative timing: {timeline or 'To be confirmed through review.'}",
         f"Commercial status: {investment or 'Pending human review.'}",
     )
@@ -558,11 +590,11 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
             ),
         ),
         ReviewSection("Why this matters now", body=(justification,)),
-        ReviewSection("What the Growth Sprint will answer", items=tuple(item for _, questions in workstreams for item in questions)),
+        ReviewSection("What the Fieldwork will answer", items=tuple(item for _, questions in workstreams for item in questions)),
         ReviewSection("Proposed workstreams", cards=workstreams, items=scope),
         ReviewSection("What the Growth Blueprint will deliver", items=deliverables),
         ReviewSection(
-            "How the Sprint will work / indicative timing",
+            "How the Fieldwork will work / indicative timing",
             body=(f"Indicative timing: {timeline or 'To be confirmed through review.'}",),
             items=(
                 "Align the evidence and the decisions the work must unlock.",
@@ -578,7 +610,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
         ReviewSection("Key assumptions or evidence gaps", items=assumptions),
     )
     return ReviewDocumentPlan(
-        product="Growth Sprint Proposal",
+        product="Fieldwork Proposal",
         gate_label="GATE 2",
         company=company,
         subtitle="A focused strategic engagement to resolve the choices that must precede research, positioning and the Narratiive Growth Blueprint.",
@@ -597,7 +629,7 @@ def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocum
     gaps = _text_list(output.get("evidence_gaps"))
     questions = _text_list(output.get("questions_to_answer_next"))
     return ReviewDocumentPlan(
-        product="Blueprint Lite",
+        product="Groundwork",
         gate_label="GATE 1",
         company=company,
         subtitle="A concise strategic read on the current growth tension and the opportunity worth validating next.",
@@ -798,17 +830,12 @@ def _telegram_notification(plan: ReviewDocumentPlan) -> str:
 
 
 def _company_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    for value in (
-        payload.get("company"),
-        payload.get("company_name"),
-        (payload.get("commercial_context") or {}).get("company") if isinstance(payload.get("commercial_context"), Mapping) else None,
-        (payload.get("company_context") or {}).get("name") if isinstance(payload.get("company_context"), Mapping) else None,
-        (payload.get("client_context") or {}).get("name") if isinstance(payload.get("client_context"), Mapping) else None,
-    ):
-        if _clean_text(value):
-            return _clean_text(value)
-    return state.entity_id or state.client_id
+    identities = customer_identity_phrases(
+        state.input_payload,
+        entity_id=state.entity_id,
+        client_id=state.client_id,
+    )
+    return _clean_text(identities[0]) if identities else state.client_id
 
 
 def _workstream_cards(value: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
@@ -873,12 +900,16 @@ def _p(value: str) -> str:
     return escape(_clean_text(value)).replace("\n", "<br/>")
 
 
-def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
-    visible = " ".join(
+def _validate_review_plan(
+    plan: ReviewDocumentPlan,
+    *,
+    protected_phrases: Iterable[str] = (),
+    enforce_customer_facing_names: bool = False,
+) -> None:
+    visible_text = " ".join(
         (
             plan.product,
             plan.gate_label,
-            plan.company,
             plan.subtitle,
             plan.decision_prompt,
             plan.next_if_approved,
@@ -889,7 +920,18 @@ def _validate_review_plan(plan: ReviewDocumentPlan) -> None:
             *(title for section in plan.sections for title, _ in section.cards),
             *(item for section in plan.sections for _, items in section.cards for item in items),
         )
-    ).casefold()
+    )
+    if enforce_customer_facing_names:
+        aliases = TerminologyPolicy.from_path().scan_customer_facing(
+            visible_text,
+            protected_phrases=protected_phrases,
+        )
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise HumanReviewArtifactError(
+                "review presentation requires current customer-facing product names: " + terms
+            )
+    visible = visible_text.casefold()
     leaked = sorted(field for field in PROHIBITED_VISIBLE_FIELDS if field in visible)
     if leaked:
         raise HumanReviewArtifactError(

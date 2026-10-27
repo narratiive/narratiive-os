@@ -307,11 +307,12 @@ class LeadAwareTonyApplication:
                     principal = supplied_principal if supplied_principal == self.authorised_principal_id else ""
                     response = self.workflow_command_service.execute(text, (), principal_id=principal)
                     status = HTTPStatus.OK
+                    rendered_message = protect_telegram_output(response.message)
                     payload = {
                         "ok": response.status != "error",
-                        "reply": protect_telegram_output(response.message),
-                        "message": protect_telegram_output(response.message),
                         **response.to_dict(),
+                        "reply": rendered_message,
+                        "message": rendered_message,
                     }
                 else:
                     status, payload = self.base._handle_telegram_command(text)

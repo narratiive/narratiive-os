@@ -40,13 +40,13 @@ class PromptRegistryTests(unittest.TestCase):
         self.assertEqual(raised.exception.terms, ("Opportunity Card",))
         self.assertEqual(self.registry.history("research-analyst"), [])
 
-    def test_publish_reports_all_distinct_retired_terms(self) -> None:
+    def test_publish_allows_internal_aliases_but_reports_retired_terms(self) -> None:
         with self.assertRaises(PromptTerminologyError) as raised:
             self.registry.publish(
                 "research-analyst",
                 "Turn the Opportunity Card into a Growth Sprint and another Opportunity Card.",
             )
-        self.assertEqual(raised.exception.terms, ("Growth Sprint", "Opportunity Card"))
+        self.assertEqual(raised.exception.terms, ("Opportunity Card",))
 
     def test_activate_selects_explicit_version(self) -> None:
         self.registry.publish("strategy-director", "Version one")

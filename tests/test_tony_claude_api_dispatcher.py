@@ -306,7 +306,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                         "type": "text",
                         "text": json.dumps(
                             {
-                                "blueprint_lite": "A concise outside-in Blueprint Lite",
+                                "blueprint_lite": "A concise outside-in Groundwork",
                                 "source_backed_evidence": ["https://example.com/source"],
                                 "evidence_gaps": ["Internal customer data is unavailable"],
                                 "fact_interpretation_hypothesis_lineage": {
@@ -333,9 +333,9 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         req = urlopen.call_args.args[0]
         sent = json.loads(req.data.decode("utf-8"))
         prompt = sent["messages"][0]["content"]
-        self.assertIn("For Blueprint Lite work", prompt)
+        self.assertIn("For Blueprint Lite workflow work", prompt)
         self.assertIn("blueprint_lite is required", prompt)
-        self.assertIn("must contain the substantive, personalised free strategic follow-up itself", prompt)
+        self.assertIn("must contain the substantive, personalised free Groundwork itself", prompt)
         self.assertIn("facts, interpretations and hypotheses", prompt)
         self.assertIn("growth_tension", prompt)
         self.assertIn("provisional_opportunity", prompt)
@@ -345,7 +345,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertIn("record those research and context limitations under evidence_gaps", prompt)
         self.assertIn("human-review-ready", prompt)
         self.assertIn("at the top level", prompt)
-        self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)
+        self.assertIn("Do not turn Groundwork into the paid Growth Blueprint", prompt)
 
     def test_dispatcher_rejects_any_non_prepare_or_unapproved_contract_shape(self):
         handler = build_claude_api_dispatcher(self._env())
@@ -378,7 +378,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_blueprint_lite_json_after_model_preamble_is_parsed(self, urlopen):
         work_product = {
-            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "blueprint_lite": "A concise synthetic Groundwork",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "recommendation": "advance",
         }
@@ -405,7 +405,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_model_added_work_product_envelope_is_promoted_for_quality_validation(self, urlopen):
         work_product = {
-            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "blueprint_lite": "A concise synthetic Groundwork",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
             "source_backed_evidence": ["https://example.invalid/source"],
@@ -450,7 +450,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_plural_lineage_keys_are_normalised_before_quality_validation(self, urlopen):
         work_product = {
-            "blueprint_lite": "A substantive synthetic Blueprint Lite for contract validation.",
+            "blueprint_lite": "A substantive synthetic Groundwork for contract validation.",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
             "source_backed_evidence": ["https://example.invalid/source"],

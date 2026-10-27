@@ -10,6 +10,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.terminology_policy import TerminologyPolicy, customer_identity_phrases
+from runtime.human_review_artifacts import RENDERER_ID, RENDERER_VERSION
 from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS, latest_artifact
 
 
@@ -33,9 +35,11 @@ class WorkflowActionPreviewService:
         self,
         workflow_root: str | Path,
         gmail_dispatcher: Callable[[dict[str, Any]], dict[str, Any]] | None,
+        terminology_policy: TerminologyPolicy | None = None,
     ) -> None:
         self.workflow_root = Path(workflow_root).resolve()
         self.gmail_dispatcher = gmail_dispatcher
+        self.terminology_policy = terminology_policy or TerminologyPolicy.from_path()
 
     def artifact_detail(self, state: WorkflowState) -> dict[str, Any]:
         artifact, output = self._artifact_output(state)
@@ -88,9 +92,30 @@ class WorkflowActionPreviewService:
         review = self._review_artifact(state, artifact)
         if not review:
             raise WorkflowActionPreviewError("approved artefact has no polished human-review PDF")
+        if (
+            review.get("renderer_id") != RENDERER_ID
+            or review.get("renderer_version") != RENDERER_VERSION
+        ):
+            raise WorkflowActionPreviewError(
+                "approved artefact requires a current immutable human-review PDF before client action preview"
+            )
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
         body = _resolve_simulation_body(source_body, recipient_name)
+        aliases = self.terminology_policy.scan_customer_facing(
+            body,
+            protected_phrases=customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+                client_id=state.client_id,
+            ),
+        )
+        if aliases:
+            terms = ", ".join(dict.fromkeys(item.term for item in aliases))
+            raise WorkflowActionPreviewError(
+                "approved draft client communication requires a new exact version using current customer-facing names: "
+                + terms
+            )
         action = {
             "kind": "simulated_growth_sprint_proposal_email",
             "simulation_mode": True,
@@ -101,7 +126,7 @@ class WorkflowActionPreviewService:
             "recipient_email": INTERNAL_REVIEW_ADDRESS,
             "cc": [],
             "bcc": [],
-            "subject": f"{company} — Growth Sprint Proposal",
+            "subject": f"{company} — Fieldwork Proposal",
             "body_description": _body_description(body),
             "full_body": body,
             "body_source_field": "draft_client_communication",
@@ -317,13 +342,12 @@ def _artifact_version(artifact: ArtifactRef) -> str:
 
 
 def _company_name(state: WorkflowState) -> str:
-    payload = state.input_payload
-    contexts = [payload.get("commercial_context"), payload.get("client_context")]
-    values = [payload.get("company"), payload.get("company_name")]
-    for context in contexts:
-        if isinstance(context, Mapping):
-            values.extend((context.get("company"), context.get("name")))
-    return next((str(value).strip() for value in values if str(value or "").strip()), state.client_id)
+    identities = customer_identity_phrases(
+        state.input_payload,
+        entity_id=state.entity_id,
+        client_id=state.client_id,
+    )
+    return identities[0] if identities else state.client_id
 
 
 def _intended_recipient_name(state: WorkflowState, company: str) -> str:

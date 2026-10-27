@@ -9,7 +9,7 @@ from runtime.tony_media_commands import TonyMediaCommandService
 
 
 class TonyTerminologyCommandService:
-    """Expose canonical vocabulary and rewrite retired language before delivery."""
+    """Expose canonical vocabulary and render customer-facing language."""
 
     VOCABULARY_COMMANDS = {"vocabulary", "terminology", "canon"}
 
@@ -44,13 +44,13 @@ class TonyTerminologyCommandService:
             response = self.media_commands.execute(command, objects)
         else:
             response = self.conversation_router.execute(command, objects)
-        violations = self.policy.scan_many(self._strings(response.message, response.data))
-        if not violations:
-            return response
-
+        # A response may contain client facts or proper names. Retired vocabulary
+        # can be rewritten, but aliases require the producing service to emit the
+        # approved customer label rather than mutating evidence at this boundary.
         rewritten_message = self.policy.rewrite(response.message)
         rewritten_data = self._rewrite_value(response.data)
-        remaining = self.policy.scan_many(self._strings(rewritten_message, rewritten_data))
+        remaining = self.policy.scan(rewritten_message)
+        remaining.extend(self.policy.scan_many(self._strings("", rewritten_data)))
         if remaining:
             return CommandResponse(
                 command=response.command,
@@ -64,6 +64,8 @@ class TonyTerminologyCommandService:
                     "policy_version": self.policy.version,
                 },
             )
+        if rewritten_message == response.message and rewritten_data == response.data:
+            return response
 
         return CommandResponse(
             command=response.command,
@@ -82,6 +84,10 @@ class TonyTerminologyCommandService:
             for entry in self.policy.unsettled_terms
         )
         retired = tuple(entry["term"] for entry in self.policy.retired_terms)
+        aliases = tuple(
+            f"{entry['term']} → {entry['replacement']}"
+            for entry in self.policy.customer_facing_aliases
+        )
 
         lines = [
             f"Narratiive vocabulary v{self.policy.version}",
@@ -93,6 +99,9 @@ class TonyTerminologyCommandService:
         if unsettled:
             lines.append("Unsettled:")
             lines.extend(f"- {item}" for item in unsettled)
+        if aliases:
+            lines.append("Customer-facing aliases:")
+            lines.extend(f"- {item}" for item in aliases)
         if retired:
             lines.append("Retired:")
             lines.extend(f"- {item}" for item in retired)
@@ -106,6 +115,7 @@ class TonyTerminologyCommandService:
                 "version_note": self.policy.version_note,
                 "approved_terms": list(self.policy.approved_terms),
                 "unsettled_terms": list(self.policy.unsettled_terms),
+                "customer_facing_aliases": list(self.policy.customer_facing_aliases),
                 "retired_terms": list(self.policy.retired_terms),
             },
         )
