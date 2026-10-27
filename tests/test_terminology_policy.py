@@ -97,6 +97,15 @@ class TerminologyPolicyTests(unittest.TestCase):
             self.policy.scan_customer_facing('The competitor is “Blueprint Lite”.'),
             [],
         )
+        self.assertEqual(
+            [
+                item.term
+                for item in self.policy.scan_customer_facing(
+                    "The client's Growth Sprint proposal hasn't been approved."
+                )
+            ],
+            ["Growth Sprint"],
+        )
 
     def test_rejects_duplicate_customer_facing_aliases(self) -> None:
         with self.assertRaisesRegex(ValueError, "Duplicate customer-facing alias"):
