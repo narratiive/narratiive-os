@@ -41,10 +41,10 @@ def state(workflow_id: str) -> WorkflowState:
 
 
 class HumanReviewArtifactContractTests(unittest.TestCase):
-    def test_groundwork_review_rejects_legacy_product_label_in_body_copy(self) -> None:
+    def test_groundwork_review_preserves_evidence_bearing_proper_names(self) -> None:
         output = blueprint_output()
         output["central_diagnosis"] = (
-            "The Blueprint Lite identifies a commercially important positioning gap that should be tested in Discovery."
+            "Competitor Blueprint Lite creates a commercially important positioning gap that should be tested in Discovery."
         )
         encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
         with tempfile.TemporaryDirectory() as temporary:
@@ -67,8 +67,8 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
             visible = "\n".join(
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
-            self.assertIn("The Groundwork identifies", visible)
-            self.assertNotIn("Blueprint Lite", visible)
+            self.assertIn("Groundwork", visible)
+            self.assertIn("Competitor Blueprint Lite", visible)
 
     def test_review_preserves_an_exact_alias_as_the_known_company_identity(self) -> None:
         output = blueprint_output()
