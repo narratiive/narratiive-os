@@ -44,7 +44,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
     def test_groundwork_review_preserves_evidence_bearing_proper_names(self) -> None:
         output = blueprint_output()
         output["central_diagnosis"] = (
-            "Competitor Blueprint Lite creates a commercially important positioning gap that should be tested in Discovery."
+            "Competitor “Blueprint Lite” creates a commercially important positioning gap that should be tested in Discovery."
         )
         encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
         with tempfile.TemporaryDirectory() as temporary:
@@ -68,7 +68,35 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
             self.assertIn("Groundwork", visible)
-            self.assertIn("Competitor Blueprint Lite", visible)
+            self.assertIn("Blueprint Lite", visible)
+
+    def test_groundwork_review_rejects_legacy_product_label_in_authored_copy(self) -> None:
+        output = blueprint_output()
+        output["central_diagnosis"] = (
+            "The Blueprint Lite identifies a commercially important positioning gap that should be tested in Discovery."
+        )
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            source_path = root / "authoritative.json"
+            source_path.write_bytes(encoded + b"\n")
+            source = ArtifactRef(
+                artifact_id="artifact-legacy-groundwork-copy",
+                artifact_type="blueprint_lite",
+                location=str(source_path),
+                checksum=hashlib.sha256(encoded).hexdigest(),
+            )
+            with self.assertRaisesRegex(
+                HumanReviewArtifactError,
+                "current customer-facing product names: Blueprint Lite",
+            ):
+                HumanReviewPresentationService(
+                    HumanReviewArtifactStore(root / "reviews")
+                ).produce(
+                    state=state("growth_diagnostic_to_blueprint_lite"),
+                    source=source,
+                    output=output,
+                )
 
     def test_review_preserves_an_exact_alias_as_the_known_company_identity(self) -> None:
         output = blueprint_output()

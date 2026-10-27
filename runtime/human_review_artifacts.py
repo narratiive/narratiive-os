@@ -221,9 +221,10 @@ class HumanReviewPresentationService:
         _validate_review_plan(
             plan,
             protected_phrases=protected_phrases,
-            enforce_customer_facing_names=(
-                state.workflow_id == "discovery_evidence_to_growth_sprint_proposal"
-            ),
+            enforce_customer_facing_names=state.workflow_id in {
+                "growth_diagnostic_to_blueprint_lite",
+                "discovery_evidence_to_growth_sprint_proposal",
+            },
         )
         pdf_bytes, pages = NarratiiveReviewPDFRenderer().render(plan)
         return self.store.persist(
