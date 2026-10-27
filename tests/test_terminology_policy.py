@@ -94,8 +94,13 @@ class TerminologyPolicyTests(unittest.TestCase):
             "Blueprint Lite Labs completed Groundwork",
         )
         self.assertEqual(
-            self.policy.scan_customer_facing('The competitor is “Blueprint Lite”.'),
-            [],
+            [
+                item.term
+                for item in self.policy.scan_customer_facing(
+                    'We recommend “Growth Sprint” after Discovery.'
+                )
+            ],
+            ["Growth Sprint"],
         )
         self.assertEqual(
             [

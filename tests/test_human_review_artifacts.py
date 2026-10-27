@@ -41,7 +41,7 @@ def state(workflow_id: str) -> WorkflowState:
 
 
 class HumanReviewArtifactContractTests(unittest.TestCase):
-    def test_groundwork_review_preserves_evidence_bearing_proper_names(self) -> None:
+    def test_groundwork_review_rejects_quoted_legacy_product_label(self) -> None:
         output = blueprint_output()
         output["central_diagnosis"] = (
             "Competitor “Blueprint Lite” creates a commercially important positioning gap that should be tested in Discovery."
@@ -57,18 +57,17 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
                 location=str(source_path),
                 checksum=hashlib.sha256(encoded).hexdigest(),
             )
-            review = HumanReviewPresentationService(
-                HumanReviewArtifactStore(root / "reviews")
-            ).produce(
-                state=state("growth_diagnostic_to_blueprint_lite"),
-                source=source,
-                output=output,
-            )
-            visible = "\n".join(
-                page.extract_text() or "" for page in PdfReader(review.location).pages
-            )
-            self.assertIn("Groundwork", visible)
-            self.assertIn("Blueprint Lite", visible)
+            with self.assertRaisesRegex(
+                HumanReviewArtifactError,
+                "requires current customer-facing product names: Blueprint Lite",
+            ):
+                HumanReviewPresentationService(
+                    HumanReviewArtifactStore(root / "reviews")
+                ).produce(
+                    state=state("growth_diagnostic_to_blueprint_lite"),
+                    source=source,
+                    output=output,
+                )
 
     def test_groundwork_review_rejects_legacy_product_label_in_authored_copy(self) -> None:
         output = blueprint_output()

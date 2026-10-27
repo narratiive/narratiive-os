@@ -230,9 +230,6 @@ class TerminologyPolicy:
             for phrase in protected_phrases
             if str(phrase).strip()
             for match in self._pattern(str(phrase).strip()).finditer(text)
-        ) + tuple(
-            match.span()
-            for match in re.finditer(r'“[^”]+”|"[^"]+"', text)
         )
         violations = [
             violation
