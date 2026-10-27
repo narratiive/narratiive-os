@@ -25,9 +25,12 @@ Notion owns the durable CRM record. Tony owns the live executive projection. A l
 
 Capture surfaces supply facts. Narratiive owns enrichment and commercial workflow defaults. Do not reproduce lead-temperature, pipeline-stage or next-action logic separately in every form.
 
-For inbound Growth Diagnostic leads, the canonical customer journey is:
+The approved customer-facing service sequence is:
 
-`Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
+`Groundwork → Discovery → Fieldwork → Sketchbook → Launchpad`
+
+Internal identifiers including Blueprint Lite, Growth Sprint, Growth Blueprint,
+Campaign World and Activation remain compatible and historical records are not migrated.
 
 ## Capture surfaces
 
@@ -56,14 +59,14 @@ Tony accepts either:
 1. the normalized lead object; or
 2. the complete JSON output from the Notion Create Page step.
 
-The second form is preferred in n8n because it removes field-by-field mapping. After the Notion node succeeds, add one HTTP Request node which POSTs the complete current item to `/leads/ingest`. Tony extracts the Notion page ID, Contact, Company, Email, Source, Status, Notes, timestamps and URL himself.
+The second form is preferred in n8n because it removes field-by-field mapping. After the Notion node succeeds, add one HTTP Request node which POSTs the complete current item plus the normalised capture facts to `/leads/ingest`. Tony extracts the Notion page ID, Contact, Company, Email, Source, Status, selected service, business challenge, timestamps and URL himself.
 
 For inbound `Tally`, `Growth Diagnostic` and `Website` records, Tony supplies missing workflow defaults without marking the lead qualified:
 
 - `Status` -> `New` when absent
 - `Lead Temperature` -> `Warm` when absent
 - `Pipeline Stage` -> `New Diagnostic` when absent
-- `Recommended Next Action` -> confirm the diagnostic input package, research verified public evidence, route Blueprint Lite drafting to Claude, preserve evidence lineage, and move the exact artefact to human review
+- `Recommended Next Action` -> follow the explicitly selected service. A missing or GROUNDWORK preference may use the existing Blueprint Lite preparation path. FIELDWORK, SKETCHBOOK or LAUNCHPAD requires founder review and must not automatically start paid research or client communication.
 - `AI Summary` -> factual summary derived from submitted Notes when absent
 
 Explicit later commercial judgement always wins. Tony never overwrites a supplied `Hot`, `Discovery Call`, proposal stage, or other explicit decision.
@@ -72,7 +75,7 @@ Explicit later commercial judgement always wins. Tony never overwrites a supplie
 
 The Narratiive website Growth Diagnostic must POST its completed lead package to the production diagnostic webhook after local submission persistence. The webhook is the bridge into the canonical commercial system; a local website database row alone is not a completed lead handoff.
 
-Website records retain `Source = Growth Diagnostic`. The immediate browser result is the Growth Diagnostic result. Blueprint Lite is a separate personalised follow-up and must not be described as sent until the downstream workflow has decision-grade delivery evidence.
+Website enquiry records retain `Source = Website`, the submitted service preference and the submitted business challenge. A separate completed Growth Diagnostic retains `Source = Growth Diagnostic`. Tony must not reinterpret an explicit FIELDWORK preference as a Growth Diagnostic or automatically start GROUNDWORK/Blueprint Lite preparation.
 
 The website must be safe to retry. Replaying the same logical submission must not create duplicate canonical leads, duplicate Blueprint Lite generation jobs, or duplicate sends.
 
@@ -114,6 +117,8 @@ After Tony confirms a completed Growth Diagnostic lead:
 
 Gmail notification is optional convenience, not a source-of-truth or business-continuity dependency. A lead path is healthy when the record is stored and Tony knows about it. Email can be enabled or disabled independently without changing lead state.
 
+Every legitimate new commercial enquiry also triggers one founder Telegram alert from the event-driven Tony ingestion boundary. The alert records a durable delivery start before one at-most-once send attempt, requires Telegram's message acknowledgement to claim delivery, logs failure or uncertain outcome, and suppresses replay by the stable submission identity. It never contacts the prospect or starts paid research.
+
 ## Executive behaviour
 
 Tony must distinguish:
@@ -130,13 +135,13 @@ Tony explicitly answers `/leads`, `inbound leads`, `today's leads`, `yesterday's
 
 A production Growth Diagnostic path passes only when all of the following are true:
 
-1. Submit a new labelled website diagnostic lead.
+1. Submit a new labelled website enquiry with an explicit service preference.
 2. A record appears in `Leads — CANONICAL` once and only once.
-3. The record has `Source = Growth Diagnostic` and the captured facts.
-4. n8n POSTs the complete Notion Create Page output to `/leads/ingest`.
-5. Tony can immediately show the new lead plus the Blueprint Lite next action.
-6. The Blueprint Lite task is routed to Claude and returns a versioned artefact with evidence lineage.
-7. Tony moves that artefact to human review and does not send it before approval.
-8. Approved delivery records execution evidence and advances the prospect to Discovery.
+3. The record has `Source = Website`, the selected service and the captured business challenge.
+4. n8n POSTs the complete Notion Create Page output plus normalised capture facts to `/leads/ingest`.
+5. Tony can immediately show the new lead, selected service and appropriate next action.
+6. Exactly one acknowledged founder Telegram alert is recorded; replay does not send a duplicate.
+7. FIELDWORK and later service preferences stop for founder review and do not start GROUNDWORK/Blueprint Lite preparation.
+8. A GROUNDWORK path retains the existing Claude, evidence-lineage and human-review controls.
 9. Replaying the same website/n8n/Notion result does not create a duplicate canonical lead, Tony lead, artefact, or send.
-10. A failed downstream webhook leaves the website lead safely persisted and retryable without falsely claiming that Blueprint Lite was delivered.
+10. A failed downstream webhook leaves the website lead safely persisted without falsely claiming alert or artefact delivery.

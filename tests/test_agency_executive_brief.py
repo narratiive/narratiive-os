@@ -30,7 +30,7 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         brief = AgencyExecutiveBriefService().build(state)
         output = brief.render_compact()
 
-        self.assertIn("Commercial:", output)
+        self.assertIn("2. Commercial opportunities", output)
         self.assertIn("Create first qualified opportunity", output)
         self.assertNotIn("PR 104", output)
         self.assertIn("being handled in the background", output)
@@ -65,9 +65,73 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         output = brief.render_compact()
 
         self.assertEqual(brief.status, "blocked")
-        self.assertIn("Automation:", output)
+        self.assertIn("3. Delivery", output)
         self.assertIn("Webhook outage", output)
-        self.assertIn("Agency blockers:", output)
+        self.assertIn("4. Decisions required", output)
+
+    def test_main_brief_has_five_executive_sections_without_raw_evidence(self):
+        state = AgencyState.from_items(
+            "2026-07-29T08:00:00Z",
+            (
+                AgencyItem(
+                    "lead-7",
+                    AgencyArea.COMMERCIAL,
+                    "FIELDWORK enquiry received",
+                    "active",
+                    "Review fit and decide whether to invite the prospect to DISCOVERY.",
+                    evidence=("workflow:l6TysPR86l5VAoXc", "database_field:selected_service"),
+                    why_matters="The prospect has stated a concrete service preference.",
+                ),
+            ),
+        )
+
+        output = AgencyExecutiveBriefService().build(state).render_compact()
+
+        for heading in (
+            "1. Agency status",
+            "2. Commercial opportunities",
+            "3. Delivery",
+            "4. Decisions required",
+            "5. Recommended priorities",
+        ):
+            self.assertIn(heading, output)
+        self.assertNotIn("l6TysPR86l5VAoXc", output)
+        self.assertNotIn("database_field", output)
+
+    def test_long_delivery_detail_cannot_truncate_decisions_or_priorities(self):
+        long_text = "Material delivery detail " * 80
+        state = AgencyState.from_items(
+            "2026-07-29T08:00:00Z",
+            tuple(
+                AgencyItem(
+                    f"delivery-{index}",
+                    AgencyArea.DELIVERY,
+                    long_text,
+                    "active",
+                    long_text,
+                    evidence=(f"source:{index}",),
+                )
+                for index in range(8)
+            )
+            + (
+                AgencyItem(
+                    "founder-decision",
+                    AgencyArea.CLIENTS,
+                    "Approve the exact client direction",
+                    "decision_required",
+                    "Approve or reject the exact client direction.",
+                    requires_matt=True,
+                    evidence=("approval:pending",),
+                ),
+            ),
+        )
+
+        output = AgencyExecutiveBriefService().build(state).render_compact()
+
+        self.assertLessEqual(len(output), 3500)
+        self.assertIn("4. Decisions required", output)
+        self.assertIn("Approve the exact client direction", output)
+        self.assertIn("5. Recommended priorities", output)
 
     def test_empty_agency_state_recommends_commercial_action_not_repository_work(self):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())
