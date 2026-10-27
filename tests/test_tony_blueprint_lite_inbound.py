@@ -293,6 +293,17 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertIn("customer facing naming current", result["failed_checks"])
 
+    def test_known_customer_identity_is_protected_in_naming_gate(self) -> None:
+        evidence = self._good_evidence()
+        evidence["central_diagnosis"] = "Blueprint Lite Ltd needs a clearer category position."
+
+        result = TonyInboundBlueprintLiteService._quality_gate(
+            evidence,
+            protected_customer_identities=("Blueprint Lite Ltd",),
+        )
+
+        self.assertTrue(result["passed"])
+
     def test_unstructured_worker_response_is_blocked_and_retained_for_diagnosis(self) -> None:
         evidence = {
             "verified": True,

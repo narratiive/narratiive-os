@@ -390,7 +390,10 @@ class WorkflowExecutionCoordinator:
             elif stage.quality_contract:
                 validator = self.quality_validators.get(stage.quality_contract)
                 try:
-                    if validator is growth_sprint_proposal_quality_gate:
+                    if stage.quality_contract in {
+                        "blueprint_lite_quality_gate",
+                        "growth_sprint_proposal_quality_gate",
+                    }:
                         quality = dict(
                             validator(
                                 output,

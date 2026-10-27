@@ -23,7 +23,7 @@ from runtime.worker_registry import (
 )
 from runtime.tony_autonomous_dispatch import TonyAutonomousDispatchCommandService
 from runtime.tony_tool_routing import TonyExecutiveToolRouter
-from runtime.terminology_policy import TerminologyPolicy
+from runtime.terminology_policy import TerminologyPolicy, customer_identity_phrases
 
 
 DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
@@ -463,7 +463,14 @@ class TonyInboundBlueprintLiteService:
             self.store.put(lead_id, state)
             return self._public_state(state)
 
-        quality = self._quality_gate(evidence)
+        quality = self._quality_gate(
+            evidence,
+            protected_customer_identities=customer_identity_phrases(
+                state,
+                entity_id=lead_id,
+                client_id=lead_id,
+            ),
+        )
         state["quality_gate"] = quality
         attempts = list(state.get("attempts") or [])
         attempts.append(
@@ -654,7 +661,12 @@ class TonyInboundBlueprintLiteService:
         )
 
     @classmethod
-    def _quality_gate(cls, evidence: Any) -> dict[str, Any]:
+    def _quality_gate(
+        cls,
+        evidence: Any,
+        *,
+        protected_customer_identities: tuple[str, ...] = (),
+    ) -> dict[str, Any]:
         if not isinstance(evidence, dict):
             return {"passed": False, "failed_checks": ["structured evidence missing"], "checks": {}}
 
@@ -679,7 +691,10 @@ class TonyInboundBlueprintLiteService:
             )
         )
         visible_texts = tuple(text for group in review_values for text in group)
-        naming_current = not TerminologyPolicy.from_path().scan_customer_facing_many(visible_texts)
+        naming_current = not TerminologyPolicy.from_path().scan_customer_facing_many(
+            visible_texts,
+            protected_phrases=protected_customer_identities,
+        )
 
         checks = {
             "blueprint_lite_present": _meaningful(evidence.get("blueprint_lite")),
