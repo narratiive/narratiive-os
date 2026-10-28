@@ -60,6 +60,49 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.lead_temperature, "Hot")
         self.assertEqual(lead.recommended_next_action, "Prepare for discovery.")
 
+    def test_website_fieldwork_preference_is_preserved_and_not_routed_to_groundwork(self):
+        lead = InboundLead.from_mapping({
+            "lead_id": "inbound-controlled-1",
+            "contact": "Controlled Prospect",
+            "company": "Controlled Company",
+            "email": "prospect@controlled.test",
+            "source": "Website",
+            "selected_service": "fieldwork",
+            "business_challenge": "Growth has slowed despite continued marketing investment.",
+        })
+
+        self.assertEqual(lead.selected_service, "FIELDWORK")
+        self.assertEqual(
+            lead.business_challenge,
+            "Growth has slowed despite continued marketing investment.",
+        )
+        self.assertIn("DISCOVERY", lead.recommended_next_action)
+        self.assertNotIn("Blueprint Lite", lead.recommended_next_action)
+        self.assertFalse(lead.should_prepare_groundwork())
+        self.assertEqual(lead.briefing_classification(), "legitimate_inbound_enquiry")
+
+    def test_new_challenge_field_cannot_hide_test_or_spam_markers(self):
+        base = {
+            "contact": "Controlled Prospect",
+            "company": "Controlled Company",
+            "email": "prospect@controlled.test",
+            "source": "Website",
+            "selected_service": "FIELDWORK",
+        }
+        rehearsal = InboundLead.from_mapping({
+            **base,
+            "lead_id": "rehearsal-1",
+            "business_challenge": "SAFE TEST ONLY — do not contact",
+        })
+        spam = InboundLead.from_mapping({
+            **base,
+            "lead_id": "spam-1",
+            "business_challenge": "We sell SEO services and backlinks",
+        })
+
+        self.assertEqual(rehearsal.briefing_classification(), "test_or_rehearsal")
+        self.assertEqual(spam.briefing_classification(), "suspicious_or_unverified")
+
 
 if __name__ == "__main__":
     unittest.main()
