@@ -56,6 +56,25 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.config["UNRELATED_API_KEY"] = "synthetic-secret-do-not-copy"
         self.assertNotIn("synthetic-secret-do-not-copy", json.dumps(self.preview()))
 
+    def test_editing_preview_does_not_change_approval_snapshot(self):
+        result = self.preview()
+        digest = copy.deepcopy(result["approval_digest"])
+        result["email_preview"]["body"] = "Changed invitation"
+        result["email_preview"]["cc"].append("other@example.net")
+        self.assertEqual(result["approval_digest"], digest)
+        self.assertEqual(self.preview()["approval_digest"], digest)
+
+    def test_control_characters_are_rejected_before_trimming(self):
+        for key, value in self.config.items():
+            for control in ("\r", "\n", "\t", "\x00", "\x7f"):
+                with self.subTest(key=key, control=repr(control)):
+                    config = {**self.config, key: control + value + control}
+                    result = build_invitation_preview(workspace_id="synthetic-test", config=config)
+                    self.assertEqual(result["status"], "blocked")
+                    self.assertIsNone(result["email_preview"])
+                    self.assertIsNone(result["approval_digest"])
+                    self.assertIn(key, " ".join(result["blockers"]))
+
     def test_each_required_input_fails_closed_without_private_value_echo(self):
         for key in self.config:
             config = dict(self.config)

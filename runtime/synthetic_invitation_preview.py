@@ -6,6 +6,7 @@ import hashlib
 import json
 import os
 import re
+from copy import deepcopy
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import urlsplit
@@ -29,7 +30,8 @@ def build_invitation_preview(
     source = os.environ if config is None else config
     fields = ("WORKSPACE_ID", "RECIPIENT", "GMAIL_SENDER", "SENDER_AUTHORITY_REF",
               "BOOKING_URL", "BOOKING_AUTHORITY_REF")
-    values = {key: source.get(PREFIX + key, "").strip() for key in fields}
+    raw_values = {key: source.get(PREFIX + key, "") for key in fields}
+    values = {key: value.strip() for key, value in raw_values.items()}
     blockers = [f"Configure {PREFIX}{key} privately." for key in fields if not values[key]]
     if values["WORKSPACE_ID"] and values["WORKSPACE_ID"] != workspace_id:
         blockers.append("Private configuration belongs to a different workspace.")
@@ -41,7 +43,7 @@ def build_invitation_preview(
         INTERNAL_REVIEW_ADDRESS.casefold(), values["GMAIL_SENDER"].casefold()
     } and values["RECIPIENT"]:
         blockers.append("Synthetic recipient must be separate from sender and internal review inbox.")
-    for key, value in values.items():
+    for key, value in raw_values.items():
         if any(ord(char) < 32 or ord(char) == 127 for char in value):
             blockers.append(f"Remove control characters from {PREFIX}{key}.")
     try:
@@ -86,7 +88,8 @@ def build_invitation_preview(
     checksum = hashlib.sha256(json.dumps(
         material, sort_keys=True, separators=(",", ":"), ensure_ascii=False
     ).encode("utf-8")).hexdigest()
-    result["email_preview"] = email
+    # Editing the display copy must not silently alter the checksummed snapshot.
+    result["email_preview"] = deepcopy(email)
     result["approval_digest"] = {
         **material, "checksum": checksum,
         "founder_action": (

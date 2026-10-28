@@ -42,6 +42,10 @@ internal reviewer; do not log it or commit generated output. Missing or invalid
 configuration returns named blockers and no email/digest. Supplied authority
 references are configuration assertions, not independently verified evidence.
 The booking-page route avoids inventing available slots.
+Control characters are rejected before trimming configuration whitespace. The
+email preview is a separate display copy: editing it does not change the digest's
+email snapshot. Callers must regenerate the preview after configuration changes;
+neither returned dictionary is an approval record or a tamper-proof store.
 
 Founder action: confirm the sender authority and that the configured booking
 page offers the intended 10-minute call; review the exact From, To, subject and
