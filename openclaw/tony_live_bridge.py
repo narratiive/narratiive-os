@@ -301,6 +301,14 @@ class LeadAwareTonyApplication:
             text = str(request.get("text") or request.get("message") or "").strip()
             if not text:
                 raise ValueError("text is required")
+            if self.workflow_command_service is not None and TonyWorkflowCommandService.is_discovery_approval(text):
+                supplied_principal = str(request.get("principal_id") or "").strip()
+                principal = supplied_principal if self.base.bridge_token and supplied_principal == self.authorised_principal_id else ""
+                response = self.workflow_command_service.approve_discovery(text, principal_id=principal)
+                return self._respond(start_response, HTTPStatus.OK, {
+                    "ok": response.status != "error", "reply": response.message,
+                    **response.to_dict(),
+                })
             if TonyAgentGateway.is_system_command(text):
                 if self.workflow_command_service is not None and self.workflow_command_service.supports(text):
                     supplied_principal = str(request.get("principal_id") or "").strip()

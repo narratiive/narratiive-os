@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from runtime.agency_state import AgencyArea, AgencyItem, AgencyState
+from runtime.founder_brief import founder_text
 
 
 class AgencyBriefPeriod(str, Enum):
@@ -50,27 +51,15 @@ class AgencyExecutiveBrief:
 
     def render_compact(self, limit: int = 3500) -> str:
         heading = "Morning agency brief" if self.period is AgencyBriefPeriod.MORNING else "End-of-day agency review"
-        status_sentence = (
-            "The agency is operational, with no agency-wide blocker."
-            if self.status != "blocked"
-            else "The agency has a critical outcome-level blocker requiring attention."
-        )
-        lines = [heading, f"Agency status: {status_sentence}"]
-        if self.material_changes:
-            self._append(lines, "Material changes", self.material_changes)
-        else:
-            lines.append("Material changes: none since the previous successfully delivered briefing.")
-        self._append(lines, "Commercial", self.commercial)
-        self._append(lines, "Clients", self.clients)
-        self._append(lines, "Delivery", self.delivery)
-        self._append(lines, "Finance", self.finance)
-        self._append(lines, "Operations", self.operations)
-        self._append(lines, "Automation", self.automation)
-        self._append(lines, "Agency blockers", self.agency_blockers)
-        self._append(lines, "Founder decisions required", self.matt_actions)
-        self._append(lines, "Tony's recommended next actions", self.recommended_actions)
-        if self.internal_platform_note:
-            lines.append(f"Internal systems: {self.internal_platform_note}")
+        heading = "Narratiive — Morning Brief" if self.period is AgencyBriefPeriod.MORNING else "Narratiive — Evening Brief"
+        lines = [heading]
+        self._append(lines, "What matters today", self.material_changes)
+        self._append(lines, "Your decisions", self.matt_actions)
+        self._append(lines, "Progress", (*self.commercial, *self.clients, *self.delivery))
+        self._append(lines, "Risks", self.agency_blockers)
+        self._append(lines, "Tony's next actions", self.recommended_actions)
+        if len(lines) == 1:
+            lines.append("No material change since the last briefing. I’m handling routine operations quietly.")
         output = "\n".join(lines)
         if len(output) <= limit:
             return output
@@ -113,7 +102,12 @@ class AgencyExecutiveBriefService:
                     item.title.casefold(),
                 ),
             )
-        )[: self.ITEM_LIMIT]
+        )
+        business_items = tuple(
+            item
+            for item in priority_items
+            if item.area not in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
+        )
         commercial_items = tuple(
             item for item in visible
             if item.area is AgencyArea.COMMERCIAL
@@ -134,36 +128,33 @@ class AgencyExecutiveBriefService:
             item for item in visible
             if item.area is AgencyArea.AUTOMATION and not item.requires_matt
         )
-        material_summary = (
-            f"{len(visible)} current authoritative item{'s' if len(visible) != 1 else ''} "
-            "passed the decision, change and significance checks."
-        ) if visible else ()
+        material_summary = tuple(
+            self._summary(item)
+            for item in business_items
+            if not item.requires_matt and not item.blocked
+        )[:2]
         return AgencyExecutiveBrief(
             period=period,
             generated_at=state.generated_at,
             status=status,
-            commercial=tuple(self._line(item) for item in commercial_items)[: self.ITEM_LIMIT],
-            clients=tuple(self._line(item) for item in client_items)[: self.ITEM_LIMIT],
-            delivery=tuple(self._line(item) for item in delivery_items)[: self.ITEM_LIMIT],
-            finance=tuple(self._line(item) for item in visible if item.area is AgencyArea.FINANCE and not item.requires_matt)[: self.ITEM_LIMIT],
-            operations=tuple(self._line(item) for item in visible if item.area is AgencyArea.OPERATIONS and not item.requires_matt)[: self.ITEM_LIMIT],
-            automation=tuple(self._line(item) for item in automation_items)[: self.ITEM_LIMIT],
-            matt_actions=tuple(self._line(item) for item in state.matt_actions)[: self.ITEM_LIMIT],
+            commercial=tuple(self._summary(item) for item in commercial_items)[: self.ITEM_LIMIT],
+            clients=tuple(self._summary(item) for item in client_items)[: self.ITEM_LIMIT],
+            delivery=tuple(self._summary(item) for item in delivery_items)[: self.ITEM_LIMIT],
+            finance=tuple(self._summary(item) for item in visible if item.area is AgencyArea.FINANCE and not item.requires_matt)[: self.ITEM_LIMIT],
+            operations=tuple(self._summary(item) for item in visible if item.area is AgencyArea.OPERATIONS and not item.requires_matt)[: self.ITEM_LIMIT],
+            automation=tuple(self._summary(item) for item in automation_items)[: self.ITEM_LIMIT],
+            matt_actions=tuple(self._decision(item) for item in state.matt_actions)[: self.ITEM_LIMIT],
             agency_blockers=tuple(
-                self._line(item)
-                for item in state.agency_blockers
-                if item.area in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
-            )[: self.ITEM_LIMIT] or ((
-                f"{len(state.agency_blockers)} outcome-level blocker"
-                f"{'s' if len(state.agency_blockers) != 1 else ''} require attention."
-            ),) if state.agency_blockers else (),
+                self._risk(item) for item in state.agency_blockers
+            )[: self.ITEM_LIMIT],
             internal_platform_note=platform_note,
             recommendation=self._recommendation(state),
             material_changes=(material_summary,) if material_summary else (),
             recommended_actions=tuple(
-                f"{item.next_action} Owner: {item.owner}. When: {item.action_deadline or 'now or at the next safe operating window'}."
-                for item in priority_items
-            ),
+                founder_text(item.next_action, limit=220)
+                for item in business_items
+                if not item.requires_matt and item.next_action.strip()
+            )[: self.ITEM_LIMIT],
         )
 
     @classmethod
@@ -171,13 +162,24 @@ class AgencyExecutiveBriefService:
         return tuple(cls._line(item) for item in items if item.area is area)[: cls.ITEM_LIMIT]
 
     @staticmethod
-    def _line(item: AgencyItem) -> str:
-        evidence = item.evidence[0] if item.evidence else "No source reference available"
-        why = item.why_matters or "This materially affects the current agency plan."
-        return (
-            f"[{item.significance}] {item.title}. Why it matters: {why} "
-            f"Evidence: {evidence}. Recommended action: {item.next_action}"
-        )
+    def _summary(item: AgencyItem) -> str:
+        why = founder_text(item.why_matters, limit=150)
+        title = founder_text(item.title, limit=110)
+        return f"{title} — {why}" if why else title
+
+    @staticmethod
+    def _decision(item: AgencyItem) -> str:
+        title = founder_text(item.title, limit=100)
+        action = founder_text(item.next_action, limit=180)
+        deadline = founder_text(item.action_deadline, limit=60)
+        suffix = f" By {deadline}." if deadline else ""
+        return f"{title}: {action}{suffix}"
+
+    @staticmethod
+    def _risk(item: AgencyItem) -> str:
+        title = founder_text(item.title, limit=100)
+        consequence = founder_text(item.why_matters, limit=160)
+        return f"{title} — {consequence}" if consequence else title
 
     @staticmethod
     def _recommendation(state: AgencyState) -> str:

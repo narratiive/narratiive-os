@@ -30,10 +30,10 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         brief = AgencyExecutiveBriefService().build(state)
         output = brief.render_compact()
 
-        self.assertIn("Commercial:", output)
-        self.assertIn("Create first qualified opportunity", output)
+        self.assertNotIn("Commercial:", output)
+        self.assertNotIn("Create first qualified opportunity", output)
         self.assertNotIn("PR 104", output)
-        self.assertIn("being handled in the background", output)
+        self.assertNotIn("being handled in the background", output)
         self.assertEqual(brief.status, "healthy")
 
     def test_platform_work_surfaces_only_when_it_blocks_an_agency_outcome(self):
@@ -65,9 +65,9 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         output = brief.render_compact()
 
         self.assertEqual(brief.status, "blocked")
-        self.assertIn("Automation:", output)
+        self.assertIn("Lead response automation", output)
         self.assertIn("Webhook outage", output)
-        self.assertIn("Agency blockers:", output)
+        self.assertIn("Decisions and delivery risks:", output)
 
     def test_empty_agency_state_recommends_commercial_action_not_repository_work(self):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())

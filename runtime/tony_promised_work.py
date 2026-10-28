@@ -3,8 +3,10 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable, Mapping
 from typing import Any
+from urllib.parse import quote
 
 from runtime.models import WorkflowState
+from runtime.tony_internal_review_delivery import reviewable_artifact
 from runtime.tony_workflow_commands import WorkflowCommandBackend
 
 
@@ -64,10 +66,21 @@ class TonyPromisedWorkWorker:
                 "work_failed",
             )
         if state.status.value == "complete":
+            artifact = reviewable_artifact(state)
+            receipt = next(
+                (item.get("receipt", {}) for item in reversed(state.external_action_receipts)
+                 if item.get("receipt", {}).get("kind") == "internal_artifact_review_delivery"
+                 and item.get("receipt", {}).get("message_id")
+                 and artifact is not None
+                 and item.get("receipt", {}).get("artifact_checksum") == artifact.checksum),
+                {},
+            )
+            link = ("https://mail.google.com/mail/u/0/#all/" + quote(str(receipt.get("thread_id") or receipt["message_id"]), safe="")) if receipt else ""
             return self._deliver_once(
                 state,
-                "The promised internal work is complete and recorded. No consequential next step has been taken.",
-                "work_complete",
+                (f"The promised internal work is complete and recorded. Review copy: {link}"
+                 if link else "The work is recorded as complete, but no verified review-copy delivery is recorded. Review delivery needs recovery."),
+                "work_complete" if link else "review_delivery_blocked",
             )
         return state
 
@@ -106,7 +119,8 @@ class TonyPromisedWorkWorker:
             )
         notification = str(delivery.get("telegram_notification") or "").strip()
         if notification:
-            return notification[:3500]
+            link = str(delivery.get("review_link") or "").strip()
+            return notification[:2800] + (f"\nReview copy: {link}" if link else "")
         conclusions = [
             " ".join(str(item).split())[:320]
             for item in delivery.get("conclusions", [])
@@ -114,8 +128,9 @@ class TonyPromisedWorkWorker:
         ][:3]
         points = " ".join(f"• {item}" for item in conclusions)
         return (
-            "Gate 2 is ready. I’ve completed the Growth Sprint proposal and sent the full review copy to "
+            "The promised work is ready for review. I sent the full review copy to "
             "hello@narratiive.com. "
             + (points + " " if points else "")
-            + "I need your judgement on the proposed engagement. You can approve it here, request a revision, or tell me what should change."
+            + "Please approve it here or request changes."
+            + (f" Review copy: {delivery['review_link']}" if delivery.get("review_link") else "")
         )[:3500]

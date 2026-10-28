@@ -12,6 +12,8 @@ from typing import Any, Iterable
 from uuid import uuid4
 
 from runtime.agency_state import AgencyItem, AgencyState
+from runtime.agency_state import AgencyArea
+from runtime.founder_brief import is_generic_founder_action
 
 
 class BriefingDecisionType(StrEnum):
@@ -193,6 +195,19 @@ class ExecutiveBriefingPipeline:
         prior = self.baseline_store.read().get("items", {}) if self.baseline_store else {}
         selected: dict[str, AgencyItem] = {}
         for item in state.items:
+            # Routine engineering and infrastructure activity belongs in the
+            # engineering queue. It reaches the founder only when the
+            # projection has established a client, revenue, or continuity
+            # consequence.
+            if (
+                item.area in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
+                and not item.blocks_agency_outcome
+            ):
+                continue
+            # A generic workflow instruction is audit information, not a
+            # founder decision. The underlying record remains untouched.
+            if item.requires_matt and is_generic_founder_action(item.next_action):
+                continue
             identity = self._identity(item)
             decision = self._decision_for(item, decisions)
             if decision and decision.decision_type in HIDDEN_DECISIONS and item.significance != "P0":

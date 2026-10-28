@@ -591,6 +591,73 @@ class TonyWorkflowCommandService:
             return bool(command.strip().split(" ", 1)[1:])
         return name in self._COMMANDS
 
+    @staticmethod
+    def is_discovery_approval(command: str) -> bool:
+        return " ".join(command.casefold().split()).rstrip(".!") == "loom loft is approved for discovery"
+
+    def approve_discovery(self, instruction: str, *, principal_id: str) -> CommandResponse:
+        """Resolve the bounded founder instruction from authoritative state only.
+
+        Called by the authenticated Telegram ingress, never by model output.
+        The existing approval service owns the exact-version decision and the
+        durable worker owns the single authorised internal preparation step.
+        """
+        if not principal_id.strip() or not self.is_discovery_approval(instruction):
+            return self._error("approve", "authorised_principal_required", "This decision requires your authenticated approval.")
+        try:
+            states = tuple(state for state in self.backend.list_states() if _state_name(state).casefold() == "loom loft")
+            pending = tuple(state for state in states if state.approval_status == "pending" and state.status.value == "awaiting_approval")
+            approved = tuple(state for state in states if state.workflow_id == "growth_diagnostic_to_blueprint_lite" and state.approval_status == "approved")
+            if not any(state.workflow_id == "growth_diagnostic_to_blueprint_lite" for state in pending) and len(approved) == 1:
+                source = approved[0]
+                target_id = downstream_run_id(source.run_id, "blueprint_lite_to_discovery_preparation")
+                if not any(item.run_id == target_id for item in states):
+                    binding = source.approval_history[-1].get("approval_binding", {}) if source.approval_history else {}
+                    decision = binding.get("human_decision", {})
+                    if decision.get("human_instruction") == instruction and binding.get("approval_binding_digest"):
+                        return self._commission_discovery(source, str(binding["approval_binding_digest"]))
+                return CommandResponse("approve", "healthy", "Loom Loft’s Discovery approval is already recorded. I haven’t repeated it or approved a later gate.", self._summary(source))
+            if len(pending) != 1 or pending[0].workflow_id != "growth_diagnostic_to_blueprint_lite":
+                return CommandResponse("approve", "attention", "Which Loom Loft review do you mean for Discovery?", {"external_action_taken": False})
+            state = pending[0]
+            token = workflow_approval_token(state)
+            if not token:
+                return CommandResponse("approve", "blocked", "Loom Loft’s review artefact is missing; approval is still pending.", {})
+            changed = self.backend.approve(
+                state, approver=principal_id, rationale=instruction,
+                approval_token=token,
+                decision_evidence={
+                    "human_instruction": instruction,
+                    "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+                    "verbatim_current_human_instruction_verified": True,
+                    "explicit_decision_intent": "approve",
+                    "source": "authenticated_telegram_ingress",
+                },
+            )
+        except Exception:
+            return self._error("approve", "approval_not_verified", "I couldn’t verify the current Loom Loft approval; please review its current gate.")
+        return self._commission_discovery(changed, token)
+
+    def _commission_discovery(self, state: WorkflowState, token: str) -> CommandResponse:
+        try:
+            commissioned, replay = self.backend.commission(
+                state,
+                target_workflow_id="blueprint_lite_to_discovery_preparation",
+                commitment_id=f"discovery-approval:{token}",
+                inputs={
+                    "company": "Loom Loft",
+                    "company_context": state.input_payload.get("company_context") or {"company": "Loom Loft"},
+                    "diagnostic_evidence": state.input_payload.get("diagnostic_input_package"),
+                },
+            )
+        except Exception:
+            return CommandResponse("approve", "blocked", "Loom Loft’s approval is recorded. Discovery preparation could not be queued; the handoff needs recovery.", self._summary(state))
+        return CommandResponse(
+            "approve", "healthy",
+            "Loom Loft’s approval is recorded and Discovery preparation is queued. I’ll report the review copy or a blocker here. Sending and booking still require approval.",
+            {**self._summary(commissioned), "commissioned": True, "replay": replay},
+        )
+
     def execute(
         self,
         command: str,

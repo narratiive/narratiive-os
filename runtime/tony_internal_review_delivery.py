@@ -4,6 +4,7 @@ import base64
 import hashlib
 import hmac
 import json
+from urllib.parse import quote
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Callable
@@ -367,6 +368,7 @@ class InternalReviewDeliveryService:
             "decision_prompt": str(receipt.get("decision_prompt") or ""),
             "next_if_approved": str(receipt.get("next_if_approved") or ""),
             "telegram_notification": str(receipt.get("telegram_notification") or ""),
+            "review_link": "https://mail.google.com/mail/u/0/#all/" + quote(str(receipt.get("thread_id") or receipt.get("message_id") or ""), safe=""),
             "approval_token": workflow_approval_token(state),
             "external_action_taken": not duplicate,
         }
@@ -393,21 +395,9 @@ def _company_name(state: WorkflowState) -> str:
 
 
 def _email_body(company: str, review: HumanReviewArtifact) -> str:
-    lines = [
-        f"The {review.product} for {company} is ready for internal review.",
-        "",
-        "The polished PDF review copy is attached.",
-    ]
-    if review.focus_points:
-        lines.extend(("", "Please pay particular attention to:"))
-        lines.extend(f"- {item}" for item in review.focus_points[:4])
-    lines.extend(
-        (
-            "",
-            "Approval status: Pending.",
-            f"If approved: {review.next_if_approved}",
-            "",
-            "Please give Tony your approval, rejection or revision direction in Telegram.",
-        )
-    )
-    return "\n".join(lines)
+    compact = lambda value: " ".join(str(value).split())[:240]
+    return "\n".join((
+        f"{compact(company)} — {compact(review.product)} is attached for review.",
+        "Approval is pending. Please approve or request changes through Tony in Telegram.",
+        f"Next, if approved: {compact(review.next_if_approved)}",
+    ))
