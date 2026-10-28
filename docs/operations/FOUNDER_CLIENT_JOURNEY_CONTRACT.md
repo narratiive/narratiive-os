@@ -42,3 +42,22 @@ One screen: company, status (test/verified), diagnostic score with transparent d
 - KatKin Growth Blueprint r8 exists as editable PPTX and PDF, awaiting founder review; not proof of FIELDWORK v7.1 production wiring.
 - SKETCHBOOK and native Slides import not live-configured; draft PRs are not production approval.
 - Codex is separately working on live runtime: avoid duplicate work or overwriting its worktree.
+
+
+## Founder interaction contract — short, contextual and unambiguous
+- Founder may say **"Loom Loft is approved for Discovery"**, **"Approve that proposal"**, or **"What's next?"**; Tony resolves intent against the current authoritative client/run and pending gate internally. IDs, checksums and approval tokens remain in persisted machine evidence, **never required in normal founder messages**.
+- Where exactly one current gate matches, show a one-sentence human summary and execute the correct governed approval. If two gates or versions plausibly match, ask **one short disambiguating question** with plain-English choices. Never guess or bypass cryptographic approval binding.
+- If a gate requires a formal token, Tony retrieves/binds it internally; no founder copy-paste. Preserve actor identity and an auditable record of the exact approved version.
+- Responses default to: **what changed / what matters / what happens next**. Maximum ~3 short sentences for routine updates. Technical details and IDs only on explicit request or in expandable diagnostics.
+- Morning/evening briefs: max three genuinely material items, ordered by founder action or delivery risk; omit low-priority stage chatter, repeated statuses, irrelevant run IDs and generic "operational" reassurance. Zero-material-update brief is one sentence. Include a real deliverable link only when relevant.
+- Email summaries: 2–4 lines, not a copy of the attachment. Keep full reasoning in the review artefact.
+
+## Synthetic end-to-end prospect rehearsal — distinct from production
+- Test prospect **mattfranks@outlook.com** is an explicitly designated *external correspondence test recipient only*, never an internal-review, approvals or alert inbox. Store in private test configuration, not public fixtures or defaults.
+- Founder authorises a bounded test email from the real Narratiive Gmail account to this address; invitation contains a short explanation, live bookable options or scheduling link backed by Google Calendar availability, and a clear synthetic-test marker.
+- Prospect books an actual 10–20 minute meeting. Confirm event/calendar invite, organiser/attendee and joining link; verify scheduling conflict handling.
+- Run a **real recorded simulation call** with consenting test participants and Fireflies where available. No invented transcript. Verify the recording/transcript is attached to the correct client and event. Check provider permissions, consent, and ingestion lag; **3–4 minute turnaround is a performance target, not guaranteed**.
+- Generate proposal with a reusable core and call-derived, source-labelled personalisation. Aim to send within 30 minutes of the call; first send needs founder approval and external-action authorisation.
+- Prospect receives proposal, replies from Outlook, Gmail thread is ingested, exact version and scope are correlated; test acceptance and ambiguous-response handling. Synthetic acceptance may initiate **internal test FIELDWORK only**, never a real contractual obligation.
+- Log timestamps for invite send, booking, call end, transcript availability, proposal generation, email send, inbox receipt, reply ingestion, acceptance and FIELDWORK execution. Each stage must have independent proof.
+- Stop on any provider, permission, consent, or real-world send gate; do not silently replace Fireflies or calendar integrations with fixtures and claim success.
