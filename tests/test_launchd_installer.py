@@ -68,6 +68,22 @@ class LaunchdInstallerTests(unittest.TestCase):
         self.assertNotIn("EnvironmentVariables", payload)
         self.assertIn("/secure/runtime.env", payload["ProgramArguments"])
 
+    def test_opt_in_github_runner_uses_external_config_and_no_secrets(self) -> None:
+        specs = installer.build_specs(
+            Path("/repo"),
+            Path("/python"),
+            Path("/secure/runtime.env"),
+            Path("/secure/github-runner.json"),
+        )
+        self.assertEqual(specs[-1].label, "com.narratiive.github-issue-runner")
+        self.assertTrue(specs[-1].keep_alive)
+        rendered = plistlib.loads(
+            installer.render_plist(specs[-1], Path("/repo"), Path("/logs"))
+        )
+        self.assertNotIn("EnvironmentVariables", rendered)
+        self.assertIn("/secure/runtime.env", rendered["ProgramArguments"])
+        self.assertIn("/secure/github-runner.json", rendered["ProgramArguments"])
+
     def test_proactive_plists_use_expected_schedules_without_run_at_load(self) -> None:
         specs = installer.build_specs(Path("/repo"), Path("/python"), Path("/secure/runtime.env"))
         watch = plistlib.loads(installer.render_plist(specs[4], Path("/repo"), Path("/logs")))
@@ -146,6 +162,30 @@ class LaunchdInstallerTests(unittest.TestCase):
             self.assertEqual(arguments[0], str(venv_python))
             self.assertEqual(arguments[3], str(venv_python))
             self.assertNotEqual(arguments[0], str(base_python))
+
+    def test_runner_only_install_does_not_write_other_agent_plists(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repo = root / "repo"
+            (repo / "scripts").mkdir(parents=True)
+            (repo / "scripts" / "run_github_issue_runner.py").write_text("", encoding="utf-8")
+            python_path = root / "python3"
+            python_path.write_text("", encoding="utf-8")
+            env_file = root / "runtime.env"
+            env_file.write_text("SAFE=value\n", encoding="utf-8")
+            env_file.chmod(0o600)
+            config = root / "runner.json"
+            config.write_text("{}", encoding="utf-8")
+
+            target = installer.install_github_issue_runner(
+                repo, python_path, env_file, root / "home", config, activate=False
+            )
+
+            self.assertEqual(target.name, "com.narratiive.github-issue-runner.plist")
+            self.assertEqual(
+                sorted(path.name for path in target.parent.glob("*.plist")),
+                ["com.narratiive.github-issue-runner.plist"],
+            )
 
     def test_install_rejects_insecure_environment_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

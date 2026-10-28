@@ -1,0 +1,19 @@
+{
+  "repository": "narratiive/narratiive-os",
+  "repository_root": "/Users/you/Documents/narratiive-os",
+  "state_root": "/Users/you/Library/Application Support/Narratiive/github-issue-runner",
+  "worktree_root": "/Users/you/Library/Application Support/Narratiive/github-issue-worktrees",
+  "trusted_owner": "replace-with-trusted-owner-login",
+  "base_branch": "main",
+  "poll_seconds": 60,
+  "codex_timeout_seconds": 1800,
+  "git_timeout_seconds": 120,
+  "max_issue_body_chars": 12000,
+  "max_follow_ups": 3,
+  "max_follow_up_chars": 2000,
+  "ready_issue_limit": 20,
+  "github_cli_executable": "/opt/homebrew/bin/gh",
+  "github_home": "/Users/you",
+  "codex_home": "/Users/you/.codex",
+  "codex_executable": "codex"
+}

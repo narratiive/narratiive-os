@@ -7,6 +7,11 @@ The repository can install three per-user macOS LaunchAgents:
 - `com.narratiive.tony-conversation-worker` — durable long-running Tony work and correlated Telegram follow-up;
 - `com.narratiive.service-supervisor` — health check and narrow recovery every 60 seconds.
 
+An opt-in ninth agent, `com.narratiive.github-issue-runner`, is installed only
+when `--github-issue-runner-config` is supplied. See
+[`GITHUB_ISSUE_RUNNER.md`](GITHUB_ISSUE_RUNNER.md); it is not enabled by a
+normal runtime installation.
+
 ## Secure environment file
 
 Create a local file outside the repository:
