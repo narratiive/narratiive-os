@@ -66,7 +66,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
 
         return {"Claude": claude, "Gmail": gmail}
 
-    def _commission(self, dispatchers=None):
+    def _commission(self, dispatchers=None, *, source_id="safe-promised-source", commitment_id="telegram-safe-commitment"):
         dispatchers = dispatchers or self._dispatchers()
         runtime = build_tony_workflow_runtime(
             self.root,
@@ -77,18 +77,18 @@ class TonyPromisedWorkTests(unittest.TestCase):
         )
         runtime.enqueue(
             "growth_diagnostic_to_blueprint_lite",
-            "safe-promised-source",
+            source_id,
             {"diagnostic_input_package": {"overall_score": 42}, "company": "SAFE Promised Work Company"},
             entity_id="safe-lead",
             correlation_id="telegram-safe-conversation",
         )
-        runtime.advance("safe-promised-source", lifecycle())
-        runtime.approve("safe-promised-source", approver="matt", rationale="Synthetic source approval")
+        runtime.advance(source_id, lifecycle())
+        runtime.approve(source_id, approver="matt", rationale="Synthetic source approval")
         state, replay = runtime.commission(
-            "safe-promised-source",
+            source_id,
             "discovery_evidence_to_growth_sprint_proposal",
             {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test"}},
-            commitment_id="telegram-safe-commitment",
+            commitment_id=commitment_id,
         )
         return state, replay, dispatchers
 
@@ -148,7 +148,8 @@ class TonyPromisedWorkTests(unittest.TestCase):
             page.extract_text() or ""
             for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
         )
-        self.assertIn("Growth Sprint Proposal", visible)
+        self.assertIn("Fieldwork Proposal", visible)
+        self.assertNotIn("Growth Sprint", visible)
         self.assertIn("The growth challenge", visible)
         self.assertIn("Proposed workstreams", visible)
         for internal in (
@@ -179,11 +180,37 @@ class TonyPromisedWorkTests(unittest.TestCase):
 
         observed = TonyPromisedWorkWorker(backend, self._sender).run_once()
 
-        self.assertEqual(observed.run_id, state.run_id)
-        self.assertEqual(observed.status.value, "active")
-        self.assertEqual(observed.stage(observed.current_stage_id).status.value, "running")
-        self.assertIsNone(observed.blocker)
+        self.assertIsNone(observed)
+        persisted = next(item for item in backend.list_states() if item.run_id == state.run_id)
+        self.assertEqual(persisted.status.value, "active")
+        self.assertEqual(persisted.stage(persisted.current_stage_id).status.value, "running")
+        self.assertIsNone(persisted.blocker)
         self.assertEqual(self.telegram_messages, [])
+
+    def test_running_oldest_commitment_does_not_starve_later_ready_work(self) -> None:
+        state, _, dispatchers = self._commission()
+        runtime = build_tony_workflow_runtime(
+            self.root, workspace_id="narratiive", client_id="safe-client",
+            dispatchers=dispatchers, environ={},
+        )
+        later, _, _ = self._commission(
+            dispatchers, source_id="safe-promised-second-source",
+            commitment_id="telegram-safe-second-commitment",
+        )
+        self.assertNotEqual(later.run_id, state.run_id)
+        runtime.runs.start_stage(state.run_id, state.current_stage_id)
+        backend = FileWorkflowCommandBackend(
+            self.root, dispatchers=dispatchers, environ={}, workspace_id="narratiive",
+        )
+
+        delivered = TonyPromisedWorkWorker(backend, self._sender).run_once()
+
+        self.assertEqual(delivered.run_id, later.run_id)
+        self.assertEqual(delivered.status.value, "awaiting_approval")
+        self.assertEqual(delivered.approval_status, "pending")
+        self.assertEqual(len(self.telegram_messages), 1)
+        oldest = next(item for item in backend.list_states() if item.run_id == state.run_id)
+        self.assertEqual(oldest.stage(oldest.current_stage_id).status.value, "running")
 
     def test_specialist_failure_proactively_reports_blocker_without_duplicate(self) -> None:
         dispatchers = self._dispatchers(fail_specialist=True)

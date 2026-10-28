@@ -1,0 +1,26 @@
+{
+  "approval_status": "pending",
+  "command_scope": [
+    "validate structured intake",
+    "build evidence ledger",
+    "build commercial model",
+    "build seven-chapter Blueprint",
+    "build 20-slide presentation specification",
+    "render editable PPTX",
+    "render 20-page PDF",
+    "run package and layout validation",
+    "run OCR-backed rendered review",
+    "write QA and checksum-bound approval package"
+  ],
+  "environment": "local bundled workspace runtime",
+  "external_action_taken": false,
+  "fixture": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+  "measured_at": "2026-10-14",
+  "measurement_type": "warm local deterministic demonstration run",
+  "output_slide_count": 20,
+  "result": "PASS_FOR_HUMAN_REVIEW",
+  "system_seconds": 1.14,
+  "user_seconds": 18.35,
+  "wall_seconds": 13.19,
+  "warning": "This measures deterministic local production only. It excludes research collection, specialist reasoning time, human review, revisions, client delay and final presentation."
+}

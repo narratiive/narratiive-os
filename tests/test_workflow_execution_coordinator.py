@@ -5,6 +5,7 @@ import tempfile
 import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from types import SimpleNamespace
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.definitions import (
@@ -24,11 +25,39 @@ from runtime.worker_registry import (
     WorkerMetadata,
     WorkerRegistration,
 )
-from runtime.workflow_execution_coordinator import (
-    FileWorkflowArtifactStore,
-    WorkflowExecutionCoordinator,
-)
+from runtime.terminology_policy import customer_identity_phrases
+from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore, WorkflowExecutionCoordinator
 from runtime.workflow_registry import WorkflowRegistry
+
+
+class ProtectedCustomerIdentityTests(unittest.TestCase):
+    def test_collects_supported_top_level_and_nested_customer_names(self) -> None:
+        state = SimpleNamespace(
+            entity_id="growth-sprint-technologies",
+            input_payload={
+                "company": "Top Level Company",
+                "commercial_context": {"company": "Growth Sprint Technologies"},
+                "company_context": {"name": "Blueprint Lite"},
+                "client_context": {
+                    "company_name": "Nested Client Ltd",
+                    "brand_name": "Opportunity Card Labs",
+                },
+            },
+        )
+        self.assertEqual(
+            customer_identity_phrases(
+                state.input_payload,
+                entity_id=state.entity_id,
+            ),
+            (
+                "Top Level Company",
+                "Growth Sprint Technologies",
+                "Blueprint Lite",
+                "Nested Client Ltd",
+                "Opportunity Card Labs",
+                "growth-sprint-technologies",
+            ),
+        )
 
 
 def _stage(
@@ -289,6 +318,33 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
             json.loads(Path(candidate["location"]).read_text(encoding="utf-8"))["draft"],
             "weak",
         )
+
+    def test_missing_required_output_cannot_be_overridden_by_successful_validator(self) -> None:
+        definition = WorkflowDefinition(
+            "missing-output",
+            (_stage("draft", outputs=("draft", "mandatory_field")),),
+        )
+        coordinator = self._coordinator(
+            definition,
+            _worker(lambda contract: {"draft": "apparently complete"}),
+            {"quality": lambda output: {"passed": True, "failed_checks": [], "checks": {"semantic": True}}},
+        )
+        coordinator.enqueue(
+            "missing-output",
+            "run-missing-output",
+            {"brief": "safe"},
+            entity_id="e",
+            correlation_id="c",
+        )
+
+        outcome = coordinator.advance("run-missing-output", _lifecycle())
+
+        self.assertEqual(outcome.blocker, "quality_failed:quality")
+        quality = self.runs.load_run("run-missing-output").stage("draft").quality_result
+        self.assertFalse(quality["passed"])
+        self.assertEqual(quality["missing_mandatory_fields"], ["mandatory_field"])
+        self.assertIn("required_output:mandatory_field", quality["failed_checks"])
+        self.assertFalse(quality["checks"]["required_output:mandatory_field"])
 
     def test_present_empty_collection_is_decided_by_quality_contract(self) -> None:
         definition = WorkflowDefinition("empty-collection", (_stage("draft", outputs=("findings",)),))

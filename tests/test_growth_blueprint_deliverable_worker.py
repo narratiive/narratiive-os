@@ -24,6 +24,20 @@ class CountingRenderer(FakePresentationRenderer):
 
 
 def contract(source: dict, *, checksum: str | None = None) -> dict:
+    intelligence = commercial_intelligence()
+    intelligence.update({
+        "model_type": "new_customer_cohort",
+        "population": "new customers acquired during the next 12 months",
+        "inputs": [
+            {"input_id": "qualified_visits", "value": 100000, "status": "client_supplied", "source_ids": ["S1"]},
+            {"input_id": "first_purchase_conversion_rate", "value": 0.02, "status": "client_supplied", "source_ids": ["S1"]},
+            {"input_id": "realized_revenue_per_acquired_customer", "value": 80, "status": "client_supplied", "source_ids": ["S1"]},
+        ],
+        "scenarios": [
+            {"name": "Base", "qualified_visits_multiplier": 1.1, "conversion_multiplier": 1.1, "revenue_per_customer_multiplier": 1.1, "classification": "illustrative_scenario", "assumptions": ["Illustrative sensitivity only."]},
+        ],
+        "existing_customer_revenue": {"status": "excluded_from_new_customer_cohort"},
+    })
     return {
         "quality_accepted_growth_blueprint": source,
         "blueprint_identity": {
@@ -32,7 +46,7 @@ def contract(source: dict, *, checksum: str | None = None) -> dict:
             "checksum": checksum or _checksum(source),
         },
         "client_context": {"name": "Northstar Test Co"},
-        "commercial_intelligence": commercial_intelligence(),
+        "commercial_intelligence": intelligence,
         "source_register": source_register(),
         "workflow_context": {
             "workflow_id": "growth_blueprint_deliverable_production",
@@ -45,6 +59,13 @@ def contract(source: dict, *, checksum: str | None = None) -> dict:
 
 
 class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
+    @staticmethod
+    def slides_importer(path: Path, specification: dict) -> dict:
+        return {
+            "presentation_id": "native-fieldwork-test",
+            "presentation_url": "https://docs.google.com/presentation/d/native-fieldwork-test/edit",
+        }
+
     def test_produces_review_only_deliverable_and_replays_without_rerendering(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -53,6 +74,7 @@ class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
                 renderer=renderer,
                 store=FileDeliverableStore(root / "records"),
                 output_root=root / "outputs",
+                native_slides_importer=self.slides_importer,
             )
             source = artifact()
 
@@ -68,10 +90,11 @@ class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
             self.assertEqual(renderer.calls, 1)
             self.assertTrue(Path(first["editable_pptx"]).is_file())
             self.assertTrue(Path(first["review_pdf"]).is_file())
-            self.assertEqual(len(first["commercial_model"]["scenarios"]), 3)
+            self.assertEqual(len(first["commercial_model"]["scenarios"]), 1)
+            self.assertTrue(first["editable_google_slides"]["presentation_url"].startswith("https://docs.google.com/presentation/d/"))
             self.assertTrue(first["source_register"]["entries"])
             self.assertFalse(first["execution_evidence"]["codex_dependency"])
-            self.assertEqual(first["execution_evidence"]["provider_calls"], 0)
+            self.assertEqual(first["execution_evidence"]["provider_calls"], 1)
 
     def test_rejects_blueprint_whose_content_no_longer_matches_approved_identity(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -80,6 +103,7 @@ class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
                 renderer=FakePresentationRenderer(),
                 store=FileDeliverableStore(root / "records"),
                 output_root=root / "outputs",
+                native_slides_importer=self.slides_importer,
             )
             with self.assertRaisesRegex(GrowthBlueprintDeliverableWorkerError, "checksum"):
                 worker(contract(artifact(), checksum="0" * 64))
@@ -92,6 +116,7 @@ class GrowthBlueprintDeliverableWorkerTests(unittest.TestCase):
                 renderer=renderer,
                 store=FileDeliverableStore(root / "records"),
                 output_root=root / "outputs",
+                native_slides_importer=self.slides_importer,
             )
             source = artifact()
             first = contract(source)

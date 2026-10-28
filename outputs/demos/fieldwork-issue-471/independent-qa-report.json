@@ -1,0 +1,73 @@
+{
+  "checks": {
+    "all_blueprint_evidence_refs_resolve": true,
+    "approval_is_pending": true,
+    "commercial_math_reconciles": true,
+    "creative_territory_is_tangible": true,
+    "evidence_classes_are_allowed": true,
+    "external_action_is_false": true,
+    "fictional_status_is_explicit": true,
+    "no_fictional_verified_evidence": true,
+    "opening_five_are_present": true,
+    "opening_five_cover_required_functions": true,
+    "presentation_has_evidence_register": true,
+    "recommendations_link_to_levers_and_tests": true,
+    "scenarios_are_not_forecasts": true,
+    "seven_chapters_are_present_in_order": true,
+    "three_scenarios_present": true
+  },
+  "findings": [
+    "All commercial inputs are assumptions; replace them with authorised client evidence before real use.",
+    "Contribution margin, implementation cost, returns, ramp, capacity and cannibalisation remain unresolved.",
+    "Constraint, advantage and creative territory require founder and customer validation.",
+    "Rendered files remain internal review copies until Matt approves the exact checksum."
+  ],
+  "independence": "Deterministic adversarial checks run after specialist outputs; no content was silently repaired.",
+  "recommendation": "Advance the fictional demonstration to Matt's review. Do not release or reuse its assumptions as client evidence.",
+  "rendered_output": {
+    "approval_status": "pending",
+    "client_id": "fieldwork-fictional",
+    "created_at": "2026-10-14T11:48:27.281499Z",
+    "deliverable_id": "fieldwork-fictional-supervised-blueprint-demo-v1",
+    "external_action_taken": false,
+    "pdf_path": "outputs/demos/fieldwork-issue-471/fieldwork-fictional-Growth-Blueprint-v1.pdf",
+    "pptx_path": "outputs/demos/fieldwork-issue-471/fieldwork-fictional-Growth-Blueprint-v1.pptx",
+    "source_blueprint_id": "fieldwork-fictional-growth-blueprint-demo-v1",
+    "source_blueprint_version": 1,
+    "specification_checksum": "c23d1f6e9795d6ef68df017be4ade7dbdc3d67e337e3f451571fb3fd1cc06109",
+    "status": "awaiting_review",
+    "template_source": "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; locked production canon unchanged.",
+    "visual_qa": {
+      "checks": {
+        "claim_status_is_visible": true,
+        "conclusion_led_headlines": true,
+        "editorial_arc_is_complete": true,
+        "layout_validation": true,
+        "locked_canon_is_declared_unchanged": true,
+        "mandatory_opening_five_are_distinct": true,
+        "no_overflow_or_overlap": true,
+        "no_visible_machine_runtime_artefacts": true,
+        "package_integrity": true,
+        "pdf_exists": true,
+        "pptx_exists": true,
+        "quantified_commercial_model_present": true,
+        "readable_citations_present": true,
+        "rendered_slide_review_passed": true,
+        "seven_chapter_demonstration_profile_is_complete": true,
+        "slide_count": true,
+        "source_labels_present": true,
+        "source_provenance_retained": true,
+        "source_register_present": true,
+        "strategic_source_unchanged": true,
+        "visual_forms_are_intentional": true
+      },
+      "findings": [],
+      "status": "passed"
+    },
+    "workspace_id": "demo-fieldwork"
+  },
+  "rendered_quality_passed": true,
+  "review_id": "fieldwork-fictional-independent-qa-v1",
+  "reviewer_role": "Independent Quality Reviewer",
+  "status": "PASS_FOR_HUMAN_REVIEW"
+}

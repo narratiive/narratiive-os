@@ -1,0 +1,12 @@
+{
+  "status": "passed",
+  "reviewed_pages": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "basis": "rendered PNGs at 1280x720 plus PDF assembly",
+  "client_release_authorised": false
+}

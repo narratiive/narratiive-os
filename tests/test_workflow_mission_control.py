@@ -15,7 +15,7 @@ from runtime.inbound_leads import InboundLead
 
 def _blueprint_output() -> dict:
     return {
-        "blueprint_lite": "A substantive SAFE synthetic Blueprint Lite with a clear strategic point of view.",
+        "blueprint_lite": "A substantive SAFE synthetic Groundwork with a clear strategic point of view.",
         "diagnostic_signals_used": ["overall score", "main blockage"],
         "diagnostic_input_coverage": {"complete": True},
         "source_backed_evidence": [
@@ -82,6 +82,31 @@ class WorkflowMissionControlTests(unittest.TestCase):
             self.assertFalse(summary["external_action_taken"])
             self.assertEqual(view.workstreams[0].state, "tested")
             self.assertEqual(len(view.approvals_required), 1)
+
+    def test_commissioned_unstarted_run_is_not_reported_as_working(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            runtime = build_tony_workflow_runtime(
+                temporary,
+                workspace_id="narratiive",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            runtime.enqueue(
+                "growth_diagnostic_to_blueprint_lite",
+                "unstarted-run",
+                {"diagnostic_input_package": {"overall_score": 42}},
+                entity_id="safe-lead",
+                correlation_id="safe-correlation",
+            )
+            state = runtime.runs.load_run("unstarted-run")
+            summary = WorkflowMissionControlProjector(
+                workspace_id="narratiive"
+            ).project((state,)).runs[0]
+            self.assertEqual(summary["status"], "active")
+            self.assertEqual(summary["stage_status"], "ready")
+            self.assertEqual(summary["attempt_count"], 0)
+            self.assertEqual(summary["execution_state"], "waiting_to_start")
 
     def test_cross_workspace_state_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

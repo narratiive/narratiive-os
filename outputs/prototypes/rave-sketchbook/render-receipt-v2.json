@@ -1,0 +1,28 @@
+{
+  "artefact": "Rave SKETCHBOOK canonical template prototype",
+  "version": "1.0.0-candidate",
+  "source_presentation": "INTERNAL-Rave-SKETCHBOOK-canonical-prototype-v2.pptx",
+  "source_presentation_sha256": "6d3b1a46feeff8a979d85a29405e513e4d8dbee9c9be56403c1fc7671fc8e778",
+  "review_pdf": "INTERNAL-Rave-SKETCHBOOK-canonical-prototype-v2.pdf",
+  "review_pdf_sha256": "ad4564b5b93408ec821e8a03f757a55f058b1544ebcef0f9b3d253b3d3fce77d",
+  "private_validation_receipt": ".presentation-build/presentation-validation-v2.json (not committed)",
+  "validation": {
+    "package_integrity": "pass",
+    "layout_geometry": "pass",
+    "heading_fit": "pass",
+    "font_policy": "pass",
+    "observed_font": "Arial",
+    "manual_pdf_pages_inspected": 5
+  },
+  "slide_count": 5,
+  "editable": true,
+  "internal_only": true,
+  "client_approved": false,
+  "live_media_activation": false,
+  "generated_visuals": [
+    "doormat",
+    "audience",
+    "kitchen",
+    "background"
+  ]
+}

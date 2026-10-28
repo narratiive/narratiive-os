@@ -13,14 +13,14 @@ from runtime.terminology_policy import TerminologyPolicy
 
 
 class PromptTerminologyError(ValueError):
-    """Raised when a prompt contains repository-retired Narratiive language."""
+    """Raised when a prompt contains non-canonical customer-facing language."""
 
     def __init__(self, terms: list[str], policy_version: str) -> None:
         self.terms = tuple(terms)
         self.policy_version = policy_version
         joined = ", ".join(terms)
         super().__init__(
-            f"prompt contains retired terminology under policy {policy_version}: {joined}"
+            f"prompt contains non-canonical customer-facing terminology under policy {policy_version}: {joined}"
         )
 
 

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import fcntl
 import hashlib
+import inspect
 import json
 import os
 import tempfile
@@ -26,6 +27,8 @@ from runtime.worker_registry import (
 )
 from runtime.workflow_registry import WorkflowRegistry
 from runtime.workflow_handoffs import build_next_workflow_inputs
+from runtime.workflow_quality import growth_sprint_proposal_quality_gate
+from runtime.terminology_policy import customer_identity_phrases
 from runtime.workflow_run_identity import downstream_run_id
 
 
@@ -383,12 +386,25 @@ class WorkflowExecutionCoordinator:
                 for field in stage_definition.output_contract.required_fields
                 if field not in output or output[field] in (None, "")
             ]
-            if missing:
-                quality = {"passed": False, "failed_checks": [f"required_output:{field}" for field in missing]}
-            elif stage.quality_contract:
+            if stage.quality_contract:
                 validator = self.quality_validators.get(stage.quality_contract)
                 try:
-                    quality = dict(validator(output))
+                    if stage.quality_contract in {
+                        "blueprint_lite_quality_gate",
+                        "growth_sprint_proposal_quality_gate",
+                    } and "protected_customer_identities" in inspect.signature(validator).parameters:
+                        quality = dict(
+                            validator(
+                                output,
+                                protected_customer_identities=customer_identity_phrases(
+                                    state.input_payload,
+                                    entity_id=state.entity_id,
+                                    client_id=state.client_id,
+                                ),
+                            )
+                        )
+                    else:
+                        quality = dict(validator(output))
                     quality["passed"] = quality.get("passed") is True
                 except Exception as exc:
                     quality = {
@@ -397,6 +413,15 @@ class WorkflowExecutionCoordinator:
                     }
             else:
                 quality = {"passed": True, "failed_checks": []}
+            if missing:
+                checks = dict(quality.get("checks") or {})
+                checks.update({f"required_output:{field}": False for field in missing})
+                quality["checks"] = checks
+                failed = list(quality.get("failed_checks") or [])
+                failed.extend(f"required_output:{field}" for field in missing)
+                quality["failed_checks"] = list(dict.fromkeys(failed))
+                quality["missing_mandatory_fields"] = list(missing)
+                quality["passed"] = False
             if stage.quality_contract == "senior_strategist_review_quality_gate":
                 identity = state.input_payload.get("blueprint_director_output_identity")
                 expected = str(identity.get("checksum") or "") if isinstance(identity, Mapping) else ""

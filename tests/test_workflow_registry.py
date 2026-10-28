@@ -21,9 +21,11 @@ class WorkflowRegistryTests(unittest.TestCase):
             "growth_sprint_to_research_engine",
             "research_to_strategic_synthesis",
             "strategic_synthesis_to_strategy_thesis",
+            "fieldwork_founder_argument_experiment",
             "strategy_thesis_to_growth_blueprint",
             "research_to_growth_blueprint",
             "growth_blueprint_deliverable_production",
+            "sketchbook_v2_production",
             "growth_blueprint_to_campaign_world",
             "campaign_world_to_creative_bible",
             "creative_bible_to_asset_production",
@@ -96,6 +98,13 @@ class WorkflowRegistryTests(unittest.TestCase):
                 "narrative",
                 "growth_opportunity",
                 "activation_implications",
+                "central_thesis",
+                "narrative_progression",
+                "editorial_judgement",
+                "contradiction_resolution",
+                "quantitative_evidence_treatment",
+                "assumption_control",
+                "completeness",
                 "key_strategic_choices",
                 "evidence_and_uncertainty",
                 "fact_interpretation_hypothesis_lineage",
@@ -104,6 +113,21 @@ class WorkflowRegistryTests(unittest.TestCase):
             },
         )
         self.assertTrue(blueprint.approval_policy.required)
+
+    def test_founder_argument_experiment_is_opt_in_and_cannot_handoff_to_production(self) -> None:
+        definition = build_narratiive_workflow_registry().resolve(
+            "fieldwork_founder_argument_experiment"
+        )
+        self.assertEqual(definition.next_workflow_id, "")
+        self.assertFalse(definition.autonomous_handoff)
+        self.assertTrue(definition.approval_required)
+        stage = definition.stages[0]
+        self.assertEqual(stage.stage_id, "develop_founder_argument")
+        self.assertEqual(
+            stage.output_contract.required_fields,
+            ("founder_argument", "evidence_lineage", "recommendation"),
+        )
+        self.assertEqual(stage.quality_contract, "fieldwork_founder_argument_quality_gate")
 
     def test_gate_three_separates_synthesis_thesis_and_blueprint_authority(self) -> None:
         registry = build_narratiive_workflow_registry()

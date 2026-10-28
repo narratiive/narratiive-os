@@ -1,6 +1,7 @@
 # Narratiive OS Product Canon
 
 Status: Governance index to existing canon
+Version: 1.2.0
 
 This document locates and protects existing product truth. It does not replace
 the canonical files it references.
@@ -22,6 +23,26 @@ the canonical files it references.
 | `Performance Feedback` | The governed performance-learning object downstream of delivered assets |
 | `Narratiive Signal` | The external unsolicited outreach product |
 | `Opportunity Card Pipeline` | The internal workflow name for Narratiive Signal |
+
+## Customer-facing client journey names
+
+`docs/product/CLIENT_JOURNEY_NAMING_CANON_V1.md` is the authoritative
+customer-facing naming contract updated by Matt on 23 October 2026. The
+customer-facing journey is:
+
+`Groundwork → Discovery → Fieldwork → Sketchbook → Launchpad`
+
+Groundwork is the existing Blueprint Lite pre-sales assessment. Fieldwork is
+the paid strategic engagement that produces the Growth Blueprint. Sketchbook
+is the existing governed creative-strategy and development path downstream of
+approved Fieldwork. Launchpad is downstream campaign execution and does not
+inherit approval from an earlier stage.
+
+This naming layer does not rename internal workflow IDs, lifecycle values,
+historical records, specialist stages or governed artefacts. `Blueprint Lite`,
+`Growth Sprint`, `Growth Blueprint`, `Campaign World`, `Creative Director's
+Bible`, `Production Pack`, `Asset Manifest` and `Performance Feedback` remain
+valid internal or artefact terms under their existing contracts.
 
 The canonical inbound commercial journey is:
 
@@ -220,3 +241,22 @@ and client-facing outputs.
 
 Never edit a checksum-locked component without updating its governed version and
 manifest through the established import/version process.
+
+## Canon change log
+
+### 1.2.0 — 23 October 2026
+
+- Replaced Activation with Launchpad in new customer-facing and founder-facing
+  copy under Matt's explicit terminology decision.
+- Preserved Activation as an internal and historical compatibility term without
+  migrating workflow identifiers or records.
+
+### 1.1.0 — 22 October 2026
+
+- Added the approved customer-facing Groundwork, Fieldwork, Sketchbook and
+  Activation naming layer.
+- Preserved all internal identifiers, historical compatibility, specialist
+  ownership, artefact contracts and approval gates.
+- Recorded the exact mapping in
+  `docs/product/CLIENT_JOURNEY_NAMING_CANON_V1.md` without changing the
+  checksum-locked Blueprint bundle.

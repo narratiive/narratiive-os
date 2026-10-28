@@ -1,0 +1,63 @@
+{
+  "schema_version": "1.0.0",
+  "status": "internal_comparative_review_not_client_approval",
+  "rubric": {
+    "1": "fails the intended founder-facing purpose",
+    "2": "materially weak; revision required",
+    "3": "credible pass with visible limitations",
+    "4": "strong and useful; focused human refinement remains",
+    "5": "exceptional within the evidence available"
+  },
+  "method": {
+    "editorial": "Strict automated gate plus human inspection of the central argument and five-move sequence.",
+    "visual": "Human inspection of all five rendered PDF pages at review size, considering hierarchy, legibility, client specificity and continuity with the Rave benchmark.",
+    "limitation": "Scores are internal comparative judgements, not independent client validation or human approval."
+  },
+  "businesses": [
+    {
+      "id": "rave",
+      "client_name": "Rave Coffee",
+      "scores": {
+        "clarity": 5,
+        "commercial_usefulness": 4,
+        "strategic_distinctiveness": 4,
+        "presentation_quality": 4
+      },
+      "editorial_gate": "PASS",
+      "visual_review": "PASS FOR INTERNAL REVIEW",
+      "rationale": "One unresolved commercial question carries all five moves. The progression mechanism is useful but still requires first-party repeat, contribution and channel evidence. The visual system preserves the benchmark's warm paper, ink, yellow path and cobalt evidence language without copying its argument."
+    },
+    {
+      "id": "katkin",
+      "client_name": "KatKin",
+      "scores": {
+        "clarity": 5,
+        "commercial_usefulness": 4,
+        "strategic_distinctiveness": 4,
+        "presentation_quality": 4
+      },
+      "editorial_gate": "PASS",
+      "visual_review": "PASS FOR INTERNAL REVIEW",
+      "rationale": "The argument turns scientific ambition into a specific customer-decision system. It directs a measurable trial and transition intervention but cannot size value without conversion, retention, margin and acquisition data. The coral/violet world feels client-specific while retaining FIELDWORK hierarchy."
+    },
+    {
+      "id": "yardstick",
+      "client_name": "The Yardstick Agency",
+      "scores": {
+        "clarity": 4,
+        "commercial_usefulness": 4,
+        "strategic_distinctiveness": 4,
+        "presentation_quality": 4
+      },
+      "editorial_gate": "PASS",
+      "visual_review": "PASS FOR INTERNAL REVIEW",
+      "rationale": "The argument resolves a broad service menu into change-point buying logic. It is commercially useful but slightly more abstract than the consumer cases and requires pipeline, service-attach and account economics to validate. The restrained service-business visual language demonstrates range without becoming generic consultancy design."
+    }
+  ],
+  "benchmark_comparison": {
+    "benchmark": "original Claude-generated Rave strategy",
+    "preserved": true,
+    "finding": "The candidate flow consistently protects coherence, evidence boundaries and one founder decision. It matches the benchmark's clarity conditions but has not yet proven equivalent creative surprise or founder willingness to pay.",
+    "promotion_decision": "keep_opt_in_until_matt_review_and_one_supervised_first_party_engagement"
+  }
+}

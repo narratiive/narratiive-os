@@ -72,7 +72,7 @@ def lifecycle(client_id: str) -> ClientLifecycleRecord:
 
 def blueprint_output() -> dict:
     return {
-        "blueprint_lite": "A substantive synthetic Blueprint Lite with a clear strategic point of view.",
+        "blueprint_lite": "A substantive synthetic Groundwork with a clear strategic point of view.",
         "diagnostic_signals_used": ["overall score", "main blockage"],
         "diagnostic_input_coverage": {"complete": True},
         "source_backed_evidence": [{"source": "https://example.invalid", "fact": "Synthetic evidence"}],
@@ -184,9 +184,11 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertFalse(portfolio.data["external_action_taken"])
         by_client = {item["client_id"]: item for item in portfolio.data["clients"]}
         self.assertEqual(by_client["safe-client"]["current_gate"], 1)
+        self.assertEqual(by_client["safe-client"]["current_phase"], "Groundwork")
         self.assertEqual(by_client["safe-client"]["journey_status"], "awaiting_human_approval")
         self.assertEqual(by_client["safe-client-two"]["journey_status"], "in_progress")
         self.assertEqual(by_client["safe-client-two"]["run_count"], 1)
+        self.assertIn("Groundwork", portfolio.message)
 
     def test_campaign_portfolio_is_restart_safe_and_does_not_mutate_runs(self) -> None:
         before = {

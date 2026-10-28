@@ -1,9 +1,13 @@
 from __future__ import annotations
 
 import base64
+import io
+import json
 import tempfile
 import unittest
 from pathlib import Path
+
+from pypdf import PdfReader
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_command_service import CommandResponse
@@ -130,9 +134,17 @@ class WorkflowActionPreviewTests(unittest.TestCase):
         self.assertEqual(preview.data["recipient_email"], "hello@narratiive.com")
         self.assertEqual(preview.data["source_artifact_version"], "v1")
         self.assertTrue(preview.data["full_body"])
+        self.assertIn("Fieldwork", preview.data["subject"])
+        self.assertIn("Fieldwork", preview.data["full_body"])
+        self.assertNotIn("Growth Sprint", preview.data["subject"])
+        self.assertNotIn("Growth Sprint", preview.data["full_body"])
         self.assertNotIn("[Founder name]", preview.data["full_body"])
         self.assertNotIn("DRAFT — INTERNAL", preview.data["full_body"])
         self.assertTrue(preview.data["attachments"][0]["filename"].endswith(".pdf"))
+        attachment_pdf = base64.b64decode(self.gmail_calls[0]["payload"]["attachments"][0]["content_base64"])
+        attachment_text = "\n".join(page.extract_text() or "" for page in PdfReader(io.BytesIO(attachment_pdf)).pages)
+        self.assertIn("Fieldwork Proposal", attachment_text)
+        self.assertNotIn("Growth Sprint", attachment_text)
 
         stale = self.service.execute(
             f"/execute-action {run_id} because Matt approved the displayed simulation",
@@ -162,6 +174,28 @@ class WorkflowActionPreviewTests(unittest.TestCase):
         self.assertTrue(base64.b64decode(send_payload["attachments"][0]["content_base64"]).startswith(b"%PDF"))
         state = self.runtime.runs.load_run(run_id)
         self.assertNotEqual(state.input_payload.get("contact_email"), "hello@narratiive.com")
+
+    def test_preview_rejects_a_historical_review_renderer(self):
+        run_id = self._proposal_run()
+        self.service.execute(f"/deliver-review {run_id}", [])
+        token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        self.service.execute(
+            f"/approve {run_id} because approved exact proposal",
+            [], principal_id="telegram:123", inputs={"approval_token": token},
+        )
+        manifest_path = next((self.root / "human-review-artifacts").rglob("manifest.json"))
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["renderer_version"] = "2"
+        manifest_path.write_text(json.dumps(manifest, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+
+        preview = self.service.execute(
+            f"/action-preview {run_id}",
+            [],
+            inputs={"simulation_mode": True, "delivery_override": "hello@narratiive.com"},
+        )
+
+        self.assertEqual(preview.status, "error")
+        self.assertIn("current immutable human-review PDF", preview.message)
 
 
 if __name__ == "__main__":

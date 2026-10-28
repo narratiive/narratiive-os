@@ -914,17 +914,28 @@ class TonyWorkflowCommandService:
                     inputs=supplied,
                     commitment_id=commitment_id,
                 )
+                summary = self._summary(commissioned)
+                waiting_to_start = summary.get("execution_state") == "waiting_to_start"
+                if waiting_to_start:
+                    message = (
+                        "The work is commissioned but has not started. "
+                        "The worker has not been invoked; continue this exact run to execute it."
+                    )
+                elif replay:
+                    message = (
+                        "That exact governed work is already commissioned; no duplicate run was created. "
+                        "Check its execution state before taking another action."
+                    )
+                else:
+                    message = (
+                        "The work is commissioned. Check its execution state; commissioning alone "
+                        "does not prove that a worker has started."
+                    )
                 return CommandResponse(
                     name,
                     "healthy",
-                    (
-                        "That exact governed work is already commissioned; no duplicate run was created. "
-                        "Read its workflow status for the current execution state."
-                        if replay
-                        else "I’ve commissioned that work against the persisted evidence and will return here "
-                        "when it reaches the next review gate."
-                    ),
-                    {**self._summary(commissioned), "commissioned": True, "replay": replay},
+                    message,
+                    {**summary, "commissioned": True, "replay": replay},
                 )
             if name == "research":
                 if not rationale:
@@ -1144,9 +1155,9 @@ def _output_excerpt(output: Mapping[str, Any]) -> str:
 
 def _artifact_label(state: WorkflowState) -> str:
     labels = {
-        "growth_diagnostic_to_blueprint_lite": "Gate 1 — the Blueprint Lite",
+        "growth_diagnostic_to_blueprint_lite": "Gate 1 — the Groundwork",
         "blueprint_lite_to_discovery_preparation": "The Discovery synthesis",
-        "discovery_evidence_to_growth_sprint_proposal": "The Growth Sprint proposal",
+        "discovery_evidence_to_growth_sprint_proposal": "The Fieldwork proposal",
         "strategic_synthesis_to_strategy_thesis": "Gate 3 — the Strategy Thesis",
         "strategy_thesis_to_growth_blueprint": "The Growth Blueprint",
         "research_to_growth_blueprint": "The Growth Blueprint",

@@ -1,0 +1,15 @@
+{
+  "action": "await_human_approval",
+  "approval_status": "pending",
+  "artifact_checksum": "909d4a3a67a2365b9c61bfee5268e54418111475c98138bc923cfce3d7e3e705",
+  "artifact_id": "artifact-50693c48a3bb9a42-909d4a3a67a2365b",
+  "business_id": "katkin",
+  "case_sha256": "fd34ffc152a81e497611a646cf4af433c1a7187bed70c42551009966e1ffd4f7",
+  "executed_at": "2026-10-18T21:14:55.792810+00:00",
+  "external_action_taken": false,
+  "presentation_production_triggered": false,
+  "provider_message_id": "msg_011CgAPmtqcDQewkBmvd2ZKh",
+  "run_id": "katkin-fieldwork-calibration-20261018-v1",
+  "status": "awaiting_approval",
+  "workflow_id": "fieldwork_founder_argument_experiment"
+}

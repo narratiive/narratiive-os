@@ -1,0 +1,15 @@
+{
+  "action": "await_human_approval",
+  "approval_status": "pending",
+  "artifact_checksum": "2c6d9469222473621966ddf734c695b4b1f6c7ddc2e5de81e2a3b647becac262",
+  "artifact_id": "artifact-ec5468207a5a0d3c-2c6d946922247362",
+  "business_id": "yardstick",
+  "case_sha256": "b2a0f95012eae0cfccd006377f70ceb95f19cf07975ddb03f64c02cd002dd150",
+  "executed_at": "2026-10-18T21:16:08.792587+00:00",
+  "external_action_taken": false,
+  "presentation_production_triggered": false,
+  "provider_message_id": "msg_011CgAPra1AchtFmGkSzvecn",
+  "run_id": "yardstick-fieldwork-calibration-20261018-v1",
+  "status": "awaiting_approval",
+  "workflow_id": "fieldwork_founder_argument_experiment"
+}

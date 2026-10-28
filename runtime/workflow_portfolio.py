@@ -11,9 +11,9 @@ from runtime.workflow_registry import NARRATIIVE_PRODUCTION_WORKFLOWS
 _WORKFLOW_ORDER = tuple(item.workflow_id for item in NARRATIIVE_PRODUCTION_WORKFLOWS)
 _WORKFLOW_INDEX = {workflow_id: index for index, workflow_id in enumerate(_WORKFLOW_ORDER)}
 _WORKFLOW_LABELS = {
-    "growth_diagnostic_to_blueprint_lite": "Blueprint Lite",
+    "growth_diagnostic_to_blueprint_lite": "Groundwork",
     "blueprint_lite_to_discovery_preparation": "Discovery preparation",
-    "discovery_evidence_to_growth_sprint_proposal": "Growth Sprint proposal",
+    "discovery_evidence_to_growth_sprint_proposal": "Fieldwork proposal",
     "growth_sprint_to_research_engine": "Research",
     "research_to_strategic_synthesis": "Strategic Synthesis",
     "strategic_synthesis_to_strategy_thesis": "Strategy Thesis",

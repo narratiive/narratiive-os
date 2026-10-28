@@ -1,0 +1,1209 @@
+{
+  "client_id": "fieldwork-fictional",
+  "notes": [
+    "INTERNAL FICTIONAL DEMONSTRATION - HUMAN APPROVAL REQUIRED",
+    "All figures are modelled from assumptions. Scenarios are not forecasts."
+  ],
+  "slides": [
+    {
+      "body": "The base scenario reaches £1,890,000 in annualised online revenue, but the strategic prize is a defensible reason to choose and return. This is a scenario, not a forecast.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "claim_status": "MODELLED",
+      "content_data": {
+        "brand_name": "FIELDWORK",
+        "platform": "Own the mixed-use surface",
+        "subtitle": "A conditional route from first object to repeat purchase"
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 1,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee."
+      ],
+      "takeaway": "FIELDWORK could own the mixed-use surface, turning one useful object into a repeatable customer relationship.",
+      "title": "Where FIELDWORK could go",
+      "visual_treatment": "single_thesis_page"
+    },
+    {
+      "body": "The downside loses money after assumed investment. The base and upside only become investable if the ramp, contribution and cost assumptions survive verification.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "claim_status": "MODELLED - SCENARIO, NOT FORECAST",
+      "content_data": {
+        "baseline": {
+          "annual_revenue": 1200000,
+          "annual_sessions": 600000,
+          "average_order_value": 100,
+          "classification": "MODELLED FROM ASSUMPTIONS",
+          "conversion_rate": 0.02
+        },
+        "investment_case": {
+          "implementation_investment": 85000,
+          "incremental_contribution_margin": 0.32,
+          "status": "illustrative_assumption_case",
+          "unresolved_inputs": [
+            "Actual net contribution margin by product and channel",
+            "Quoted implementation and production cost",
+            "Validated monthly ramp, seasonality and capacity",
+            "Cannibalisation and working-capital impact"
+          ],
+          "warning": "The contribution, investment and payback figures are MODELLED from ASSUMPTION inputs. They are not profit forecasts or an approved investment case."
+        },
+        "model_type": "ecommerce",
+        "scenarios": [
+          {
+            "annual_revenue": 1349460,
+            "annual_sessions": 630000,
+            "average_order_value": 102,
+            "classification": "MODELLED",
+            "conversion_rate": 0.021,
+            "illustrative_payback_months": 60.9,
+            "incremental_annual_revenue": 149460,
+            "name": "Downside",
+            "scenario_not_forecast": true,
+            "year_one_incremental_contribution": 16740,
+            "year_one_incremental_revenue": 52311,
+            "year_one_net_after_investment": -68260,
+            "year_one_realisation_rate": 0.35
+          },
+          {
+            "annual_revenue": 1890000,
+            "annual_sessions": 750000,
+            "average_order_value": 105,
+            "classification": "MODELLED",
+            "conversion_rate": 0.024,
+            "illustrative_payback_months": 8.4,
+            "incremental_annual_revenue": 690000,
+            "name": "Base",
+            "scenario_not_forecast": true,
+            "year_one_incremental_contribution": 121440,
+            "year_one_incremental_revenue": 379500,
+            "year_one_net_after_investment": 36440,
+            "year_one_realisation_rate": 0.55
+          },
+          {
+            "annual_revenue": 2274480,
+            "annual_sessions": 810000,
+            "average_order_value": 108,
+            "classification": "MODELLED",
+            "conversion_rate": 0.026,
+            "illustrative_payback_months": 4.6,
+            "incremental_annual_revenue": 1074480,
+            "name": "Upside",
+            "scenario_not_forecast": true,
+            "year_one_incremental_contribution": 223492,
+            "year_one_incremental_revenue": 698412,
+            "year_one_net_after_investment": 138492,
+            "year_one_realisation_rate": 0.65
+          }
+        ]
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "layout_type": "commercial_model",
+      "slide_no": 2,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee."
+      ],
+      "takeaway": "The base scenario adds £690,000 of annualised revenue headroom. The base case produces a £36,440 first-year contribution proxy after £85,000 of assumed investment. Verify every input before committing.",
+      "title": "What the commercial opportunity looks like",
+      "visual_treatment": "commercial_model"
+    },
+    {
+      "body": "Working diagnosis only. Falsify it by: Reject this diagnosis if a specific mixed-use proposition does not improve qualified product-page progression and net conversion, or if existing cohorts already show strong second-purchase behaviour.",
+      "citation_labels": [
+        "A4"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "left_detail": "A broad catalogue asks paid media to create the distinction.",
+        "left_headline": "Reach before reason",
+        "left_label": "CURRENT PATTERN",
+        "right_headline": "No proven repeat path",
+        "right_label": "WORKING CONSTRAINT"
+      },
+      "evidence_refs": [
+        "A4"
+      ],
+      "layout_type": "provocation_page",
+      "slide_no": 3,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK."
+      ],
+      "takeaway": "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household should choose its first object or return for the second.",
+      "title": "What currently prevents growth",
+      "visual_treatment": "provocation_page"
+    },
+    {
+      "body": "Each move changes a customer decision and has a measurable commercial gate. Larger investment remains conditional on evidence.",
+      "citation_labels": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "phases": [
+          [
+            "OWN THE MIXED-USE SURFACE",
+            "Qualified conversion",
+            "Controlled message and landing-page test"
+          ],
+          [
+            "MAKE USEFULNESS VISIBLE",
+            "Conversion and average order value",
+            "Product-story comprehension and basket test"
+          ],
+          [
+            "EARN THE SECOND OBJECT",
+            "Second-purchase economics",
+            "Cohort retention and referral pilot"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "layout_type": "constraint_priority_roadmap",
+      "slide_no": 4,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Own the mixed-use surface, make usefulness visible, then earn the second object before scaling acquisition.",
+      "title": "The strategic moves",
+      "visual_treatment": "constraint_priority_roadmap"
+    },
+    {
+      "body": "Use real traces of domestic work as the setting, then annotate the product decisions that make a shared surface calmer without pretending life is tidy.",
+      "citation_labels": [
+        "A5",
+        "C1"
+      ],
+      "claim_status": "CREATIVE ILLUSTRATION",
+      "content_data": {
+        "asset_path": "fieldwork/built-for-the-work-of-living-v1.png",
+        "bridge": "made",
+        "creative_line": "Built for the work of living",
+        "image_alt": "Fictional FIELDWORK modular desk object on a lived-in dining table shared by work and family life",
+        "primary_phrase": "USEFUL BY DESIGN",
+        "principles": [
+          [
+            "OBSERVE",
+            "Real work leaves traces"
+          ],
+          [
+            "PROVE",
+            "Materials and use stay visible"
+          ],
+          [
+            "REPEAT",
+            "One warm orange work mark"
+          ]
+        ],
+        "secondary_phrase": "HUMAN IN PRACTICE"
+      },
+      "evidence_refs": [
+        "A5",
+        "C1"
+      ],
+      "layout_type": "creative_proof",
+      "slide_no": 5,
+      "source_notes": [
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+      "title": "What the future could look like",
+      "visual_treatment": "creative_proof"
+    },
+    {
+      "body": "The base case produces a £36,440 first-year contribution proxy after £85,000 of assumed investment. Verify every input before committing.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "claim_status": "MODELLED",
+      "content_data": {
+        "chapter_label": "CHAPTER 1 / THE OPPORTUNITY",
+        "signal": "SCENARIO",
+        "support": "Validate before investment"
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "layout_type": "single_thesis_page",
+      "slide_no": 6,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee."
+      ],
+      "takeaway": "FIELDWORK could test an annualised ecommerce revenue scenario of £1,890,000, £690,000 above the assumed baseline. At the assumed ramp, contribution margin and £85,000 investment, the first-year net contribution proxy is £36,440.",
+      "title": "The Opportunity",
+      "visual_treatment": "single_thesis_page"
+    },
+    {
+      "body": "The sequential bridge reconciles to £690,000. The attribution order is a modelling convention.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "claim_status": "MODELLED",
+      "content_data": {
+        "chapter_label": "CHAPTER 1 / THE OPPORTUNITY"
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A8",
+        "A9",
+        "A10"
+      ],
+      "layout_type": "evidence_ladder",
+      "slide_no": 7,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee."
+      ],
+      "takeaway": "Traffic and conversion each account for £300,000 of the base case. Higher order value accounts for £90,000.",
+      "title": "The scenario bridge",
+      "visual_treatment": "evidence_ladder"
+    },
+    {
+      "body": "Reject this diagnosis if a specific mixed-use proposition does not improve qualified product-page progression and net conversion, or if existing cohorts already show strong second-purchase behaviour.",
+      "citation_labels": [
+        "A4"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 2 / THE CONSTRAINT"
+      },
+      "evidence_refs": [
+        "A4"
+      ],
+      "layout_type": "evidence_ladder",
+      "slide_no": 8,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK."
+      ],
+      "takeaway": "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household should choose its first object or return for the second.",
+      "title": "The Constraint",
+      "visual_treatment": "evidence_ladder"
+    },
+    {
+      "body": "Reject this diagnosis if a specific mixed-use proposition does not improve qualified product-page progression and net conversion, or if existing cohorts already show strong second-purchase behaviour.",
+      "citation_labels": [
+        "A4"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 2 / THE CONSTRAINT"
+      },
+      "evidence_refs": [
+        "A4"
+      ],
+      "layout_type": "test_plan",
+      "slide_no": 9,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK."
+      ],
+      "takeaway": "The diagnosis fails if a specific mixed-use proposition does not improve net conversion or existing cohorts already repeat strongly.",
+      "title": "What would disprove the diagnosis",
+      "visual_treatment": "test_plan"
+    },
+    {
+      "body": "Compare this territory with organisation-led and status-led alternatives on relevance, distinctiveness, willingness to pay and unprompted recall.",
+      "citation_labels": [
+        "A5"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "audience": "People whose home workspace disappears and reappears every day",
+        "chapter_label": "CHAPTER 3 / THE ADVANTAGE",
+        "competitor_miss": "Validation required. No competitor position is asserted in this fictional fixture.",
+        "competitors": [],
+        "current_position": [
+          "FIELDWORK TODAY",
+          42,
+          44
+        ],
+        "future_position": [
+          "TEST TERRITORY",
+          78,
+          80
+        ],
+        "market_gap": "Modular objects for surfaces shared by work and life",
+        "x_axis": [
+          "GENERIC ORGANISATION",
+          "MIXED-USE SPECIFIC"
+        ],
+        "y_axis": [
+          "DECORATIVE",
+          "PROVEN IN USE"
+        ]
+      },
+      "evidence_refs": [
+        "A5"
+      ],
+      "layout_type": "market_gap_map",
+      "slide_no": 10,
+      "source_notes": [
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life."
+      ],
+      "takeaway": "FIELDWORK could own the mixed-use surface: modular objects designed for the daily collision of paid work, domestic life and limited space.",
+      "title": "The Advantage",
+      "visual_treatment": "market_gap_map"
+    },
+    {
+      "body": "Compare this territory with organisation-led and status-led alternatives on relevance, distinctiveness, willingness to pay and unprompted recall.",
+      "citation_labels": [
+        "A5"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 3 / THE ADVANTAGE",
+        "customer_language": [
+          "Observe how shared surfaces are reset",
+          "Test the mixed-use proposition",
+          "Measure willingness to pay"
+        ],
+        "interpretation": "The territory remains a hypothesis until observed behaviour and customer choice evidence support it.",
+        "language_status": "CUSTOMER EVIDENCE REQUIRED",
+        "signals": [
+          [
+            "FOUNDER VIEW",
+            "A proposed category to own"
+          ],
+          [
+            "CUSTOMER DATA",
+            "Not yet supplied"
+          ],
+          [
+            "CHOICE TEST",
+            "Required before selection"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A5"
+      ],
+      "layout_type": "customer_evidence_board",
+      "slide_no": 11,
+      "source_notes": [
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life."
+      ],
+      "takeaway": "Founder conviction can frame a hypothesis. Customer choice data must decide whether the advantage is real.",
+      "title": "The advantage needs proof",
+      "visual_treatment": "customer_evidence_board"
+    },
+    {
+      "body": "Approve only the next tests, not the modelled revenue outcome.",
+      "citation_labels": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "banner": "Turn one useful object into a reason to return.",
+        "chapter_label": "CHAPTER 4 / THE STRATEGY",
+        "steps": [
+          [
+            "TENSION",
+            "Broad accessories compete on taste and paid attention"
+          ],
+          [
+            "SHIFT",
+            "Own the mixed-use surface and show usefulness in context"
+          ],
+          [
+            "RESOLUTION",
+            "Let the first object earn the second before buying reach"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "layout_type": "narrative_platform_framework",
+      "slide_no": 12,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Turn the mixed-use surface into a category FIELDWORK can own, then prove that one useful object earns the next purchase before scaling acquisition.",
+      "title": "The Strategy",
+      "visual_treatment": "narrative_platform_framework"
+    },
+    {
+      "body": "The work stays reversible until conversion, repeat and contribution evidence justify larger investment.",
+      "citation_labels": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 4 / THE STRATEGY",
+        "recurring_formats": [
+          "Claim and proof",
+          "Test and result"
+        ],
+        "territories": [
+          [
+            "OWN THE MIXED-USE SURFACE",
+            "Qualified conversion",
+            "A narrower promise may reduce broad but low-intent traffic.",
+            "Controlled message and landing-page test",
+            "Strategy Director"
+          ],
+          [
+            "MAKE USEFULNESS VISIBLE",
+            "Conversion and average order value",
+            "More proof requires disciplined production and may expose weak claims.",
+            "Product-story comprehension and basket test",
+            "Creative Director"
+          ],
+          [
+            "EARN THE SECOND OBJECT",
+            "Second-purchase economics",
+            "Near-term reach grows more slowly while economics are validated.",
+            "Cohort retention and referral pilot",
+            "Strategy Director"
+          ]
+        ],
+        "tone_motion_cues": [
+          "Direct",
+          "Useful"
+        ],
+        "verbal_assets": [
+          "Specific promise",
+          "Visible proof"
+        ]
+      },
+      "evidence_refs": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "layout_type": "messaging_territories",
+      "slide_no": 13,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "The strategy connects each recommendation to a measurable commercial lever.",
+      "title": "Three moves, three tests",
+      "visual_treatment": "messaging_territories"
+    },
+    {
+      "body": "Use real traces of domestic work as the setting, then annotate the product decisions that make a shared surface calmer without pretending life is tidy.",
+      "citation_labels": [
+        "A5",
+        "C1"
+      ],
+      "claim_status": "CREATIVE ILLUSTRATION",
+      "content_data": {
+        "bridge": "meets",
+        "chapter_label": "CHAPTER 5 / THE CREATIVE FUTURE",
+        "primary_phrase": "USEFUL BY DESIGN",
+        "principles": [
+          [
+            "OBSERVE",
+            "Real work leaves traces"
+          ],
+          [
+            "PROVE",
+            "Materials and use stay visible"
+          ],
+          [
+            "REPEAT",
+            "One warm orange work mark"
+          ]
+        ],
+        "secondary_phrase": "HUMAN IN PRACTICE"
+      },
+      "evidence_refs": [
+        "A5",
+        "C1"
+      ],
+      "layout_type": "creative_direction",
+      "slide_no": 14,
+      "source_notes": [
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Built for the work of living: Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+      "title": "The Creative Future",
+      "visual_treatment": "creative_direction"
+    },
+    {
+      "body": "A film keeps the camera on one dining table as invoice, lunch, school drawing and late call replace each other. The FIELDWORK object stays, adapts and gathers the day's essential tools. Product annotations explain every material and modular choice.",
+      "citation_labels": [
+        "A5",
+        "C1"
+      ],
+      "claim_status": "CREATIVE ILLUSTRATION",
+      "content_data": {
+        "chapter_label": "CHAPTER 5 / THE CREATIVE FUTURE",
+        "principles": [
+          [
+            "OBSERVE",
+            "Real work leaves traces"
+          ],
+          [
+            "PROVE",
+            "Materials and use stay visible"
+          ],
+          [
+            "REPEAT",
+            "One warm orange work mark"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A5",
+        "C1"
+      ],
+      "layout_type": "creative_principles",
+      "slide_no": 15,
+      "source_notes": [
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+      "title": "The campaign behaviour",
+      "visual_treatment": "creative_principles"
+    },
+    {
+      "body": "Increase paid acquisition only after proposition comprehension, net conversion and cohort contribution improve without unacceptable returns or discounting.",
+      "citation_labels": [
+        "A6"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 6 / THE GROWTH ENGINE",
+        "rows": [
+          [
+            "Owned site",
+            "Prove the proposition and convert qualified demand",
+            "Message comprehension and net conversion"
+          ],
+          [
+            "CRM",
+            "Build repeat, cross-sell and referral evidence",
+            "Cohort contribution and opt-out guardrail"
+          ],
+          [
+            "Paid social",
+            "Scale tested creative and proposition routes",
+            "Incremental contribution after creative and media cost"
+          ],
+          [
+            "Partnerships",
+            "Reach relevant work and design communities",
+            "Qualified traffic and assisted conversion"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A6"
+      ],
+      "layout_type": "channel_role_map",
+      "slide_no": 16,
+      "source_notes": [
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible."
+      ],
+      "takeaway": "Use the owned site to prove the mixed-use proposition, then use the first object to earn a second purchase before paid media scales the system.",
+      "title": "The Growth Engine",
+      "visual_treatment": "channel_role_map"
+    },
+    {
+      "body": "Baseline every measure before the first test. Record cost, capacity and confidence alongside performance.",
+      "citation_labels": [
+        "A6"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 6 / THE GROWTH ENGINE",
+        "rows": [
+          [
+            "LEADING",
+            "Proposition comprehension, qualified click-through, product-page progression"
+          ],
+          [
+            "BEHAVIOURAL",
+            "Net conversion, average order value, repeat and referral"
+          ],
+          [
+            "COMMERCIAL",
+            "Contribution after returns, fulfilment, media and implementation"
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A6"
+      ],
+      "layout_type": "priority_matrix_plus_measurement_stack",
+      "slide_no": 17,
+      "source_notes": [
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible."
+      ],
+      "takeaway": "Leading indicators must move before the plan releases larger media or inventory commitments.",
+      "title": "Measurement before scale",
+      "visual_treatment": "priority_matrix_plus_measurement_stack"
+    },
+    {
+      "body": "Start with a 12-week proof phase. Release the remaining roadmap only when baseline, contribution, customer choice and capacity evidence pass their gates.",
+      "citation_labels": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "C1"
+      ],
+      "claim_status": "ASSUMPTION",
+      "content_data": {
+        "chapter_label": "CHAPTER 7 / THE NEXT 12 MONTHS",
+        "phases": [
+          [
+            "Months 1-3",
+            "Establish the truth",
+            "Verify economics, interview customers and test three proposition routes."
+          ],
+          [
+            "Months 4-6",
+            "Prove the proposition",
+            "Run controlled site, product-story and CRM tests with contribution guardrails."
+          ],
+          [
+            "Months 7-9",
+            "Build the engine",
+            "Codify winning creative, CRM and referral mechanics and assess capacity."
+          ]
+        ]
+      },
+      "evidence_refs": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "C1"
+      ],
+      "layout_type": "constraint_priority_roadmap",
+      "slide_no": 18,
+      "source_notes": [
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "A7 [ASSUMPTION]: A staged 12-month validation programme is affordable and resourced.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+      "title": "The Next 12 Months",
+      "visual_treatment": "constraint_priority_roadmap"
+    },
+    {
+      "body": "This fictional fixture contains no verified client or external research. Its numeric inputs are assumptions and its outputs are modelled scenarios.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "C1"
+      ],
+      "claim_status": "EVIDENCE REGISTER",
+      "content_data": {
+        "chapter_label": "GOVERNANCE / EVIDENCE",
+        "entries": [
+          {
+            "claim": "FIELDWORK receives 600,000 ecommerce sessions per year.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A1",
+            "limitations": "No GA4 export exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A1",
+            "title": "Assumed annual ecommerce sessions",
+            "unit": "annual sessions",
+            "validation_step": "Reconcile an authorised GA4 export to ecommerce platform sessions and orders.",
+            "value": 600000
+          },
+          {
+            "claim": "FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A2",
+            "limitations": "No analytics or order export exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A2",
+            "title": "Assumed ecommerce conversion rate",
+            "unit": "session conversion rate",
+            "validation_step": "Agree the conversion denominator and reconcile sessions to completed non-refunded orders.",
+            "value": 0.02
+          },
+          {
+            "claim": "FIELDWORK has a £100 average order value before returns and discounts.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A3",
+            "limitations": "VAT, discounts and returns are not represented.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A3",
+            "title": "Assumed average order value",
+            "unit": "GBP per order",
+            "validation_step": "Calculate net realised order value from an authorised transaction export.",
+            "value": 100
+          },
+          {
+            "claim": "The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A4",
+            "limitations": "No customer, funnel or competitor research supports this diagnosis.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A4",
+            "title": "Working constraint hypothesis",
+            "validation_step": "Run founder interviews, proposition testing and a controlled landing-page conversion test."
+          },
+          {
+            "claim": "FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A5",
+            "limitations": "No customer preference or competitor evidence supports ownability.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A5",
+            "title": "Proposed brand advantage",
+            "validation_step": "Test relevance, distinctiveness and willingness to pay with target customers."
+          },
+          {
+            "claim": "A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A6",
+            "limitations": "No channel economics, media budget, inventory capacity or retention cohorts exist.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A6",
+            "title": "Proposed growth engine",
+            "validation_step": "Obtain channel spend, contribution margin, stock capacity and cohort retention before scale."
+          },
+          {
+            "claim": "A staged 12-month validation programme is affordable and resourced.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A7",
+            "limitations": "No cost, owner capacity or dependency plan has been approved.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A7",
+            "title": "Proposed delivery roadmap",
+            "validation_step": "Scope the work, cost each phase and secure named owner commitments."
+          },
+          {
+            "claim": "Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A8",
+            "limitations": "No product, channel, returns or fulfilment contribution data exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A8",
+            "title": "Assumed incremental contribution margin",
+            "unit": "incremental contribution margin",
+            "validation_step": "Reconcile order-level net revenue and variable costs by product and channel.",
+            "value": 0.32
+          },
+          {
+            "claim": "The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A9",
+            "limitations": "No implementation plan, seasonality profile or test velocity supports the ramp range.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A9",
+            "title": "Assumed first-year ramp",
+            "validation_step": "Build a monthly implementation plan with test cadence, seasonality and operational capacity."
+          },
+          {
+            "claim": "The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A10",
+            "limitations": "No suppliers, media plan, production scope or internal time costs have been quoted.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A10",
+            "title": "Assumed implementation investment",
+            "unit": "GBP",
+            "validation_step": "Obtain a costed delivery plan and separate one-off, variable and internal costs.",
+            "value": 85000
+          },
+          {
+            "claim": "Built for the work of living is an illustrative creative territory for FIELDWORK.",
+            "classification": "CREATIVE ILLUSTRATION",
+            "confidence": "illustrative",
+            "evidence_id": "C1",
+            "limitations": "The territory has not been tested with a founder, customer or legal reviewer.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "C1",
+            "title": "Creative territory illustration",
+            "validation_step": "Test strategic fit, distinctiveness, comprehension and trademark risk before selection."
+          }
+        ],
+        "ledger_profile": "founder",
+        "source_register_entries": [
+          {
+            "claim": "FIELDWORK receives 600,000 ecommerce sessions per year.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A1",
+            "limitations": "No GA4 export exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A1",
+            "title": "Assumed annual ecommerce sessions",
+            "unit": "annual sessions",
+            "validation_step": "Reconcile an authorised GA4 export to ecommerce platform sessions and orders.",
+            "value": 600000
+          },
+          {
+            "claim": "FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A2",
+            "limitations": "No analytics or order export exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A2",
+            "title": "Assumed ecommerce conversion rate",
+            "unit": "session conversion rate",
+            "validation_step": "Agree the conversion denominator and reconcile sessions to completed non-refunded orders.",
+            "value": 0.02
+          },
+          {
+            "claim": "FIELDWORK has a £100 average order value before returns and discounts.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A3",
+            "limitations": "VAT, discounts and returns are not represented.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A3",
+            "title": "Assumed average order value",
+            "unit": "GBP per order",
+            "validation_step": "Calculate net realised order value from an authorised transaction export.",
+            "value": 100
+          },
+          {
+            "claim": "The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A4",
+            "limitations": "No customer, funnel or competitor research supports this diagnosis.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A4",
+            "title": "Working constraint hypothesis",
+            "validation_step": "Run founder interviews, proposition testing and a controlled landing-page conversion test."
+          },
+          {
+            "claim": "FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A5",
+            "limitations": "No customer preference or competitor evidence supports ownability.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A5",
+            "title": "Proposed brand advantage",
+            "validation_step": "Test relevance, distinctiveness and willingness to pay with target customers."
+          },
+          {
+            "claim": "A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A6",
+            "limitations": "No channel economics, media budget, inventory capacity or retention cohorts exist.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A6",
+            "title": "Proposed growth engine",
+            "validation_step": "Obtain channel spend, contribution margin, stock capacity and cohort retention before scale."
+          },
+          {
+            "claim": "A staged 12-month validation programme is affordable and resourced.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A7",
+            "limitations": "No cost, owner capacity or dependency plan has been approved.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A7",
+            "title": "Proposed delivery roadmap",
+            "validation_step": "Scope the work, cost each phase and secure named owner commitments."
+          },
+          {
+            "claim": "Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A8",
+            "limitations": "No product, channel, returns or fulfilment contribution data exists for this fictional company.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A8",
+            "title": "Assumed incremental contribution margin",
+            "unit": "incremental contribution margin",
+            "validation_step": "Reconcile order-level net revenue and variable costs by product and channel.",
+            "value": 0.32
+          },
+          {
+            "claim": "The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A9",
+            "limitations": "No implementation plan, seasonality profile or test velocity supports the ramp range.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A9",
+            "title": "Assumed first-year ramp",
+            "validation_step": "Build a monthly implementation plan with test cadence, seasonality and operational capacity."
+          },
+          {
+            "claim": "The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee.",
+            "classification": "ASSUMPTION",
+            "confidence": "low",
+            "evidence_id": "A10",
+            "limitations": "No suppliers, media plan, production scope or internal time costs have been quoted.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "A10",
+            "title": "Assumed implementation investment",
+            "unit": "GBP",
+            "validation_step": "Obtain a costed delivery plan and separate one-off, variable and internal costs.",
+            "value": 85000
+          },
+          {
+            "claim": "Built for the work of living is an illustrative creative territory for FIELDWORK.",
+            "classification": "CREATIVE ILLUSTRATION",
+            "confidence": "illustrative",
+            "evidence_id": "C1",
+            "limitations": "The territory has not been tested with a founder, customer or legal reviewer.",
+            "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+            "observed_at": "2026-10-14",
+            "publisher": "Narratiive fictional fixture",
+            "source_id": "C1",
+            "title": "Creative territory illustration",
+            "validation_step": "Test strategic fit, distinctiveness, comprehension and trademark risk before selection."
+          }
+        ]
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "C1"
+      ],
+      "layout_type": "source_register",
+      "slide_no": 19,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "A7 [ASSUMPTION]: A staged 12-month validation programme is affordable and resourced.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Every material claim resolves to an explicit evidence class and validation step.",
+      "title": "Evidence and assumptions ledger",
+      "visual_treatment": "source_register"
+    },
+    {
+      "body": "Before client release, Matt approves the exact artefact. The founder then decides whether to fund 12 weeks of verification against explicit stop and scale gates.",
+      "citation_labels": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "C1"
+      ],
+      "claim_status": "HUMAN DECISION REQUIRED",
+      "content_data": {
+        "chapter_label": "DECISION / NEXT COMMITMENT",
+        "lines": [
+          "Fund proof,",
+          "not scale.",
+          "Release investment only as evidence improves."
+        ],
+        "next_step": "Verify the baseline, cost the 12-week proof phase and approve only the first decision gate."
+      },
+      "evidence_refs": [
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "A8",
+        "A9",
+        "A10",
+        "C1"
+      ],
+      "layout_type": "closing_mandate",
+      "slide_no": 20,
+      "source_notes": [
+        "A1 [ASSUMPTION]: FIELDWORK receives 600,000 ecommerce sessions per year.",
+        "A2 [ASSUMPTION]: FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+        "A3 [ASSUMPTION]: FIELDWORK has a £100 average order value before returns and discounts.",
+        "A4 [ASSUMPTION]: The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+        "A5 [ASSUMPTION]: FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+        "A6 [ASSUMPTION]: A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+        "A7 [ASSUMPTION]: A staged 12-month validation programme is affordable and resourced.",
+        "A8 [ASSUMPTION]: Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+        "A9 [ASSUMPTION]: The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+        "A10 [ASSUMPTION]: The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee.",
+        "C1 [CREATIVE ILLUSTRATION]: Built for the work of living is an illustrative creative territory for FIELDWORK."
+      ],
+      "takeaway": "Fund a bounded proof phase, not the £690,000 outcome.",
+      "title": "The founder decision",
+      "visual_treatment": "closing_mandate"
+    }
+  ],
+  "source_blueprint_id": "fieldwork-fictional-growth-blueprint-demo-v2",
+  "source_blueprint_version": 2,
+  "source_checksum": "f312dfe829163989d8cc5645d4008c496dedb115658cd15122d0f7f3a98120c7",
+  "specification_id": "fieldwork-fictional-supervised-demo-presentation-v2",
+  "status": "ready_for_production",
+  "strategic_source_unchanged": true,
+  "template_source": "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; Issue #473 founder-quality controls; locked production canon unchanged.",
+  "title": "Narratiive Growth Blueprint - FIELDWORK",
+  "workspace_id": "demo-fieldwork"
+}

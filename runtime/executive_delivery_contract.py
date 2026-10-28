@@ -12,11 +12,14 @@ VALID_EXECUTIVE_MESSAGE_KINDS = {"brief", "escalation"}
 
 def _reject_retired_language(*texts: str) -> None:
     policy = TerminologyPolicy.from_path()
+    # Executive material can contain evidence-backed client and initiative names.
+    # Customer aliases are rendered by their producing services; this boundary
+    # only rejects vocabulary that is retired in every context.
     violations = policy.scan_many(texts)
     if not violations:
         return
     terms = ", ".join(dict.fromkeys(violation.term for violation in violations))
-    raise ValueError(f"Executive message contains retired terminology: {terms}")
+    raise ValueError(f"Executive message contains non-canonical customer-facing terminology: {terms}")
 
 
 @dataclass(frozen=True, slots=True)

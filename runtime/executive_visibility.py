@@ -6,7 +6,9 @@ from runtime.inbound_leads import InboundLead
 from runtime.models import WorkflowState
 
 
-HIDDEN_DISPOSITIONS = frozenset({"suppressed", "test", "archived"})
+HIDDEN_DISPOSITIONS = frozenset(
+    {"suppressed", "test", "archived", "spam", "internal", "duplicate", "deferred"}
+)
 NO_ACTION_LEAD_STATUSES = frozenset({"complete", "completed", "closed", "won", "lost", "disqualified"})
 
 

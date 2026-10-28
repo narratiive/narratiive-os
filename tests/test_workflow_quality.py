@@ -15,6 +15,7 @@ from runtime.workflow_quality import (
     delivery_preparation_quality_gate,
     follow_up_preparation_quality_gate,
     discovery_preparation_quality_gate,
+    fieldwork_founder_argument_quality_gate,
     growth_blueprint_quality_gate,
     growth_sprint_proposal_quality_gate,
     research_evidence_quality_gate,
@@ -216,8 +217,8 @@ def proposal_output() -> dict:
             {"workstream": "Positioning", "questions": ["Which defensible difference can organise the growth story clearly?"]},
         ],
         "expected_growth_blueprint_outputs": ["Market and category diagnosis", "Audience definition", "Growth barriers", "Positioning", "Narrative platform"],
-        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Growth Sprint range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
-        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend a focused Growth Sprint spanning audience, category and positioning research, culminating in the Narratiive Growth Blueprint. The attached scope remains a draft for review, including timing, dependencies and a proposed investment that requires final human approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
+        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Fieldwork range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
+        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend a focused Fieldwork engagement spanning audience, category and positioning research, culminating in the Narratiive Growth Blueprint. The attached scope remains a draft for review, including timing, dependencies and a proposed investment that requires final human approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
         "assumptions_and_dependencies": ["Access to existing customer evidence", "Availability of commercial stakeholders for interviews"],
         "evidence_lineage": [
             {"claim": "Demand quality is urgent.", "classification": "fact", "source_refs": ["meeting:notes:1"]},
@@ -307,6 +308,105 @@ def growth_blueprint_output() -> dict:
             {"claim": "An urgent audience should lead.", "classification": "hypothesis", "source_refs": ["ev-1"]},
             {"claim": "Earlier proof may improve confidence.", "classification": "hypothesis", "source_refs": ["ev-2"]},
         ],
+        "recommendation": "advance",
+        "external_action_taken": False,
+    }
+
+
+def fieldwork_founder_argument_output() -> dict:
+    evidence = [
+        {
+            "claim": f"Rave evidence claim {index} supports a distinct part of the internal argument.",
+            "classification": classification,
+            "source_refs": [f"rave-{index}"],
+        }
+        for index, classification in enumerate(
+            (
+                "VERIFIED EXTERNAL",
+                "VERIFIED EXTERNAL",
+                "MODELLED",
+                "ASSUMPTION",
+                "VERIFIED EXTERNAL",
+            ),
+            start=1,
+        )
+    ]
+    move_names = (
+        "current_position",
+        "commercial_opportunity",
+        "growth_levers",
+        "audience_opportunity",
+        "strategic_direction",
+    )
+    move_arguments = (
+        "Rave already owns approachable coffee, recurring purchase routes and broad product choice, but customers do not yet see those assets as one connected journey.",
+        "The twelve month opportunity comes from improving qualified entry, the first purchase decision, early repeat behaviour and progression into greater value.",
+        "Four controllable levers connect the commercial model: entry at the upgrade moment, simpler choice, useful replenishment and visible discovery after trust develops.",
+        "People replacing supermarket coffee form the priority hypothesis because their active decision can connect acquisition intent with repeat purchase and guided exploration.",
+        "Rave should organise the business around owning the upgrade moment, then validate each part of that progression before increasing acquisition investment.",
+    )
+    move_consequences = (
+        "Existing assets can create more value when customers understand how they fit together.",
+        "The model focuses management on measurable customer behaviour rather than an invented revenue promise.",
+        "Sequencing these levers shows which operational and marketing work deserves priority.",
+        "A moment-based audience gives acquisition and product journeys one commercially useful focus.",
+        "A single direction aligns customer entry, retention evidence and future investment decisions.",
+    )
+    founder_decisions = (
+        "Confirm whether the disconnected journey describes the current commercial constraint.",
+        "Approve the internal data required to replace every open model variable.",
+        "Choose which lever should receive the first bounded commercial test.",
+        "Authorise primary research to validate or reject the Upgrader hypothesis.",
+        "Approve or reject owning the upgrade as the experimental strategic direction.",
+    )
+    moves = [
+        {
+            "move": move,
+            "headline": f"Rave decision {index} has a distinct commercial role",
+            "argument": move_arguments[index - 1],
+            "commercial_consequence": move_consequences[index - 1],
+            "founder_decision": founder_decisions[index - 1],
+            "evidence_refs": [f"rave-{index}"],
+        }
+        for index, move in enumerate(move_names, start=1)
+    ]
+    return {
+        "founder_argument": {
+            "client_name": "Rave",
+            "central_argument": "Rave can turn its accessible speciality range into a clearer customer progression by concentrating on the upgrade moment, reducing uncertainty at the first choice and proving which steps increase repeat purchase before scaling acquisition or making an unsupported revenue promise.",
+            "business_opportunity": {
+                "statement": "The business opportunity is to convert more first orders into retained relationships.",
+                "growth_mechanism": "Improve qualified entry, first choice, early repeat and customer progression.",
+                "commercial_consequence": "Better retention and progression can increase contribution without assuming an unsupported revenue forecast.",
+                "evidence_refs": ["rave-1", "rave-3"],
+                "validation_required": "Rave must supply channel conversion, repeat and contribution baselines.",
+            },
+            "audience_opportunity": {
+                "priority_audience": "People ready to replace supermarket coffee with a dependable speciality choice.",
+                "commercial_moment": "Their routine or equipment has changed and the first speciality decision feels uncertain.",
+                "commercial_relevance": "This moment connects acquisition intent to a route for repeat purchase and discovery.",
+                "evidence_refs": ["rave-2", "rave-4"],
+                "validation_required": "Validate the audience with CRM cohorts and primary customer research.",
+            },
+            "strategic_recommendation": {
+                "recommendation": "Rave should own the upgrade moment and organise entry, choice, repeat and discovery as one visible progression.",
+                "why_this": "The recommendation joins Rave's existing range and recurring routes around a specific customer decision.",
+                "tradeoffs": "Rave would give less prominence to an undifferentiated catalogue and delay broad acquisition until the progression is measured.",
+                "competitor_substitution_test": "A competitor cannot reuse this recommendation without Rave's accessible range, subscription routes and documented upgrade signals.",
+                "next_decision": "Approve or reject the upgrader hypothesis for validation before any presentation is produced.",
+                "evidence_refs": ["rave-1", "rave-2", "rave-5"],
+            },
+            "commercial_growth_mechanism": {
+                "growth_equation": "Qualified entry multiplied by first purchase conversion, early repeat and value progression increases contribution.",
+                "growth_levers": ["qualified entry", "early repeat", "value progression"],
+                "known_inputs": ["Public range and subscription routes exist."],
+                "missing_inputs": ["Channel conversion, repeat, margin and cohort evidence."],
+                "scenario_not_forecast": True,
+            },
+            "evidence_basis": evidence,
+            "argument_moves": moves,
+        },
+        "evidence_lineage": evidence,
         "recommendation": "advance",
         "external_action_taken": False,
     }
@@ -509,6 +609,31 @@ class WorkflowQualityTests(unittest.TestCase):
         denied["draft_client_communication"] += " No email sent; this remains internal."
         self.assertTrue(growth_sprint_proposal_quality_gate(denied)["passed"])
 
+        legacy_name = proposal_output()
+        legacy_name["draft_client_communication"] = legacy_name["draft_client_communication"].replace(
+            "Fieldwork engagement", "Growth Sprint engagement"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_name)
+        self.assertFalse(result["passed"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
+
+        legacy_review_field = proposal_output()
+        legacy_review_field["commercial_proposal_inputs"]["investment_recommendation"] = (
+            "Within the authorised Growth Sprint range, exact figure for human approval"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_review_field)
+        self.assertFalse(result["passed"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
+
+        proper_name = proposal_output()
+        proper_name["draft_client_communication"] += " Growth Sprint Technologies remains the named client in this synthetic example."
+        self.assertTrue(
+            growth_sprint_proposal_quality_gate(
+                proper_name,
+                protected_customer_identities=("Growth Sprint Technologies",),
+            )["passed"]
+        )
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {
@@ -538,7 +663,7 @@ class WorkflowQualityTests(unittest.TestCase):
                         "content_hash": "safe-hash",
                     }],
                 },
-                "blueprint_lite": "Synthetic Blueprint Lite",
+                "blueprint_lite": "Synthetic Groundwork",
                 "commercial_context": {},
             },
         )
@@ -573,6 +698,54 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertTrue(growth_blueprint_quality_gate(output)["passed"])
         output["positioning"] = {"diagnosis": "Generic", "evidence_refs": [], "implication": "Do better", "uncertainties": []}
         self.assertFalse(growth_blueprint_quality_gate(output)["passed"])
+
+    def test_growth_blueprint_gate_fails_closed_for_every_missing_mandatory_field(self) -> None:
+        mandatory = (
+            "central_thesis",
+            "narrative_progression",
+            "editorial_judgement",
+            "contradiction_resolution",
+            "quantitative_evidence_treatment",
+            "assumption_control",
+            "completeness",
+        )
+        for field in mandatory:
+            with self.subTest(field=field):
+                output = growth_blueprint_output()
+                output.pop(field)
+                output["recommendation"] = "advance"
+                result = growth_blueprint_quality_gate(output)
+                self.assertFalse(result["passed"])
+                self.assertEqual(result["missing_mandatory_fields"], [field])
+                self.assertIn("mandatory quality fields are present", result["failed_checks"])
+
+    def test_founder_argument_gate_accepts_coherent_evidence_linked_argument(self) -> None:
+        result = fieldwork_founder_argument_quality_gate(fieldwork_founder_argument_output())
+        self.assertTrue(result["passed"], result)
+        self.assertTrue(all(axis["passed"] for axis in result["editorial_qa"].values()))
+
+    def test_founder_argument_gate_rejects_jargon_repetition_and_unsupported_precision(self) -> None:
+        output = fieldwork_founder_argument_output()
+        argument = output["founder_argument"]
+        argument["strategic_recommendation"]["recommendation"] = (
+            "Rave should unlock potential through a best-in-class holistic ecosystem with a £2m outcome."
+        )
+        argument["argument_moves"][1] = dict(argument["argument_moves"][0])
+        result = fieldwork_founder_argument_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("writing is clear and free of jargon", result["failed_checks"])
+        self.assertIn("argument does not repeat itself", result["failed_checks"])
+        self.assertIn("financial precision is supported", result["failed_checks"])
+        self.assertEqual(result["editorial_qa"]["unsupported_financial_precision"]["tokens"], ["£2"])
+
+    def test_founder_argument_gate_accepts_supported_currency_before_punctuation(self) -> None:
+        output = fieldwork_founder_argument_output()
+        output["founder_argument"]["central_argument"] += " The current public entry price is £9.95, subject to revalidation."
+        output["founder_argument"]["evidence_basis"][0]["claim"] += " The captured public entry price is £9.95."
+
+        result = fieldwork_founder_argument_quality_gate(output)
+
+        self.assertTrue(result["checks"]["financial_precision_is_supported"])
 
     def test_senior_strategist_review_requires_every_axis_and_exact_disposition(self) -> None:
         output = senior_strategist_review_output("a" * 64)

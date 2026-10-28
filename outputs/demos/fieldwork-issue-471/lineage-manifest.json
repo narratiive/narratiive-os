@@ -1,0 +1,212 @@
+{
+  "approval_status": "pending",
+  "blueprint_checksum": "f1658aaad04c4c049f3696e7ff6e314297caf01f370db3e6e3bb77b4b28cfe42",
+  "commercial_model_checksum": "5fd8480a9a5a824555e5a72faa2b460e46d40683eb1625bbcf6b3c7f4bd76440",
+  "evidence_ledger_checksum": "c944b6d85a3d2f3e16527afb401faac7ca17b63c78a40a4a12065f545fed0e61",
+  "external_action_taken": false,
+  "fictional_demonstration": true,
+  "lineage": [
+    {
+      "artifact": {
+        "artifact_id": "art-df0611dcd7dc3a8c7933e7a4c5d11256faeface46a84251bbffd491a6bbaf3ac",
+        "artifact_type": "structured_client_intake",
+        "checksum": "df0611dcd7dc3a8c7933e7a4c5d11256faeface46a84251bbffd491a6bbaf3ac",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/df0611dcd7dc3a8c7933e7a4c5d11256faeface46a84251bbffd491a6bbaf3ac.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.274399+00:00",
+      "parent_artifact_ids": [],
+      "producer": "Research Analyst",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "research_analyst",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-1f5c397e28cbaf54b44d2f094d408f69cae22acd8c9d156304a8ed1601d30201",
+        "artifact_type": "evidence_ledger",
+        "checksum": "1f5c397e28cbaf54b44d2f094d408f69cae22acd8c9d156304a8ed1601d30201",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/1f5c397e28cbaf54b44d2f094d408f69cae22acd8c9d156304a8ed1601d30201.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.275331+00:00",
+      "parent_artifact_ids": [
+        "art-df0611dcd7dc3a8c7933e7a4c5d11256faeface46a84251bbffd491a6bbaf3ac"
+      ],
+      "producer": "Research Analyst",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "research_analyst",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-61585f9f0b6c076fb6666aad03413187eed35c002998248a4a695153647cc153",
+        "artifact_type": "commercial_opportunity_model",
+        "checksum": "61585f9f0b6c076fb6666aad03413187eed35c002998248a4a695153647cc153",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/61585f9f0b6c076fb6666aad03413187eed35c002998248a4a695153647cc153.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.276439+00:00",
+      "parent_artifact_ids": [
+        "art-1f5c397e28cbaf54b44d2f094d408f69cae22acd8c9d156304a8ed1601d30201"
+      ],
+      "producer": "Strategy Director",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "strategy_director",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-67f734fdfee8916778884af5c3fba737e142354d959573582bdf862ce049ff34",
+        "artifact_type": "seven_chapter_growth_blueprint",
+        "checksum": "67f734fdfee8916778884af5c3fba737e142354d959573582bdf862ce049ff34",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/67f734fdfee8916778884af5c3fba737e142354d959573582bdf862ce049ff34.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.277431+00:00",
+      "parent_artifact_ids": [
+        "art-1f5c397e28cbaf54b44d2f094d408f69cae22acd8c9d156304a8ed1601d30201",
+        "art-61585f9f0b6c076fb6666aad03413187eed35c002998248a4a695153647cc153"
+      ],
+      "producer": "Strategy Director",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "strategy_director",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-1fb43776b13a81ca69d8098eb2459a0395f1ec201e394a984569502b9829f53e",
+        "artifact_type": "creative_territory",
+        "checksum": "1fb43776b13a81ca69d8098eb2459a0395f1ec201e394a984569502b9829f53e",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/1fb43776b13a81ca69d8098eb2459a0395f1ec201e394a984569502b9829f53e.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.278124+00:00",
+      "parent_artifact_ids": [
+        "art-67f734fdfee8916778884af5c3fba737e142354d959573582bdf862ce049ff34"
+      ],
+      "producer": "Campaign World Generator",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "campaign_world_generator",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-25e79df70a9feb1e76969433138c344b84a2174b66d2776cb658eeade380991c",
+        "artifact_type": "blueprint_presentation_specification",
+        "checksum": "25e79df70a9feb1e76969433138c344b84a2174b66d2776cb658eeade380991c",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/25e79df70a9feb1e76969433138c344b84a2174b66d2776cb658eeade380991c.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.279875+00:00",
+      "parent_artifact_ids": [
+        "art-67f734fdfee8916778884af5c3fba737e142354d959573582bdf862ce049ff34",
+        "art-1fb43776b13a81ca69d8098eb2459a0395f1ec201e394a984569502b9829f53e"
+      ],
+      "producer": "Creative Director",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "creative_director",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    },
+    {
+      "artifact": {
+        "artifact_id": "art-54ba57ca1ab431c42a69867589cc2a606057253fc881edfce2da4b65c49105a5",
+        "artifact_type": "independent_quality_review",
+        "checksum": "54ba57ca1ab431c42a69867589cc2a606057253fc881edfce2da4b65c49105a5",
+        "location": ".runtime/issue-471-fieldwork/artifacts/content/54ba57ca1ab431c42a69867589cc2a606057253fc881edfce2da4b65c49105a5.json",
+        "metadata": {
+          "approval_required": true,
+          "fictional_demonstration": true,
+          "workspace_id": "demo-fieldwork"
+        }
+      },
+      "created_at": "2026-10-14T11:48:27.280795+00:00",
+      "parent_artifact_ids": [
+        "art-25e79df70a9feb1e76969433138c344b84a2174b66d2776cb658eeade380991c"
+      ],
+      "producer": "Quality Reviewer",
+      "run_id": "issue-471-fieldwork-v1",
+      "stage_id": "quality_reviewer",
+      "version": 1,
+      "workspace_id": "demo-fieldwork"
+    }
+  ],
+  "package_id": "fieldwork-fictional-growth-blueprint-demo-v1",
+  "presentation_specification_checksum": "c23d1f6e9795d6ef68df017be4ade7dbdc3d67e337e3f451571fb3fd1cc06109",
+  "qa_report_checksum": "983f4761a03c451811cfdbbe88aacfce67350f29c42557ad6893fd0618ab8eb2",
+  "release_authorised": false,
+  "rendered_deliverable": {
+    "approval_status": "pending",
+    "client_id": "fieldwork-fictional",
+    "created_at": "2026-10-14T11:48:27.281499Z",
+    "deliverable_id": "fieldwork-fictional-supervised-blueprint-demo-v1",
+    "external_action_taken": false,
+    "pdf_path": "outputs/demos/fieldwork-issue-471/fieldwork-fictional-Growth-Blueprint-v1.pdf",
+    "pptx_path": "outputs/demos/fieldwork-issue-471/fieldwork-fictional-Growth-Blueprint-v1.pptx",
+    "source_blueprint_id": "fieldwork-fictional-growth-blueprint-demo-v1",
+    "source_blueprint_version": 1,
+    "specification_checksum": "c23d1f6e9795d6ef68df017be4ade7dbdc3d67e337e3f451571fb3fd1cc06109",
+    "status": "awaiting_review",
+    "template_source": "Existing Narratiive local Artifact Tool renderer. Seven-chapter Issue #471 demonstration profile; locked production canon unchanged.",
+    "visual_qa": {
+      "checks": {
+        "claim_status_is_visible": true,
+        "conclusion_led_headlines": true,
+        "editorial_arc_is_complete": true,
+        "layout_validation": true,
+        "locked_canon_is_declared_unchanged": true,
+        "mandatory_opening_five_are_distinct": true,
+        "no_overflow_or_overlap": true,
+        "no_visible_machine_runtime_artefacts": true,
+        "package_integrity": true,
+        "pdf_exists": true,
+        "pptx_exists": true,
+        "quantified_commercial_model_present": true,
+        "readable_citations_present": true,
+        "rendered_slide_review_passed": true,
+        "seven_chapter_demonstration_profile_is_complete": true,
+        "slide_count": true,
+        "source_labels_present": true,
+        "source_provenance_retained": true,
+        "source_register_present": true,
+        "strategic_source_unchanged": true,
+        "visual_forms_are_intentional": true
+      },
+      "findings": [],
+      "status": "passed"
+    },
+    "workspace_id": "demo-fieldwork"
+  },
+  "source_intake_checksum": "c432118a6ff141a0f11fb103fd95cc9fcdbf80b20fc2872d10b29c859a303770",
+  "status": "awaiting_human_approval"
+}

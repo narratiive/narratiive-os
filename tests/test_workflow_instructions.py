@@ -77,6 +77,22 @@ class WorkflowInstructionTests(unittest.TestCase):
             instruction,
         )
 
+    def test_experimental_founder_argument_contract_separates_reasoning_from_slides(self) -> None:
+        instruction = workflow_instruction(
+            "fieldwork_founder_argument_experiment",
+            "develop_founder_argument",
+            ("founder_argument", "evidence_lineage", "recommendation"),
+        )
+
+        self.assertIn("one commercially compelling argument", instruction)
+        self.assertIn("exactly five ordered objects", instruction)
+        self.assertIn("reasoning moves, not slide-production instructions", instruction)
+        self.assertIn("scenario is not a forecast", instruction)
+        self.assertIn("must not trigger presentation production", instruction)
+        self.assertIn("VERIFIED CLIENT", instruction)
+        self.assertIn("a list of known_inputs", instruction)
+        self.assertIn("a list of missing_inputs", instruction)
+
     def test_blueprint_director_contract_prioritises_editorial_product(self) -> None:
         instruction = workflow_instruction(
             "strategy_thesis_to_growth_blueprint",
