@@ -1,0 +1,14 @@
+{
+  "brandVisuals": true,
+  "pdf": "outputs/demos/fieldwork-issue-473/fieldwork-fictional-Growth-Blueprint-v2.pdf",
+  "pptx": "outputs/demos/fieldwork-issue-473/fieldwork-fictional-Growth-Blueprint-v2.pptx",
+  "slideCount": 20,
+  "validation": "outputs/demos/fieldwork-issue-473/presentation-validation.json",
+  "visualManifest": [
+    {
+      "asset": "built-for-the-work-of-living-v1.png",
+      "role": "creative illustration",
+      "slide": 5
+    }
+  ]
+}

@@ -1,0 +1,267 @@
+{
+  "evidence_lineage": [
+    {
+      "claim": "KatKin raised \u00a337.4 million for UK expansion, DTC growth, retail and new markets, with reported claims of 2% UK share, 100m+ meals delivered and 150 staff.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K1"
+      ]
+    },
+    {
+      "claim": "Current trial and subscription pricing is \u00a360.96\u2013\u00a379.03 per 28-day plan plus a \u00a32.99 delivery fee, verifying price mechanics only.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K2"
+      ]
+    },
+    {
+      "claim": "KatKin's heat-damage study reports comparative lysine and AGE findings and claims peer review, but the independent journal record was not located and needs direct verification.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K3"
+      ]
+    },
+    {
+      "claim": "KatKin positions itself as an uncompromising, science-led, cat-only brand; this verifies intended positioning, not customer recognition.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K4"
+      ]
+    },
+    {
+      "claim": "KatKin runs in-home taste panels and ongoing product testing, supporting proprietary learning capability but not independent scientific authority.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K5"
+      ]
+    },
+    {
+      "claim": "Untamed offers comparable convenience, flexible delivery and whole-meat recipes with a claimed 50 million meals delivered, showing these features are not unique to KatKin.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K6"
+      ]
+    },
+    {
+      "claim": "The UK pet-food market is estimated at about \u00a34.1 billion in 2025, but this cannot establish the addressable fresh-cat-food opportunity.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "K7"
+      ]
+    },
+    {
+      "claim": "The highest-value audience may be committed cat parents seeking evidence to justify price and operational change; no first-party segment data verifies this.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "K8"
+      ]
+    },
+    {
+      "claim": "A visible proof ladder from evidence to feeding confidence to observed outcome could improve trial conversion, transition completion and retention; this is a commercial mechanism, not a forecast.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "K9"
+      ]
+    }
+  ],
+  "founder_argument": {
+    "argument_moves": [
+      {
+        "argument": "KatKin has raised significant growth capital and reports scale claims via trade press, while first-party conversion, transition and retention data remain unavailable.",
+        "commercial_consequence": "Expansion spend risks being deployed without visibility into which growth lever is actually weak.",
+        "evidence_refs": [
+          "K1"
+        ],
+        "founder_decision": "Decide whether to commission baseline measurement of trial, transition and retention before scaling spend.",
+        "headline": "Capital and scale claims exist, but customer economics don't.",
+        "move": "current_position"
+      },
+      {
+        "argument": "Competitors already match convenience, flexibility and whole-meat claims; KatKin's comparative study and taste-panel capability are not yet matched, but currently function as campaign proof rather than guidance at the point a parent decides to trial, transition or stay.",
+        "commercial_consequence": "Without a decision system, the scientific advantage is invisible exactly when the cat parent weighs commitment to price and change.",
+        "evidence_refs": [
+          "K3",
+          "K5",
+          "K6"
+        ],
+        "founder_decision": "Decide whether to convert existing research assets into explicit customer-facing decision content.",
+        "headline": "Science is KatKin's hardest-to-copy asset, but it isn't organised as a decision aid.",
+        "move": "commercial_opportunity"
+      },
+      {
+        "argument": "Qualified trial conversion, transition completion, early retained feeding and retail-to-owned conversion together form the growth path; public evidence confirms their existence as mechanisms but not their current performance.",
+        "commercial_consequence": "Prioritising spend without knowing which lever underperforms risks reinforcing a lever that is not the real constraint.",
+        "evidence_refs": [
+          "K2",
+          "K9"
+        ],
+        "founder_decision": "Decide which lever to instrument and measure first; transition completion is the recommended starting point since it is where proof must do practical work.",
+        "headline": "Four levers compound retained feeders; none has a measured baseline.",
+        "move": "growth_levers"
+      },
+      {
+        "argument": "The audience most likely to value evidence-based reassurance is the committed cat parent justifying price and operational change; this is where science needs to resolve doubt, not just attract attention.",
+        "commercial_consequence": "If this moment is left unaddressed, acquisition spend produces trials that lapse before retention is reached.",
+        "evidence_refs": [
+          "K2",
+          "K8"
+        ],
+        "founder_decision": "Decide whether to validate this audience assumption with first-party cohort research before building the decision system around it.",
+        "headline": "The highest-value moment is the trial-to-subscription transition, not acquisition.",
+        "move": "audience_opportunity"
+      },
+      {
+        "argument": "Combining available capital, differentiated science and an unaddressed transition moment points to building a structured proof-to-decision journey as the next commercial investment, ahead of broader-reach marketing.",
+        "commercial_consequence": "This creates a harder-to-copy growth mechanism rather than repeating claims competitors can match.",
+        "evidence_refs": [
+          "K1",
+          "K3",
+          "K9"
+        ],
+        "founder_decision": "Decide next: commission baseline data and independent verification of K3, or proceed to broader marketing scale without them.",
+        "headline": "Build the decision system before scaling acquisition further.",
+        "move": "strategic_direction"
+      }
+    ],
+    "audience_opportunity": {
+      "commercial_moment": "The decision window between completing a trial and committing to ongoing subscription, when price and transition friction become concrete.",
+      "commercial_relevance": "This is the moment science must function as a decision aid rather than a brand claim, or trials will lapse before retention is reached.",
+      "evidence_refs": [
+        "K2",
+        "K8",
+        "K9"
+      ],
+      "priority_audience": "Committed cat parents weighing whether the price and operational change of frozen fresh food (freezer space, defrost routine) is justified by evidence. This is an assumption, not a verified segment, since no first-party cohort data exists.",
+      "validation_required": [
+        "cohort-level trial-to-subscription conversion data",
+        "segment-level cancellation reasons",
+        "qualitative research confirming this audience priority"
+      ]
+    },
+    "business_opportunity": {
+      "commercial_consequence": "Without this, newly raised capital risks buying volume that competitors with similar convenience and pricing can also attract, rather than building a durable retained-feeder base.",
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K5",
+        "K6",
+        "K9"
+      ],
+      "growth_mechanism": "A visible proof ladder \u2014 evidence, feeding confidence, observed outcome \u2014 applied at each growth lever could lift conversion and retention. This is a modelled mechanism, not a forecast, since no baseline conversion data exists.",
+      "statement": "KatKin can grow by converting scientific evidence into a structured decision system operating across trial, transition and retention, rather than relying on claims alone to hold off copyable competitors.",
+      "validation_required": [
+        "first-party trial conversion and transition completion data",
+        "cancellation-reason data",
+        "independent verification of the K3 study",
+        "retail-to-DTC conversion data"
+      ]
+    },
+    "central_argument": "KatKin's real difference is scientific ambition, but that ambition currently lives in marketing claims, not in the customer's path from trial to committed fresh feeding. Competitors already match convenience and ingredient claims. The commercial opportunity is to turn KatKin's science into a visible decision system that helps a committed cat parent justify trial, manage the transition, and recognise that fresh feeding is working \u2014 before further acquisition spend is committed.",
+    "client_name": "KatKin",
+    "commercial_growth_mechanism": {
+      "growth_equation": "qualified trial conversion \u00d7 transition completion \u00d7 early retained feeding \u00d7 retail-to-owned conversion = retained fresh feeders (structural logic, not a numeric forecast)",
+      "growth_levers": [
+        "qualified trial conversion",
+        "transition completion",
+        "early retained feeding",
+        "retail-to-owned relationship conversion"
+      ],
+      "known_inputs": [
+        "current trial and subscription pricing (K2)",
+        "claimed scale metrics: 2% UK share, 100m+ meals delivered, 150 staff (K1)",
+        "existence of a comparative heat-damage study (K3)",
+        "existence of an in-home taste-panel capability (K5)",
+        "competitor convenience and pricing benchmark (K6)"
+      ],
+      "missing_inputs": [
+        "trial conversion rate",
+        "transition completion rate",
+        "retention and churn rate",
+        "retail-to-DTC conversion rate",
+        "customer acquisition cost",
+        "margin per subscriber"
+      ],
+      "scenario_not_forecast": true
+    },
+    "evidence_basis": [
+      {
+        "claim": "KatKin raised \u00a337.4 million for UK expansion and reports 2% UK cat food share, 100m+ meals delivered and 150 staff, as company claims reported by trade press.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "K1"
+        ]
+      },
+      {
+        "claim": "A standard 28-day fresh-food plan costs \u00a360.96 to \u00a379.03 plus a \u00a32.99 delivery fee at capture; this verifies price mechanics, not margin or willingness to pay.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "K2"
+        ]
+      },
+      {
+        "claim": "KatKin's heat-damage study reports lower AGE levels and higher available lysine than compared wet foods and says it passed peer review, but the underlying independent journal record was not located in this research pass.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "K3"
+        ]
+      },
+      {
+        "claim": "KatKin runs in-home taste panels and ongoing product testing, supporting a proprietary learning capability but not proving health outcomes.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "K5"
+        ]
+      },
+      {
+        "claim": "Untamed offers low-cost trial, flexible delivery, whole-meat recipes and claims 50 million meals delivered, showing convenience and ingredient claims are not unique to KatKin.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "K6"
+        ]
+      },
+      {
+        "claim": "The highest-value audience may be committed cat parents seeking evidence strong enough to justify price and operational change; no first-party segment data confirms this.",
+        "classification": "ASSUMPTION",
+        "source_refs": [
+          "K8"
+        ]
+      },
+      {
+        "claim": "A visible proof ladder from evidence to feeding confidence to observed outcome could improve conversion, transition and retention; this is a commercial mechanism, not a forecast.",
+        "classification": "ASSUMPTION",
+        "source_refs": [
+          "K9"
+        ]
+      }
+    ],
+    "strategic_recommendation": {
+      "competitor_substitution_test": "A competitor could copy the format of a decision system, but cannot easily copy KatKin's claimed proprietary testing and comparative research unless they build equivalent capability and verified science, making this harder to substitute than claims-based advertising alone \u2014 provided K3 is independently verified.",
+      "evidence_refs": [
+        "K1",
+        "K3",
+        "K5",
+        "K6"
+      ],
+      "next_decision": "Decide whether to commission first-party conversion and retention baselines and independent verification of K3 before committing production budget to the decision system.",
+      "recommendation": "Build and test a customer-facing decision system that translates KatKin's scientific evidence into explicit guidance at trial, transition and early feeding stages, before committing further acquisition or brand spend.",
+      "tradeoffs": "This diverts investment from pure acquisition marketing and depends on first-party cohort data that does not yet exist. It also requires independent verification of the K3 study before it can carry the weight of a decision system.",
+      "why_this": "Growth capital is now available and competitors already match convenience and ingredient claims; the one asset left to differentiate on is science, but it currently exists as campaign proof, not customer-journey infrastructure."
+    }
+  },
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "provider_message_id": "msg_011CgAPmtqcDQewkBmvd2ZKh",
+  "recommendation": "advance",
+  "stop_reason": "end_turn",
+  "verified": true,
+  "work_product": "{\"founder_argument\":{\"client_name\":\"KatKin\",\"central_argument\":\"KatKin's real difference is scientific ambition, but that ambition currently lives in marketing claims, not in the customer's path from trial to committed fresh feeding. Competitors already match convenience and ingredient claims. The commercial opportunity is to turn KatKin's science into a visible decision system that helps a committed cat parent justify trial, manage the transition, and recognise that fresh feeding is working \u2014 before further acquisition spend is committed.\",\"business_opportunity\":{\"statement\":\"KatKin can grow by converting scientific evidence into a structured decision system operating across trial, transition and retention, rather than relying on claims alone to hold off copyable competitors.\",\"growth_mechanism\":\"A visible proof ladder \u2014 evidence, feeding confidence, observed outcome \u2014 applied at each growth lever could lift conversion and retention. This is a modelled mechanism, not a forecast, since no baseline conversion data exists.\",\"commercial_consequence\":\"Without this, newly raised capital risks buying volume that competitors with similar convenience and pricing can also attract, rather than building a durable retained-feeder base.\",\"evidence_refs\":[\"K1\",\"K3\",\"K5\",\"K6\",\"K9\"],\"validation_required\":[\"first-party trial conversion and transition completion data\",\"cancellation-reason data\",\"independent verification of the K3 study\",\"retail-to-DTC conversion data\"]},\"audience_opportunity\":{\"priority_audience\":\"Committed cat parents weighing whether the price and operational change of frozen fresh food (freezer space, defrost routine) is justified by evidence. This is an assumption, not a verified segment, since no first-party cohort data exists.\",\"commercial_moment\":\"The decision window between completing a trial and committing to ongoing subscription, when price and transition friction become concrete.\",\"commercial_relevance\":\"This is the moment science must function as a decision aid rather than a brand claim, or trials will lapse before retention is reached.\",\"evidence_refs\":[\"K2\",\"K8\",\"K9\"],\"validation_required\":[\"cohort-level trial-to-subscription conversion data\",\"segment-level cancellation reasons\",\"qualitative research confirming this audience priority\"]},\"strategic_recommendation\":{\"recommendation\":\"Build and test a customer-facing decision system that translates KatKin's scientific evidence into explicit guidance at trial, transition and early feeding stages, before committing further acquisition or brand spend.\",\"why_this\":\"Growth capital is now available and competitors already match convenience and ingredient claims; the one asset left to differentiate on is science, but it currently exists as campaign proof, not customer-journey infrastructure.\",\"tradeoffs\":\"This diverts investment from pure acquisition marketing and depends on first-party cohort data that does not yet exist. It also requires independent verification of the K3 study before it can carry the weight of a decision system.\",\"competitor_substitution_test\":\"A competitor could copy the format of a decision system, but cannot easily copy KatKin's claimed proprietary testing and comparative research unless they build equivalent capability and verified science, making this harder to substitute than claims-based advertising alone \u2014 provided K3 is independently verified.\",\"next_decision\":\"Decide whether to commission first-party conversion and retention baselines and independent verification of K3 before committing production budget to the decision system.\",\"evidence_refs\":[\"K1\",\"K3\",\"K5\",\"K6\"]},\"commercial_growth_mechanism\":{\"growth_equation\":\"qualified trial conversion \u00d7 transition completion \u00d7 early retained feeding \u00d7 retail-to-owned conversion = retained fresh feeders (structural logic, not a numeric forecast)\",\"growth_levers\":[\"qualified trial conversion\",\"transition completion\",\"early retained feeding\",\"retail-to-owned relationship conversion\"],\"known_inputs\":[\"current trial and subscription pricing (K2)\",\"claimed scale metrics: 2% UK share, 100m+ meals delivered, 150 staff (K1)\",\"existence of a comparative heat-damage study (K3)\",\"existence of an in-home taste-panel capability (K5)\",\"competitor convenience and pricing benchmark (K6)\"],\"missing_inputs\":[\"trial conversion rate\",\"transition completion rate\",\"retention and churn rate\",\"retail-to-DTC conversion rate\",\"customer acquisition cost\",\"margin per subscriber\"],\"scenario_not_forecast\":true},\"evidence_basis\":[{\"claim\":\"KatKin raised \u00a337.4 million for UK expansion and reports 2% UK cat food share, 100m+ meals delivered and 150 staff, as company claims reported by trade press.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K1\"]},{\"claim\":\"A standard 28-day fresh-food plan costs \u00a360.96 to \u00a379.03 plus a \u00a32.99 delivery fee at capture; this verifies price mechanics, not margin or willingness to pay.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K2\"]},{\"claim\":\"KatKin's heat-damage study reports lower AGE levels and higher available lysine than compared wet foods and says it passed peer review, but the underlying independent journal record was not located in this research pass.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K3\"]},{\"claim\":\"KatKin runs in-home taste panels and ongoing product testing, supporting a proprietary learning capability but not proving health outcomes.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K5\"]},{\"claim\":\"Untamed offers low-cost trial, flexible delivery, whole-meat recipes and claims 50 million meals delivered, showing convenience and ingredient claims are not unique to KatKin.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K6\"]},{\"claim\":\"The highest-value audience may be committed cat parents seeking evidence strong enough to justify price and operational change; no first-party segment data confirms this.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"K8\"]},{\"claim\":\"A visible proof ladder from evidence to feeding confidence to observed outcome could improve conversion, transition and retention; this is a commercial mechanism, not a forecast.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"K9\"]}],\"argument_moves\":[{\"move\":\"current_position\",\"headline\":\"Capital and scale claims exist, but customer economics don't.\",\"argument\":\"KatKin has raised significant growth capital and reports scale claims via trade press, while first-party conversion, transition and retention data remain unavailable.\",\"commercial_consequence\":\"Expansion spend risks being deployed without visibility into which growth lever is actually weak.\",\"founder_decision\":\"Decide whether to commission baseline measurement of trial, transition and retention before scaling spend.\",\"evidence_refs\":[\"K1\"]},{\"move\":\"commercial_opportunity\",\"headline\":\"Science is KatKin's hardest-to-copy asset, but it isn't organised as a decision aid.\",\"argument\":\"Competitors already match convenience, flexibility and whole-meat claims; KatKin's comparative study and taste-panel capability are not yet matched, but currently function as campaign proof rather than guidance at the point a parent decides to trial, transition or stay.\",\"commercial_consequence\":\"Without a decision system, the scientific advantage is invisible exactly when the cat parent weighs commitment to price and change.\",\"founder_decision\":\"Decide whether to convert existing research assets into explicit customer-facing decision content.\",\"evidence_refs\":[\"K3\",\"K5\",\"K6\"]},{\"move\":\"growth_levers\",\"headline\":\"Four levers compound retained feeders; none has a measured baseline.\",\"argument\":\"Qualified trial conversion, transition completion, early retained feeding and retail-to-owned conversion together form the growth path; public evidence confirms their existence as mechanisms but not their current performance.\",\"commercial_consequence\":\"Prioritising spend without knowing which lever underperforms risks reinforcing a lever that is not the real constraint.\",\"founder_decision\":\"Decide which lever to instrument and measure first; transition completion is the recommended starting point since it is where proof must do practical work.\",\"evidence_refs\":[\"K2\",\"K9\"]},{\"move\":\"audience_opportunity\",\"headline\":\"The highest-value moment is the trial-to-subscription transition, not acquisition.\",\"argument\":\"The audience most likely to value evidence-based reassurance is the committed cat parent justifying price and operational change; this is where science needs to resolve doubt, not just attract attention.\",\"commercial_consequence\":\"If this moment is left unaddressed, acquisition spend produces trials that lapse before retention is reached.\",\"founder_decision\":\"Decide whether to validate this audience assumption with first-party cohort research before building the decision system around it.\",\"evidence_refs\":[\"K2\",\"K8\"]},{\"move\":\"strategic_direction\",\"headline\":\"Build the decision system before scaling acquisition further.\",\"argument\":\"Combining available capital, differentiated science and an unaddressed transition moment points to building a structured proof-to-decision journey as the next commercial investment, ahead of broader-reach marketing.\",\"commercial_consequence\":\"This creates a harder-to-copy growth mechanism rather than repeating claims competitors can match.\",\"founder_decision\":\"Decide next: commission baseline data and independent verification of K3, or proceed to broader marketing scale without them.\",\"evidence_refs\":[\"K1\",\"K3\",\"K9\"]}]},\"evidence_lineage\":[{\"claim\":\"KatKin raised \u00a337.4 million for UK expansion, DTC growth, retail and new markets, with reported claims of 2% UK share, 100m+ meals delivered and 150 staff.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K1\"]},{\"claim\":\"Current trial and subscription pricing is \u00a360.96\u2013\u00a379.03 per 28-day plan plus a \u00a32.99 delivery fee, verifying price mechanics only.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K2\"]},{\"claim\":\"KatKin's heat-damage study reports comparative lysine and AGE findings and claims peer review, but the independent journal record was not located and needs direct verification.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K3\"]},{\"claim\":\"KatKin positions itself as an uncompromising, science-led, cat-only brand; this verifies intended positioning, not customer recognition.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K4\"]},{\"claim\":\"KatKin runs in-home taste panels and ongoing product testing, supporting proprietary learning capability but not independent scientific authority.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K5\"]},{\"claim\":\"Untamed offers comparable convenience, flexible delivery and whole-meat recipes with a claimed 50 million meals delivered, showing these features are not unique to KatKin.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K6\"]},{\"claim\":\"The UK pet-food market is estimated at about \u00a34.1 billion in 2025, but this cannot establish the addressable fresh-cat-food opportunity.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"K7\"]},{\"claim\":\"The highest-value audience may be committed cat parents seeking evidence to justify price and operational change; no first-party segment data verifies this.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"K8\"]},{\"claim\":\"A visible proof ladder from evidence to feeding confidence to observed outcome could improve trial conversion, transition completion and retention; this is a commercial mechanism, not a forecast.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"K9\"]}],\"recommendation\":\"advance\"}",
+  "worker_execution": {
+    "attempt": 1,
+    "capability": "strategic_reasoning",
+    "policy_id": "deterministic-default",
+    "provider": "anthropic",
+    "selection_reason": "only_eligible_worker",
+    "side_effect_classification": "preparation",
+    "worker_id": "claude-anthropic"
+  }
+}

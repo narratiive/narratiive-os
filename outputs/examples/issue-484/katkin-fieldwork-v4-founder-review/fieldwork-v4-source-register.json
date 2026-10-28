@@ -1,0 +1,204 @@
+{
+  "entries": [
+    {
+      "source_id": "K1",
+      "title": "The Grocer reported in December 2025 that KatKin raised \u00a337.4 million in",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://www.thegrocer.co.uk/news/catfood-challenger-katkin-secures-37m-scale-up-investment/713118.article",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K1"
+      ],
+      "applies_to_pages": [
+        1,
+        5,
+        8,
+        30
+      ]
+    },
+    {
+      "source_id": "K2",
+      "title": "KatKin's current help centre states that a standard 28-day fresh-food pl",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://help.katkin.com/en/articles/431149-how-the-subscription-works",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K2"
+      ],
+      "applies_to_pages": [
+        2,
+        3,
+        4,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        24,
+        25,
+        26,
+        28
+      ]
+    },
+    {
+      "source_id": "K3",
+      "title": "KatKin's July 2026 company article says its 26-product heat-damage study",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://www.katkin.com/articles/katkins-heat-damage-study",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K3"
+      ],
+      "applies_to_pages": [
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        30
+      ]
+    },
+    {
+      "source_id": "K4",
+      "title": "KatKin presents itself as an uncompromising cat-health brand built aroun",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://www.katkin.com/about-us",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K4"
+      ],
+      "applies_to_pages": []
+    },
+    {
+      "source_id": "K5",
+      "title": "KatKin describes in-home taste panels and ongoing product testing, while",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://www.katkin.com/articles/in-home-taste-panel-how-we-learn-what-cats-really-enjoy",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K5"
+      ],
+      "applies_to_pages": [
+        6,
+        7,
+        16
+      ]
+    },
+    {
+      "source_id": "K6",
+      "title": "Untamed currently offers a low-cost trial, flexible delivery and whole-m",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://untamed.com/products/try-now?step=cats-info",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K6"
+      ],
+      "applies_to_pages": [
+        6,
+        7,
+        16
+      ]
+    },
+    {
+      "source_id": "K7",
+      "title": "The FCA-equivalent primary industry source is unavailable for pet-food p",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "https://www.ukpetfood.org/static/22d36acc-68c9-4e38-b76cf7954eb33214/UK-Pet-Food-Annual-Report-2025.pdf",
+      "classification": "verified_external",
+      "evidence_refs": [
+        "K7"
+      ],
+      "applies_to_pages": []
+    },
+    {
+      "source_id": "K8",
+      "title": "The highest-value audience may be committed cat parents who want evidenc",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "K2",
+      "classification": "assumption",
+      "evidence_refs": [
+        "K8"
+      ],
+      "applies_to_pages": [
+        4,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17,
+        18,
+        19
+      ]
+    },
+    {
+      "source_id": "K9",
+      "title": "A visible proof ladder from product evidence to feeding confidence and o",
+      "publisher": "Source captured in KatKin research case",
+      "date": "2026-10-18",
+      "location": "K2",
+      "classification": "assumption",
+      "evidence_refs": [
+        "K9"
+      ],
+      "applies_to_pages": [
+        2,
+        3,
+        5,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        24,
+        25,
+        26,
+        28,
+        30
+      ]
+    },
+    {
+      "source_id": "T1",
+      "title": "KatKin FIELDWORK founder argument",
+      "publisher": "Narratiive",
+      "date": "2026-10-18",
+      "location": "governed repository artefact",
+      "classification": "internal_strategy",
+      "evidence_refs": [
+        "T1"
+      ],
+      "applies_to_pages": [
+        23,
+        27,
+        29
+      ]
+    }
+  ]
+}

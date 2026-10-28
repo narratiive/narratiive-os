@@ -48,6 +48,7 @@ from runtime.workflow_quality import (
     production_planning_quality_gate,
     research_evidence_quality_gate,
     senior_strategist_review_quality_gate,
+    sketchbook_v2_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
 )
@@ -166,9 +167,11 @@ def _deliverable_output() -> dict[str, Any]:
             ],
         },
         "commercial_model": {
+            "model_type": "new_customer_cohort",
+            "output_metric": "revenue_index",
             "scenarios": [
-                {"name": name, "classification": "illustrative_scenario", "incremental_annual_revenue": revenue, "incremental_annual_contribution": contribution}
-                for name, revenue, contribution in (("Conservative", 1000000, 300000), ("Base", 2000000, 800000), ("Ambitious", 4000000, 2000000))
+                {"name": name, "classification": "illustrative_scenario", "new_customer_cohort_revenue": revenue}
+                for name, revenue in (("Conservative", 110), ("Base", 133), ("Ambitious", 150))
             ]
         },
         "source_register": {"entries": [
@@ -176,6 +179,7 @@ def _deliverable_output() -> dict[str, Any]:
             {"source_id": "T1", "title": "Synthetic thesis", "location": "synthetic:thesis", "classification": "approved_strategy", "applies_to_pages": [1]},
         ]},
         "editable_pptx": "northstar-test-drive://growth-blueprint-v1.pptx",
+        "editable_google_slides": {"presentation_url": "https://docs.google.com/presentation/d/northstar-fieldwork", "mime_type": "application/vnd.google-apps.presentation"},
         "review_pdf": "northstar-test-drive://growth-blueprint-v1.pdf",
         "visual_qa": {"status": "passed", "checks": {"fit": True, "legibility": True}},
         "execution_evidence": {"codex_dependency": False, "elapsed_seconds": 1.0, "provider_calls": 0, "estimated_provider_cost_gbp": 0.0},
@@ -204,6 +208,8 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
         return growth_blueprint_output()
     if workflow_id == "growth_blueprint_deliverable_production":
         return _deliverable_output()
+    if workflow_id == "sketchbook_v2_production":
+        return {"contract_version":"2.0.0","specification_checksum":"synthetic-sketchbook","fieldwork_handoff":{"artifact_id":"northstar-fieldwork","checksum":"abc"},"editable_google_slides":{"presentation_url":"https://docs.google.com/presentation/d/northstar-sketchbook","mime_type":"application/vnd.google-apps.presentation"},"editable_pptx":"northstar-test-drive://sketchbook.pptx","review_pdf":"northstar-test-drive://sketchbook.pdf","visual_qa":{"status":"passed"},"approval_status":"pending_human_review","client_release_authorised":False}
     if workflow_id == "growth_blueprint_to_campaign_world":
         return campaign_world_candidates_output()
     if workflow_id == "campaign_world_to_creative_bible":
@@ -381,6 +387,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
                     "copy_drafting",
                     "market_research",
                     "document_generation",
+                    "sketchbook_generation",
                     "creative_asset_production",
                     "client_asset_delivery",
                 ),
@@ -468,6 +475,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
         "blueprint_director_quality_gate": blueprint_director_quality_gate,
         "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
+        "sketchbook_v2_quality_gate": sketchbook_v2_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
         "creative_bible_quality_gate": creative_bible_quality_gate,
@@ -552,6 +560,7 @@ def _additional_inputs(workflow_id: str, prior_output: Mapping[str, Any]) -> dic
             },
             "source_register": {"entries": [{"source_id": "S1", "title": "Synthetic source", "publisher": "Test", "location": "synthetic:northstar", "classification": "verified_fact", "evidence_refs": ["northstar-test-evidence-1"], "applies_to_pages": list(range(2, 31))}, {"source_id": "S2", "title": "Synthetic science", "publisher": "Test", "location": "synthetic:science", "classification": "verified_fact", "evidence_refs": [], "applies_to_pages": []}, {"source_id": "T1", "title": "Approved strategy thesis", "publisher": "Narratiive", "location": "synthetic:thesis", "classification": "approved_strategy", "evidence_refs": [], "applies_to_pages": [1]}]},
         },
+        "sketchbook_v2_production": {"approved_fieldwork_handoff":{"artifact_id":"northstar-fieldwork","checksum":"abc","approval_status":"approved"},"client_manifest":{"client_id":"northstar"},"sketchbook_pages":["creative_proposition","audience_profile","visual_world","campaign_territory","campaign_executions"]},
         "growth_blueprint_to_campaign_world": {
             "campaign_identity": _campaign_identity(),
             "approved_growth_blueprint": dict(prior_output),

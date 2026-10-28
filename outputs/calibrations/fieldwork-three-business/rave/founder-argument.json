@@ -1,0 +1,253 @@
+{
+  "evidence_lineage": [
+    {
+      "claim": "Company filing status confirms Rave as a live trading entity but does not confirm channel economics.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R1"
+      ]
+    },
+    {
+      "claim": "Public subscription and wholesale pages confirm that multiple entry and service routes exist today.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R2",
+        "R3",
+        "R4"
+      ]
+    },
+    {
+      "claim": "Market growth reports establish the category context used to justify testing an upgrader audience.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R5"
+      ]
+    },
+    {
+      "claim": "Competitor subscription models show that explicit progression is already a category norm against which Rave is implicitly compared.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R6",
+        "R7"
+      ]
+    },
+    {
+      "claim": "The upgrader audience is treated as an assumption pending first-party validation, not as a confirmed segment.",
+      "classification": "ASSUMPTION",
+      "source_refs": [
+        "R9"
+      ]
+    },
+    {
+      "claim": "The proposed growth equation is modelled from observed competitor and product structures, not derived from Rave's own performance data.",
+      "classification": "MODELLED",
+      "source_refs": [
+        "R10"
+      ]
+    },
+    {
+      "claim": "Rave's sustainability commitment is disclosed publicly without a reconciled, datable evidence trail.",
+      "classification": "VERIFIED EXTERNAL",
+      "source_refs": [
+        "R8"
+      ]
+    }
+  ],
+  "founder_argument": {
+    "argument_moves": [
+      {
+        "argument": "Rave publicly offers subscriptions, single origins, rare releases, wholesale service and a stated environmental commitment, but no public or internal evidence shows which route leads to repeat purchase or higher customer value.",
+        "commercial_consequence": "Without a confirmed progression, any new marketing or product launch risks adding more choice rather than more conversion.",
+        "evidence_refs": [
+          "R2",
+          "R3",
+          "R4",
+          "R8"
+        ],
+        "founder_decision": "Confirm whether Rave currently tracks how customers move between entry products.",
+        "headline": "Breadth is proven; progression is not.",
+        "move": "current_position"
+      },
+      {
+        "argument": "Competitors such as Pact and Union already sequence their offer into guided ladders or discovery journeys. Rave's wider range, education content and wholesale service could support an equivalent progression if it were made explicit and proven.",
+        "commercial_consequence": "A proven progression would let Rave scale one known conversion path instead of relying on undifferentiated product variety.",
+        "evidence_refs": [
+          "R6",
+          "R7",
+          "R2",
+          "R4"
+        ],
+        "founder_decision": "Decide whether to prioritise designing one guided progression over adding further product variety.",
+        "headline": "A visible progression can turn breadth into deliberate value.",
+        "move": "commercial_opportunity"
+      },
+      {
+        "argument": "The growth logic depends on four measurable stages: qualified entry, first-choice completion, 90-day repeat, and progression to a higher-value relationship. None of these currently has first-party measurement at Rave.",
+        "commercial_consequence": "Any lever left unmeasured keeps the growth case unverifiable and makes investment decisions ungrounded.",
+        "evidence_refs": [
+          "R9",
+          "R10"
+        ],
+        "founder_decision": "Approve internal instrumentation of these four stages before committing to positioning or acquisition spend.",
+        "headline": "Four levers define the test, not the forecast.",
+        "move": "growth_levers"
+      },
+      {
+        "argument": "Market data shows growth concentrated in premiumisation and younger drinkers, and Rave's current entry price, education and Discovery subscription match a capable upgrader profile. This remains an assumption until tested against Rave's own customers.",
+        "commercial_consequence": "Designing campaigns around this audience without validation risks targeting the wrong moment or channel.",
+        "evidence_refs": [
+          "R5",
+          "R9",
+          "R2"
+        ],
+        "founder_decision": "Commission minimal first-party research to confirm whether this audience exists in Rave's actual customer base before any campaign design.",
+        "headline": "The upgrader moment is plausible, not confirmed.",
+        "move": "audience_opportunity"
+      },
+      {
+        "argument": "The commercial question is not which new offer to add, it is which existing entry route already compounds into repeat purchase and contribution. That requires measurement, not new creative or positioning work.",
+        "commercial_consequence": "Scaling before this evidence exists risks investment in the wrong channel or entry point.",
+        "evidence_refs": [
+          "R9",
+          "R10",
+          "R1"
+        ],
+        "founder_decision": "Choose to run a bounded data-validation phase on channel, repeat and contribution before approving any broader growth or presentation work.",
+        "headline": "Validate the single path before scaling any of it.",
+        "move": "strategic_direction"
+      }
+    ],
+    "audience_opportunity": {
+      "commercial_moment": "The first speciality purchase decision, where Rave's breadth could build confidence or cause hesitation.",
+      "commercial_relevance": "Category growth is concentrated in premiumisation and younger drinkers, which makes this moment plausible to target, but Rave has no first-party evidence that this audience exists in its own customer base or behaves this way.",
+      "evidence_refs": [
+        "R2",
+        "R3",
+        "R5",
+        "R9"
+      ],
+      "priority_audience": "The capable home-coffee upgrader moving on from supermarket coffee - a testable hypothesis, not a confirmed segment.",
+      "validation_required": "Segment-level first-party data confirming who buys, why, and what they purchase next."
+    },
+    "business_opportunity": {
+      "commercial_consequence": "If the sequence is proven, Rave can direct spend and attention to the path that compounds, instead of spreading effort across many undifferentiated entry points.",
+      "evidence_refs": [
+        "R2",
+        "R3",
+        "R4",
+        "R10"
+      ],
+      "growth_mechanism": "Sequence existing products into one visible progression - confident first choice, early repeat, guided discovery, higher-value relationship - and test it against real customer behaviour rather than launching new offers.",
+      "statement": "Rave's current range (entry blends, Discovery subscription, single origins, rare releases, wholesale) already contains every stage of a plausible customer journey, but no evidence confirms which stage converts into repeat value.",
+      "validation_required": "First-party data on channel mix, first-order conversion, 90-day repeat and contribution by product line."
+    },
+    "central_argument": "Rave already has the breadth, education and service infrastructure to look like a confident speciality coffee brand, but no public or first-party evidence shows which entry route actually turns a new customer into a repeat, higher-value one. Competitors increasingly make progression explicit (Pact's tiered subscription, Union's discovery plan). The commercially useful move is not more product choice, it is proving one guided progression from first purchase to repeat to discovery, before scaling anything.",
+    "client_name": "Rave Coffee",
+    "commercial_growth_mechanism": {
+      "growth_equation": "qualified upgrader entry x first-choice completion x 90-day repeat x progression into higher-value relationship = valuable repeat growth (modelled relationship, not a forecast)",
+      "growth_levers": [
+        "qualified upgrader entry",
+        "first-choice completion",
+        "90-day repeat",
+        "progression into a higher-value relationship"
+      ],
+      "known_inputs": [
+        "Product and subscription breadth verified publicly (R2, R3)",
+        "Wholesale service model verified publicly (R4)",
+        "Competitor progression and pricing structures verified publicly (R6, R7)",
+        "Category growth context verified publicly (R5)"
+      ],
+      "missing_inputs": [
+        "Channel-level traffic and first-order conversion data",
+        "First-party 90-day repeat rates",
+        "Contribution margin by product line",
+        "Wholesale retention and service capacity data",
+        "Confirmed audience segment data for the proposed upgrader"
+      ],
+      "scenario_not_forecast": true
+    },
+    "evidence_basis": [
+      {
+        "claim": "Rave is an active, founder-controlled company with a recent accounts filing whose financial detail was not extracted or verified.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "R1"
+        ]
+      },
+      {
+        "claim": "Rave's public range spans entry blends, subscriptions, single origins, rare releases and a wholesale service model.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "R2",
+          "R3",
+          "R4"
+        ]
+      },
+      {
+        "claim": "UK speciality coffee consumption is growing mainly through premiumisation, with faster growth among 18-34 year olds.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "R5"
+        ]
+      },
+      {
+        "claim": "Competitors including Pact and Union already present explicit progression, provenance or discovery narratives in their subscriptions.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "R6",
+          "R7"
+        ]
+      },
+      {
+        "claim": "The home-coffee upgrader is a reasonable audience to test, but it is not evidenced by any first-party Rave data.",
+        "classification": "ASSUMPTION",
+        "source_refs": [
+          "R9"
+        ]
+      },
+      {
+        "claim": "A guided progression from first choice to repeat and discovery is a plausible growth mechanism, not a validated one.",
+        "classification": "ASSUMPTION",
+        "source_refs": [
+          "R10"
+        ]
+      },
+      {
+        "claim": "Rave's environmental giving claim is publicly stated but its supporting figures are not independently reconciled.",
+        "classification": "VERIFIED EXTERNAL",
+        "source_refs": [
+          "R8"
+        ]
+      }
+    ],
+    "strategic_recommendation": {
+      "competitor_substitution_test": "A generic claim of 'we offer more variety' would not survive comparison with Pact's tiered ladder or Union's discovery plan, since both already make progression explicit. The recommendation only holds if it is tied to Rave's own tested data, not to copying competitor language.",
+      "evidence_refs": [
+        "R6",
+        "R7",
+        "R9",
+        "R10"
+      ],
+      "next_decision": "The founder decides whether to commission first-party measurement of entry, repeat and progression data before approving any further growth or creative investment.",
+      "recommendation": "Run a bounded validation test of one guided progression path (first choice, early repeat, discovery) before committing to new positioning, pricing or acquisition spend.",
+      "tradeoffs": "Focusing on one progression path temporarily de-emphasises other live routes (wholesale, gifting, rare releases), and delays broader positioning work until the test produces data.",
+      "why_this": "Rave's advantage is currently implicit and unproven, while competitors already state their progression logic explicitly. Testing is cheap relative to building a campaign on an unverified mechanism."
+    }
+  },
+  "model": "claude-sonnet-5",
+  "provider": "anthropic",
+  "provider_message_id": "msg_011CgAPgTC7bhHffZS1e61yy",
+  "recommendation": "advance",
+  "stop_reason": "end_turn",
+  "verified": true,
+  "work_product": "{\"founder_argument\":{\"client_name\":\"Rave Coffee\",\"central_argument\":\"Rave already has the breadth, education and service infrastructure to look like a confident speciality coffee brand, but no public or first-party evidence shows which entry route actually turns a new customer into a repeat, higher-value one. Competitors increasingly make progression explicit (Pact's tiered subscription, Union's discovery plan). The commercially useful move is not more product choice, it is proving one guided progression from first purchase to repeat to discovery, before scaling anything.\",\"business_opportunity\":{\"statement\":\"Rave's current range (entry blends, Discovery subscription, single origins, rare releases, wholesale) already contains every stage of a plausible customer journey, but no evidence confirms which stage converts into repeat value.\",\"growth_mechanism\":\"Sequence existing products into one visible progression - confident first choice, early repeat, guided discovery, higher-value relationship - and test it against real customer behaviour rather than launching new offers.\",\"commercial_consequence\":\"If the sequence is proven, Rave can direct spend and attention to the path that compounds, instead of spreading effort across many undifferentiated entry points.\",\"evidence_refs\":[\"R2\",\"R3\",\"R4\",\"R10\"],\"validation_required\":\"First-party data on channel mix, first-order conversion, 90-day repeat and contribution by product line.\"},\"audience_opportunity\":{\"priority_audience\":\"The capable home-coffee upgrader moving on from supermarket coffee - a testable hypothesis, not a confirmed segment.\",\"commercial_moment\":\"The first speciality purchase decision, where Rave's breadth could build confidence or cause hesitation.\",\"commercial_relevance\":\"Category growth is concentrated in premiumisation and younger drinkers, which makes this moment plausible to target, but Rave has no first-party evidence that this audience exists in its own customer base or behaves this way.\",\"evidence_refs\":[\"R2\",\"R3\",\"R5\",\"R9\"],\"validation_required\":\"Segment-level first-party data confirming who buys, why, and what they purchase next.\"},\"strategic_recommendation\":{\"recommendation\":\"Run a bounded validation test of one guided progression path (first choice, early repeat, discovery) before committing to new positioning, pricing or acquisition spend.\",\"why_this\":\"Rave's advantage is currently implicit and unproven, while competitors already state their progression logic explicitly. Testing is cheap relative to building a campaign on an unverified mechanism.\",\"tradeoffs\":\"Focusing on one progression path temporarily de-emphasises other live routes (wholesale, gifting, rare releases), and delays broader positioning work until the test produces data.\",\"competitor_substitution_test\":\"A generic claim of 'we offer more variety' would not survive comparison with Pact's tiered ladder or Union's discovery plan, since both already make progression explicit. The recommendation only holds if it is tied to Rave's own tested data, not to copying competitor language.\",\"next_decision\":\"The founder decides whether to commission first-party measurement of entry, repeat and progression data before approving any further growth or creative investment.\",\"evidence_refs\":[\"R6\",\"R7\",\"R9\",\"R10\"]},\"commercial_growth_mechanism\":{\"growth_equation\":\"qualified upgrader entry x first-choice completion x 90-day repeat x progression into higher-value relationship = valuable repeat growth (modelled relationship, not a forecast)\",\"growth_levers\":[\"qualified upgrader entry\",\"first-choice completion\",\"90-day repeat\",\"progression into a higher-value relationship\"],\"known_inputs\":[\"Product and subscription breadth verified publicly (R2, R3)\",\"Wholesale service model verified publicly (R4)\",\"Competitor progression and pricing structures verified publicly (R6, R7)\",\"Category growth context verified publicly (R5)\"],\"missing_inputs\":[\"Channel-level traffic and first-order conversion data\",\"First-party 90-day repeat rates\",\"Contribution margin by product line\",\"Wholesale retention and service capacity data\",\"Confirmed audience segment data for the proposed upgrader\"],\"scenario_not_forecast\":true},\"evidence_basis\":[{\"claim\":\"Rave is an active, founder-controlled company with a recent accounts filing whose financial detail was not extracted or verified.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R1\"]},{\"claim\":\"Rave's public range spans entry blends, subscriptions, single origins, rare releases and a wholesale service model.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R2\",\"R3\",\"R4\"]},{\"claim\":\"UK speciality coffee consumption is growing mainly through premiumisation, with faster growth among 18-34 year olds.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R5\"]},{\"claim\":\"Competitors including Pact and Union already present explicit progression, provenance or discovery narratives in their subscriptions.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R6\",\"R7\"]},{\"claim\":\"The home-coffee upgrader is a reasonable audience to test, but it is not evidenced by any first-party Rave data.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"R9\"]},{\"claim\":\"A guided progression from first choice to repeat and discovery is a plausible growth mechanism, not a validated one.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"R10\"]},{\"claim\":\"Rave's environmental giving claim is publicly stated but its supporting figures are not independently reconciled.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R8\"]}],\"argument_moves\":[{\"move\":\"current_position\",\"headline\":\"Breadth is proven; progression is not.\",\"argument\":\"Rave publicly offers subscriptions, single origins, rare releases, wholesale service and a stated environmental commitment, but no public or internal evidence shows which route leads to repeat purchase or higher customer value.\",\"commercial_consequence\":\"Without a confirmed progression, any new marketing or product launch risks adding more choice rather than more conversion.\",\"founder_decision\":\"Confirm whether Rave currently tracks how customers move between entry products.\",\"evidence_refs\":[\"R2\",\"R3\",\"R4\",\"R8\"]},{\"move\":\"commercial_opportunity\",\"headline\":\"A visible progression can turn breadth into deliberate value.\",\"argument\":\"Competitors such as Pact and Union already sequence their offer into guided ladders or discovery journeys. Rave's wider range, education content and wholesale service could support an equivalent progression if it were made explicit and proven.\",\"commercial_consequence\":\"A proven progression would let Rave scale one known conversion path instead of relying on undifferentiated product variety.\",\"founder_decision\":\"Decide whether to prioritise designing one guided progression over adding further product variety.\",\"evidence_refs\":[\"R6\",\"R7\",\"R2\",\"R4\"]},{\"move\":\"growth_levers\",\"headline\":\"Four levers define the test, not the forecast.\",\"argument\":\"The growth logic depends on four measurable stages: qualified entry, first-choice completion, 90-day repeat, and progression to a higher-value relationship. None of these currently has first-party measurement at Rave.\",\"commercial_consequence\":\"Any lever left unmeasured keeps the growth case unverifiable and makes investment decisions ungrounded.\",\"founder_decision\":\"Approve internal instrumentation of these four stages before committing to positioning or acquisition spend.\",\"evidence_refs\":[\"R9\",\"R10\"]},{\"move\":\"audience_opportunity\",\"headline\":\"The upgrader moment is plausible, not confirmed.\",\"argument\":\"Market data shows growth concentrated in premiumisation and younger drinkers, and Rave's current entry price, education and Discovery subscription match a capable upgrader profile. This remains an assumption until tested against Rave's own customers.\",\"commercial_consequence\":\"Designing campaigns around this audience without validation risks targeting the wrong moment or channel.\",\"founder_decision\":\"Commission minimal first-party research to confirm whether this audience exists in Rave's actual customer base before any campaign design.\",\"evidence_refs\":[\"R5\",\"R9\",\"R2\"]},{\"move\":\"strategic_direction\",\"headline\":\"Validate the single path before scaling any of it.\",\"argument\":\"The commercial question is not which new offer to add, it is which existing entry route already compounds into repeat purchase and contribution. That requires measurement, not new creative or positioning work.\",\"commercial_consequence\":\"Scaling before this evidence exists risks investment in the wrong channel or entry point.\",\"founder_decision\":\"Choose to run a bounded data-validation phase on channel, repeat and contribution before approving any broader growth or presentation work.\",\"evidence_refs\":[\"R9\",\"R10\",\"R1\"]}]},\"evidence_lineage\":[{\"claim\":\"Company filing status confirms Rave as a live trading entity but does not confirm channel economics.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R1\"]},{\"claim\":\"Public subscription and wholesale pages confirm that multiple entry and service routes exist today.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R2\",\"R3\",\"R4\"]},{\"claim\":\"Market growth reports establish the category context used to justify testing an upgrader audience.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R5\"]},{\"claim\":\"Competitor subscription models show that explicit progression is already a category norm against which Rave is implicitly compared.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R6\",\"R7\"]},{\"claim\":\"The upgrader audience is treated as an assumption pending first-party validation, not as a confirmed segment.\",\"classification\":\"ASSUMPTION\",\"source_refs\":[\"R9\"]},{\"claim\":\"The proposed growth equation is modelled from observed competitor and product structures, not derived from Rave's own performance data.\",\"classification\":\"MODELLED\",\"source_refs\":[\"R10\"]},{\"claim\":\"Rave's sustainability commitment is disclosed publicly without a reconciled, datable evidence trail.\",\"classification\":\"VERIFIED EXTERNAL\",\"source_refs\":[\"R8\"]}],\"recommendation\":\"advance\"}",
+  "worker_execution": {
+    "attempt": 1,
+    "capability": "strategic_reasoning",
+    "policy_id": "deterministic-default",
+    "provider": "anthropic",
+    "selection_reason": "only_eligible_worker",
+    "side_effect_classification": "preparation",
+    "worker_id": "claude-anthropic"
+  }
+}

@@ -6,6 +6,8 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from runtime.fieldwork_v4 import FIELDWORK_V4_OPENING_TITLES
+
 from runtime.external_action_truth import no_asserted_external_action
 
 
@@ -13,6 +15,43 @@ _FALSE_ACTION_MARKERS = (
     "email sent", "proposal sent", "sent to the client", "sent to the prospect",
     "meeting booked", "calendar event created", "notion updated", "published to the client",
     "client-facing publication completed", "publication completed",
+)
+
+_GROWTH_BLUEPRINT_MANDATORY_FIELDS = (
+    "central_thesis",
+    "narrative_progression",
+    "editorial_judgement",
+    "contradiction_resolution",
+    "quantitative_evidence_treatment",
+    "assumption_control",
+    "completeness",
+)
+
+_FIELDWORK_ARGUMENT_MOVES = (
+    "current_position",
+    "commercial_opportunity",
+    "growth_levers",
+    "audience_opportunity",
+    "strategic_direction",
+)
+
+_FIELDWORK_EVIDENCE_CLASSES = {
+    "VERIFIED CLIENT",
+    "VERIFIED EXTERNAL",
+    "MODELLED",
+    "ASSUMPTION",
+    "CREATIVE ILLUSTRATION",
+}
+
+_EDITORIAL_JARGON = (
+    "best-in-class",
+    "game-changing",
+    "holistic ecosystem",
+    "strategic value drivers",
+    "transformative excellence",
+    "unlock potential",
+    "value-led",
+    "coordinated execution",
 )
 
 
@@ -77,6 +116,18 @@ def validate_operational_inputs(workflow_id: str, inputs: Mapping[str, Any]) -> 
             raise ValueError("Strategy Thesis requires evidence-linked strategic tensions")
         if not _lineage(inputs.get("evidence_lineage"), minimum=5):
             raise ValueError("Strategy Thesis requires complete evidence lineage")
+    elif workflow_id == "fieldwork_founder_argument_experiment":
+        pack = inputs.get("evidence_pack")
+        if not isinstance(pack, Mapping) or not _meaningful(pack.get("records")):
+            raise ValueError("FIELDWORK founder argument requires a substantive evidence pack")
+        if not _strategic_synthesis(inputs.get("strategic_synthesis")):
+            raise ValueError("FIELDWORK founder argument requires a quality-accepted Strategic Synthesis")
+        if not _commercial_growth_equation(inputs.get("commercial_growth_equation")):
+            raise ValueError("FIELDWORK founder argument requires a complete commercial growth equation")
+        if not _meaningful(inputs.get("approved_growth_sprint_scope")):
+            raise ValueError("FIELDWORK founder argument requires approved Growth Sprint scope")
+        if not isinstance(inputs.get("client_context"), Mapping):
+            raise ValueError("FIELDWORK founder argument requires structured client context")
     elif workflow_id == "strategy_thesis_to_growth_blueprint":
         if not _strategy_thesis(inputs.get("approved_strategy_thesis")):
             raise ValueError("Growth Blueprint preparation requires an approved Strategy Thesis")
@@ -273,11 +324,13 @@ def strategy_thesis_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]
 
 
 def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    missing_mandatory = _missing_fields(output, _GROWTH_BLUEPRINT_MANDATORY_FIELDS)
     strategic_fields = (
         "market_category_diagnosis", "audience", "growth_barriers", "source_of_difference",
         "positioning", "narrative", "growth_opportunity", "activation_implications",
     )
     checks = {
+        "mandatory_quality_fields_are_present": not missing_mandatory,
         "all_strategic_questions_are_substantive": all(
             _growth_opportunity_section(output.get(field))
             if field == "growth_opportunity"
@@ -329,7 +382,165 @@ def growth_blueprint_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any
         "recommendation_is_advance": str(output.get("recommendation") or "").casefold() == "advance",
         "no_false_external_execution_claim": _no_false_action(output),
     }
-    return _result(checks)
+    result = _result(checks)
+    result["missing_mandatory_fields"] = missing_mandatory
+    return result
+
+
+def fieldwork_founder_argument_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    argument = output.get("founder_argument")
+    moves = argument.get("argument_moves") if isinstance(argument, Mapping) else None
+    evidence_basis = argument.get("evidence_basis") if isinstance(argument, Mapping) else None
+    lineage = output.get("evidence_lineage")
+    business = argument.get("business_opportunity") if isinstance(argument, Mapping) else None
+    audience = argument.get("audience_opportunity") if isinstance(argument, Mapping) else None
+    recommendation = argument.get("strategic_recommendation") if isinstance(argument, Mapping) else None
+    mechanism = argument.get("commercial_growth_mechanism") if isinstance(argument, Mapping) else None
+    client_name = str(argument.get("client_name") or "").strip() if isinstance(argument, Mapping) else ""
+    visible_text = json.dumps(argument, sort_keys=True, ensure_ascii=False) if isinstance(argument, Mapping) else ""
+    argument_copy_text = " ".join(
+        (
+            str(argument.get("central_argument") or ""),
+            str(recommendation.get("recommendation") or "") if isinstance(recommendation, Mapping) else "",
+            *(str(item.get("argument") or "") for item in moves or [] if isinstance(item, Mapping)),
+        )
+    )
+    financial_tokens = set(
+        re.findall(r"(?:[£$€]\s?\d(?:[\d,]*\d)?(?:\.\d+)?|\b\d+(?:\.\d+)?%)", visible_text)
+    )
+    supported_financial_text = " ".join(
+        str(item.get("claim") or "")
+        for item in evidence_basis or []
+        if isinstance(item, Mapping)
+        and str(item.get("classification") or "").strip().upper()
+        in {"VERIFIED CLIENT", "VERIFIED EXTERNAL", "MODELLED"}
+    )
+    unsupported_financial_tokens = sorted(
+        token for token in financial_tokens if token not in supported_financial_text
+    )
+    move_order = [
+        str(item.get("move") or "") for item in moves or [] if isinstance(item, Mapping)
+    ]
+    headlines = [
+        str(item.get("headline") or "") for item in moves or [] if isinstance(item, Mapping)
+    ]
+    argument_refs = {
+        str(ref)
+        for item in evidence_basis or []
+        if isinstance(item, Mapping)
+        for ref in item.get("source_refs") or []
+        if str(ref).strip()
+    }
+    argument_refs.update(
+        str(ref)
+        for item in lineage or []
+        if isinstance(item, Mapping)
+        for ref in item.get("source_refs") or []
+        if str(ref).strip()
+    )
+    used_refs = {
+        str(ref)
+        for item in moves or []
+        if isinstance(item, Mapping)
+        for ref in item.get("evidence_refs") or []
+        if str(ref).strip()
+    }
+    used_refs.update(
+        str(ref)
+        for section in (business, audience, recommendation)
+        if isinstance(section, Mapping)
+        for ref in section.get("evidence_refs") or []
+        if str(ref).strip()
+    )
+    jargon_found = sorted(
+        phrase for phrase in _EDITORIAL_JARGON if phrase in argument_copy_text.casefold()
+    )
+    client_tokens = [
+        token
+        for token in re.findall(r"[a-z0-9]+", client_name.casefold())
+        if len(token) >= 4 and token not in {"coffee", "company", "limited"}
+    ]
+    checks = {
+        "founder_argument_has_required_opportunities_and_recommendation": (
+            isinstance(argument, Mapping)
+            and _substantive_text(argument.get("central_argument"), minimum_words=30)
+            and _mapping_fields(
+                business,
+                ("statement", "growth_mechanism", "commercial_consequence", "evidence_refs", "validation_required"),
+            )
+            and _mapping_fields(
+                audience,
+                ("priority_audience", "commercial_moment", "commercial_relevance", "evidence_refs", "validation_required"),
+            )
+            and _mapping_fields(
+                recommendation,
+                ("recommendation", "why_this", "tradeoffs", "competitor_substitution_test", "next_decision", "evidence_refs"),
+            )
+        ),
+        "commercial_growth_mechanism_is_explicit_and_not_a_forecast": (
+            isinstance(mechanism, Mapping)
+            and _substantive_text(mechanism.get("growth_equation"), minimum_words=6)
+            and isinstance(mechanism.get("growth_levers"), list)
+            and 2 <= len(mechanism["growth_levers"]) <= 4
+            and isinstance(mechanism.get("known_inputs"), list)
+            and isinstance(mechanism.get("missing_inputs"), list)
+            and mechanism.get("scenario_not_forecast") is True
+        ),
+        "five_moves_form_the_required_argument_sequence": (
+            isinstance(moves, list)
+            and len(moves) == 5
+            and move_order == list(_FIELDWORK_ARGUMENT_MOVES)
+            and all(
+                isinstance(item, Mapping)
+                and _substantive_text(item.get("headline"), minimum_words=3)
+                and _substantive_text(item.get("argument"), minimum_words=12)
+                and _substantive_text(item.get("commercial_consequence"), minimum_words=6)
+                and _substantive_text(item.get("founder_decision"), minimum_words=5)
+                and _meaningful_list(item.get("evidence_refs"), minimum=1)
+                for item in moves
+            )
+        ),
+        "evidence_basis_uses_canonical_classifications": (
+            _fieldwork_evidence_basis(evidence_basis, minimum=5)
+            and _fieldwork_evidence_basis(lineage, minimum=5)
+            and bool(argument_refs)
+            and used_refs.issubset(argument_refs)
+        ),
+        "recommendation_is_client_specific": (
+            bool(client_tokens)
+            and any(token in argument_copy_text.casefold() for token in client_tokens)
+            and _substantive_text(
+                recommendation.get("competitor_substitution_test") if isinstance(recommendation, Mapping) else None,
+                minimum_words=10,
+            )
+        ),
+        "writing_is_clear_and_free_of_jargon": not jargon_found,
+        "argument_does_not_repeat_itself": _distinct_argument_moves(headlines, moves),
+        "financial_precision_is_supported": not unsupported_financial_tokens,
+        "recommendation_is_advance": str(output.get("recommendation") or "").casefold() == "advance",
+        "no_false_external_execution_claim": _no_false_action(output),
+    }
+    result = _result(checks)
+    result["editorial_qa"] = {
+        "clarity": {
+            "passed": checks["writing_is_clear_and_free_of_jargon"],
+            "findings": [f"jargon:{item}" for item in jargon_found],
+        },
+        "specificity": {"passed": checks["recommendation_is_client_specific"]},
+        "evidence": {"passed": checks["evidence_basis_uses_canonical_classifications"]},
+        "commercial_relevance": {
+            "passed": checks["commercial_growth_mechanism_is_explicit_and_not_a_forecast"]
+        },
+        "founder_usefulness": {
+            "passed": checks["five_moves_form_the_required_argument_sequence"]
+        },
+        "repetition": {"passed": checks["argument_does_not_repeat_itself"]},
+        "unsupported_financial_precision": {
+            "passed": checks["financial_precision_is_supported"],
+            "tokens": unsupported_financial_tokens,
+        },
+    }
+    return result
 
 
 def blueprint_director_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -528,9 +739,8 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         }
         for source_id in registered_pages
     }
-    canonical_titles = (
-        "Cover", "Executive Thesis", "The Commercial Question", "Market Reality",
-        "Category Growth Dynamics", "Competitive Landscape", "The Sea of Sameness",
+    canonical_titles = FIELDWORK_V4_OPENING_TITLES + (
+        "Competitive Landscape", "The Sea of Sameness",
         "The Market Gap", "Growth Constraint Diagnosis", "The Provocation", "Audience Reality",
         "Audience Segments / Demand Pools", "Customer Evidence Board",
         "Audience Tensions / Decision Context", "Category Entry Points", "Current Brand Diagnosis",
@@ -544,7 +754,7 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         "presentation_specification_is_present": _meaningful(output.get("presentation_specification")),
         "full_blueprint_has_exactly_thirty_slides": isinstance(presentation_slides, list)
         and len(presentation_slides) == 30,
-        "canonical_schema_v3_slide_roles_are_preserved": isinstance(presentation_slides, list)
+        "fieldwork_v4_slide_roles_are_preserved": isinstance(presentation_slides, list)
         and tuple(str(item.get("title") or "") for item in presentation_slides if isinstance(item, Mapping))
         == canonical_titles,
         "canonical_schema_v3_slide_roles_are_substantive": (
@@ -557,14 +767,19 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
             and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
         ),
         "editable_pptx_is_present": _meaningful(output.get("editable_pptx")),
+        "editable_native_google_slides_is_present": isinstance(output.get("editable_google_slides"), Mapping)
+        and str(output["editable_google_slides"].get("presentation_url") or "").startswith("https://docs.google.com/presentation/d/")
+        and output["editable_google_slides"].get("mime_type") == "application/vnd.google-apps.presentation",
         "review_pdf_is_present": _meaningful(output.get("review_pdf")),
         "quantified_commercial_model_is_present": isinstance(model_scenarios, list)
-        and len(model_scenarios) == 3
+        and 1 <= len(model_scenarios) <= 3
+        and isinstance(commercial_model, Mapping)
+        and commercial_model.get("model_type") == "new_customer_cohort"
+        and commercial_model.get("output_metric") in {"revenue", "revenue_index"}
         and all(
             isinstance(item, Mapping)
-            and item.get("classification") == "illustrative_scenario"
-            and isinstance(item.get("incremental_annual_revenue"), int)
-            and isinstance(item.get("incremental_annual_contribution"), int)
+            and item.get("classification") in {"planning_case", "sensitivity", "illustrative_scenario"}
+            and isinstance(item.get("new_customer_cohort_revenue"), int)
             for item in model_scenarios
         ),
         "source_register_is_present": isinstance(source_entries, list)
@@ -589,6 +804,24 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         "no_external_action_taken": output.get("external_action_taken") is False,
     }
     return _result(checks)
+
+
+def sketchbook_v2_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    slides = output.get("editable_google_slides") or {}
+    qa = output.get("visual_qa") or {}
+    return _result({
+        "contract_is_v2": output.get("contract_version") == "2.0.0",
+        "fieldwork_lineage_is_exact": isinstance(output.get("fieldwork_handoff"), Mapping)
+        and bool(output["fieldwork_handoff"].get("artifact_id"))
+        and bool(output["fieldwork_handoff"].get("checksum")),
+        "native_google_slides_is_editable": isinstance(slides, Mapping)
+        and str(slides.get("presentation_url") or "").startswith("https://docs.google.com/presentation/d/")
+        and slides.get("mime_type") == "application/vnd.google-apps.presentation",
+        "review_pdf_is_present": bool(output.get("review_pdf")),
+        "visual_qa_passed": isinstance(qa, Mapping) and qa.get("status") == "passed",
+        "human_gate_is_preserved": output.get("approval_status") == "pending_human_review"
+        and output.get("client_release_authorised") is False,
+    })
 
 
 def campaign_world_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
@@ -1011,6 +1244,49 @@ def follow_up_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str
         and output.get("media_spend_authorised") is False,
     }
     return _result(checks)
+
+
+def _missing_fields(output: Mapping[str, Any], fields: tuple[str, ...]) -> list[str]:
+    return [field for field in fields if field not in output or output[field] in (None, "")]
+
+
+def _fieldwork_evidence_basis(value: Any, *, minimum: int) -> bool:
+    return (
+        isinstance(value, list)
+        and len(value) >= minimum
+        and all(
+            isinstance(item, Mapping)
+            and _substantive_text(item.get("claim"), minimum_words=5)
+            and str(item.get("classification") or "").strip().upper() in _FIELDWORK_EVIDENCE_CLASSES
+            and _meaningful_list(item.get("source_refs"), minimum=1)
+            for item in value
+        )
+    )
+
+
+def _distinct_argument_moves(headlines: list[str], moves: Any) -> bool:
+    if len(headlines) != 5 or len({item.casefold().strip() for item in headlines}) != 5:
+        return False
+    texts = [
+        " ".join(
+            str(item.get(field) or "")
+            for field in ("headline", "argument", "commercial_consequence", "founder_decision")
+        )
+        for item in moves or []
+        if isinstance(item, Mapping)
+    ]
+    if len(texts) != 5:
+        return False
+    tokens = [
+        {token for token in re.findall(r"[a-z0-9]+", text.casefold()) if len(token) > 3}
+        for text in texts
+    ]
+    for index, left in enumerate(tokens):
+        for right in tokens[index + 1:]:
+            union = left | right
+            if union and len(left & right) / len(union) >= 0.72:
+                return False
+    return True
 
 
 def _result(checks: Mapping[str, bool]) -> dict[str, Any]:

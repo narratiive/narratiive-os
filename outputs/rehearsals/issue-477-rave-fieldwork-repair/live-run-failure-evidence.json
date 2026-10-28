@@ -1,0 +1,27 @@
+{
+  "purpose": "Compact audit of genuine experimental executions that were correctly blocked before the accepted v3 run.",
+  "external_action_taken": false,
+  "presentation_production_triggered": false,
+  "runs": [
+    {
+      "run_id": "rave-fieldwork-founder-argument-20261018-v1",
+      "outcome": "worker_retry_policy_exhausted",
+      "observed_failure": "worker_output_truncated",
+      "attempts": 2,
+      "repair": "Dedicated bounded return contract and long-form token budget."
+    },
+    {
+      "run_id": "rave-fieldwork-founder-argument-20261018-v2",
+      "provider_message_id": "msg_011Cg9h45wGhPX3EYUdDTpBJ",
+      "outcome": "quality_failed:fieldwork_founder_argument_quality_gate",
+      "passed_checks": [
+        "five_move_sequence",
+        "commercial_growth_mechanism",
+        "scenario_not_forecast",
+        "no_repetition",
+        "no_unsupported_financial_precision"
+      ],
+      "repair": "Governed evidence-set union, distinctive client-token matching and founder-facing-only jargon scan."
+    }
+  ]
+}

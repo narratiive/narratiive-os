@@ -16,7 +16,7 @@ from runtime.creative_production_workflow_adapter import CreativeProductionWorkf
 from runtime.asset_delivery_preparation_worker import AssetDeliveryPreparationWorker
 from runtime.client_asset_delivery_adapter import ClientAssetDeliveryAdapter
 from runtime.delivery_follow_up_worker import DeliveryFollowUpPreparationWorker
-from runtime.growth_blueprint_deliverable_worker import build_growth_blueprint_deliverable_worker
+from runtime.growth_blueprint_deliverable_worker import NativeSlidesImporter, build_growth_blueprint_deliverable_worker
 from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
@@ -42,6 +42,7 @@ from runtime.workflow_quality import (
     delivery_preparation_quality_gate,
     client_asset_delivery_quality_gate,
     follow_up_preparation_quality_gate,
+    fieldwork_founder_argument_quality_gate,
     creative_bible_quality_gate,
     creative_bible_triage_quality_gate,
     discovery_preparation_quality_gate,
@@ -52,6 +53,7 @@ from runtime.workflow_quality import (
     production_planning_quality_gate,
     research_evidence_quality_gate,
     senior_strategist_review_quality_gate,
+    sketchbook_v2_quality_gate,
     strategic_synthesis_quality_gate,
     strategy_thesis_quality_gate,
     validate_operational_inputs,
@@ -650,6 +652,8 @@ def build_tony_workflow_runtime(
     dispatchers: Mapping[str, WorkerAdapter] | None = None,
     environ: Mapping[str, str] | None = None,
     quality_validators: Mapping[str, QualityValidator] | None = None,
+    native_slides_importer: NativeSlidesImporter | None = None,
+    sketchbook_adapter: WorkerAdapter | None = None,
 ) -> TonyWorkflowRuntime:
     """Compose the production workflow runtime without executing any work."""
 
@@ -668,7 +672,11 @@ def build_tony_workflow_runtime(
         client_id=client_id,
     )
     configured_dispatchers = dict(dispatchers) if dispatchers is not None else build_http_dispatchers(environ)
-    document_adapter = build_growth_blueprint_deliverable_worker(scoped_root, environ)
+    document_adapter = build_growth_blueprint_deliverable_worker(
+        scoped_root,
+        environ,
+        native_slides_importer=native_slides_importer,
+    )
     validators: dict[str, QualityValidator] = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
@@ -676,10 +684,12 @@ def build_tony_workflow_runtime(
         "research_evidence_quality_gate": research_evidence_quality_gate,
         "strategic_synthesis_quality_gate": strategic_synthesis_quality_gate,
         "strategy_thesis_quality_gate": strategy_thesis_quality_gate,
+        "fieldwork_founder_argument_quality_gate": fieldwork_founder_argument_quality_gate,
         "growth_blueprint_quality_gate": growth_blueprint_quality_gate,
         "blueprint_director_quality_gate": blueprint_director_quality_gate,
         "senior_strategist_review_quality_gate": senior_strategist_review_quality_gate,
         "growth_blueprint_deliverable_quality_gate": growth_blueprint_deliverable_quality_gate,
+        "sketchbook_v2_quality_gate": sketchbook_v2_quality_gate,
         "campaign_world_quality_gate": campaign_world_quality_gate,
         "campaign_world_candidates_quality_gate": campaign_world_candidates_quality_gate,
         "campaign_world_triage_quality_gate": campaign_world_triage_quality_gate,
@@ -706,6 +716,7 @@ def build_tony_workflow_runtime(
                 fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
             ),
             document_adapter=document_adapter,
+            sketchbook_adapter=sketchbook_adapter,
             campaign_world_triage_adapter=CampaignWorldTriageWorker(),
             creative_bible_triage_adapter=CreativeBibleTriageWorker(),
             production_planning_adapter=CampaignProductionPlanningWorker(),

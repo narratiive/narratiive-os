@@ -260,6 +260,31 @@ STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS = _workflow(
     autonomous_handoff=True,
 )
 
+
+FIELDWORK_FOUNDER_ARGUMENT_EXPERIMENT = _workflow(
+    "fieldwork_founder_argument_experiment",
+    _step(
+        "develop_founder_argument",
+        capability="strategic_reasoning",
+        inputs=(
+            "evidence_pack",
+            "strategic_synthesis",
+            "commercial_growth_equation",
+            "approved_growth_sprint_scope",
+            "client_context",
+        ),
+        outputs=(
+            "founder_argument",
+            "evidence_lineage",
+            "recommendation",
+        ),
+        quality="fieldwork_founder_argument_quality_gate",
+        approval_required=True,
+    ),
+    approval_required=True,
+)
+
+
 STRATEGY_THESIS_TO_GROWTH_BLUEPRINT = _workflow(
     "strategy_thesis_to_growth_blueprint",
     (
@@ -393,6 +418,13 @@ RESEARCH_TO_GROWTH_BLUEPRINT = _workflow(
             "narrative",
             "growth_opportunity",
             "activation_implications",
+            "central_thesis",
+            "narrative_progression",
+            "editorial_judgement",
+            "contradiction_resolution",
+            "quantitative_evidence_treatment",
+            "assumption_control",
+            "completeness",
             "key_strategic_choices",
             "evidence_and_uncertainty",
             "fact_interpretation_hypothesis_lineage",
@@ -425,6 +457,7 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
             "commercial_model",
             "source_register",
             "editable_pptx",
+            "editable_google_slides",
             "review_pdf",
             "visual_qa",
             "execution_evidence",
@@ -434,6 +467,20 @@ GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION = _workflow(
         approval_required=True,
     ),
     next_workflow_id="growth_blueprint_to_campaign_world",
+    approval_required=True,
+)
+
+SKETCHBOOK_V2_PRODUCTION = _workflow(
+    "sketchbook_v2_production",
+    _step(
+        "produce_sketchbook_v2",
+        capability="sketchbook_generation",
+        inputs=("approved_fieldwork_handoff", "client_manifest", "sketchbook_pages"),
+        outputs=("contract_version", "specification_checksum", "fieldwork_handoff", "editable_google_slides", "editable_pptx", "review_pdf", "visual_qa", "approval_status", "client_release_authorised"),
+        quality="sketchbook_v2_quality_gate",
+        approval_required=True,
+        max_attempts=1,
+    ),
     approval_required=True,
 )
 
@@ -599,9 +646,11 @@ NARRATIIVE_PRODUCTION_WORKFLOWS = (
     GROWTH_SPRINT_TO_RESEARCH_ENGINE,
     RESEARCH_TO_STRATEGIC_SYNTHESIS,
     STRATEGIC_SYNTHESIS_TO_STRATEGY_THESIS,
+    FIELDWORK_FOUNDER_ARGUMENT_EXPERIMENT,
     STRATEGY_THESIS_TO_GROWTH_BLUEPRINT,
     RESEARCH_TO_GROWTH_BLUEPRINT,
     GROWTH_BLUEPRINT_DELIVERABLE_PRODUCTION,
+    SKETCHBOOK_V2_PRODUCTION,
     GROWTH_BLUEPRINT_TO_CAMPAIGN_WORLD,
     CAMPAIGN_WORLD_TO_CREATIVE_BIBLE,
     CREATIVE_BIBLE_TO_ASSET_PRODUCTION,

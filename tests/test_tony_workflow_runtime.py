@@ -14,8 +14,10 @@ from tests.test_workflow_quality import (
     campaign_identity,
     creative_bible_output,
     discovery_output,
+    fieldwork_founder_argument_output,
     growth_blueprint_output,
     proposal_output,
+    strategic_synthesis_output,
 )
 
 
@@ -114,7 +116,7 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 environ={},
             )
             registry_ids = {item.workflow_id for item in runtime.coordinator.registry.all()}
-            self.assertEqual(len(registry_ids), 14)
+            self.assertEqual(len(registry_ids), 16)
             runtime.enqueue(
                 "growth_diagnostic_to_blueprint_lite",
                 "safe-blueprint-run",
@@ -148,6 +150,53 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
             )
             self.assertEqual(restarted.status("safe-blueprint-run")["status"], "complete")
             self.assertEqual(len(calls), 1)
+
+    def test_founder_argument_experiment_runs_without_presentation_handoff(self) -> None:
+        calls = []
+        synthesis = strategic_synthesis_output()
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={
+                    "Claude": lambda contract: calls.append(contract) or fieldwork_founder_argument_output()
+                },
+                environ={},
+            )
+            runtime.enqueue(
+                "fieldwork_founder_argument_experiment",
+                "safe-founder-argument-run",
+                {
+                    "evidence_pack": {"records": [{"evidence_id": "rave-1"}]},
+                    "strategic_synthesis": synthesis["strategic_synthesis"],
+                    "commercial_growth_equation": synthesis["commercial_growth_equation"],
+                    "approved_growth_sprint_scope": ["Internal synthetic comparison"],
+                    "client_context": {"company_name": "Rave"},
+                },
+                entity_id="safe-rave",
+                correlation_id="safe-correlation",
+            )
+
+            outcome = runtime.advance(
+                "safe-founder-argument-run", _lifecycle("safe-client")
+            )
+            state = runtime.status("safe-founder-argument-run")
+
+            self.assertEqual(outcome.status, "awaiting_approval")
+            self.assertTrue(state["stages"][0]["quality_result"]["passed"])
+            self.assertTrue(
+                all(
+                    axis["passed"]
+                    for axis in state["stages"][0]["quality_result"]["editorial_qa"].values()
+                )
+            )
+            self.assertEqual(len(state["stages"]), 1)
+            self.assertEqual(len(calls), 1)
+            self.assertIn(
+                "must not trigger presentation production",
+                calls[0]["instruction"],
+            )
 
     def test_discovery_preparation_uses_real_validator_and_pauses_for_review(self) -> None:
         calls = []

@@ -70,6 +70,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
                 "blueprint_lite_to_discovery_preparation",
                 "research_to_strategic_synthesis",
                 "strategic_synthesis_to_strategy_thesis",
+                "fieldwork_founder_argument_experiment",
                 "strategy_thesis_to_growth_blueprint",
                 "research_to_growth_blueprint",
             }
@@ -145,6 +146,14 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
             "Return only the top-level fields named in TASK, plus no commentary or duplicated source material. "
             "Use short evidence source identifiers in evidence_refs and source_refs. "
             "Do not add a work_product wrapper."
+        )
+    elif workflow_id == "fieldwork_founder_argument_experiment":
+        return_contract = (
+            "Return exactly one compact JSON object under 2,500 words and no markdown fences. "
+            "Return only founder_argument, evidence_lineage and recommendation, plus no commentary or "
+            "duplicated source material. Keep the five argument moves concise and cumulative. Use short "
+            "source identifiers in evidence_refs and source_refs; do not reproduce source passages. "
+            "Do not add a work_product wrapper or any presentation-production fields."
         )
     elif workflow_id in {"strategy_thesis_to_growth_blueprint", "research_to_growth_blueprint"}:
         return_contract = (

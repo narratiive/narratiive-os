@@ -1,0 +1,412 @@
+{
+  "identity": {
+    "workspace_id": "demo-fieldwork",
+    "client_id": "fieldwork-fictional",
+    "run_id": "issue-473-fieldwork-v2",
+    "package_version": 2,
+    "company_name": "FIELDWORK",
+    "founder_name": "Alex Example",
+    "fictional": true,
+    "permission_scope": "synthetic demonstration only",
+    "intake_date": "2026-10-14"
+  },
+  "business_context": {
+    "business_model": "Founder-led direct-to-consumer home and work accessories",
+    "ambition": "Own the mixed-use home workspace and prove a profitable route from first object to repeat purchase before buying more reach.",
+    "geography": "United Kingdom",
+    "stage": "Fictional established small business",
+    "known_constraints": [
+      "No real client analytics supplied",
+      "No transaction export supplied",
+      "No customer research supplied",
+      "No approved implementation budget supplied"
+    ]
+  },
+  "evidence_ledger": [
+    {
+      "evidence_id": "A1",
+      "source_id": "A1",
+      "classification": "ASSUMPTION",
+      "claim": "FIELDWORK receives 600,000 ecommerce sessions per year.",
+      "value": 600000,
+      "unit": "annual sessions",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed annual ecommerce sessions",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No GA4 export exists for this fictional company.",
+      "validation_step": "Reconcile an authorised GA4 export to ecommerce platform sessions and orders."
+    },
+    {
+      "evidence_id": "A2",
+      "source_id": "A2",
+      "classification": "ASSUMPTION",
+      "claim": "FIELDWORK converts 2.0% of ecommerce sessions to orders.",
+      "value": 0.02,
+      "unit": "session conversion rate",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed ecommerce conversion rate",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No analytics or order export exists for this fictional company.",
+      "validation_step": "Agree the conversion denominator and reconcile sessions to completed non-refunded orders."
+    },
+    {
+      "evidence_id": "A3",
+      "source_id": "A3",
+      "classification": "ASSUMPTION",
+      "claim": "FIELDWORK has a £100 average order value before returns and discounts.",
+      "value": 100,
+      "unit": "GBP per order",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed average order value",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "VAT, discounts and returns are not represented.",
+      "validation_step": "Calculate net realised order value from an authorised transaction export."
+    },
+    {
+      "evidence_id": "A4",
+      "source_id": "A4",
+      "classification": "ASSUMPTION",
+      "claim": "The principal growth constraint is a broad proposition that gives qualified buyers too little reason to choose FIELDWORK.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Working constraint hypothesis",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No customer, funnel or competitor research supports this diagnosis.",
+      "validation_step": "Run founder interviews, proposition testing and a controlled landing-page conversion test."
+    },
+    {
+      "evidence_id": "A5",
+      "source_id": "A5",
+      "classification": "ASSUMPTION",
+      "claim": "FIELDWORK can build an advantage around objects designed for the overlap between work and home life.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Proposed brand advantage",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No customer preference or competitor evidence supports ownability.",
+      "validation_step": "Test relevance, distinctiveness and willingness to pay with target customers."
+    },
+    {
+      "evidence_id": "A6",
+      "source_id": "A6",
+      "classification": "ASSUMPTION",
+      "claim": "A proposition-led acquisition, conversion and retention programme is operationally feasible.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Proposed growth engine",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No channel economics, media budget, inventory capacity or retention cohorts exist.",
+      "validation_step": "Obtain channel spend, contribution margin, stock capacity and cohort retention before scale."
+    },
+    {
+      "evidence_id": "A7",
+      "source_id": "A7",
+      "classification": "ASSUMPTION",
+      "claim": "A staged 12-month validation programme is affordable and resourced.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Proposed delivery roadmap",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No cost, owner capacity or dependency plan has been approved.",
+      "validation_step": "Scope the work, cost each phase and secure named owner commitments."
+    },
+    {
+      "evidence_id": "A8",
+      "source_id": "A8",
+      "classification": "ASSUMPTION",
+      "claim": "Incremental revenue contributes 32% after returns, fulfilment, payment fees and incremental media.",
+      "value": 0.32,
+      "unit": "incremental contribution margin",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed incremental contribution margin",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No product, channel, returns or fulfilment contribution data exists for this fictional company.",
+      "validation_step": "Reconcile order-level net revenue and variable costs by product and channel."
+    },
+    {
+      "evidence_id": "A9",
+      "source_id": "A9",
+      "classification": "ASSUMPTION",
+      "claim": "The business realises 35% to 65% of annualised scenario headroom in the first 12 months.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed first-year ramp",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No implementation plan, seasonality profile or test velocity supports the ramp range.",
+      "validation_step": "Build a monthly implementation plan with test cadence, seasonality and operational capacity."
+    },
+    {
+      "evidence_id": "A10",
+      "source_id": "A10",
+      "classification": "ASSUMPTION",
+      "claim": "The first 12 months require £85,000 of incremental implementation investment beyond the Growth Blueprint fee.",
+      "value": 85000,
+      "unit": "GBP",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Assumed implementation investment",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "low",
+      "limitations": "No suppliers, media plan, production scope or internal time costs have been quoted.",
+      "validation_step": "Obtain a costed delivery plan and separate one-off, variable and internal costs."
+    },
+    {
+      "evidence_id": "C1",
+      "source_id": "C1",
+      "classification": "CREATIVE ILLUSTRATION",
+      "claim": "Built for the work of living is an illustrative creative territory for FIELDWORK.",
+      "publisher": "Narratiive fictional fixture",
+      "title": "Creative territory illustration",
+      "location": "tests/fixtures/fieldwork_supervised_blueprint_v2.json",
+      "observed_at": "2026-10-14",
+      "confidence": "illustrative",
+      "limitations": "The territory has not been tested with a founder, customer or legal reviewer.",
+      "validation_step": "Test strategic fit, distinctiveness, comprehension and trademark risk before selection."
+    }
+  ],
+  "evidence_gaps": [
+    "Verified revenue by channel, tax basis, returns and discounts",
+    "Contribution margin, fulfilment cost and implementation budget",
+    "GA4 sessions and conversion definition",
+    "Customer needs, preference, retention and willingness to pay",
+    "Competitor positioning, pricing, share and creative activity",
+    "Inventory capacity, seasonality and cannibalisation"
+  ],
+  "commercial_model": {
+    "model_type": "ecommerce",
+    "currency": "GBP",
+    "input_evidence_ids": [
+      "A1",
+      "A2",
+      "A3",
+      "A8",
+      "A9",
+      "A10"
+    ],
+    "baseline": {
+      "annual_sessions": 600000,
+      "conversion_rate": 0.02,
+      "average_order_value": 100
+    },
+    "scenarios": [
+      {
+        "name": "Downside",
+        "annual_sessions": 630000,
+        "conversion_rate": 0.021,
+        "average_order_value": 102,
+        "year_one_realisation_rate": 0.35
+      },
+      {
+        "name": "Base",
+        "annual_sessions": 750000,
+        "conversion_rate": 0.024,
+        "average_order_value": 105,
+        "year_one_realisation_rate": 0.55
+      },
+      {
+        "name": "Upside",
+        "annual_sessions": 810000,
+        "conversion_rate": 0.026,
+        "average_order_value": 108,
+        "year_one_realisation_rate": 0.65
+      }
+    ],
+    "economics": {
+      "incremental_contribution_margin": 0.32,
+      "implementation_investment": 85000
+    },
+    "unresolved_inputs": [
+      "Actual net contribution margin by product and channel",
+      "Quoted implementation and production cost",
+      "Validated monthly ramp, seasonality and capacity",
+      "Cannibalisation and working-capital impact"
+    ]
+  },
+  "strategy": {
+    "constraint": {
+      "statement": "FIELDWORK is buying attention for a broad design promise before it has proved why a mixed-use household should choose its first object or return for the second.",
+      "falsification_test": "Reject this diagnosis if a specific mixed-use proposition does not improve qualified product-page progression and net conversion, or if existing cohorts already show strong second-purchase behaviour.",
+      "evidence_ids": [
+        "A4"
+      ]
+    },
+    "advantage": {
+      "statement": "FIELDWORK could own the mixed-use surface: modular objects designed for the daily collision of paid work, domestic life and limited space.",
+      "validation_test": "Compare this territory with organisation-led and status-led alternatives on relevance, distinctiveness, willingness to pay and unprompted recall.",
+      "evidence_ids": [
+        "A5"
+      ]
+    },
+    "thesis": "Turn the mixed-use surface into a category FIELDWORK can own, then prove that one useful object earns the next purchase before scaling acquisition.",
+    "recommendations": [
+      {
+        "name": "Own the mixed-use surface",
+        "action": "Organise the proposition around the moments when work and home collide, rather than a broad accessories catalogue.",
+        "lever": "Qualified conversion",
+        "test": "Controlled message and landing-page test",
+        "trade_off": "A narrower promise may reduce broad but low-intent traffic.",
+        "owner": "Strategy Director",
+        "evidence_ids": [
+          "A4",
+          "A5"
+        ]
+      },
+      {
+        "name": "Make usefulness visible",
+        "action": "Merchandise each object through a specific domestic work moment, with dimensions, material decisions and usage proof visible before purchase.",
+        "lever": "Conversion and average order value",
+        "test": "Product-story comprehension and basket test",
+        "trade_off": "More proof requires disciplined production and may expose weak claims.",
+        "owner": "Creative Director",
+        "evidence_ids": [
+          "A5",
+          "C1"
+        ]
+      },
+      {
+        "name": "Earn the second object",
+        "action": "Build modular add-on, post-purchase and referral tests that reveal whether the first object creates a repeatable customer system.",
+        "lever": "Second-purchase economics",
+        "test": "Cohort retention and referral pilot",
+        "trade_off": "Near-term reach grows more slowly while economics are validated.",
+        "owner": "Strategy Director",
+        "evidence_ids": [
+          "A6"
+        ]
+      }
+    ]
+  },
+  "creative_territory": {
+    "name": "Built for the work of living",
+    "platform": "Objects designed for the table where invoices, lunch, school drawings and late calls all happen.",
+    "description": "Use real traces of domestic work as the setting, then annotate the product decisions that make a shared surface calmer without pretending life is tidy.",
+    "asset_path": "fieldwork/built-for-the-work-of-living-v1.png",
+    "asset_alt": "Fictional FIELDWORK modular desk object on a lived-in dining table shared by work and family life",
+    "primary_phrase": "USEFUL BY DESIGN",
+    "secondary_phrase": "HUMAN IN PRACTICE",
+    "principles": [
+      [
+        "OBSERVE",
+        "Real work leaves traces"
+      ],
+      [
+        "PROVE",
+        "Materials and use stay visible"
+      ],
+      [
+        "REPEAT",
+        "One warm orange work mark"
+      ]
+    ],
+    "example_execution": "A film keeps the camera on one dining table as invoice, lunch, school drawing and late call replace each other. The FIELDWORK object stays, adapts and gathers the day's essential tools. Product annotations explain every material and modular choice.",
+    "validation_test": "Test founder authenticity, customer recognition, distinctiveness and whether the territory improves product understanding.",
+    "evidence_ids": [
+      "A5",
+      "C1"
+    ]
+  },
+  "growth_engine": {
+    "thesis": "Use the owned site to prove the mixed-use proposition, then use the first object to earn a second purchase before paid media scales the system.",
+    "scale_gate": "Increase paid acquisition only after proposition comprehension, net conversion and cohort contribution improve without unacceptable returns or discounting.",
+    "evidence_ids": [
+      "A6"
+    ],
+    "channels": [
+      {
+        "channel": "Owned site",
+        "role": "Prove the proposition and convert qualified demand",
+        "gate": "Message comprehension and net conversion"
+      },
+      {
+        "channel": "CRM",
+        "role": "Build repeat, cross-sell and referral evidence",
+        "gate": "Cohort contribution and opt-out guardrail"
+      },
+      {
+        "channel": "Paid social",
+        "role": "Scale tested creative and proposition routes",
+        "gate": "Incremental contribution after creative and media cost"
+      },
+      {
+        "channel": "Partnerships",
+        "role": "Reach relevant work and design communities",
+        "gate": "Qualified traffic and assisted conversion"
+      }
+    ],
+    "measurement": [
+      {
+        "level": "LEADING",
+        "metrics": "Proposition comprehension, qualified click-through, product-page progression"
+      },
+      {
+        "level": "BEHAVIOURAL",
+        "metrics": "Net conversion, average order value, repeat and referral"
+      },
+      {
+        "level": "COMMERCIAL",
+        "metrics": "Contribution after returns, fulfilment, media and implementation"
+      }
+    ]
+  },
+  "roadmap": [
+    {
+      "period": "Months 1-3",
+      "name": "Establish the truth",
+      "outcome": "Verify economics, interview customers and test three proposition routes.",
+      "owner": "Research Analyst and Strategy Director",
+      "decision_gate": "Matt selects a proposition test and approves its bounded budget.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A7"
+      ]
+    },
+    {
+      "period": "Months 4-6",
+      "name": "Prove the proposition",
+      "outcome": "Run controlled site, product-story and CRM tests with contribution guardrails.",
+      "owner": "Strategy Director and Creative Director",
+      "decision_gate": "Continue only if comprehension and net conversion improve.",
+      "evidence_ids": [
+        "A6",
+        "A7",
+        "C1"
+      ]
+    },
+    {
+      "period": "Months 7-9",
+      "name": "Build the engine",
+      "outcome": "Codify winning creative, CRM and referral mechanics and assess capacity.",
+      "owner": "Tony coordinating responsible specialists",
+      "decision_gate": "Approve scale only when repeat economics and stock capacity support it.",
+      "evidence_ids": [
+        "A6",
+        "A7"
+      ]
+    },
+    {
+      "period": "Months 10-12",
+      "name": "Scale selectively",
+      "outcome": "Increase investment in validated routes and document what changed commercially.",
+      "owner": "Tony coordinating responsible specialists",
+      "decision_gate": "Matt approves any material commercial commitment or client-facing release.",
+      "evidence_ids": [
+        "A6",
+        "A7"
+      ]
+    }
+  ]
+}
