@@ -8,6 +8,7 @@ from unittest import mock
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
 from runtime.tony_claude_api_dispatcher import ClaudeDispatcherConfigError, build_claude_api_dispatcher
 from runtime.tony_dispatch_adapters import build_http_dispatchers
+from runtime.model_usage_budget import ModelBudgetConfigurationError
 
 
 class _Response:
@@ -25,6 +26,14 @@ class _Response:
 
 
 class TonyClaudeAPIDispatcherTests(unittest.TestCase):
+    def setUp(self):
+        budget_factory = mock.patch(
+            "runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment",
+            return_value=None,
+        )
+        budget_factory.start()
+        self.addCleanup(budget_factory.stop)
+
     def _env(self):
         return {
             "TONY_DISPATCH_CLAUDE_MODE": "anthropic_api",
@@ -131,6 +140,82 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         for value in ("invalid", "0", "-1"):
             with self.subTest(value=value), self.assertRaises(ClaudeDispatcherConfigError):
                 build_claude_api_dispatcher({**self._env(), "TONY_DISPATCH_CLAUDE_TIMEOUT_SECONDS": value})
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment")
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_ambiguous_transport_failure_retains_budget_reservation(self, urlopen, guard_factory):
+        guard = guard_factory.return_value
+        reservation = object()
+        guard.reserve_capacity.return_value = reservation
+        guard.default_request_reserve_usd = 1
+        guard.pricing.input_usd_per_mtok = 3
+        guard.pricing.cache_write_usd_per_mtok = 6
+        guard.pricing.output_usd_per_mtok = 15
+        urlopen.side_effect = TimeoutError("ambiguous timeout")
+
+        with self.assertRaisesRegex(TimeoutError, "ambiguous timeout"):
+            build_claude_api_dispatcher(self._env())(self._contract())
+
+        guard.release_reservation.assert_not_called()
+        guard.settle_direct_usage.assert_not_called()
+        guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment")
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_success_without_usage_retains_reservation_and_fails_closed(self, urlopen, guard_factory):
+        guard = guard_factory.return_value
+        reservation = object()
+        guard.reserve_capacity.return_value = reservation
+        guard.default_request_reserve_usd = 1
+        guard.pricing.input_usd_per_mtok = 3
+        guard.pricing.cache_write_usd_per_mtok = 6
+        guard.pricing.output_usd_per_mtok = 15
+        urlopen.return_value = _Response(
+            {
+                "id": "msg_unknown_usage",
+                "model": "claude-test-model",
+                "stop_reason": "end_turn",
+                "content": [{"type": "text", "text": '{"work_product":"SAFE draft"}'}],
+            }
+        )
+
+        with self.assertRaises(ModelBudgetConfigurationError):
+            build_claude_api_dispatcher(self._env())(self._contract())
+
+        guard.release_reservation.assert_not_called()
+        guard.settle_direct_usage.assert_not_called()
+        guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.HostedModelBudgetGuard.from_environment")
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_invalid_billing_response_id_retains_reservation_and_fails_closed(
+        self, urlopen, guard_factory
+    ):
+        for response_id in (123, True, "   ", None):
+            with self.subTest(response_id=response_id):
+                guard = guard_factory.return_value
+                guard.reset_mock()
+                reservation = object()
+                guard.reserve_capacity.return_value = reservation
+                guard.default_request_reserve_usd = 1
+                guard.pricing.input_usd_per_mtok = 3
+                guard.pricing.cache_write_usd_per_mtok = 6
+                guard.pricing.output_usd_per_mtok = 15
+                payload = {
+                    "model": "claude-test-model",
+                    "stop_reason": "end_turn",
+                    "usage": {"input_tokens": 1, "output_tokens": 2},
+                    "content": [{"type": "text", "text": '{"work_product":"SAFE draft"}'}],
+                }
+                if response_id is not None:
+                    payload["id"] = response_id
+                urlopen.return_value = _Response(payload)
+
+                with self.assertRaisesRegex(RuntimeError, "billing response id"):
+                    build_claude_api_dispatcher(self._env())(self._contract())
+
+                guard.settle_direct_usage.assert_not_called()
+                guard.retain_ambiguous_reservation.assert_called_once_with(reservation)
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_long_form_strategy_and_discovery_work_uses_its_bounded_output_budget(self, urlopen):
@@ -246,7 +331,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
                         "type": "text",
                         "text": json.dumps(
                             {
-                                "blueprint_lite": "A concise outside-in Blueprint Lite",
+                                "blueprint_lite": "A concise outside-in Groundwork",
                                 "source_backed_evidence": ["https://example.com/source"],
                                 "evidence_gaps": ["Internal customer data is unavailable"],
                                 "fact_interpretation_hypothesis_lineage": {
@@ -273,9 +358,9 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         req = urlopen.call_args.args[0]
         sent = json.loads(req.data.decode("utf-8"))
         prompt = sent["messages"][0]["content"]
-        self.assertIn("For Blueprint Lite work", prompt)
+        self.assertIn("For Blueprint Lite workflow work", prompt)
         self.assertIn("blueprint_lite is required", prompt)
-        self.assertIn("must contain the substantive, personalised free strategic follow-up itself", prompt)
+        self.assertIn("must contain the substantive, personalised free Groundwork itself", prompt)
         self.assertIn("facts, interpretations and hypotheses", prompt)
         self.assertIn("growth_tension", prompt)
         self.assertIn("provisional_opportunity", prompt)
@@ -285,7 +370,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertIn("record those research and context limitations under evidence_gaps", prompt)
         self.assertIn("human-review-ready", prompt)
         self.assertIn("at the top level", prompt)
-        self.assertIn("Do not turn Blueprint Lite into the paid Growth Blueprint", prompt)
+        self.assertIn("Do not turn Groundwork into the paid Growth Blueprint", prompt)
 
     def test_dispatcher_rejects_any_non_prepare_or_unapproved_contract_shape(self):
         handler = build_claude_api_dispatcher(self._env())
@@ -318,7 +403,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_blueprint_lite_json_after_model_preamble_is_parsed(self, urlopen):
         work_product = {
-            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "blueprint_lite": "A concise synthetic Groundwork",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "recommendation": "advance",
         }
@@ -345,7 +430,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_model_added_work_product_envelope_is_promoted_for_quality_validation(self, urlopen):
         work_product = {
-            "blueprint_lite": "A concise synthetic Blueprint Lite",
+            "blueprint_lite": "A concise synthetic Groundwork",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
             "source_backed_evidence": ["https://example.invalid/source"],
@@ -390,7 +475,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_plural_lineage_keys_are_normalised_before_quality_validation(self, urlopen):
         work_product = {
-            "blueprint_lite": "A substantive synthetic Blueprint Lite for contract validation.",
+            "blueprint_lite": "A substantive synthetic Groundwork for contract validation.",
             "diagnostic_signals_used": ["Synthetic diagnostic signal"],
             "diagnostic_input_coverage": {"complete": True, "missing_inputs": []},
             "source_backed_evidence": ["https://example.invalid/source"],

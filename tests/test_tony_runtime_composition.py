@@ -24,6 +24,13 @@ from tests.test_workflow_mission_control import _blueprint_output
 
 
 class TonyRuntimeCompositionTests(unittest.TestCase):
+    def setUp(self):
+        budget_factory = mock.patch.object(
+            tony_live_bridge.HostedModelBudgetGuard, "from_environment", return_value=None
+        )
+        budget_factory.start()
+        self.addCleanup(budget_factory.stop)
+
     def test_composition_exposes_persisted_campaign_engine_portfolio(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -165,6 +172,7 @@ class TonyRuntimeCompositionTests(unittest.TestCase):
             ), mock.patch.dict(
                 "os.environ",
                 {
+                    "TONY_HOSTED_MODEL_BUDGET_ENFORCEMENT": "disabled",
                     "TONY_INBOUND_LEADS_PATH": str(root / "leads.json"),
                     "TONY_WORKFLOW_RUNTIME_ROOT": str(root / "workflows"),
                 },

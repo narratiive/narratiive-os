@@ -148,7 +148,8 @@ class TonyPromisedWorkTests(unittest.TestCase):
             page.extract_text() or ""
             for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
         )
-        self.assertIn("Growth Sprint Proposal", visible)
+        self.assertIn("Fieldwork Proposal", visible)
+        self.assertNotIn("Growth Sprint", visible)
         self.assertIn("The growth challenge", visible)
         self.assertIn("Proposed workstreams", visible)
         for internal in (

@@ -217,8 +217,8 @@ def proposal_output() -> dict:
             {"workstream": "Positioning", "questions": ["Which defensible difference can organise the growth story clearly?"]},
         ],
         "expected_growth_blueprint_outputs": ["Market and category diagnosis", "Audience definition", "Growth barriers", "Positioning", "Narrative platform"],
-        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Growth Sprint range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
-        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend a focused Growth Sprint spanning audience, category and positioning research, culminating in the Narratiive Growth Blueprint. The attached scope remains a draft for review, including timing, dependencies and a proposed investment that requires final human approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
+        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Fieldwork range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
+        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend a focused Fieldwork engagement spanning audience, category and positioning research, culminating in the Narratiive Growth Blueprint. The attached scope remains a draft for review, including timing, dependencies and a proposed investment that requires final human approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
         "assumptions_and_dependencies": ["Access to existing customer evidence", "Availability of commercial stakeholders for interviews"],
         "evidence_lineage": [
             {"claim": "Demand quality is urgent.", "classification": "fact", "source_refs": ["meeting:notes:1"]},
@@ -609,6 +609,31 @@ class WorkflowQualityTests(unittest.TestCase):
         denied["draft_client_communication"] += " No email sent; this remains internal."
         self.assertTrue(growth_sprint_proposal_quality_gate(denied)["passed"])
 
+        legacy_name = proposal_output()
+        legacy_name["draft_client_communication"] = legacy_name["draft_client_communication"].replace(
+            "Fieldwork engagement", "Growth Sprint engagement"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_name)
+        self.assertFalse(result["passed"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
+
+        legacy_review_field = proposal_output()
+        legacy_review_field["commercial_proposal_inputs"]["investment_recommendation"] = (
+            "Within the authorised Growth Sprint range, exact figure for human approval"
+        )
+        result = growth_sprint_proposal_quality_gate(legacy_review_field)
+        self.assertFalse(result["passed"])
+        self.assertIn("customer visible proposal uses current product names", result["failed_checks"])
+
+        proper_name = proposal_output()
+        proper_name["draft_client_communication"] += " Growth Sprint Technologies remains the named client in this synthetic example."
+        self.assertTrue(
+            growth_sprint_proposal_quality_gate(
+                proper_name,
+                protected_customer_identities=("Growth Sprint Technologies",),
+            )["passed"]
+        )
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {
@@ -638,7 +663,7 @@ class WorkflowQualityTests(unittest.TestCase):
                         "content_hash": "safe-hash",
                     }],
                 },
-                "blueprint_lite": "Synthetic Blueprint Lite",
+                "blueprint_lite": "Synthetic Groundwork",
                 "commercial_context": {},
             },
         )

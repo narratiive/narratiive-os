@@ -125,7 +125,7 @@ class TonyPromisedWorkWorker:
         ][:3]
         points = " ".join(f"• {item}" for item in conclusions)
         return (
-            "Gate 2 is ready. I’ve completed the Growth Sprint proposal and sent the full review copy to "
+            "Gate 2 is ready. I’ve completed the Fieldwork proposal and sent the full review copy to "
             "hello@narratiive.com. "
             + (points + " " if points else "")
             + "I need your judgement on the proposed engagement. You can approve it here, request a revision, or tell me what should change."
