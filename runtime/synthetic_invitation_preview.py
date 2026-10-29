@@ -16,6 +16,11 @@ from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS
 
 
 PREFIX = "NARRATIIVE_SYNTHETIC_INVITATION_"
+INVITATION_SECTIONS = (
+    "THE BIGGER AMBITION",
+    "THE PEOPLE WHO MATTER",
+    "WHAT MAKES YOU UNMISSABLE",
+)
 
 
 def build_invitation_preview(
@@ -49,8 +54,10 @@ def build_invitation_preview(
     except json.JSONDecodeError:
         insights = []
         blockers.append(f"Configure valid JSON for {PREFIX}INSIGHTS_JSON.")
-    if not isinstance(insights, list) or not 1 <= len(insights) <= 3:
-        blockers.append("Provide one to three validated insight/question pairs.")
+    if not isinstance(insights, list) or len(insights) != len(INVITATION_SECTIONS):
+        blockers.append(
+            "Provide exactly three validated insight/question pairs for the Discovery invitation."
+        )
         insights = []
     for insight in insights:
         if not isinstance(insight, dict) or not all(str(insight.get(key, "")).strip() for key in ("observation", "question", "source_ref")):
@@ -95,22 +102,12 @@ def build_invitation_preview(
     email = {
         "from": values["GMAIL_SENDER"], "to": values["RECIPIENT"],
         "cc": [], "bcc": [], "attachments": [],
-        "subject": f"[SYNTHETIC TEST] {values['COMPANY_NAME']} — 30-minute Discovery conversation",
-        "body": (
-            "Hello,\n\nThis is test correspondence only for Narratiive's synthetic "
-            f"Discovery journey for {values['COMPANY_NAME']}. Following the completed "
-            "internal Discovery Preparation, please book a 30-minute simulated Discovery "
-            "conversation using this page:\n"
-            f"{values['BOOKING_URL']}\n\n"
-            "The preferred meeting platform is Google Meet. If the test is booked, its "
-            "Google Meet transcript and Gemini notes are the intended evidence source; "
-            "Fireflies is only an optional fallback. No real client work, commercial "
-            "commitment, or purchase is being commissioned.\n\nNarratiive"
-        ),
+        "subject": f"[SYNTHETIC TEST] {values['COMPANY_NAME']} — three things worth discussing",
+        "body": _render_text(values, insights),
     }
     email["html"] = _render_html(values, insights)
     material = {
-        "version": 1, "workspace_id": workspace_id, "email": email,
+        "version": 2, "workspace_id": workspace_id, "email": email,
         "sender_authority_ref": values["SENDER_AUTHORITY_REF"],
         "booking_authority_ref": values["BOOKING_AUTHORITY_REF"],
         "company_name": values["COMPANY_NAME"],
@@ -119,6 +116,10 @@ def build_invitation_preview(
         "meeting_duration_minutes": 30,
         "meeting_evidence_source": "google_meet_transcript_and_gemini_notes",
         "booking_mechanism": "configured_authorised_booking_page",
+        "validated_insights": [
+            {key: str(item[key]) for key in ("observation", "question", "source_ref")}
+            for item in insights
+        ],
     }
     checksum = hashlib.sha256(json.dumps(
         material, sort_keys=True, separators=(",", ":"), ensure_ascii=False
@@ -143,22 +144,44 @@ def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
     company = html.escape(values["COMPANY_NAME"])
     booking = html.escape(values["BOOKING_URL"], quote=True)
     signature = html.escape(values["FOUNDER_SIGNATURE"])
-    rows = "".join(
+    sections = "".join(
         "<tr><td style=\"padding:14px 0;border-bottom:1px solid #dbe4ef\">"
-        f"<strong style=\"color:#10243e\">{index}. {html.escape(str(item['observation']))}</strong>"
-        f"<br><span style=\"color:#38506b\">{html.escape(str(item['question']))}</span></td></tr>"
-        for index, item in enumerate(insights, 1)
+        f"<strong style=\"color:#d96b3b;font-size:12px;letter-spacing:.4px\">{title}</strong>"
+        f"<p style=\"color:#10243e;line-height:1.5;margin:7px 0 5px\">{html.escape(str(item['observation']))}</p>"
+        f"<p style=\"color:#38506b;line-height:1.5;margin:0\">{html.escape(str(item['question']))}</p>"
+        "</td></tr>"
+        for title, item in zip(INVITATION_SECTIONS, insights, strict=True)
     )
     return (
         "<!doctype html><html><body style=\"margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#10243e\">"
         "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:20px\">"
         "<table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;background:#fff\">"
         "<tr><td style=\"padding:26px 28px 12px;font-size:22px;font-weight:bold;letter-spacing:.5px\">NARRATIIVE</td></tr>"
-        f"<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">{company}: a few things worth comparing notes on</h1>"
-        f"<p style=\"line-height:1.5;margin:0\">We have reviewed the submitted Growth Diagnostic and completed internal GROUNDWORK. These are questions to test together, not conclusions about your business.</p></td></tr>"
-        "<tr><td style=\"padding:18px 28px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f0f5fa\"><tr><td style=\"padding:16px\"><strong>WHAT WE'RE SEEING</strong><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
-        + rows + "</table></td></tr></table></td></tr>"
-        f"<tr><td style=\"padding:8px 28px 26px\"><strong>LET'S COMPARE NOTES</strong><p style=\"line-height:1.5\">A 30-minute Google Meet conversation will help us test these observations against your experience.</p>"
+        f"<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">{company}: three things worth exploring</h1>"
+        f"<p style=\"line-height:1.5;margin:0\">Thanks for reaching out. We've had an interesting look around {company}, and there's something we'd love to explore with you.</p></td></tr>"
+        "<tr><td style=\"padding:18px 28px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f0f5fa\"><tr><td style=\"padding:16px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
+        + sections + "</table></td></tr></table></td></tr>"
+        f"<tr><td style=\"padding:8px 28px 26px\"><p style=\"line-height:1.5\">If it feels useful, let's compare notes in a 30-minute Google Meet.</p>"
         f"<a href=\"{booking}\" style=\"display:inline-block;background:#d96b3b;color:#ffffff;padding:13px 18px;text-decoration:none;font-weight:bold\">Book a 30-minute conversation</a>"
-        f"<p style=\"line-height:1.5;margin:22px 0 0\">{signature}</p></td></tr></table></td></tr></table></body></html>"
+        f"<p style=\"font-size:12px;line-height:1.5;color:#596b80;margin:18px 0 0\">This is a clearly labelled synthetic test. No commercial commitment is being requested.</p><p style=\"line-height:1.5;margin:22px 0 0\">{signature}</p></td></tr></table></td></tr></table></body></html>"
+    )
+
+
+def _render_text(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -> str:
+    """Plain-text equivalent of the permanent evidence-bound invitation voice."""
+    sections = "\n\n".join(
+        f"{title}\n{item['observation']}\n{item['question']}"
+        for title, item in zip(INVITATION_SECTIONS, insights, strict=True)
+    )
+    return (
+        "Hello,\n\n"
+        f"Thanks for reaching out. We've had an interesting look around {values['COMPANY_NAME']}, "
+        "and there's something we'd love to explore with you.\n\n"
+        f"{sections}\n\n"
+        "If it feels useful, let's compare notes in a 30-minute Google Meet.\n"
+        f"{values['BOOKING_URL']}\n\n"
+        "This is a clearly labelled synthetic test. No commercial commitment is being requested. "
+        "If the test is booked, Google Meet transcript and Gemini notes are the intended evidence "
+        "source; Fireflies is only an optional fallback.\n\n"
+        f"{values['FOUNDER_SIGNATURE']}"
     )

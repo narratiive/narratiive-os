@@ -24,7 +24,11 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             "ENTITY_ID": "synthetic-entity-1",
             "DISCOVERY_PREPARATION_REF": "artifact-synthetic-discovery-v1",
             "MEETING_DURATION_MINUTES": "30",
-            "INSIGHTS_JSON": json.dumps([{"observation": "Validated fixture observation.", "question": "What would change this view?", "source_ref": "fixture:1"}]),
+            "INSIGHTS_JSON": json.dumps([
+                {"observation": "Validated fixture ambition.", "question": "What would make it more useful?", "source_ref": "fixture:1"},
+                {"observation": "Validated fixture audience.", "question": "Who matters most here?", "source_ref": "fixture:2"},
+                {"observation": "Validated fixture distinction.", "question": "What should be unmissable?", "source_ref": "fixture:3"},
+            ]),
             "FOUNDER_SIGNATURE": "Matt Franks\nFounder, Narratiive",
         }.items()}
 
@@ -52,10 +56,14 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.assertIn(self.config[PREFIX + "BOOKING_URL"], email["body"])
         self.assertEqual(result["approval_digest"]["entity_id"], "synthetic-entity-1")
         self.assertEqual(result["approval_digest"]["meeting_duration_minutes"], 30)
-        self.assertIn("WHAT WE'RE SEEING", email["html"])
-        self.assertIn("LET'S COMPARE NOTES", email["html"])
+        self.assertIn("Thanks for reaching out. We've had an interesting look around", email["body"])
+        for section in ("THE BIGGER AMBITION", "THE PEOPLE WHO MATTER", "WHAT MAKES YOU UNMISSABLE"):
+            self.assertIn(section, email["body"])
+            self.assertIn(section, email["html"])
         self.assertIn("Book a 30-minute conversation", email["html"])
         self.assertNotIn("fixture:1", email["html"])
+        self.assertNotIn("fixture:1", email["body"])
+        self.assertEqual(len(result["approval_digest"]["validated_insights"]), 3)
         self.assertEqual(email["cc"] + email["bcc"] + email["attachments"], [])
         self.assertEqual(result["status"], "awaiting_approval")
         self.assertFalse(result["external_action_taken"])
@@ -162,7 +170,16 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
     def test_missing_or_unsafe_insights_block_personalised_preview(self):
         missing = {**self.config, PREFIX + "INSIGHTS_JSON": "[]"}
         self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=missing)["status"], "blocked")
-        unsafe = {**self.config, PREFIX + "INSIGHTS_JSON": '[{"observation":"<script>","question":"Why?","source_ref":"fixture"}]'}
+        incomplete = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
+            {"observation": "One.", "question": "Why?", "source_ref": "fixture:1"},
+            {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
+        ])}
+        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=incomplete)["status"], "blocked")
+        unsafe = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
+            {"observation": "<script>", "question": "Why?", "source_ref": "fixture:1"},
+            {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
+            {"observation": "Three.", "question": "Why?", "source_ref": "fixture:3"},
+        ])}
         result = build_invitation_preview(workspace_id="synthetic-test", config=unsafe)
         self.assertEqual(result["status"], "awaiting_approval")
         self.assertNotIn("<script>", result["email_preview"]["html"])

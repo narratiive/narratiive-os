@@ -9,6 +9,13 @@ internal in-memory email preview and exact-content SHA-256 approval digest.
 It does not send, schedule, contact providers, create a prospect, persist private
 values, or record approval. No live integration has been verified by this change.
 
+The permanent Discovery-invitation default is a warm, concise conversation:
+**THE BIGGER AMBITION**, **THE PEOPLE WHO MATTER**, and **WHAT MAKES YOU
+UNMISSABLE**. Each section requires one validated GROUNDWORK observation and
+one question, with its internal source reference retained only in the approval
+material. The renderer fails closed unless all three are present; it never
+manufactures company-specific copy.
+
 Call with an explicit `workspace_id` and a private configuration mapping, or omit
 `config` to resolve environment values at call time. Required keys share the
 `NARRATIIVE_SYNTHETIC_INVITATION_` prefix:
