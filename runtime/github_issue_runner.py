@@ -31,6 +31,7 @@ RUNNER_STAGES = {
     "claim_published",
     "worktree_ready",
     "codex_running",
+    "codex_capacity_wait",
     "codex_exited",
     "codex_complete",
     "pushed",
@@ -59,6 +60,15 @@ class AlreadyRunning(IssueRunnerError):
 
 class TransientGitHubError(IssueRunnerError):
     """Raised for a GitHub condition that must not convert work into a block."""
+
+
+class CodexCapacityExhausted(IssueRunnerError):
+    """A temporary Codex usage or capacity limit with retained process evidence."""
+
+    def __init__(self, message: str, evidence: Mapping[str, Any], retry_after_seconds: int) -> None:
+        super().__init__(message)
+        self.evidence = dict(evidence)
+        self.retry_after_seconds = retry_after_seconds
 
 
 def utc_now() -> str:
@@ -175,8 +185,6 @@ class RunnerConfig:
             raise IssueRunnerError("github_cli_executable is required")
         if not self.github_home.is_dir():
             raise IssueRunnerError("github_home must be an existing directory")
-        if not self.codex_home.is_dir():
-            raise IssueRunnerError("codex_home must be an existing directory")
         bounds = {
             "poll_seconds": (self.poll_seconds, 5, 3600),
             "codex_timeout_seconds": (self.codex_timeout_seconds, 60, 7200),
@@ -686,6 +694,13 @@ class CodexExecutor:
         )
         evidence.update(self._persist_output(job, stdout, stderr))
         if process.returncode != 0:
+            retry_after_seconds = _codex_capacity_retry_after(stdout, stderr)
+            if retry_after_seconds is not None:
+                raise CodexCapacityExhausted(
+                    "Codex capacity is temporarily exhausted",
+                    evidence,
+                    retry_after_seconds,
+                )
             raise ProcessFailure(
                 f"Codex exited with status {process.returncode}", evidence
             )
@@ -733,6 +748,42 @@ class ProcessFailure(IssueRunnerError):
     def __init__(self, message: str, evidence: Mapping[str, Any]) -> None:
         super().__init__(message)
         self.evidence = dict(evidence)
+
+
+def _codex_capacity_retry_after(stdout: str, stderr: str) -> int | None:
+    """Classify only explicit temporary capacity responses; auth stays terminal."""
+    diagnostic = f"{stdout}\n{stderr}".casefold()
+    if any(marker in diagnostic for marker in ("authentication", "permission denied", "unauthorised", "unauthorized")):
+        return None
+    capacity_markers = (
+        "usage limit",
+        "usage exhausted",
+        "rate limit",
+        "rate_limit",
+        "quota exceeded",
+        "capacity exhausted",
+        "insufficient capacity",
+    )
+    if not any(marker in diagnostic for marker in capacity_markers):
+        return None
+    match = re.search(r"(?:retry|try again)(?:\s+after|\s+in)?\s+(\d+)\s*(seconds?|minutes?|hours?|s|m|h)\b", diagnostic)
+    if match:
+        value = int(match.group(1))
+        unit = match.group(2)
+        multiplier = 3600 if unit.startswith("h") else 60 if unit.startswith("m") else 1
+        return max(5, min(3600, value * multiplier))
+    # Do not hammer the service if it supplies no retry advice.
+    return 300
+
+
+def _parse_retry_at(value: str) -> datetime | None:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    if parsed.tzinfo is None:
+        return None
+    return parsed.astimezone(timezone.utc)
 
 
 class GitHubIssueRunner:
@@ -824,6 +875,11 @@ class GitHubIssueRunner:
                     job = self._move(job, "worktree_ready", **prepared)
                 elif stage == "worktree_ready":
                     job = self._run_codex(job)
+                elif stage == "codex_capacity_wait":
+                    retry_at = _parse_retry_at(str(job.get("capacity_retry_at", "")))
+                    if retry_at is not None and datetime.now(timezone.utc) < retry_at:
+                        return "capacity_wait"
+                    job = self._move(job, "worktree_ready", capacity_resumed_at=utc_now())
                 elif stage == "codex_running":
                     disposition = self.repository.inspect(job)
                     if disposition == "committed":
@@ -903,6 +959,21 @@ class GitHubIssueRunner:
             # Preserve the last durable stage and let the bounded service loop retry.
             # A temporary GitHub failure must never relabel an authorised issue blocked.
             raise
+        except CodexCapacityExhausted as exc:
+            latest = self.store.load() or job
+            retries = int(latest.get("capacity_retry_count", 0)) + 1
+            retry_after = min(3600, max(5, exc.retry_after_seconds))
+            retry_at = datetime.now(timezone.utc).timestamp() + retry_after
+            return_stage = self._move(
+                latest,
+                "codex_capacity_wait",
+                process_evidence=exc.evidence,
+                capacity_retry_count=retries,
+                capacity_retry_after_seconds=retry_after,
+                capacity_retry_at=datetime.fromtimestamp(retry_at, timezone.utc).isoformat(),
+                capacity_reason="temporary_usage_or_rate_limit",
+            )
+            return str(return_stage["stage"])
         except IssueRunnerError as exc:
             evidence = exc.evidence if isinstance(exc, ProcessFailure) else None
             latest = self.store.load() or job

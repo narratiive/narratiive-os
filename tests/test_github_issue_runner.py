@@ -27,6 +27,7 @@ READY_LABEL = runner_module.READY_LABEL
 REPOSITORY = runner_module.REPOSITORY
 REVIEW_LABEL = runner_module.REVIEW_LABEL
 CodexExecutor = runner_module.CodexExecutor
+CodexCapacityExhausted = runner_module.CodexCapacityExhausted
 GitHubCLI = runner_module.GitHubCLI
 GitHubIssueRunner = runner_module.GitHubIssueRunner
 Issue = runner_module.Issue
@@ -122,6 +123,28 @@ class FakeCodex:
 
     def execute(self, job, prompt):
         self.prompts.append(prompt)
+        self.repository.disposition = "committed"
+        return {
+            "returncode": 0,
+            "stdout": {"bytes": 0, "sha256": "0" * 64},
+            "stderr": {"bytes": 0, "sha256": "0" * 64},
+        }
+
+
+class CapacityThenSuccessCodex(FakeCodex):
+    def __init__(self, repository: FakeRepository) -> None:
+        super().__init__(repository)
+        self.remaining_capacity_failures = 1
+
+    def execute(self, job, prompt):
+        self.prompts.append(prompt)
+        if self.remaining_capacity_failures:
+            self.remaining_capacity_failures -= 1
+            raise CodexCapacityExhausted(
+                "Codex capacity is temporarily exhausted",
+                {"returncode": 1, "stderr": {"sha256": "1" * 64}},
+                5,
+            )
         self.repository.disposition = "committed"
         return {
             "returncode": 0,
@@ -371,6 +394,36 @@ class GitHubIssueRunnerTests(unittest.TestCase):
 
         self.assertEqual(service.run_once(), "review")
         self.assertEqual(len(codex.prompts), 1)
+        self.assertEqual(github.blocked, [])
+
+    def test_usage_exhaustion_preserves_job_and_retries_same_worktree(self) -> None:
+        issue = Issue(
+            504, "Canary", "Safe canary.",
+            "https://github.com/narratiive/narratiive-os/issues/504",
+            "trusted-owner", "2026-10-28T10:00:00Z", (READY_LABEL,),
+        )
+        github = FakeGitHub(issue)
+        repository = FakeRepository(self.root / "worktrees" / "issue-504")
+        codex = CapacityThenSuccessCodex(repository)
+        store = StateStore(self.config.state_root, REPOSITORY)
+        service = GitHubIssueRunner(
+            self.config, store=store, github=github, repository=repository, codex=codex
+        )
+
+        self.assertEqual(service.run_once(), "codex_capacity_wait")
+        waiting = store.load()
+        self.assertEqual(waiting["stage"], "codex_capacity_wait")
+        self.assertEqual(waiting["issue"]["number"], 504)
+        self.assertEqual(github.blocked, [])
+        self.assertEqual(repository.disposition, "base_clean")
+
+        store.transition({**waiting, "capacity_retry_at": "2000-01-01T00:00:00+00:00"})
+        restarted = GitHubIssueRunner(
+            self.config, store=store, github=github, repository=repository, codex=codex
+        )
+        self.assertEqual(restarted.run_once(), "review")
+        self.assertEqual(store.load()["stage"], "review")
+        self.assertEqual(len(codex.prompts), 2)
         self.assertEqual(github.blocked, [])
 
     def test_codex_environment_excludes_github_token_and_records_hashes_only(self) -> None:
