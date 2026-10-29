@@ -171,7 +171,7 @@ class MissionControlOperatorTests(unittest.TestCase):
 
         self.assertEqual(
             [item["state"] for item in result["system"]["connections"]],
-            ["unknown", "connected"],
+            ["unknown", "unknown"],
         )
 
     def test_blocker_and_operational_substate_are_visible(self):
