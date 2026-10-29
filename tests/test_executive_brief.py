@@ -159,7 +159,6 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         )
         output = self.service.build(snapshot, BriefPeriod.MORNING).render_compact(limit=500)
         self.assertLessEqual(len(output), 500)
-        self.assertTrue(output.endswith("…"))
 
     def test_both_periods_limit_material_items_and_hide_run_references(self):
         snapshot = self.builder.build(

@@ -232,7 +232,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
     def test_09_no_material_changes_produces_an_explicit_short_result(self):
         brief = AgencyExecutiveBriefService().build(AgencyState.from_items("now", ()))
 
-        self.assertIn("Material changes: none", brief.render_compact())
+        self.assertIn("No material change since the last briefing", brief.render_compact())
         self.assertEqual(brief.recommended_actions, ())
 
     def test_10_blocked_workflow_does_not_mark_whole_agency_blocked(self):
@@ -249,7 +249,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
         brief = AgencyExecutiveBriefService().build(state)
 
         self.assertEqual(brief.status, "healthy")
-        self.assertIn("agency is operational", brief.render_compact())
+        self.assertNotIn("Blueprint revision", brief.render_compact())
 
     def test_generic_founder_recommendation_fails_quality_validation(self):
         generic = AgencyItem(
@@ -267,6 +267,27 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
 
         with self.assertRaisesRegex(ValueError, "generic founder recommendation"):
             self.pipeline.validate(AgencyState.from_items("now", (generic,)))
+
+    def test_real_failure_pattern_keeps_only_one_current_business_decision(self):
+        state = AgencyState.from_items("now", (
+            AgencyItem("pr-511", AgencyArea.ENGINEERING, "PR #511 runtime check failed", "blocked", "Repair the check.", owner="Matt", evidence=("github:511",), blocked=True, requires_matt=True, entity_id="pr-511", significance="P1", why_matters="An engineering check failed."),
+            AgencyItem("katkin-v3", AgencyArea.DELIVERY, "KatKin v3 approval", "decision_required", "Approve the older KatKin version.", owner="Matt", evidence=("workflow:katkin-v3",), requires_matt=True, entity_id="katkin", significance="P1", why_matters="Historical candidate."),
+            AgencyItem("katkin-v5", AgencyArea.DELIVERY, "KatKin current deliverable", "decision_required", "Approve the current KatKin deliverable.", owner="Matt", evidence=("workflow:katkin-v5",), requires_matt=True, entity_id="katkin", significance="P1", why_matters="The current deliverable is ready for founder review."),
+            AgencyItem("generic", AgencyArea.DELIVERY, "Blueprint Lite", "decision_required", "Continue the current authorised internal workflow step.", owner="Matt", evidence=("workflow:private-run",), requires_matt=True, entity_id="generic", significance="P1", why_matters="Generic instruction."),
+            AgencyItem("loom", AgencyArea.DELIVERY, "Loom Loft proposal", "decision_required", "Approve the current Loom Loft proposal or request changes.", owner="Matt", evidence=("workflow:inbound-d1b96a67",), requires_matt=True, entity_id="loom-loft", significance="P1", why_matters="The approved client journey cannot progress without this decision."),
+        ))
+
+        refined = self.pipeline.refine(state)
+        output = AgencyExecutiveBriefService().build(refined).render_compact()
+
+        self.assertIn("Loom Loft proposal", output)
+        self.assertIn("KatKin", output)
+        self.assertEqual(output.count("KatKin current deliverable"), 1)
+        self.assertNotIn("KatKin v3 approval", output)
+        self.assertNotIn("PR #511", output)
+        self.assertNotIn("private-run", output)
+        self.assertNotIn("generic", output.casefold())
+        self.assertLessEqual(len(output.split()), 200)
 
 
 if __name__ == "__main__":

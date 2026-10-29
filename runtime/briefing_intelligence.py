@@ -278,12 +278,19 @@ class ExecutiveBriefingPipeline:
             self.baseline_store.store(snapshot)
 
     @classmethod
-    def _rank(cls, item: AgencyItem) -> tuple[int, int, int]:
+    def _rank(cls, item: AgencyItem) -> tuple[int, int, int, int]:
         return (
             cls.PRIORITY.get(item.significance, 4),
             0 if item.requires_matt else 1,
             0 if item.blocked else 1,
+            0 if cls._is_current_authority(item) else 1,
         )
+
+    @staticmethod
+    def _is_current_authority(item: AgencyItem) -> bool:
+        """Prefer an explicitly current item when records share one client identity."""
+        text = " ".join((item.title, item.next_action, item.why_matters)).casefold()
+        return any(marker in text for marker in ("current ", "latest ", "authoritative "))
 
     @staticmethod
     def _identity(item: AgencyItem) -> str:

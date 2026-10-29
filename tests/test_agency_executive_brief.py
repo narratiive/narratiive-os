@@ -30,7 +30,7 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         brief = AgencyExecutiveBriefService().build(state)
         output = brief.render_compact()
 
-        self.assertNotIn("Commercial:", output)
+        self.assertIn("No material change since the last briefing", output)
         self.assertNotIn("Create first qualified opportunity", output)
         self.assertNotIn("PR 104", output)
         self.assertNotIn("being handled in the background", output)
@@ -67,7 +67,7 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         self.assertEqual(brief.status, "blocked")
         self.assertIn("Lead response automation", output)
         self.assertIn("Webhook outage", output)
-        self.assertIn("Decisions and delivery risks:", output)
+        self.assertIn("Risks:", output)
 
     def test_empty_agency_state_recommends_commercial_action_not_repository_work(self):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())

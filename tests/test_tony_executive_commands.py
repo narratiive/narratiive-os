@@ -74,8 +74,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         self.assertEqual(response.command, "morning")
         self.assertEqual(response.status, "healthy")
         self.assertEqual(response.data["period"], "morning")
-        self.assertIn("Morning agency brief", response.message)
-        self.assertIn("No material founder decision or delivery risk is recorded.", response.message)
+        self.assertIn("Narratiive — Morning Brief", response.message)
         self.assertNotIn("Mission Control —", response.message)
         self.assertIn("agency_state", response.data)
         self.assertEqual(base.calls, [])
@@ -87,8 +86,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
 
         self.assertEqual(response.command, "evening")
         self.assertEqual(response.data["period"], "evening")
-        self.assertIn("End-of-day agency review", response.message)
-        self.assertIn("No material founder decision or delivery risk is recorded.", response.message)
+        self.assertIn("Narratiive — Evening Brief", response.message)
 
     def test_command_aliases_resolve_to_canonical_periods(self):
         service = executive_service(StubCommandService(snapshot))
@@ -170,7 +168,7 @@ class TonyExecutiveCommandServiceTests(unittest.TestCase):
         response = service.execute("/morning", [])
 
         self.assertEqual(response.status, "healthy")
-        self.assertIn("No material founder decision or delivery risk is recorded.", response.message)
+        self.assertIn("Narratiive — Morning Brief", response.message)
         self.assertNotIn("GitHub state is unavailable", response.message)
 
 

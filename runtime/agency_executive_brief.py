@@ -55,7 +55,12 @@ class AgencyExecutiveBrief:
         lines = [heading]
         self._append(lines, "What matters today", self.material_changes)
         self._append(lines, "Your decisions", self.matt_actions)
-        self._append(lines, "Progress", (*self.commercial, *self.clients, *self.delivery))
+        progress = tuple(
+            item
+            for item in (*self.commercial, *self.clients, *self.delivery)
+            if item not in self.material_changes
+        )[:3]
+        self._append(lines, "Progress", progress)
         self._append(lines, "Risks", self.agency_blockers)
         self._append(lines, "Tony's next actions", self.recommended_actions)
         if len(lines) == 1:
@@ -106,11 +111,14 @@ class AgencyExecutiveBriefService:
         business_items = tuple(
             item
             for item in priority_items
-            if item.area not in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
+            if (
+                item.area not in {AgencyArea.ENGINEERING, AgencyArea.INFRASTRUCTURE}
+                and item.significance != "P4"
+            )
         )
         commercial_items = tuple(
             item for item in visible
-            if item.area is AgencyArea.COMMERCIAL
+            if item.area is AgencyArea.COMMERCIAL and not item.blocked and item.significance != "P4"
             and item.classification not in {
                 "unverified_commercial_contact", "suspicious_commercial_contact",
                 "test", "internal", "spam", "duplicate", "deferred", "archived",
@@ -118,11 +126,11 @@ class AgencyExecutiveBriefService:
         )
         client_items = tuple(
             item for item in visible
-            if item.area is AgencyArea.CLIENTS and not item.requires_matt
+            if item.area is AgencyArea.CLIENTS and not item.requires_matt and not item.blocked and item.significance != "P4"
         )
         delivery_items = tuple(
             item for item in visible
-            if item.area is AgencyArea.DELIVERY and not item.requires_matt
+            if item.area is AgencyArea.DELIVERY and not item.requires_matt and not item.blocked and item.significance != "P4"
         )
         automation_items = tuple(
             item for item in visible
@@ -149,7 +157,7 @@ class AgencyExecutiveBriefService:
             )[: self.ITEM_LIMIT],
             internal_platform_note=platform_note,
             recommendation=self._recommendation(state),
-            material_changes=(material_summary,) if material_summary else (),
+            material_changes=material_summary,
             recommended_actions=tuple(
                 founder_text(item.next_action, limit=220)
                 for item in business_items

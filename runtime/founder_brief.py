@@ -4,7 +4,7 @@ import re
 
 
 _RUNTIME_REFERENCE = re.compile(
-    r"\b(?:workflow(?:[_ ]?run)?|run[_ ]?id|workstream)\s*[:#-]?\s*[a-z0-9][a-z0-9_.:-]{5,}\b",
+    r"\b(?:workflow(?:[_ ]?run)?|run[_ ]?id|workstream)\s*[:#-]?\s*[a-z0-9][a-z0-9_.-]{5,}\b",
     re.IGNORECASE,
 )
 _GITHUB_REFERENCE = re.compile(r"\b(?:pull request|pr|issue)\s*#?\d+\b", re.IGNORECASE)
@@ -28,7 +28,9 @@ def material_founder_lines(decisions: tuple[str, ...], risks: tuple[str, ...]) -
 
 def founder_text(value: str, *, limit: int = 260) -> str:
     """Strip implementation identifiers from a short founder-facing statement."""
-    text = _RUNTIME_REFERENCE.sub("", str(value))
+    text = re.sub(r"\b(?:workstream:)?workflow:[^\s:]+:", "", str(value), flags=re.IGNORECASE)
+    text = re.sub(r"\b(?:workflow_run|run_id|workstream):[^\s:]+:?", "", text, flags=re.IGNORECASE)
+    text = _RUNTIME_REFERENCE.sub("", text)
     text = _GITHUB_REFERENCE.sub("engineering item", text)
     text = " ".join(text.split()).strip(" -:;.")
     return text[:limit].rstrip()
