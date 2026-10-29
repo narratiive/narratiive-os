@@ -1017,16 +1017,28 @@ def run_service(
 ) -> None:
     service = GitHubIssueRunner(config)
     should_stop = stop or (lambda: False)
+    transient_failures = 0
     while not should_stop():
+        delay = config.poll_seconds
         try:
             service.run_once()
+            transient_failures = 0
         except AlreadyRunning:
             if once:
                 return
+        except TransientGitHubError as exc:
+            transient_failures += 1
+            # GitHub returns a shared-account rate limit; repeatedly polling does
+            # not make progress and can prolong recovery. Cap the pause so a
+            # restored service remains responsive without a restart.
+            delay = min(3600, config.poll_seconds * (2 ** min(transient_failures, 6)))
+            if once:
+                raise
+            print(f"GitHub issue runner failed closed: {exc}; retrying in {delay}s", file=sys.stderr)
         except IssueRunnerError as exc:
             if once:
                 raise
             print(f"GitHub issue runner failed closed: {exc}", file=sys.stderr)
         if once:
             return
-        time.sleep(config.poll_seconds)
+        time.sleep(delay)
