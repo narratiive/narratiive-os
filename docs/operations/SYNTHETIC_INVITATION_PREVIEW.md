@@ -16,6 +16,11 @@ one question, with its internal source reference retained only in the approval
 material. The renderer fails closed unless all three are present; it never
 manufactures company-specific copy.
 
+The authorised Loom Loft rehearsal (`inbound-d1b96a67`) is the sole exception:
+it uses the founder-approved fictional copy exactly as approved. That copy is
+explicitly isolated from all other entities; real-prospect invitations remain
+evidence-bound and must be personalised from verified research.
+
 Call with an explicit `workspace_id` and a private configuration mapping, or omit
 `config` to resolve environment values at call time. Required keys share the
 `NARRATIIVE_SYNTHETIC_INVITATION_` prefix:

@@ -21,6 +21,8 @@ INVITATION_SECTIONS = (
     "THE PEOPLE WHO MATTER",
     "WHAT MAKES YOU UNMISSABLE",
 )
+FOUNDER_APPROVED_SYNTHETIC_ENTITY = "inbound-d1b96a67"
+FOUNDER_APPROVED_SYNTHETIC_COMPANY = "Loom Loft"
 
 
 def build_invitation_preview(
@@ -141,6 +143,8 @@ def build_invitation_preview(
 
 def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -> str:
     """Render email-safe, self-contained HTML; source references stay in audit only."""
+    if _uses_founder_approved_synthetic_copy(values):
+        return _render_founder_approved_synthetic_html(values)
     company = html.escape(values["COMPANY_NAME"])
     booking = html.escape(values["BOOKING_URL"], quote=True)
     signature = html.escape(values["FOUNDER_SIGNATURE"])
@@ -169,6 +173,8 @@ def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
 
 def _render_text(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -> str:
     """Plain-text equivalent of the permanent evidence-bound invitation voice."""
+    if _uses_founder_approved_synthetic_copy(values):
+        return _founder_approved_synthetic_text(values["BOOKING_URL"])
     sections = "\n\n".join(
         f"{title}\n{item['observation']}\n{item['question']}"
         for title, item in zip(INVITATION_SECTIONS, insights, strict=True)
@@ -184,4 +190,63 @@ def _render_text(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
         "If the test is booked, Google Meet transcript and Gemini notes are the intended evidence "
         "source; Fireflies is only an optional fallback.\n\n"
         f"{values['FOUNDER_SIGNATURE']}"
+    )
+
+
+def _uses_founder_approved_synthetic_copy(values: Mapping[str, str]) -> bool:
+    """Keep the founder-approved fictional Loom Loft copy out of real-prospect paths."""
+    return (
+        values["ENTITY_ID"] == FOUNDER_APPROVED_SYNTHETIC_ENTITY
+        and values["COMPANY_NAME"] == FOUNDER_APPROVED_SYNTHETIC_COMPANY
+    )
+
+
+def _founder_approved_synthetic_text(booking_url: str) -> str:
+    """Exact founder-approved fictional copy for the authorised Loom Loft rehearsal."""
+    return (
+        "Hi [First Name],\n\n"
+        "Thanks for getting in touch. We’ve been having a look around Loom Loft, and we’re intrigued.\n\n"
+        "Furniture is an interesting business. People might come looking for a sofa, but what they’re really imagining is a different version of home. And that creates some exciting possibilities for a brand with ambition.\n\n"
+        "We’ve got a few thoughts. But we’d much rather explore them with you than jump to conclusions.\n\n"
+        "THREE THINGS WE’D LOVE TO EXPLORE\n\n"
+        "01 / HOW BIG COULD THIS GET?\n"
+        "Forget next quarter’s targets for a moment. Where do you really want to take Loom Loft? And what’s stopping you getting there faster?\n\n"
+        "02 / WHO COULD FALL IN LOVE WITH IT?\n"
+        "There’s a difference between reaching more people and becoming the brand that the right people actively seek out. Who are those people for Loom Loft?\n\n"
+        "03 / WHAT COULD MAKE YOU FAMOUS?\n"
+        "Not just another furniture retailer. A brand people recognise, remember and recommend. What could Loom Loft become known for?\n\n"
+        "LET’S FIND OUT TOGETHER.\n\n"
+        "I’d love to spend 30 minutes exploring what’s possible. We’ll bring an outside perspective, you bring the inside story, and we’ll see where the interesting opportunities emerge.\n\n"
+        "No pitch deck. No obligation. Just a good conversation.\n\n"
+        f"→ Book a 30-minute conversation\n{booking_url}\n\n"
+        "Looking forward to meeting you.\n\n"
+        "Matt\nFounder, Narratiive"
+    )
+
+
+def _render_founder_approved_synthetic_html(values: Mapping[str, str]) -> str:
+    """Render the supplied fictional copy verbatim, inside the existing email shell."""
+    booking = html.escape(values["BOOKING_URL"], quote=True)
+    return (
+        "<!doctype html><html><body style=\"margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#10243e\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:20px\">"
+        "<table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;background:#fff\">"
+        "<tr><td style=\"padding:26px 28px 12px;font-size:22px;font-weight:bold;letter-spacing:.5px\">NARRATIIVE</td></tr>"
+        "<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">Loom Loft — what could we build together?</h1>"
+        "<p style=\"line-height:1.5;margin:0 0 14px\">Hi [First Name],</p>"
+        "<p style=\"line-height:1.5;margin:0 0 14px\">Thanks for getting in touch. We’ve been having a look around Loom Loft, and we’re intrigued.</p>"
+        "<p style=\"line-height:1.5;margin:0 0 14px\">Furniture is an interesting business. People might come looking for a sofa, but what they’re really imagining is a different version of home. And that creates some exciting possibilities for a brand with ambition.</p>"
+        "<p style=\"line-height:1.5;margin:0\">We’ve got a few thoughts. But we’d much rather explore them with you than jump to conclusions.</p></td></tr>"
+        "<tr><td style=\"padding:18px 28px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f0f5fa\"><tr><td style=\"padding:16px\"><strong style=\"color:#d96b3b;font-size:12px;letter-spacing:.4px\">THREE THINGS WE’D LOVE TO EXPLORE</strong>"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
+        "<tr><td style=\"padding:14px 0;border-bottom:1px solid #dbe4ef\"><strong style=\"color:#10243e\">01 / HOW BIG COULD THIS GET?</strong><p style=\"color:#38506b;line-height:1.5;margin:7px 0 0\">Forget next quarter’s targets for a moment. Where do you really want to take Loom Loft? And what’s stopping you getting there faster?</p></td></tr>"
+        "<tr><td style=\"padding:14px 0;border-bottom:1px solid #dbe4ef\"><strong style=\"color:#10243e\">02 / WHO COULD FALL IN LOVE WITH IT?</strong><p style=\"color:#38506b;line-height:1.5;margin:7px 0 0\">There’s a difference between reaching more people and becoming the brand that the right people actively seek out. Who are those people for Loom Loft?</p></td></tr>"
+        "<tr><td style=\"padding:14px 0\"><strong style=\"color:#10243e\">03 / WHAT COULD MAKE YOU FAMOUS?</strong><p style=\"color:#38506b;line-height:1.5;margin:7px 0 0\">Not just another furniture retailer. A brand people recognise, remember and recommend. What could Loom Loft become known for?</p></td></tr>"
+        "</table></td></tr></table></td></tr>"
+        "<tr><td style=\"padding:8px 28px 26px\"><strong style=\"color:#d96b3b;font-size:12px;letter-spacing:.4px\">LET’S FIND OUT TOGETHER.</strong>"
+        "<p style=\"line-height:1.5\">I’d love to spend 30 minutes exploring what’s possible. We’ll bring an outside perspective, you bring the inside story, and we’ll see where the interesting opportunities emerge.</p>"
+        "<p style=\"line-height:1.5\">No pitch deck. No obligation. Just a good conversation.</p>"
+        f"<a href=\"{booking}\" style=\"display:inline-block;background:#d96b3b;color:#ffffff;padding:13px 18px;text-decoration:none;font-weight:bold\">→ Book a 30-minute conversation</a>"
+        "<p style=\"line-height:1.5;margin:22px 0 0\">Looking forward to meeting you.</p><p style=\"line-height:1.5;margin:14px 0 0\">Matt<br>Founder, Narratiive</p></td></tr>"
+        "</table></td></tr></table></body></html>"
     )
