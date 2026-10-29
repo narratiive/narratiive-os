@@ -211,13 +211,18 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
     checks = {
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
+        "commercial_read_is_evidence_linked": _commercial_read(output.get("commercial_read")),
+        "strategic_hypothesis_is_distinctive": _proposal_hypothesis(output.get("strategic_hypothesis"), output.get("growth_problem_or_opportunity")),
+        "evidence_is_sufficient_for_client_facing_proposal": _proposal_evidence_ready(output.get("proposal_evidence_readiness")),
+        "fieldwork_offer_is_client_ready_and_terms_remain_pending": _fieldwork_offer(output.get("fieldwork_offer")),
+        "editorial_argument_and_exhibits_are_specific": _proposal_editorial_plan(output.get("editorial_plan")),
         "further_work_is_justified": _substantive_text(output.get("why_further_strategic_work_is_justified"), minimum_words=20),
         "scope_has_bounded_workstreams": _meaningful_list(output.get("proposed_scope"), minimum=3),
         "workstreams_have_strategic_questions": _workstreams(output.get("workstreams_and_questions")),
         "growth_blueprint_outputs_are_explicit": _meaningful_list(output.get("expected_growth_blueprint_outputs"), minimum=5),
         "commercial_inputs_are_pending_human_approval": _commercial_inputs(commercial),
         "assumptions_and_dependencies_are_explicit": _meaningful_list(output.get("assumptions_and_dependencies"), minimum=2),
-        "draft_client_communication_is_reviewable": _bounded_text(output.get("draft_client_communication"), 60, 500),
+        "draft_client_communication_uses_fieldwork_name": _fieldwork_client_copy(output.get("draft_client_communication")),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
         "no_false_external_execution_claim": _no_false_action(output),
     }
@@ -1216,7 +1221,7 @@ def _lineage(value: Any, *, minimum: int) -> bool:
 
 
 def _workstreams(value: Any) -> bool:
-    return (
+    if not (
         isinstance(value, list)
         and len(value) >= 3
         and all(
@@ -1225,7 +1230,104 @@ def _workstreams(value: Any) -> bool:
             and _questions(item.get("questions"), minimum=1, maximum=6)
             for item in value
         )
+    ):
+        return False
+    questions = [
+        _normalise_text(question)
+        for item in value
+        for question in item["questions"]
+    ]
+    return len(questions) == len(set(questions))
+
+
+def _commercial_read(value: Any) -> bool:
+    allowed = {"fact", "interpretation", "hypothesis"}
+    return (
+        isinstance(value, list)
+        and 2 <= len(value) <= 4
+        and all(
+            isinstance(item, Mapping)
+            and _substantive_text(item.get("observation"), minimum_words=6)
+            and str(item.get("classification") or "").casefold() in allowed
+            and _meaningful_list(item.get("evidence_refs"), minimum=1)
+            and _substantive_text(item.get("commercial_implication"), minimum_words=6)
+            for item in value
+        )
     )
+
+
+def _proposal_hypothesis(value: Any, growth_problem: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    fields = (
+        "commercial_tension",
+        "what_may_be_overlooked",
+        "why_conventional_approach_is_insufficient",
+        "decision_fieldwork_will_unlock",
+    )
+    statements = [str(value.get(field) or "").strip() for field in fields]
+    return (
+        all(_substantive_text(statement, minimum_words=8) for statement in statements)
+        and len({_normalise_text(statement) for statement in statements}) == len(statements)
+        and _normalise_text(statements[0]) != _normalise_text(growth_problem)
+    )
+
+
+def _proposal_evidence_ready(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and value.get("client_facing_ready") is True
+        and value.get("material_contradictions") == []
+        and isinstance(value.get("missing_evidence"), list)
+        and value.get("required_clarification") == []
+    )
+
+
+def _fieldwork_offer(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    investment_status = str(value.get("investment_status") or "").casefold()
+    return (
+        value.get("engagement_name") == "FIELDWORK"
+        and value.get("client_facing_title") == "Narratiive FIELDWORK Proposal"
+        and _substantive_text(value.get("recommendation"), minimum_words=10)
+        and _meaningful_list(value.get("deliverables"), minimum=3)
+        and _substantive_text(value.get("duration"), minimum_words=1)
+        and "pending" in investment_status
+    )
+
+
+def _proposal_editorial_plan(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    argument = value.get("argument")
+    exhibits = value.get("visual_exhibits")
+    return (
+        isinstance(argument, list)
+        and len(argument) == 6
+        and all(_substantive_text(item, minimum_words=6) for item in argument)
+        and len({_normalise_text(item) for item in argument}) == len(argument)
+        and isinstance(exhibits, list)
+        and 1 <= len(exhibits) <= 3
+        and all(
+            isinstance(item, Mapping)
+            and _meaningful(item.get("type"))
+            and _substantive_text(item.get("purpose"), minimum_words=5)
+            and _meaningful_list(item.get("evidence_refs"), minimum=1)
+            for item in exhibits
+        )
+    )
+
+
+def _fieldwork_client_copy(value: Any) -> bool:
+    if not _bounded_text(value, 60, 500):
+        return False
+    text = _normalise_text(value)
+    return "fieldwork" in text and "growth sprint" not in text and "growth blueprint" not in text
+
+
+def _normalise_text(value: Any) -> str:
+    return " ".join(str(value or "").casefold().split())
 
 
 def _commercial_inputs(value: Any) -> bool:

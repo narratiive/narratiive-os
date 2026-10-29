@@ -73,6 +73,11 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertIn("draft_client_communication", proposal.output_contract.required_fields)
         self.assertIn("growth_problem_or_opportunity", proposal.output_contract.required_fields)
         self.assertIn("expected_growth_blueprint_outputs", proposal.output_contract.required_fields)
+        self.assertIn("commercial_read", proposal.output_contract.required_fields)
+        self.assertIn("strategic_hypothesis", proposal.output_contract.required_fields)
+        self.assertIn("proposal_evidence_readiness", proposal.output_contract.required_fields)
+        self.assertIn("fieldwork_offer", proposal.output_contract.required_fields)
+        self.assertIn("editorial_plan", proposal.output_contract.required_fields)
         self.assertTrue(proposal.approval_policy.required)
         delivery = registry.resolve("asset_review_to_delivery_preparation").stages[0]
         self.assertIn("proposed_delivery_action", delivery.output_contract.required_fields)

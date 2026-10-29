@@ -526,6 +526,10 @@ def _story(plan: ReviewDocumentPlan, styles: Mapping[str, ParagraphStyle]) -> li
 def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
     synthesis = _required_text(output, "discovery_synthesis")
     challenge = _required_text(output, "growth_problem_or_opportunity")
+    commercial_read = _commercial_read_cards(output.get("commercial_read"))
+    hypothesis = output.get("strategic_hypothesis") if isinstance(output.get("strategic_hypothesis"), Mapping) else {}
+    offer = output.get("fieldwork_offer") if isinstance(output.get("fieldwork_offer"), Mapping) else {}
+    editorial_plan = output.get("editorial_plan") if isinstance(output.get("editorial_plan"), Mapping) else {}
     justification = _required_text(output, "why_further_strategic_work_is_justified")
     scope = _text_list(output.get("proposed_scope"))
     workstreams = _workstream_cards(output.get("workstreams_and_questions"))
@@ -536,56 +540,48 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
     timeline = _clean_text(commercial.get("timeline"))
     investment = _clean_text(commercial.get("investment_recommendation"))
     assumptions = _text_list(output.get("assumptions_and_dependencies"))
-    question_count = sum(len(items) for _, items in workstreams)
-    workstream_count = len(workstreams)
-    decision = (
-        f"Decide whether these {workstream_count} workstreams correctly define what Narratiive should solve "
-        "before research and the Growth Blueprint begin. Approve the proposal, request revision, or identify the choice that needs to change."
-    )
+    recommendation = _clean_text(offer.get("recommendation"))
+    duration = _clean_text(offer.get("duration")) or timeline
+    investment_status = _clean_text(offer.get("investment_status")) or investment
+    deliverables = _text_list(offer.get("deliverables")) or deliverables
+    argument = _text_list(editorial_plan.get("argument"))
+    decision = "Approve this exact FIELDWORK proposal, request a revision, or identify the commercial or strategic choice that must change."
     focus = (
-        challenge,
-        f"The proposed Sprint is organised around {workstream_count} workstreams and {question_count} strategic questions.",
-        f"Indicative timing: {timeline or 'To be confirmed through review.'}",
-        f"Commercial status: {investment or 'Pending human review.'}",
+        _clean_text(hypothesis.get("commercial_tension")) or challenge,
+        _clean_text(hypothesis.get("decision_fieldwork_will_unlock")),
+        f"Indicative duration: {duration or 'To be confirmed through review.'}",
+        f"Investment status: {investment_status or 'Pending human review.'}",
     )
     sections = (
-        ReviewSection("The situation / what we heard", body=(synthesis,)),
-        ReviewSection("The growth challenge", body=(challenge,)),
+        ReviewSection("What we heard", body=(synthesis,)),
+        ReviewSection("The opportunity worth taking seriously", body=(_clean_text(hypothesis.get("commercial_tension")) or challenge,)),
+        ReviewSection("What the evidence suggests", cards=commercial_read),
         ReviewSection(
-            "Our strategic hypothesis",
-            body=(
-                f"Our working hypothesis is that the opportunity is not solved by isolated messaging or channel optimisation. {challenge}",
+            "Our point of view",
+            body=tuple(
+                item for item in (
+                    _clean_text(hypothesis.get("what_may_be_overlooked")),
+                    _clean_text(hypothesis.get("why_conventional_approach_is_insufficient")),
+                ) if item
             ),
         ),
-        ReviewSection("Why this matters now", body=(justification,)),
-        ReviewSection("What the Growth Sprint will answer", items=tuple(item for _, questions in workstreams for item in questions)),
-        ReviewSection("Proposed workstreams", cards=workstreams, items=scope),
-        ReviewSection("What the Growth Blueprint will deliver", items=deliverables),
-        ReviewSection(
-            "How the Sprint will work / indicative timing",
-            body=(f"Indicative timing: {timeline or 'To be confirmed through review.'}",),
-            items=(
-                "Align the evidence and the decisions the work must unlock.",
-                "Investigate the priority audience, category and positioning questions.",
-                "Synthesize the evidence into a clear strategic thesis and Growth Blueprint.",
-                "Return the exact strategic choices for human review before activation.",
-            ),
-        ),
-        ReviewSection(
-            "Investment / commercial status",
-            body=(investment or "Investment remains to be confirmed through human review.", "Approval status: Pending."),
-        ),
-        ReviewSection("Key assumptions or evidence gaps", items=assumptions),
+        ReviewSection("What becomes possible", body=(justification,)),
+        ReviewSection("The decisions FIELDWORK will unlock", body=tuple(argument[3:6]), items=tuple(item for _, questions in workstreams for item in questions)),
+        ReviewSection("Introducing FIELDWORK", body=(recommendation,), cards=workstreams, items=scope),
+        ReviewSection("What you will receive", items=deliverables),
+        ReviewSection("How we will work together", body=(f"Indicative duration: {duration or 'To be confirmed through review.'}",), items=("Align on the commercial decisions this work must resolve.", "Investigate the audience, category and positioning questions that matter most.", "Return a strategic recommendation with clear choices and next steps.")),
+        ReviewSection("Investment status", body=(investment_status or "Commercial terms remain pending founder approval.",)),
+        ReviewSection("Evidence boundaries", items=assumptions),
     )
     return ReviewDocumentPlan(
-        product="Growth Sprint Proposal",
-        gate_label="GATE 2",
+        product="Narratiive FIELDWORK Proposal",
+        gate_label="FOUNDER REVIEW",
         company=company,
-        subtitle="A focused strategic engagement to resolve the choices that must precede research, positioning and the Narratiive Growth Blueprint.",
+        subtitle="A commercially focused strategic engagement, grounded in Discovery evidence and designed to resolve the decisions that matter most.",
         sections=sections,
         focus_points=tuple(item for item in focus if item)[:4],
         decision_prompt=decision,
-        next_if_approved="Tony will commission the approved research scope and move the work into the Growth Blueprint production sequence. No client contact or external release will occur.",
+        next_if_approved="Tony will commission the approved FIELDWORK scope through the existing governed research and strategy sequence. No client contact or external release will occur.",
     )
 
 
@@ -822,6 +818,23 @@ def _workstream_cards(value: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
         questions = _text_list(item.get("questions"))
         if title and questions:
             result.append((title, questions))
+    return tuple(result)
+
+
+def _commercial_read_cards(value: Any) -> tuple[tuple[str, tuple[str, ...]], ...]:
+    """Keep provenance backstage while presenting the commercial implication."""
+    if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
+        return ()
+    result = []
+    for item in value:
+        if not isinstance(item, Mapping):
+            continue
+        observation = _clean_text(item.get("observation"))
+        implication = _clean_text(item.get("commercial_implication"))
+        classification = _clean_text(item.get("classification"))
+        if observation and implication:
+            label = classification.title() if classification else "Commercial read"
+            result.append((label, (observation, implication)))
     return tuple(result)
 
 

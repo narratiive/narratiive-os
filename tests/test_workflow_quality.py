@@ -208,6 +208,36 @@ def proposal_output() -> dict:
     return {
         "discovery_synthesis": "The synthetic discovery evidence shows a team with a credible offer but no shared choice about the priority audience or the proof that moves that audience. The meeting confirmed urgency around demand quality while leaving customer language and competitive response uncertain and explicitly unresolved.",
         "growth_problem_or_opportunity": "Narratiive can help the team turn broad relevance into a distinctive, evidence-led growth choice that improves the quality of demand.",
+        "commercial_read": [
+            {"observation": "The synthetic discovery notes identify demand quality as an urgent leadership concern.", "classification": "fact", "evidence_refs": ["meeting:notes:1"], "commercial_implication": "Improving conversion quality may matter more than increasing undifferentiated traffic."},
+            {"observation": "The current evidence suggests broad relevance may be making the offer easier to compare.", "classification": "interpretation", "evidence_refs": ["meeting:notes:1", "blueprint:v1"], "commercial_implication": "A more explicit choice could improve the value and confidence attached to demand."},
+        ],
+        "strategic_hypothesis": {
+            "commercial_tension": "The business needs stronger demand while the evidence does not yet identify which customer situation deserves priority.",
+            "what_may_be_overlooked": "The most valuable growth lever may be the proof required for a high-confidence choice, rather than a broader volume of messages.",
+            "why_conventional_approach_is_insufficient": "More channel activity would amplify the same unresolved choice and risk making comparison easier before the offer earns preference.",
+            "decision_fieldwork_will_unlock": "FIELDWORK will determine the audience, category position and proof system that should guide investment and creative development.",
+        },
+        "proposal_evidence_readiness": {"client_facing_ready": True, "material_contradictions": [], "missing_evidence": ["Direct customer language remains to be tested during FIELDWORK."], "required_clarification": []},
+        "fieldwork_offer": {
+            "engagement_name": "FIELDWORK",
+            "client_facing_title": "Narratiive FIELDWORK Proposal",
+            "recommendation": "We recommend FIELDWORK to turn the current commercial tension into an evidence-backed strategic choice and a clear plan for action.",
+            "deliverables": ["Commercial and category diagnosis", "Priority audience and demand definition", "Positioning and narrative recommendation"],
+            "duration": "Four weeks",
+            "investment_status": "Commercial terms pending founder approval",
+        },
+        "editorial_plan": {
+            "argument": [
+                "The discovery points to an urgent need for better-quality demand, not simply more activity.",
+                "The tension is that broad relevance can grow reach while weakening the reason the right customer should choose.",
+                "The supplied notes support a commercial read that audience priority and proof remain unresolved.",
+                "Our hypothesis is that a more deliberate category role can make demand both more valuable and more defensible.",
+                "Testing that hypothesis could create clearer investment choices and more confident customer-facing communication.",
+                "FIELDWORK will resolve the audience, positioning and proof decisions before downstream execution begins.",
+            ],
+            "visual_exhibits": [{"type": "decision map", "purpose": "Show how the supplied commercial tension connects to the decisions FIELDWORK will resolve.", "evidence_refs": ["meeting:notes:1", "blueprint:v1"]}],
+        },
         "why_further_strategic_work_is_justified": "The diagnostic and discovery expose connected questions across audience, category, positioning and proof. Resolving only the messaging symptom would leave the underlying commercial choices and evidence gaps untouched.",
         "proposed_scope": ["Audience and demand diagnosis", "Category and competitive research", "Positioning and narrative platform"],
         "workstreams_and_questions": [
@@ -217,7 +247,7 @@ def proposal_output() -> dict:
         ],
         "expected_growth_blueprint_outputs": ["Market and category diagnosis", "Audience definition", "Growth barriers", "Positioning", "Narrative platform"],
         "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Growth Sprint range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
-        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend a focused Growth Sprint spanning audience, category and positioning research, culminating in the Narratiive Growth Blueprint. The attached scope remains a draft for review, including timing, dependencies and a proposed investment that requires final human approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
+        "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend FIELDWORK: a focused engagement spanning audience, category and positioning research. The attached proposal remains a draft for founder review, including timing, dependencies and commercial terms that remain pending approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
         "assumptions_and_dependencies": ["Access to existing customer evidence", "Availability of commercial stakeholders for interviews"],
         "evidence_lineage": [
             {"claim": "Demand quality is urgent.", "classification": "fact", "source_refs": ["meeting:notes:1"]},
@@ -508,6 +538,21 @@ class WorkflowQualityTests(unittest.TestCase):
         denied = proposal_output()
         denied["draft_client_communication"] += " No email sent; this remains internal."
         self.assertTrue(growth_sprint_proposal_quality_gate(denied)["passed"])
+
+    def test_proposal_quality_rejects_generic_hypothesis_legacy_name_and_repetition(self) -> None:
+        weak = proposal_output()
+        weak["strategic_hypothesis"]["commercial_tension"] = weak["growth_problem_or_opportunity"]
+        weak["fieldwork_offer"]["engagement_name"] = "Growth Sprint"
+        weak["draft_client_communication"] = weak["draft_client_communication"].replace("FIELDWORK", "Growth Sprint")
+        weak["proposal_evidence_readiness"] = {"client_facing_ready": False, "material_contradictions": ["Source association is unresolved."], "missing_evidence": [], "required_clarification": ["Confirm the source association."]}
+        weak["workstreams_and_questions"][1]["questions"] = list(weak["workstreams_and_questions"][0]["questions"])
+        result = growth_sprint_proposal_quality_gate(weak)
+        self.assertFalse(result["passed"])
+        self.assertIn("strategic hypothesis is distinctive", result["failed_checks"])
+        self.assertIn("fieldwork offer is client ready and terms remain pending", result["failed_checks"])
+        self.assertIn("draft client communication uses fieldwork name", result["failed_checks"])
+        self.assertIn("evidence is sufficient for client facing proposal", result["failed_checks"])
+        self.assertIn("workstreams have strategic questions", result["failed_checks"])
 
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
