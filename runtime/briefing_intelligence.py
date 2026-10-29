@@ -195,6 +195,11 @@ class ExecutiveBriefingPipeline:
         prior = self.baseline_store.read().get("items", {}) if self.baseline_store else {}
         selected: dict[str, AgencyItem] = {}
         for item in state.items:
+            presentation = " ".join((item.title, *item.aliases)).casefold()
+            # Explicitly marked internal certification/test records must never
+            # be promoted from durable audit state into founder communications.
+            if "do not contact" in presentation or "founder certification" in presentation:
+                continue
             # Routine engineering and infrastructure activity belongs in the
             # engineering queue. It reaches the founder only when the
             # projection has established a client, revenue, or continuity
@@ -206,7 +211,7 @@ class ExecutiveBriefingPipeline:
                 continue
             # A generic workflow instruction is audit information, not a
             # founder decision. The underlying record remains untouched.
-            if item.requires_matt and is_generic_founder_action(item.next_action):
+            if is_generic_founder_action(item.next_action):
                 continue
             identity = self._identity(item)
             decision = self._decision_for(item, decisions)

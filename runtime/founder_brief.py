@@ -8,6 +8,7 @@ _RUNTIME_REFERENCE = re.compile(
     re.IGNORECASE,
 )
 _GITHUB_REFERENCE = re.compile(r"\b(?:pull request|pr|issue)\s*#?\d+\b", re.IGNORECASE)
+_MACHINE_IDENTIFIER = re.compile(r"\b[a-z]+(?:_[a-z0-9]+){2,}\b", re.IGNORECASE)
 _GENERIC_ACTION = {
     "review and decide this item",
     "review the lead and decide the next commercial action",
@@ -32,6 +33,7 @@ def founder_text(value: str, *, limit: int = 260) -> str:
     text = re.sub(r"\b(?:workflow_run|run_id|workstream):[^\s:]+:?", "", text, flags=re.IGNORECASE)
     text = _RUNTIME_REFERENCE.sub("", text)
     text = _GITHUB_REFERENCE.sub("engineering item", text)
+    text = _MACHINE_IDENTIFIER.sub("", text)
     text = " ".join(text.split()).strip(" -:;.")
     return text[:limit].rstrip()
 

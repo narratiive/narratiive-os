@@ -70,8 +70,15 @@ class AgencyStateProjector:
             if summary is not None:
                 company = str(summary.get("company") or summary.get("entity_id") or "this work")
                 workflow = str(summary.get("workflow_id") or "workflow")
-                title = f"Decision required: {company} — {workflow}"
-                next_action = str(summary.get("proposed_next_action") or f"Review the current {workflow} artefact and approve, reject or request revision.")
+                # Explicitly labelled internal certification and test records
+                # remain in the audit state, never in a founder briefing.
+                if "do not contact" in company.casefold() or "synthetic" in company.casefold():
+                    continue
+                product = self._founder_product_label(workflow)
+                title = f"Decision required: {company} — {product}"
+                next_action = (
+                    f"Review the {product} and approve it or request changes."
+                )
                 entity_id = str(summary.get("entity_id") or summary.get("client_id") or run_id)
                 aliases = tuple(filter(None, (company, run_id)))
             items.append(
@@ -177,6 +184,17 @@ class AgencyStateProjector:
         if not approval.startswith("workflow:"):
             return ""
         return approval.split(":", 2)[1]
+
+    @staticmethod
+    def _founder_product_label(workflow_id: str) -> str:
+        """Translate stable internal workflow identifiers only at the briefing boundary."""
+        labels = {
+            "growth_diagnostic_to_blueprint_lite": "GROUNDWORK assessment",
+            "blueprint_lite_to_discovery_preparation": "Discovery preparation",
+            "discovery_evidence_to_growth_sprint_proposal": "FIELDWORK proposal",
+            "growth_blueprint_deliverable_production": "Growth Blueprint",
+        }
+        return labels.get(workflow_id, "current client deliverable")
 
     @staticmethod
     def _authoritative_run_ids(summaries: Iterable[Mapping[str, Any]]) -> set[str]:

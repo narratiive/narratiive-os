@@ -131,7 +131,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
 
         approvals = tuple(value for value in state.items if value.requires_matt)
         self.assertEqual(len(approvals), 1)
-        self.assertIn("Approve the current evidence-backed blueprint", approvals[0].next_action)
+        self.assertIn("Review the current client deliverable", approvals[0].next_action)
 
     def test_05_same_blocker_is_not_repeated_across_sections(self):
         blocker = item(
@@ -274,6 +274,7 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
             AgencyItem("katkin-v3", AgencyArea.DELIVERY, "KatKin v3 approval", "decision_required", "Approve the older KatKin version.", owner="Matt", evidence=("workflow:katkin-v3",), requires_matt=True, entity_id="katkin", significance="P1", why_matters="Historical candidate."),
             AgencyItem("katkin-v5", AgencyArea.DELIVERY, "KatKin current deliverable", "decision_required", "Approve the current KatKin deliverable.", owner="Matt", evidence=("workflow:katkin-v5",), requires_matt=True, entity_id="katkin", significance="P1", why_matters="The current deliverable is ready for founder review."),
             AgencyItem("generic", AgencyArea.DELIVERY, "Blueprint Lite", "decision_required", "Continue the current authorised internal workflow step.", owner="Matt", evidence=("workflow:private-run",), requires_matt=True, entity_id="generic", significance="P1", why_matters="Generic instruction."),
+            AgencyItem("internal-certification", AgencyArea.DELIVERY, "FOUNDER CERTIFICATION — DO NOT CONTACT", "active", "Continue the current authorised internal workflow step.", owner="Tony", evidence=("workflow:certification",), entity_id="internal-certification", significance="P1", why_matters="Internal certification only."),
             AgencyItem("loom", AgencyArea.DELIVERY, "Loom Loft proposal", "decision_required", "Approve the current Loom Loft proposal or request changes.", owner="Matt", evidence=("workflow:inbound-d1b96a67",), requires_matt=True, entity_id="loom-loft", significance="P1", why_matters="The approved client journey cannot progress without this decision."),
         ))
 
@@ -286,7 +287,9 @@ class BriefingIntelligenceFailureCaseTests(unittest.TestCase):
         self.assertNotIn("KatKin v3 approval", output)
         self.assertNotIn("PR #511", output)
         self.assertNotIn("private-run", output)
+        self.assertNotIn("growth_", output)
         self.assertNotIn("generic", output.casefold())
+        self.assertNotIn("DO NOT CONTACT", output)
         self.assertLessEqual(len(output.split()), 200)
 
 

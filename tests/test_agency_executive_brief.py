@@ -77,6 +77,28 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         self.assertIn("commercial opportunity", brief.recommendation)
         self.assertNotIn("repository", brief.recommendation.casefold())
 
+    def test_founder_gated_commercial_item_is_not_repeated_as_progress(self):
+        state = AgencyState.from_items(
+            "2026-10-29T08:00:00Z",
+            (
+                AgencyItem(
+                    "loom-proposal",
+                    AgencyArea.COMMERCIAL,
+                    "Decision required: Loom Loft — FIELDWORK proposal",
+                    "awaiting_founder_approval",
+                    "Review the FIELDWORK proposal and approve it or request changes.",
+                    requires_matt=True,
+                    evidence=("proposal:loom-loft",),
+                    why_matters="The current proposal cannot progress without a founder decision.",
+                ),
+            ),
+        )
+
+        output = AgencyExecutiveBriefService().build(state).render_compact()
+
+        self.assertIn("Your decisions:", output)
+        self.assertNotIn("Progress:", output)
+
     def test_business_areas_are_ordered_before_engineering(self):
         state = AgencyState.from_items(
             "2026-07-29T08:00:00Z",

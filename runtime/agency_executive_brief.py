@@ -118,7 +118,7 @@ class AgencyExecutiveBriefService:
         )
         commercial_items = tuple(
             item for item in visible
-            if item.area is AgencyArea.COMMERCIAL and not item.blocked and item.significance != "P4"
+            if item.area is AgencyArea.COMMERCIAL and not item.requires_matt and not item.blocked and item.significance != "P4"
             and item.classification not in {
                 "unverified_commercial_contact", "suspicious_commercial_contact",
                 "test", "internal", "spam", "duplicate", "deferred", "archived",
