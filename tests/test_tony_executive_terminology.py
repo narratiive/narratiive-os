@@ -106,9 +106,9 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
 
         self.assertEqual(response.status, "healthy")
         self.assertNotIn("strategy session", response.message.lower())
-        self.assertIn("Growth Blueprint", response.message)
-        self.assertTrue(response.data["terminology_rewritten"])
-        self.assertEqual(archive.briefs, [])
+        self.assertIn("No material founder decision or delivery risk is recorded.", response.message)
+        self.assertFalse(response.data["terminology_rewritten"])
+        self.assertEqual(len(archive.briefs), 1)
 
     def test_unavailable_policy_fails_closed(self):
         def broken_policy_loader():
