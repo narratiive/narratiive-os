@@ -519,6 +519,12 @@ class WorkflowRunService:
             raise ValueError("workflow run is not awaiting approval")
         if not identity or not reason:
             raise ValueError("approval requires approver identity and rationale")
+        if approval_binding and "approval_binding_digest" in approval_binding:
+            # Revalidate under the coordinator's run lock, against persisted
+            # state rather than the earlier conversational lookup snapshot.
+            from runtime.tony_internal_review_delivery import assert_current_approval_token
+
+            assert_current_approval_token(state, str(approval_binding.get("approval_binding_digest") or ""))
         approval = {
             "approver": identity,
             "rationale": reason,

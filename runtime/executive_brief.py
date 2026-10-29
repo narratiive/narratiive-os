@@ -10,6 +10,7 @@ from uuid import uuid4
 
 from runtime.artifact_catalog import ArtifactRecord, FileArtifactCatalog
 from runtime.executive_message import ExecutiveMessage
+from runtime.founder_brief import material_founder_lines
 from runtime.github_work import GitHubWorkError, GitHubWorkSnapshot
 from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 from runtime.mission_control_service import MissionControlService
@@ -62,26 +63,10 @@ class ExecutiveBrief:
         heading = "Morning brief" if self.period is BriefPeriod.MORNING else "End-of-day review"
         lines = [f"{heading} — {self.status}"]
 
-        if self.period is BriefPeriod.MORNING:
-            self._append(lines, "Today's focus", self.priorities)
-            self._append(lines, "What changed", self.changed)
-            self._append(lines, "Tony is handling", self.tony_handling)
-            self._append(lines, "Approvals needed", self.approvals)
-            self._append(lines, "Blockers", self.blockers)
-            self._append(lines, "Watch-outs", self.system_watchouts)
-        else:
-            self._append(lines, "Completed", self.completed)
-            self._append(lines, "Progressed", self.changed)
-            self._append(lines, "Remaining", self.open_items)
-            self._append(lines, "Carry into tomorrow", self.carry_forward)
-            self._append(lines, "Decisions", self.approvals)
-            self._append(lines, "Blockers", self.blockers)
-            self._append(lines, "Watch-outs", self.system_watchouts)
-
-        if self._has_operational_content():
-            lines.append(f"Tony's recommendation: {self.executive.recommendation}")
-        elif len(lines) == 1:
-            lines.append("No evidence-backed operational work is currently recorded.")
+        material = material_founder_lines(self.approvals, self.blockers)
+        self._append(lines, "Decisions and delivery risks", material)
+        if not material:
+            lines.append("No material founder decision or delivery risk is recorded.")
 
         output = "\n".join(lines)
         if len(output) <= limit:

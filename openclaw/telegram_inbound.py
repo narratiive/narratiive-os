@@ -13,6 +13,7 @@ from urllib.request import Request, urlopen
 from openclaw.telegram_outbound import TelegramConfig, TelegramDeliveryError, TelegramSender
 from openclaw.telegram_output_policy import protect_telegram_output
 from openclaw.tony_agent_gateway import TonyAgentGateway, TonyAgentGatewayConfig, TonyAgentGatewayError
+from runtime.tony_workflow_commands import TonyWorkflowCommandService
 
 
 class TelegramInboundError(RuntimeError):
@@ -121,6 +122,8 @@ class TelegramInboundService:
         self.sender.send(self.config.allowed_chat_id, reply)
 
     def _execute_tony(self, text: str) -> str:
+        if TonyWorkflowCommandService.is_discovery_approval(text):
+            return self._execute_legacy_command(text)
         if not TonyAgentGateway.is_system_command(text):
             try:
                 return protect_telegram_output(self._sanitize_user_reply(self.agent_gateway.converse(text)))

@@ -30,10 +30,10 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         brief = AgencyExecutiveBriefService().build(state)
         output = brief.render_compact()
 
-        self.assertIn("Commercial:", output)
-        self.assertIn("Create first qualified opportunity", output)
+        self.assertIn("No material change since the last briefing", output)
+        self.assertNotIn("Create first qualified opportunity", output)
         self.assertNotIn("PR 104", output)
-        self.assertIn("being handled in the background", output)
+        self.assertNotIn("being handled in the background", output)
         self.assertEqual(brief.status, "healthy")
 
     def test_platform_work_surfaces_only_when_it_blocks_an_agency_outcome(self):
@@ -65,9 +65,9 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         output = brief.render_compact()
 
         self.assertEqual(brief.status, "blocked")
-        self.assertIn("Automation:", output)
+        self.assertIn("Lead response automation", output)
         self.assertIn("Webhook outage", output)
-        self.assertIn("Agency blockers:", output)
+        self.assertIn("Risks:", output)
 
     def test_empty_agency_state_recommends_commercial_action_not_repository_work(self):
         state = AgencyState.from_items("2026-07-29T08:00:00Z", ())
@@ -76,6 +76,28 @@ class AgencyExecutiveBriefTests(unittest.TestCase):
         self.assertEqual(brief.status, "healthy")
         self.assertIn("commercial opportunity", brief.recommendation)
         self.assertNotIn("repository", brief.recommendation.casefold())
+
+    def test_founder_gated_commercial_item_is_not_repeated_as_progress(self):
+        state = AgencyState.from_items(
+            "2026-10-29T08:00:00Z",
+            (
+                AgencyItem(
+                    "loom-proposal",
+                    AgencyArea.COMMERCIAL,
+                    "Decision required: Loom Loft — FIELDWORK proposal",
+                    "awaiting_founder_approval",
+                    "Review the FIELDWORK proposal and approve it or request changes.",
+                    requires_matt=True,
+                    evidence=("proposal:loom-loft",),
+                    why_matters="The current proposal cannot progress without a founder decision.",
+                ),
+            ),
+        )
+
+        output = AgencyExecutiveBriefService().build(state).render_compact()
+
+        self.assertIn("Your decisions:", output)
+        self.assertNotIn("Progress:", output)
 
     def test_business_areas_are_ordered_before_engineering(self):
         state = AgencyState.from_items(

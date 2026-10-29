@@ -6,6 +6,7 @@ import shlex
 import hashlib
 import hmac
 import re
+from decimal import Decimal
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable, Mapping
@@ -24,7 +25,13 @@ from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
 from runtime.campaign_engine import CampaignIdentity
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.agency_state_projection import AgencyStateProjector
 from runtime.lead_attention import LeadAttentionService
+from runtime.briefing_intelligence import (
+    ExecutiveBriefingPipeline,
+    FileBriefingBaselineStore,
+    FileBriefingDecisionRegister,
+)
 from runtime.media_control import (
     CreativePlatformMapping,
     MediaConfigurationError,
@@ -90,6 +97,7 @@ from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCo
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
+from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -213,6 +221,8 @@ class LeadAwareTonyApplication:
         tiktok_oauth: TikTokOAuthService | None = None,
         meta_oauth: MetaOAuthService | None = None,
         mission_control_web: MissionControlWebApplication | None = None,
+        model_budget_guard: HostedModelBudgetGuard | None = None,
+        model_budget_reserve_usd: Decimal = Decimal("1"),
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -226,6 +236,8 @@ class LeadAwareTonyApplication:
         self.tiktok_oauth = tiktok_oauth
         self.meta_oauth = meta_oauth
         self.mission_control_web = mission_control_web
+        self.model_budget_guard = model_budget_guard
+        self.model_budget_reserve_usd = model_budget_reserve_usd
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -289,6 +301,14 @@ class LeadAwareTonyApplication:
             text = str(request.get("text") or request.get("message") or "").strip()
             if not text:
                 raise ValueError("text is required")
+            if self.workflow_command_service is not None and TonyWorkflowCommandService.is_discovery_approval(text):
+                supplied_principal = str(request.get("principal_id") or "").strip()
+                principal = supplied_principal if self.base.bridge_token and supplied_principal == self.authorised_principal_id else ""
+                response = self.workflow_command_service.approve_discovery(text, principal_id=principal)
+                return self._respond(start_response, HTTPStatus.OK, {
+                    "ok": response.status != "error", "reply": response.message,
+                    **response.to_dict(),
+                })
             if TonyAgentGateway.is_system_command(text):
                 if self.workflow_command_service is not None and self.workflow_command_service.supports(text):
                     supplied_principal = str(request.get("principal_id") or "").strip()
@@ -322,7 +342,23 @@ class LeadAwareTonyApplication:
                         },
                     }
                     return self._respond(start_response, status, payload)
-                reply = self.agent_gateway.converse(text)
+                reservation = None
+                if self.model_budget_guard is not None:
+                    reservation = self.model_budget_guard.reserve_capacity(
+                        reserve_usd=self.model_budget_reserve_usd,
+                        ttl_seconds=int(self.agent_gateway.config.work_timeout_seconds) + 60,
+                    )
+                try:
+                    reply = self.agent_gateway.converse(text)
+                except Exception:
+                    # The Gateway may have accepted and billed a request before a
+                    # timeout/disconnect. Charge it conservatively through month-end.
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.retain_ambiguous_reservation(reservation)
+                    raise
+                else:
+                    if self.model_budget_guard is not None and reservation is not None:
+                        self.model_budget_guard.release_reservation(reservation)
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":
                     reply = (
                         "I’m here, but I don’t have a verified update I can stand behind yet. "
@@ -338,6 +374,12 @@ class LeadAwareTonyApplication:
                     "message": reply,
                     "data": {"runtime": "openclaw", "external_action_taken": False},
                 }
+        except ModelBudgetExceeded as exc:
+            return self._respond(
+                start_response,
+                HTTPStatus.TOO_MANY_REQUESTS,
+                {"ok": False, "error": {"code": "hosted_model_budget_exceeded", "message": str(exc)}},
+            )
         except TonyAgentGatewayError as exc:
             return self._respond(start_response, HTTPStatus.SERVICE_UNAVAILABLE, {"ok": False, "error": {"code": "openclaw_conversation_unavailable", "message": str(exc)}})
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -463,8 +505,16 @@ class LeadAwareTonyApplication:
             else:
                 reference = str(request.get("reference") or "").strip()
                 if not reference: raise ValueError("reference is required")
-                mapping = {"ignore": "suppressed", "suppress": "suppressed", "mark_test": "test", "archive": "archived", "restore": "active", "watch": "watching"}
-                result = self.attention_service.mutate(reference, mapping.get(operation, operation), reason, actor)
+                mapping = {"ignore": "suppressed", "suppress": "suppressed", "mark_spam": "spam", "mark_internal": "internal", "mark_test": "test", "mark_duplicate": "duplicate", "defer": "deferred", "reclassify": "active", "archive": "archived", "restore": "active", "watch": "watching"}
+                decision_mapping = {"ignore": "suppress", "mark_spam": "spam", "mark_internal": "internal", "mark_test": "test", "mark_duplicate": "duplicate", "defer": "defer", "reclassify": "reclassify", "archive": "archive", "restore": "restore"}
+                result = self.attention_service.mutate(
+                    reference,
+                    mapping.get(operation, operation),
+                    reason,
+                    actor,
+                    decision_mapping.get(operation, operation),
+                    str(request.get("classification") or ""),
+                )
             return self._respond(start_response, HTTPStatus.OK, {**result, "reply": "Attention state updated." if result.get("ok") else "No attention state changed."})
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
             return self._respond(start_response, HTTPStatus.BAD_REQUEST, {"ok": False, "error": {"code": "invalid_attention_control", "message": str(exc)}})
@@ -845,15 +895,31 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     workspace_id = os.getenv("TONY_EXECUTIVE_WORKSPACE_ID", "").strip() or os.getenv("TONY_GITHUB_WORKSPACE_ID", "").strip() or "narratiive"
     lead_path = Path(os.getenv("TONY_INBOUND_LEADS_PATH", str(REPOSITORY_ROOT / ".runtime" / "inbound-leads.json"))).resolve()
     lead_store = FileInboundLeadStore(lead_path)
-    attention_service = LeadAttentionService(lead_store, Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))))
+    decision_register = FileBriefingDecisionRegister(Path(os.getenv("TONY_BRIEFING_DECISION_REGISTER_PATH", str(REPOSITORY_ROOT / ".runtime" / "briefing-decision-register.jsonl"))))
+    briefing_pipeline = ExecutiveBriefingPipeline(
+        decision_register=decision_register,
+        baseline_store=FileBriefingBaselineStore(Path(os.getenv("TONY_BRIEFING_BASELINE_PATH", str(REPOSITORY_ROOT / ".runtime" / "briefing-last-delivered.json")))),
+    )
     authoritative_lead_loader = build_runtime_lead_loader(lead_store)
     visibility = ExecutiveVisibilityPolicy()
+    agency_projector = AgencyStateProjector()
+    attention_service = LeadAttentionService(
+        lead_store,
+        Path(os.getenv("TONY_LEAD_ATTENTION_EVENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "lead-attention-events.jsonl"))),
+        decision_register=decision_register,
+        entity_loader=lambda: agency_projector.project(
+            app.command_service.mission_control_loader(),
+            visibility.visible_leads(authoritative_lead_loader()),
+            lead_source_available=True,
+        ).items,
+    )
     executive_service = TonyExecutiveCommandService(
         app.command_service,
         brief_archive=app.brief_archive,
         friday_record_loader=lambda: load_friday_review_records(records_root),
         workspace_id=workspace_id,
         inbound_lead_loader=lambda: visibility.visible_leads(authoritative_lead_loader()),
+        briefing_pipeline=briefing_pipeline,
     )
     capability_service = TonyCapabilityCommandService(executive_service)
     commercial_watch_service = TonyCommercialWatchCommandService(capability_service, store_path=Path(os.getenv("TONY_COMMERCIAL_COMMITMENTS_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-commitments.json"))))
@@ -1036,6 +1102,16 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         load_operator_snapshot,
         workflow_root=workflow_runtime_root,
     )
+    model_budget_guard = HostedModelBudgetGuard.from_environment(
+        os.environ,
+        repository_root=REPOSITORY_ROOT,
+        required=True,
+    )
+    model_budget_reserve_usd = (
+        model_budget_guard.default_request_reserve_usd
+        if model_budget_guard is not None
+        else Decimal("1")
+    )
     return LeadAwareTonyApplication(
         app,
         lead_store,
@@ -1053,6 +1129,8 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         tiktok_oauth=TikTokOAuthService.from_environment(os.environ),
         meta_oauth=MetaOAuthService.from_environment(os.environ),
         mission_control_web=mission_control_web,
+        model_budget_guard=model_budget_guard,
+        model_budget_reserve_usd=model_budget_reserve_usd,
     )
 
 

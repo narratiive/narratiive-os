@@ -84,9 +84,9 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         )
         output = self.service.build(snapshot, BriefPeriod.MORNING).render_compact()
         self.assertIn("Morning brief", output)
-        self.assertIn("Today's focus:", output)
-        self.assertIn("What changed:", output)
-        self.assertIn("Tony is handling:", output)
+        self.assertIn("No material founder decision or delivery risk is recorded.", output)
+        self.assertNotIn("What changed:", output)
+        self.assertNotIn("Tony is handling:", output)
         self.assertNotIn("Observation:", output)
         self.assertNotIn("GitHub:", output)
 
@@ -100,7 +100,7 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         )
         output = self.service.build(snapshot, BriefPeriod.EVENING).render_compact()
         self.assertIn("End-of-day review", output)
-        self.assertIn("Completed:", output)
+        self.assertNotIn("Completed:", output)
         self.assertNotIn("Today's focus:", output)
         self.assertNotIn("Tony is handling:", output)
 
@@ -125,7 +125,7 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertIn("notion: not_connected — credential not configured", brief.system_watchouts)
         self.assertIn("Repository: stale-index", brief.system_watchouts)
         output = brief.render_compact()
-        self.assertIn("Watch-outs:", output)
+        self.assertNotIn("Watch-outs:", output)
         self.assertNotIn("Tony's recommendation:", output)
 
     def test_empty_state_does_not_invent_work_or_strategy(self):
@@ -138,7 +138,7 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
         self.assertEqual(brief.completed, ())
         self.assertIn("no active workstream", brief.executive.observation.lower())
         output = brief.render_compact()
-        self.assertIn("No evidence-backed operational work is currently recorded.", output)
+        self.assertIn("No material founder decision or delivery risk is recorded.", output)
         self.assertNotIn("Tony's recommendation:", output)
 
     def test_compact_render_is_bounded(self):
@@ -155,10 +155,21 @@ class ExecutiveBriefServiceTests(unittest.TestCase):
                 )
                 for index in range(5)
             ),
+            approvals_required=("A" * 900,),
         )
         output = self.service.build(snapshot, BriefPeriod.MORNING).render_compact(limit=500)
         self.assertLessEqual(len(output), 500)
-        self.assertTrue(output.endswith("…"))
+
+    def test_both_periods_limit_material_items_and_hide_run_references(self):
+        snapshot = self.builder.build(
+            generated_at="2026-10-28T08:00:00Z",
+            progress=self.progress(),
+            approvals_required=tuple(f"workflow:synthetic-run-{i}:Review company {i}" for i in range(6)),
+        )
+        for period in BriefPeriod:
+            output = self.service.build(snapshot, period).render_compact()
+            self.assertEqual(sum(line.startswith("- ") for line in output.splitlines()), 3)
+            self.assertNotIn("synthetic-run", output)
 
 
 if __name__ == "__main__":

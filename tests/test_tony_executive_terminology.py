@@ -106,9 +106,9 @@ class TonyExecutiveTerminologyTests(unittest.TestCase):
 
         self.assertEqual(response.status, "healthy")
         self.assertNotIn("strategy session", response.message.lower())
-        self.assertIn("Growth Blueprint", response.message)
+        self.assertIn("Narratiive — Morning Brief", response.message)
         self.assertTrue(response.data["terminology_rewritten"])
-        self.assertEqual(archive.briefs, [])
+        self.assertEqual(len(archive.briefs), 0)
 
     def test_unavailable_policy_fails_closed(self):
         def broken_policy_loader():

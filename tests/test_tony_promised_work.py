@@ -144,6 +144,8 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(attachment["mime_type"], "application/pdf")
         self.assertTrue(attachment["filename"].endswith(".pdf"))
         self.assertLess(len(self.gmail_calls[0]["payload"]["body"]), 3000)
+        self.assertEqual(len(self.gmail_calls[0]["payload"]["body"].splitlines()), 3)
+        self.assertIn("Review copy: https://mail.google.com/", self.telegram_messages[0])
         visible = "\n".join(
             page.extract_text() or ""
             for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
