@@ -195,27 +195,29 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         )["email_preview"]
         expected = (
             "Hi [First Name],\n\n"
-            "Thanks for getting in touch. We’ve been having a look around Loom Loft, and we’re intrigued.\n\n"
-            "Furniture is an interesting business. People might come looking for a sofa, but what they’re really imagining is a different version of home. And that creates some exciting possibilities for a brand with ambition.\n\n"
-            "We’ve got a few thoughts. But we’d much rather explore them with you than jump to conclusions.\n\n"
-            "THREE THINGS WE’D LOVE TO EXPLORE\n\n"
+            "Thanks for getting in touch. We've been having a look around Loom Loft, and we're intrigued.\n\n"
+            "Furniture is an interesting business. People might come looking for a sofa, but what they're really imagining is a different version of home. And that creates some exciting possibilities for a brand with ambition.\n\n"
+            "We've got a few thoughts. But we'd much rather explore them with you than jump to conclusions.\n\n"
+            "THREE THINGS WE'D LOVE TO EXPLORE\n\n"
             "01 / HOW BIG COULD THIS GET?\n"
-            "Forget next quarter’s targets for a moment. Where do you really want to take Loom Loft? And what’s stopping you getting there faster?\n\n"
+            "Forget next quarter's targets for a moment. Where do you really want to take Loom Loft? And what's stopping you getting there faster?\n\n"
             "02 / WHO COULD FALL IN LOVE WITH IT?\n"
-            "There’s a difference between reaching more people and becoming the brand that the right people actively seek out. Who are those people for Loom Loft?\n\n"
+            "There's a difference between reaching more people and becoming the brand that the right people actively seek out. Who are those people for Loom Loft?\n\n"
             "03 / WHAT COULD MAKE YOU FAMOUS?\n"
             "Not just another furniture retailer. A brand people recognise, remember and recommend. What could Loom Loft become known for?\n\n"
-            "LET’S FIND OUT TOGETHER.\n\n"
-            "I’d love to spend 30 minutes exploring what’s possible. We’ll bring an outside perspective, you bring the inside story, and we’ll see where the interesting opportunities emerge.\n\n"
+            "LET'S FIND OUT TOGETHER.\n\n"
+            "I'd love to spend 30 minutes exploring what's possible. We'll bring an outside perspective, you bring the inside story, and we'll see where the interesting opportunities emerge.\n\n"
             "No pitch deck. No obligation. Just a good conversation.\n\n"
             "→ Book a 30-minute conversation\nhttps://example.org/synthetic-booking\n\n"
             "Looking forward to meeting you.\n\n"
-            "Matt\nFounder, Narratiive"
+            "Matt Franks\nFounder, Narratiive"
         )
         self.assertEqual(email["body"], expected)
-        self.assertIn("Loom Loft — what could we build together?", email["html"])
-        self.assertIn("THREE THINGS WE’D LOVE TO EXPLORE", email["html"])
-        self.assertIn("→ Book a 30-minute conversation", email["html"])
+        self.assertEqual(email["subject"], "Loom Loft — what could we build together?")
+        self.assertIn("Loom Loft —<br>what could we<br>build together?", email["html"])
+        self.assertIn("THREE THINGS WE'D LOVE TO EXPLORE", email["html"])
+        self.assertIn("Book a 30-minute conversation&nbsp; →", email["html"])
+        self.assertNotIn("The submitted diagnostic", email["html"])
 
         non_synthetic = build_invitation_preview(
             workspace_id="synthetic-test",
