@@ -19,8 +19,12 @@ Call with an explicit `workspace_id` and a private configuration mapping, or omi
 | `RECIPIENT` | Founder-designated synthetic external test mailbox; no default |
 | `GMAIL_SENDER` | Exact authorised Gmail sending identity; no default |
 | `SENDER_AUTHORITY_REF` | Non-secret reference to sender authorisation |
-| `BOOKING_URL` | Authorised HTTPS booking page offering a 10-minute call |
+| `BOOKING_URL` | Authorised HTTPS booking page offering a 30-minute call |
 | `BOOKING_AUTHORITY_REF` | Non-secret reference to booking-page authorisation |
+| `COMPANY_NAME` | Exact synthetic prospect/company label shown in the preview |
+| `ENTITY_ID` | Exact safe workflow entity identifier |
+| `DISCOVERY_PREPARATION_REF` | Exact existing Discovery Preparation artefact reference |
+| `MEETING_DURATION_MINUTES` | Must be `30` for this founder-approved invitation path |
 
 Keep these values in private runtime configuration outside Git (mode `0600`
 for an environment file). Do not put credentials in authority references or
@@ -48,14 +52,16 @@ email snapshot. Callers must regenerate the preview after configuration changes;
 neither returned dictionary is an approval record or a tamper-proof store.
 
 Founder action: confirm the sender authority and that the configured booking
-page offers the intended 10-minute call; review the exact From, To, subject and
+page offers the intended 30-minute call; review the exact From, To, subject and
 body; authorise **one** external synthetic invitation for the displayed checksum
 through the existing authenticated single-use approval boundary. Any change
 requires a new preview and approval. The digest is a review reference, not an
 approval token. This module cannot consume approval or send even after approval;
 a separately authorised execution step must preserve the existing approval and
-verified Gmail receipt conventions. Calendar, Fireflies, proposal and FIELDWORK
-execution remain outside this increment.
+verified Gmail receipt conventions. Google Meet transcript and Gemini notes are
+the intended future evidence source; Fireflies remains an optional fallback.
+Calendar, transcript ingestion, proposal and FIELDWORK execution remain outside
+this increment.
 
 Validation: ` .venv/bin/python -m unittest discover -s tests -p 'test_synthetic_invitation_preview.py' -v`
 

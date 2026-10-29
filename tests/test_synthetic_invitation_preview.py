@@ -20,6 +20,10 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             "SENDER_AUTHORITY_REF": "synthetic-authority-1",
             "BOOKING_URL": "https://example.org/synthetic-booking",
             "BOOKING_AUTHORITY_REF": "synthetic-booking-authority-1",
+            "COMPANY_NAME": "Synthetic Company",
+            "ENTITY_ID": "synthetic-entity-1",
+            "DISCOVERY_PREPARATION_REF": "artifact-synthetic-discovery-v1",
+            "MEETING_DURATION_MINUTES": "30",
         }.items()}
 
     def preview(self, **kwargs):
@@ -38,9 +42,14 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.assertEqual(email["to"], "synthetic-prospect@example.net")
         self.assertEqual(email["from"], "synthetic-sender@example.org")
         self.assertIn("[SYNTHETIC TEST]", email["subject"])
-        self.assertIn("10-minute", email["body"])
-        self.assertIn("informed consent", email["body"])
+        self.assertIn("30-minute", email["body"])
+        self.assertIn("Google Meet", email["body"])
+        self.assertIn("Gemini notes", email["body"])
+        self.assertIn("optional fallback", email["body"])
+        self.assertIn("Synthetic Company", email["body"])
         self.assertIn(self.config[PREFIX + "BOOKING_URL"], email["body"])
+        self.assertEqual(result["approval_digest"]["entity_id"], "synthetic-entity-1")
+        self.assertEqual(result["approval_digest"]["meeting_duration_minutes"], 30)
         self.assertEqual(email["cc"] + email["bcc"] + email["attachments"], [])
         self.assertEqual(result["status"], "awaiting_approval")
         self.assertFalse(result["external_action_taken"])
@@ -99,6 +108,8 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             ("BOOKING_URL", "http://example.org/book"),
             ("BOOKING_URL", "https://[invalid"),
             ("SENDER_AUTHORITY_REF", "unsafe\nreference"),
+            ("ENTITY_ID", "unsafe entity"),
+            ("MEETING_DURATION_MINUTES", "10"),
         ):
             with self.subTest(key=key, value=value):
                 config = {**self.config, PREFIX + key: value}
@@ -108,11 +119,26 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
 
     def test_digest_changes_for_every_authority_or_email_input(self):
         original = self.preview()["approval_digest"]["checksum"]
-        for key in ("RECIPIENT", "GMAIL_SENDER", "BOOKING_URL", "SENDER_AUTHORITY_REF", "BOOKING_AUTHORITY_REF"):
+        changed_values = {
+            "RECIPIENT": "changed-prospect@example.net",
+            "GMAIL_SENDER": "changed-sender@example.org",
+            "BOOKING_URL": "https://example.org/changed-booking",
+            "SENDER_AUTHORITY_REF": "changed-authority",
+            "BOOKING_AUTHORITY_REF": "changed-booking-authority",
+            "COMPANY_NAME": "Changed Company",
+            "ENTITY_ID": "changed-entity",
+            "DISCOVERY_PREPARATION_REF": "artifact-changed-discovery-v1",
+        }
+        for key, changed_value in changed_values.items():
             config = dict(self.config)
-            config[PREFIX + key] = config[PREFIX + key].replace("synthetic", "changed")
+            config[PREFIX + key] = changed_value
             result = build_invitation_preview(workspace_id="synthetic-test", config=config)
             self.assertNotEqual(original, result["approval_digest"]["checksum"])
+
+        invalid_duration = {**self.config, PREFIX + "MEETING_DURATION_MINUTES": "10"}
+        result = build_invitation_preview(workspace_id="synthetic-test", config=invalid_duration)
+        self.assertEqual(result["status"], "blocked")
+        self.assertIsNone(result["approval_digest"])
 
     def test_preview_cannot_dispatch_or_grant_approval(self):
         gmail = Mock(side_effect=AssertionError("sending forbidden"))
