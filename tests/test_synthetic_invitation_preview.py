@@ -24,6 +24,8 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             "ENTITY_ID": "synthetic-entity-1",
             "DISCOVERY_PREPARATION_REF": "artifact-synthetic-discovery-v1",
             "MEETING_DURATION_MINUTES": "30",
+            "INSIGHTS_JSON": json.dumps([{"observation": "Validated fixture observation.", "question": "What would change this view?", "source_ref": "fixture:1"}]),
+            "FOUNDER_SIGNATURE": "Matt Franks\nFounder, Narratiive",
         }.items()}
 
     def preview(self, **kwargs):
@@ -50,6 +52,10 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.assertIn(self.config[PREFIX + "BOOKING_URL"], email["body"])
         self.assertEqual(result["approval_digest"]["entity_id"], "synthetic-entity-1")
         self.assertEqual(result["approval_digest"]["meeting_duration_minutes"], 30)
+        self.assertIn("WHAT WE'RE SEEING", email["html"])
+        self.assertIn("LET'S COMPARE NOTES", email["html"])
+        self.assertIn("Book a 30-minute conversation", email["html"])
+        self.assertNotIn("fixture:1", email["html"])
         self.assertEqual(email["cc"] + email["bcc"] + email["attachments"], [])
         self.assertEqual(result["status"], "awaiting_approval")
         self.assertFalse(result["external_action_taken"])
@@ -76,6 +82,8 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
     def test_control_characters_are_rejected_before_trimming(self):
         for key, value in self.config.items():
             for control in ("\r", "\n", "\t", "\x00", "\x7f"):
+                if key == PREFIX + "FOUNDER_SIGNATURE" and control == "\n":
+                    continue
                 with self.subTest(key=key, control=repr(control)):
                     config = {**self.config, key: control + value + control}
                     result = build_invitation_preview(workspace_id="synthetic-test", config=config)
@@ -150,6 +158,14 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             with self.assertRaises(StructuredActionExecutionError):
                 executor.execute(payload)
         gmail.assert_not_called()
+
+    def test_missing_or_unsafe_insights_block_personalised_preview(self):
+        missing = {**self.config, PREFIX + "INSIGHTS_JSON": "[]"}
+        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=missing)["status"], "blocked")
+        unsafe = {**self.config, PREFIX + "INSIGHTS_JSON": '[{"observation":"<script>","question":"Why?","source_ref":"fixture"}]'}
+        result = build_invitation_preview(workspace_id="synthetic-test", config=unsafe)
+        self.assertEqual(result["status"], "awaiting_approval")
+        self.assertNotIn("<script>", result["email_preview"]["html"])
 
 
 if __name__ == "__main__":

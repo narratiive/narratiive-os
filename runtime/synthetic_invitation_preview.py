@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import html
 import json
 import os
 import re
@@ -32,6 +33,7 @@ def build_invitation_preview(
         "WORKSPACE_ID", "RECIPIENT", "GMAIL_SENDER", "SENDER_AUTHORITY_REF",
         "BOOKING_URL", "BOOKING_AUTHORITY_REF", "COMPANY_NAME", "ENTITY_ID",
         "DISCOVERY_PREPARATION_REF", "MEETING_DURATION_MINUTES",
+        "INSIGHTS_JSON", "FOUNDER_SIGNATURE",
     )
     raw_values = {key: source.get(PREFIX + key, "") for key in fields}
     values = {key: value.strip() for key, value in raw_values.items()}
@@ -42,6 +44,19 @@ def build_invitation_preview(
         blockers.append(f"Configure a safe identifier for {PREFIX}ENTITY_ID.")
     if values["MEETING_DURATION_MINUTES"] and values["MEETING_DURATION_MINUTES"] != "30":
         blockers.append(f"Configure {PREFIX}MEETING_DURATION_MINUTES as 30.")
+    try:
+        insights = json.loads(values["INSIGHTS_JSON"]) if values["INSIGHTS_JSON"] else []
+    except json.JSONDecodeError:
+        insights = []
+        blockers.append(f"Configure valid JSON for {PREFIX}INSIGHTS_JSON.")
+    if not isinstance(insights, list) or not 1 <= len(insights) <= 3:
+        blockers.append("Provide one to three validated insight/question pairs.")
+        insights = []
+    for insight in insights:
+        if not isinstance(insight, dict) or not all(str(insight.get(key, "")).strip() for key in ("observation", "question", "source_ref")):
+            blockers.append("Each insight must retain observation, question and source reference.")
+            insights = []
+            break
     for key in ("RECIPIENT", "GMAIL_SENDER"):
         value = values[key]
         if value and not re.fullmatch(r"[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+", value):
@@ -51,7 +66,11 @@ def build_invitation_preview(
     } and values["RECIPIENT"]:
         blockers.append("Synthetic recipient must be separate from sender and internal review inbox.")
     for key, value in raw_values.items():
-        if any(ord(char) < 32 or ord(char) == 127 for char in value):
+        if any(
+            (ord(char) < 32 or ord(char) == 127)
+            and not (key == "FOUNDER_SIGNATURE" and char == "\n")
+            for char in value
+        ):
             blockers.append(f"Remove control characters from {PREFIX}{key}.")
     try:
         url = urlsplit(values["BOOKING_URL"])
@@ -89,6 +108,7 @@ def build_invitation_preview(
             "commitment, or purchase is being commissioned.\n\nNarratiive"
         ),
     }
+    email["html"] = _render_html(values, insights)
     material = {
         "version": 1, "workspace_id": workspace_id, "email": email,
         "sender_authority_ref": values["SENDER_AUTHORITY_REF"],
@@ -116,3 +136,29 @@ def build_invitation_preview(
         ),
     }
     return result
+
+
+def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -> str:
+    """Render email-safe, self-contained HTML; source references stay in audit only."""
+    company = html.escape(values["COMPANY_NAME"])
+    booking = html.escape(values["BOOKING_URL"], quote=True)
+    signature = html.escape(values["FOUNDER_SIGNATURE"])
+    rows = "".join(
+        "<tr><td style=\"padding:14px 0;border-bottom:1px solid #dbe4ef\">"
+        f"<strong style=\"color:#10243e\">{index}. {html.escape(str(item['observation']))}</strong>"
+        f"<br><span style=\"color:#38506b\">{html.escape(str(item['question']))}</span></td></tr>"
+        for index, item in enumerate(insights, 1)
+    )
+    return (
+        "<!doctype html><html><body style=\"margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#10243e\">"
+        "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:20px\">"
+        "<table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;background:#fff\">"
+        "<tr><td style=\"padding:26px 28px 12px;font-size:22px;font-weight:bold;letter-spacing:.5px\">NARRATIIVE</td></tr>"
+        f"<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">{company}: a few things worth comparing notes on</h1>"
+        f"<p style=\"line-height:1.5;margin:0\">We have reviewed the submitted Growth Diagnostic and completed internal GROUNDWORK. These are questions to test together, not conclusions about your business.</p></td></tr>"
+        "<tr><td style=\"padding:18px 28px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f0f5fa\"><tr><td style=\"padding:16px\"><strong>WHAT WE'RE SEEING</strong><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
+        + rows + "</table></td></tr></table></td></tr>"
+        f"<tr><td style=\"padding:8px 28px 26px\"><strong>LET'S COMPARE NOTES</strong><p style=\"line-height:1.5\">A 30-minute Google Meet conversation will help us test these observations against your experience.</p>"
+        f"<a href=\"{booking}\" style=\"display:inline-block;background:#d96b3b;color:#ffffff;padding:13px 18px;text-decoration:none;font-weight:bold\">Book a 30-minute conversation</a>"
+        f"<p style=\"line-height:1.5;margin:22px 0 0\">{signature}</p></td></tr></table></td></tr></table></body></html>"
+    )
