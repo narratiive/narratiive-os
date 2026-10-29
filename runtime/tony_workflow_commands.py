@@ -1213,7 +1213,7 @@ def _artifact_label(state: WorkflowState) -> str:
     labels = {
         "growth_diagnostic_to_blueprint_lite": "Gate 1 — the Blueprint Lite",
         "blueprint_lite_to_discovery_preparation": "The Discovery synthesis",
-        "discovery_evidence_to_growth_sprint_proposal": "The Growth Sprint proposal",
+        "discovery_evidence_to_growth_sprint_proposal": "The Narratiive FIELDWORK Proposal",
         "strategic_synthesis_to_strategy_thesis": "Gate 3 — the Strategy Thesis",
         "strategy_thesis_to_growth_blueprint": "The Growth Blueprint",
         "research_to_growth_blueprint": "The Growth Blueprint",

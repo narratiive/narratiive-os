@@ -10,6 +10,7 @@ from pypdf import PdfReader
 
 from runtime.human_review_artifacts import (
     BLUEPRINT_PRESENTATION_RENDERER_ID,
+    HumanReviewArtifactError,
     HumanReviewArtifactStore,
     HumanReviewPresentationService,
     NarratiiveReviewPDFRenderer,
@@ -33,7 +34,7 @@ def state(workflow_id: str) -> WorkflowState:
         workspace_id="narratiive",
         client_id="safe-client",
         entity_id="safe-company",
-        input_payload={"company": "SAFE Review Company"},
+        input_payload={"company": "SAFE Review Company", "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}}},
     )
 
 
@@ -102,10 +103,17 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
         self.assertIn("The opportunity worth taking seriously", visible)
         self.assertIn("Introducing FIELDWORK", visible)
         self.assertNotIn("Growth Sprint", visible)
+        self.assertIn("FIELDWORK fee: £12,000", visible)
         self.assertNotIn("internal-provider", visible)
         self.assertNotIn("internal-model", visible)
         self.assertNotIn("internal-message", visible)
         self.assertNotIn("internal-worker", visible)
+
+    def test_fieldwork_review_requires_an_approved_fee_from_commercial_context(self) -> None:
+        proposal_state = state("discovery_evidence_to_growth_sprint_proposal")
+        proposal_state.input_payload = {"company": "SAFE Review Company"}
+        with self.assertRaisesRegex(HumanReviewArtifactError, "approved fee"):
+            build_review_plan(proposal_state, proposal_output())
 
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()

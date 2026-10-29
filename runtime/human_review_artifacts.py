@@ -282,7 +282,7 @@ def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> Review
     if state.workflow_id == "growth_diagnostic_to_blueprint_lite":
         return _blueprint_lite_plan(company, output)
     if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-        return _growth_sprint_plan(company, output)
+        return _growth_sprint_plan(company, output, _approved_fieldwork_fee(state.input_payload))
     if state.workflow_id in {
         "growth_sprint_to_research_engine",
         "blueprint_lite_to_discovery_preparation",
@@ -523,9 +523,10 @@ def _story(plan: ReviewDocumentPlan, styles: Mapping[str, ParagraphStyle]) -> li
     return story
 
 
-def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
+def _growth_sprint_plan(company: str, output: Mapping[str, Any], approved_fee: str) -> ReviewDocumentPlan:
     synthesis = _required_text(output, "discovery_synthesis")
     challenge = _required_text(output, "growth_problem_or_opportunity")
+    opportunity = output.get("commercial_opportunity") if isinstance(output.get("commercial_opportunity"), Mapping) else {}
     commercial_read = _commercial_read_cards(output.get("commercial_read"))
     hypothesis = output.get("strategic_hypothesis") if isinstance(output.get("strategic_hypothesis"), Mapping) else {}
     offer = output.get("fieldwork_offer") if isinstance(output.get("fieldwork_offer"), Mapping) else {}
@@ -547,12 +548,22 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
     argument = _text_list(editorial_plan.get("argument"))
     decision = "Approve this exact FIELDWORK proposal, request a revision, or identify the commercial or strategic choice that must change."
     focus = (
-        _clean_text(hypothesis.get("commercial_tension")) or challenge,
+        _clean_text(opportunity.get("headline")) or _clean_text(hypothesis.get("commercial_tension")) or challenge,
         _clean_text(hypothesis.get("decision_fieldwork_will_unlock")),
         f"Indicative duration: {duration or 'To be confirmed through review.'}",
         f"Investment status: {investment_status or 'Pending human review.'}",
     )
     sections = (
+        ReviewSection(
+            "The opportunity",
+            body=tuple(
+                item for item in (
+                    _clean_text(opportunity.get("headline")),
+                    _clean_text(opportunity.get("commercial_insight")),
+                    _monetary_estimate_text(opportunity.get("monetary_estimate")),
+                ) if item
+            ),
+        ),
         ReviewSection("What we heard", body=(synthesis,)),
         ReviewSection("The opportunity worth taking seriously", body=(_clean_text(hypothesis.get("commercial_tension")) or challenge,)),
         ReviewSection("What the evidence suggests", cards=commercial_read),
@@ -570,7 +581,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
         ReviewSection("Introducing FIELDWORK", body=(recommendation,), cards=workstreams, items=scope),
         ReviewSection("What you will receive", items=deliverables),
         ReviewSection("How we will work together", body=(f"Indicative duration: {duration or 'To be confirmed through review.'}",), items=("Align on the commercial decisions this work must resolve.", "Investigate the audience, category and positioning questions that matter most.", "Return a strategic recommendation with clear choices and next steps.")),
-        ReviewSection("Investment status", body=(investment_status or "Commercial terms remain pending founder approval.",)),
+        ReviewSection("Investment", body=(approved_fee,)),
         ReviewSection("Evidence boundaries", items=assumptions),
     )
     return ReviewDocumentPlan(
@@ -583,6 +594,33 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
         decision_prompt=decision,
         next_if_approved="Tony will commission the approved FIELDWORK scope through the existing governed research and strategy sequence. No client contact or external release will occur.",
     )
+
+
+def _approved_fieldwork_fee(payload: Mapping[str, Any]) -> str:
+    context = payload.get("commercial_context")
+    fee = context.get("approved_fieldwork_fee") if isinstance(context, Mapping) else None
+    if not isinstance(fee, Mapping):
+        raise HumanReviewArtifactError("FIELDWORK proposal review requires an approved fee in commercial context")
+    amount = fee.get("amount")
+    currency = _clean_text(fee.get("currency")).upper()
+    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3:
+        raise HumanReviewArtifactError("FIELDWORK proposal review requires an approved fee in commercial context")
+    formatted = f"{amount:,.0f}" if float(amount).is_integer() else f"{amount:,.2f}"
+    display = f"£{formatted}" if currency == "GBP" else f"{currency} {formatted}"
+    return f"FIELDWORK fee: {display}"
+
+
+def _monetary_estimate_text(value: Any) -> str:
+    if not isinstance(value, Mapping):
+        return ""
+    amount = value.get("amount")
+    currency = _clean_text(value.get("currency")).upper()
+    basis = _clean_text(value.get("basis"))
+    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3 or not basis:
+        return ""
+    formatted = f"{amount:,.0f}" if float(amount).is_integer() else f"{amount:,.2f}"
+    display = f"£{formatted}" if currency == "GBP" else f"{currency} {formatted}"
+    return f"Illustrative commercial opportunity: {display}. Basis: {basis}"
 
 
 def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:

@@ -74,6 +74,7 @@ class WorkflowRegistryTests(unittest.TestCase):
         self.assertIn("growth_problem_or_opportunity", proposal.output_contract.required_fields)
         self.assertIn("expected_growth_blueprint_outputs", proposal.output_contract.required_fields)
         self.assertIn("commercial_read", proposal.output_contract.required_fields)
+        self.assertIn("commercial_opportunity", proposal.output_contract.required_fields)
         self.assertIn("strategic_hypothesis", proposal.output_contract.required_fields)
         self.assertIn("proposal_evidence_readiness", proposal.output_contract.required_fields)
         self.assertIn("fieldwork_offer", proposal.output_contract.required_fields)

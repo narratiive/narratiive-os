@@ -64,7 +64,7 @@ class WorkflowActionPreviewTests(unittest.TestCase):
             {
                 "diagnostic_input_package": {"overall_score": 40},
                 "company": "KatKin",
-                "commercial_context": {"company": "KatKin"},
+                "commercial_context": {"company": "KatKin", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
             },
             entity_id="safe-katkin",
             correlation_id="safe-katkin",
@@ -97,7 +97,8 @@ class WorkflowActionPreviewTests(unittest.TestCase):
                 "discovery_evidence": {
                     "notes": "SAFE discovery evidence.",
                     "sources": [{"source_id": "safe", "source_type": "notes", "location": "safe:test"}],
-                }
+                },
+                "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
             },
         ).data["run_id"]
 

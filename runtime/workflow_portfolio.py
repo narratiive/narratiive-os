@@ -13,7 +13,7 @@ _WORKFLOW_INDEX = {workflow_id: index for index, workflow_id in enumerate(_WORKF
 _WORKFLOW_LABELS = {
     "growth_diagnostic_to_blueprint_lite": "Blueprint Lite",
     "blueprint_lite_to_discovery_preparation": "Discovery preparation",
-    "discovery_evidence_to_growth_sprint_proposal": "Growth Sprint proposal",
+    "discovery_evidence_to_growth_sprint_proposal": "FIELDWORK proposal",
     "growth_sprint_to_research_engine": "Research",
     "research_to_strategic_synthesis": "Strategic Synthesis",
     "strategic_synthesis_to_strategy_thesis": "Strategy Thesis",

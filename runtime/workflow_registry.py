@@ -157,6 +157,7 @@ DISCOVERY_EVIDENCE_TO_GROWTH_SPRINT_PROPOSAL = _workflow(
         outputs=(
             "discovery_synthesis",
             "growth_problem_or_opportunity",
+            "commercial_opportunity",
             "commercial_read",
             "strategic_hypothesis",
             "proposal_evidence_readiness",

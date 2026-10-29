@@ -211,6 +211,7 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
     checks = {
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
+        "one_defensible_commercial_opportunity_leads": _commercial_opportunity(output.get("commercial_opportunity")),
         "commercial_read_is_evidence_linked": _commercial_read(output.get("commercial_read")),
         "strategic_hypothesis_is_distinctive": _proposal_hypothesis(output.get("strategic_hypothesis"), output.get("growth_problem_or_opportunity")),
         "evidence_is_sufficient_for_client_facing_proposal": _proposal_evidence_ready(output.get("proposal_evidence_readiness")),
@@ -1256,6 +1257,29 @@ def _commercial_read(value: Any) -> bool:
     )
 
 
+def _commercial_opportunity(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    if not (
+        _substantive_text(value.get("headline"), minimum_words=6)
+        and str(value.get("classification") or "").casefold() in {"fact", "interpretation", "hypothesis"}
+        and _meaningful_list(value.get("evidence_refs"), minimum=1)
+        and _substantive_text(value.get("commercial_insight"), minimum_words=10)
+        and _substantive_text(value.get("basis"), minimum_words=6)
+    ):
+        return False
+    estimate = value.get("monetary_estimate")
+    return estimate is None or (
+        isinstance(estimate, Mapping)
+        and isinstance(estimate.get("amount"), (int, float))
+        and not isinstance(estimate.get("amount"), bool)
+        and estimate["amount"] > 0
+        and isinstance(estimate.get("currency"), str)
+        and len(estimate["currency"].strip()) == 3
+        and _substantive_text(estimate.get("basis"), minimum_words=6)
+    )
+
+
 def _proposal_hypothesis(value: Any, growth_problem: Any) -> bool:
     if not isinstance(value, Mapping):
         return False
@@ -1286,14 +1310,14 @@ def _proposal_evidence_ready(value: Any) -> bool:
 def _fieldwork_offer(value: Any) -> bool:
     if not isinstance(value, Mapping):
         return False
-    investment_status = str(value.get("investment_status") or "").casefold()
     return (
         value.get("engagement_name") == "FIELDWORK"
         and value.get("client_facing_title") == "Narratiive FIELDWORK Proposal"
         and _substantive_text(value.get("recommendation"), minimum_words=10)
         and _meaningful_list(value.get("deliverables"), minimum=3)
         and _substantive_text(value.get("duration"), minimum_words=1)
-        and "pending" in investment_status
+        and "approved" in str(value.get("investment_status") or "").casefold()
+        and value.get("fee_source") == "commercial_context.approved_fieldwork_fee"
     )
 
 
@@ -1328,6 +1352,8 @@ def _fieldwork_client_copy(value: Any) -> bool:
 
 def _normalise_text(value: Any) -> str:
     return " ".join(str(value or "").casefold().split())
+
+
 
 
 def _commercial_inputs(value: Any) -> bool:

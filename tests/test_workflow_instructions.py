@@ -45,6 +45,8 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn('engagement_name exactly "FIELDWORK"', instruction)
         self.assertIn("not a restatement of the growth problem", instruction)
         self.assertIn("Do not turn unresolved identity, scale, source-association or commercial-evidence conflicts", instruction)
+        self.assertIn("Lead with one commercial_opportunity object", instruction)
+        self.assertIn("never calculate, alter or compare it", instruction)
         self.assertIn("Questions must not repeat across workstreams", instruction)
 
     def test_growth_blueprint_contract_matches_validator(self) -> None:

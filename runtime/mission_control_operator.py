@@ -38,7 +38,7 @@ LEAD_STAGE = {
 ARTEFACT_NAMES = {
     "growth_diagnostic_to_blueprint_lite": "Blueprint Lite",
     "blueprint_lite_to_discovery_preparation": "Discovery Preparation",
-    "discovery_evidence_to_growth_sprint_proposal": "Growth Sprint Proposal",
+    "discovery_evidence_to_growth_sprint_proposal": "Narratiive FIELDWORK Proposal",
     "growth_sprint_to_research_engine": "Research Dossier",
     "research_to_strategic_synthesis": "Strategic Synthesis",
     "strategic_synthesis_to_strategy_thesis": "Strategy Thesis",

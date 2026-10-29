@@ -208,6 +208,7 @@ def proposal_output() -> dict:
     return {
         "discovery_synthesis": "The synthetic discovery evidence shows a team with a credible offer but no shared choice about the priority audience or the proof that moves that audience. The meeting confirmed urgency around demand quality while leaving customer language and competitive response uncertain and explicitly unresolved.",
         "growth_problem_or_opportunity": "Narratiive can help the team turn broad relevance into a distinctive, evidence-led growth choice that improves the quality of demand.",
+        "commercial_opportunity": {"headline": "A sharper choice can improve the quality of demand before more activity expands it.", "classification": "interpretation", "evidence_refs": ["meeting:notes:1", "blueprint:v1"], "commercial_insight": "The evidence suggests the greatest commercial upside is to make the offer easier for the right customer to choose with confidence.", "basis": "Discovery notes identify demand quality and proof as unresolved leadership concerns."},
         "commercial_read": [
             {"observation": "The synthetic discovery notes identify demand quality as an urgent leadership concern.", "classification": "fact", "evidence_refs": ["meeting:notes:1"], "commercial_implication": "Improving conversion quality may matter more than increasing undifferentiated traffic."},
             {"observation": "The current evidence suggests broad relevance may be making the offer easier to compare.", "classification": "interpretation", "evidence_refs": ["meeting:notes:1", "blueprint:v1"], "commercial_implication": "A more explicit choice could improve the value and confidence attached to demand."},
@@ -225,7 +226,8 @@ def proposal_output() -> dict:
             "recommendation": "We recommend FIELDWORK to turn the current commercial tension into an evidence-backed strategic choice and a clear plan for action.",
             "deliverables": ["Commercial and category diagnosis", "Priority audience and demand definition", "Positioning and narrative recommendation"],
             "duration": "Four weeks",
-            "investment_status": "Commercial terms pending founder approval",
+            "investment_status": "FIELDWORK fee approved for this proposal; proposal remains pending founder approval.",
+            "fee_source": "commercial_context.approved_fieldwork_fee",
         },
         "editorial_plan": {
             "argument": [
@@ -246,7 +248,7 @@ def proposal_output() -> dict:
             {"workstream": "Positioning", "questions": ["Which defensible difference can organise the growth story clearly?"]},
         ],
         "expected_growth_blueprint_outputs": ["Market and category diagnosis", "Audience definition", "Growth barriers", "Positioning", "Narrative platform"],
-        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Within the authorised Growth Sprint range, exact figure for human approval", "human_approval_required": True, "approval_status": "pending"},
+        "commercial_proposal_inputs": {"timeline": "Four weeks", "investment_recommendation": "Approved FIELDWORK fee is supplied through commercial context.", "human_approval_required": True, "approval_status": "pending"},
         "draft_client_communication": "Thank you for the candid discovery conversation. We heard a clear ambition to improve demand quality, alongside an unresolved choice about who matters most and which proof earns their confidence. We recommend FIELDWORK: a focused engagement spanning audience, category and positioning research. The attached proposal remains a draft for founder review, including timing, dependencies and commercial terms that remain pending approval. If the framing reflects what you heard, the next step would be to review the scope together and resolve the remaining evidence questions before any work is commissioned.",
         "assumptions_and_dependencies": ["Access to existing customer evidence", "Availability of commercial stakeholders for interviews"],
         "evidence_lineage": [
@@ -554,6 +556,13 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertIn("evidence is sufficient for client facing proposal", result["failed_checks"])
         self.assertIn("workstreams have strategic questions", result["failed_checks"])
 
+    def test_proposal_quality_requires_one_defensible_opportunity(self) -> None:
+        weak = proposal_output()
+        weak["commercial_opportunity"]["monetary_estimate"] = {"amount": 0, "currency": "GBP", "basis": "Unsupported value"}
+        result = growth_sprint_proposal_quality_gate(weak)
+        self.assertFalse(result["passed"])
+        self.assertIn("one defensible commercial opportunity leads", result["failed_checks"])
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {
@@ -561,7 +570,7 @@ class WorkflowQualityTests(unittest.TestCase):
                 "sources": [{"source_id": "meeting-1", "source_type": "notes", "location": "meeting:synthetic"}],
             },
             "blueprint_lite": "Synthetic blueprint",
-            "commercial_context": {},
+            "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
         }
         validate_operational_inputs("discovery_evidence_to_growth_sprint_proposal", valid)
         invalid = dict(valid)
@@ -584,7 +593,7 @@ class WorkflowQualityTests(unittest.TestCase):
                     }],
                 },
                 "blueprint_lite": "Synthetic Blueprint Lite",
-                "commercial_context": {},
+                "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
             },
         )
 

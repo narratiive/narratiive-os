@@ -974,7 +974,7 @@ class NotionWorkflowProjectionDispatcher:
             return {"verified": True, "updated": True, "mutation_count": 0, "duplicate_suppressed": True, "record_id": _text(current.get("id")), "projection_key": key}
         status = {"active": "Active", "blocked": "Waiting", "awaiting_approval": "Waiting", "complete": "Complete", "failed": "Waiting"}.get(_text(payload.get("workflow_status")), "Waiting")
         approval = {"pending": "Needs Review", "approved": "Approved", "rejected": "Rejected"}.get(_text(payload.get("approval_status")))
-        pipeline = {"blueprint_lite": "Blueprint Lite", "discovery": "Discovery Call", "proposal": "Proposal", "delivery": "Growth Sprint"}.get(_text(payload.get("lifecycle_stage")))
+        pipeline = {"blueprint_lite": "Blueprint Lite", "discovery": "Discovery Call", "proposal": "Proposal", "delivery": "FIELDWORK"}.get(_text(payload.get("lifecycle_stage")))
         deliverable_state = _text(payload.get("deliverable_state"))
         drive_files = payload.get("drive_files") if isinstance(payload.get("drive_files"), list) else []
         drive_summary = "; ".join(
