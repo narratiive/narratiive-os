@@ -49,7 +49,7 @@ class DiscoveryEvidenceResolver:
                     if stage.stage_id != "prepare_discovery":
                         continue
                     matches.extend(
-                        artifact for artifact in stage.output_artifacts
+                        (state, artifact) for artifact in stage.output_artifacts
                         if (
                             artifact.artifact_id == discovery_preparation_ref
                             and artifact.artifact_type == "workflow_step_output"
@@ -62,10 +62,18 @@ class DiscoveryEvidenceResolver:
                     )
         if len(matches) != 1:
             raise ValueError("discovery preparation artefact is not uniquely resolved")
-        artifact = matches[0]
+        state, artifact = matches[0]
         location = Path(artifact.location).resolve()
-        if self.artifact_root not in location.parents or location.suffix != ".json":
-            raise ValueError("discovery preparation artefact escapes the immutable store")
+        identity = hashlib.sha256(f"{state.run_id}:prepare_discovery".encode("utf-8")).hexdigest()
+        expected_id = f"artifact-{identity[:16]}-{str(artifact.checksum or '')[:16]}"
+        expected_location = (self.artifact_root / f"{expected_id}.json").resolve()
+        if (
+            artifact.artifact_id != expected_id
+            or location != expected_location
+            or self.artifact_root not in location.parents
+            or artifact.metadata.get("client_id") != state.client_id
+        ):
+            raise ValueError("discovery preparation artefact is not canonical for this run and stage")
         content = location.read_bytes()
         if not artifact.checksum or hashlib.sha256(content.rstrip(b"\n")).hexdigest() != artifact.checksum:
             raise ValueError("discovery preparation artefact integrity failed")

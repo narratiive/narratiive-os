@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-from runtime.models import StageRecord, WorkflowState
+from runtime.models import ArtifactRef, StageRecord, WorkflowState
 from runtime.repositories import FileWorkflowRunRepository
 from runtime.synthetic_invitation_preview import DiscoveryEvidenceResolver, PREFIX, build_invitation_preview
 from runtime.tony_structured_action_execution import (
@@ -296,6 +297,29 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             **self.config,
             PREFIX + "ENTITY_ID": attempt_entity,
             PREFIX + "DISCOVERY_PREPARATION_REF": attempt_ref,
+        })["status"], "blocked")
+        forged_entity = "forged-mapping"
+        forged_state = WorkflowState(
+            workflow_id="blueprint_lite_to_discovery_preparation",
+            run_id="forged-mapping-run",
+            stages=[StageRecord("prepare_discovery", "Claude")],
+            workspace_id="synthetic-test",
+            client_id="synthetic-client",
+            entity_id=forged_entity,
+        )
+        forged_content = b'{"evidence_lineage":[{"source_refs":["fixture:1"]}]}'
+        forged_path = self.artifacts.root / "forged.json"
+        forged_path.write_bytes(forged_content)
+        forged_state.stage("prepare_discovery").output_artifacts = [ArtifactRef(
+            artifact_id="artifact-forged", artifact_type="workflow_step_output",
+            location=str(forged_path), checksum=hashlib.sha256(forged_content).hexdigest(),
+            metadata={"workspace_id": "synthetic-test", "client_id": "synthetic-client", "entity_id": forged_entity, "workflow_id": "blueprint_lite_to_discovery_preparation", "run_id": "forged-mapping-run", "stage_id": "prepare_discovery"},
+        )]
+        self.runs.save(forged_state)
+        self.assertEqual(self.preview(config={
+            **self.config,
+            PREFIX + "ENTITY_ID": forged_entity,
+            PREFIX + "DISCOVERY_PREPARATION_REF": "artifact-forged",
         })["status"], "blocked")
 
     def test_founder_approved_loom_loft_copy_is_exact_and_isolated(self):
