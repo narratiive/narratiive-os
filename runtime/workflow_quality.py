@@ -1363,7 +1363,11 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
         }
     text = _model_text(proposal)
     return not re.search(
-        r"(?:\b(?:fee|price|pricing)\b|[£$€]\s*\d|\b(?:GBP|USD|EUR)\s*\d)",
+        # The validated renderer supports any ISO-style three-letter currency,
+        # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
+        # currency amount regardless of its code or whether it is expressed in
+        # words; otherwise an unbound FIELDWORK fee can reach a review copy.
+        r"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b[A-Z]{3}\s*\d|\b(?:\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[ -]+(?:hundred|thousand|million|billion|and|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))*[ -]+(?:pounds?|dollars?|euros?)\b)",
         text,
         flags=re.IGNORECASE,
     )
