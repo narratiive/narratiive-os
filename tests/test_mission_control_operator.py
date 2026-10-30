@@ -108,7 +108,7 @@ class MissionControlOperatorTests(unittest.TestCase):
         test = self._state(client="fixture", synthetic=True)
         self.classifications.append(
             WorkflowEntityClassification.create(
-                workspace_id="narratiive", entity_id="fixture", workflow_id=test.workflow_id,
+                workspace_id="narratiive", client_id=test.client_id, run_id=test.run_id, entity_id="fixture", workflow_id=test.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
                 authorisation_reference="approval:test-fixture", authorisation_turn_id="turn-fixture", authorisation_proof="proof-fixture", reason="Authorised fixture.",
             ),
@@ -154,7 +154,7 @@ class MissionControlOperatorTests(unittest.TestCase):
         katkin.input_payload["company"] = "CatKin"
         self.classifications.append(
             WorkflowEntityClassification.create(
-                workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id=loom.workflow_id,
+                workspace_id="narratiive", client_id=loom.client_id, run_id=loom.run_id, entity_id="inbound-d1b96a67", workflow_id=loom.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
                 authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="Authorised test.",
             ),

@@ -251,6 +251,8 @@ class FileWorkflowCommandBackend:
         return service.record(
             WorkflowEntityClassification.create(
                 workspace_id=state.workspace_id,
+                client_id=state.client_id,
+                run_id=state.run_id,
                 entity_id=state.entity_id,
                 workflow_id=state.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST,
@@ -778,6 +780,7 @@ class TonyWorkflowCommandService:
                 return self._queue(name, states)
             reference, rationale = self._arguments(parts[1:])
             if name == "classify-synthetic-test":
+                supplied = dict(inputs or {})
                 matching_entity_states = tuple(
                     state for state in states if state.entity_id == reference
                 )
@@ -787,12 +790,36 @@ class TonyWorkflowCommandService:
                         "exact_workflow_entity_not_found",
                         "Classification requires an exact persisted workflow entity ID.",
                     )
-                state = max(
-                    matching_entity_states, key=lambda item: (item.updated_at, item.run_id)
+                supplied_scope = supplied.get("classification_scope")
+                if not isinstance(supplied_scope, Mapping):
+                    return self._error(
+                        name,
+                        "exact_classification_authorisation_required",
+                        "Classification requires the exact signed workspace, client, workflow and run identity.",
+                    )
+                requested_scope = {
+                    field: str(supplied_scope.get(field) or "").strip()
+                    for field in ("workspace_id", "client_id", "workflow_id", "run_id")
+                }
+                if not all(requested_scope.values()):
+                    return self._error(
+                        name,
+                        "ambiguous_workflow_entity_scope",
+                        "Classification requires the exact workspace, client, workflow and run identity.",
+                    )
+                scoped_states = tuple(
+                    state for state in matching_entity_states
+                    if all(getattr(state, field) == value for field, value in requested_scope.items() if value)
                 )
+                if len(scoped_states) != 1:
+                    return self._error(
+                        name,
+                        "exact_workflow_entity_not_found",
+                        "Classification requires one exact persisted workspace, client, workflow and run identity.",
+                    )
+                state = scoped_states[0]
                 if not principal_id.strip():
                     return self._error(name, "authorised_principal_required", "Classification requires Matt's authenticated identity.")
-                supplied = dict(inputs or {})
                 authorisation_reference = str(supplied.get("authorisation_reference") or "").strip()
                 authorisation_turn_id = str(supplied.get("classification_instruction_run_id") or "").strip()
                 authorisation_proof = str(supplied.get("classification_instruction_proof") or "").strip()

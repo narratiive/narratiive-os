@@ -24,7 +24,7 @@ export function hasExplicitWorkflowDecisionIntent(operation, instruction) {
   return /(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b/i.test(text);
 }
 
-export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "" }) {
+export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "", classificationScope = {} }) {
   const normalized = normalizedOperation(operation);
   const fields = [
     "narratiive-workflow-decision-v1",
@@ -34,7 +34,10 @@ export function workflowDecisionProofMaterial({ runId, operation, reference, app
     String(approvalToken || ""),
     String(instruction || ""),
   ];
-  if (normalized === CLASSIFICATION_OPERATION) fields.push(String(authorisationReference || ""));
+  if (normalized === CLASSIFICATION_OPERATION) {
+    fields.push(String(authorisationReference || ""));
+    for (const field of ["workspace_id", "client_id", "workflow_id", "run_id"]) fields.push(String(classificationScope?.[field] || ""));
+  }
   return fields.join("\0");
 }
 
@@ -89,8 +92,12 @@ export function buildTrustedWorkflowClassificationParams(params, trustedTurn, br
   }
   const reference = String(params?.reference || "").trim();
   const authorisationReference = String(params?.authorisation_reference || "").trim();
-  if (!reference || !authorisationReference) {
-    throw new Error("workflow classification requires an exact entity reference and authorisation reference");
+  const suppliedScope = params?.classification_scope;
+  const classificationScope = Object.fromEntries(
+    ["workspace_id", "client_id", "workflow_id", "run_id"].map((field) => [field, String(suppliedScope?.[field] || "").trim()]),
+  );
+  if (!reference || !authorisationReference || Object.values(classificationScope).some((value) => !value)) {
+    throw new Error("workflow classification requires an exact entity, workspace, client, workflow, run and authorisation reference");
   }
   if (!instruction.includes(reference)) {
     throw new Error("the current human instruction must name the exact workflow entity reference");
@@ -102,11 +109,13 @@ export function buildTrustedWorkflowClassificationParams(params, trustedTurn, br
     approvalToken: "",
     instruction,
     authorisationReference,
+    classificationScope,
   };
   return {
     ...params,
     classification_instruction: instruction,
     _classification_instruction_run_id: trustedTurn.runId,
     _classification_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
+    classification_scope: classificationScope,
   };
 }

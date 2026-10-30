@@ -181,11 +181,29 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         )
         self.assertEqual(denied.data["error_code"], "exact_workflow_entity_not_found")
 
-        result = service.execute(
+        ambiguous = service.execute(
             "/classify-synthetic-test safe-lead because authorised internal test",
             [],
             principal_id="telegram:founder",
             inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
+        )
+        self.assertEqual(ambiguous.data["error_code"], "exact_classification_authorisation_required")
+
+        result = service.execute(
+            "/classify-synthetic-test safe-lead because authorised internal test",
+            [],
+            principal_id="telegram:founder",
+            inputs={
+                "authorisation_reference": "telegram-message:123",
+                "classification_instruction_run_id": "turn-123",
+                "classification_instruction_proof": "proof-123",
+                "classification_scope": {
+                    "workspace_id": "narratiive",
+                    "client_id": "safe-client",
+                    "workflow_id": "growth_diagnostic_to_blueprint_lite",
+                    "run_id": "safe-executive-run",
+                },
+            },
         )
 
         self.assertEqual(result.status, "healthy")
@@ -195,7 +213,10 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         journal = FileWorkflowEntityClassificationJournal(
             self.root, authorised_classifier_id="telegram:founder"
         )
-        self.assertEqual(journal.latest("narratiive")["safe-lead"].workflow_id, state.workflow_id)
+        self.assertEqual(
+            journal.classification_for(state, states=[state]).workflow_id,
+            state.workflow_id,
+        )
 
     def test_campaign_portfolio_reports_one_safe_current_position_per_client(self) -> None:
         second = build_tony_workflow_runtime(

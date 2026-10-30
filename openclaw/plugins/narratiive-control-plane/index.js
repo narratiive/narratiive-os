@@ -59,6 +59,18 @@ const WORKFLOW_SCHEMA = {
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
   classification_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human instruction explicitly classifying this exact workflow entity as an internal synthetic test." },
   authorisation_reference: { type: "string", minLength: 1, maxLength: 500, description: "Durable reference for the explicit founder authorisation." },
+  classification_scope: {
+    type: "object",
+    properties: {
+      workspace_id: { type: "string", minLength: 1, maxLength: 200 },
+      client_id: { type: "string", minLength: 1, maxLength: 200 },
+      workflow_id: { type: "string", minLength: 1, maxLength: 200 },
+      run_id: { type: "string", minLength: 1, maxLength: 500 },
+    },
+    required: ["workspace_id", "client_id", "workflow_id", "run_id"],
+    additionalProperties: false,
+    description: "Exact canonical scope of an authorised synthetic-test classification. This scope is bound into the trusted-turn proof.",
+  },
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {
@@ -148,6 +160,7 @@ async function executeWorkflowControl(params) {
           ...(authorisationReference ? { authorisation_reference: authorisationReference } : {}),
           ...(params?._classification_instruction_run_id ? { classification_instruction_run_id: String(params._classification_instruction_run_id) } : {}),
           ...(params?._classification_instruction_proof ? { classification_instruction_proof: String(params._classification_instruction_proof) } : {}),
+          ...(params?.classification_scope && typeof params.classification_scope === "object" && !Array.isArray(params.classification_scope) ? { classification_scope: params.classification_scope } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),

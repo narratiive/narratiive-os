@@ -326,6 +326,7 @@ class TelegramInboundTests(unittest.TestCase):
             workflow_command_service=workflows, authorised_principal_id="telegram:123",
         )
         entity_id = "inbound-d1b96a67"
+        scope = {"workspace_id": "narratiive", "client_id": "loom-client", "workflow_id": "growth_diagnostic_to_blueprint_lite", "run_id": "loom-run"}
         instruction = "Classify inbound-d1b96a67 as a synthetic internal test."
         proof = hmac.new(
             b"secret",
@@ -336,11 +337,12 @@ class TelegramInboundTests(unittest.TestCase):
                 approval_token="",
                 instruction=instruction,
                 authorisation_reference="telegram-message:513",
+                classification_scope=scope,
             ),
             hashlib.sha256,
         ).hexdigest()
 
-        def call(reference: str):
+        def call(reference: str, *, supplied_scope=None):
             body = {
                 "operation": "classify-synthetic-test", "reference": reference,
                 "rationale": "Founder-authorised internal certification record.",
@@ -350,6 +352,7 @@ class TelegramInboundTests(unittest.TestCase):
                     "classification_instruction": instruction,
                     "classification_instruction_run_id": "openclaw-conversation-turn-1",
                     "classification_instruction_proof": proof,
+                    "classification_scope": supplied_scope or scope,
                 },
                 "source": "openclaw_telegram_workflow_tool",
             }
@@ -362,6 +365,8 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertEqual(workflows.calls[-1]["principal_id"], "telegram:123")
         self.assertIn(entity_id, workflows.calls[-1]["text"])
         self.assertFalse(call("different-entity")["ok"])
+        altered_scope = dict(scope, run_id="other-run")
+        self.assertFalse(call(entity_id, supplied_scope=altered_scope)["ok"])
 
 
 if __name__ == "__main__":
