@@ -57,6 +57,8 @@ const WORKFLOW_SCHEMA = {
   recipient: { type: "string", minLength: 1, maxLength: 320 },
   workflow_id: { type: "string", minLength: 1, maxLength: 200 },
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
+  classification_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human instruction explicitly classifying this exact workflow entity as an internal synthetic test." },
+  authorisation_reference: { type: "string", minLength: 1, maxLength: 500, description: "Durable reference for the explicit founder authorisation." },
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {
@@ -120,6 +122,9 @@ async function executeWorkflowControl(params) {
   if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !hasExplicitWorkflowDecisionIntent(operation, approvalInstruction)) throw new Error(`the current human instruction does not explicitly ${operation.replace("_", " ")} this artefact`);
   const actionDigest = String(params?.action_digest || "").trim();
   if (operation === "execute_action" && !actionDigest) throw new Error("action execution requires the exact preview action digest");
+  const authorisationReference = String(params?.authorisation_reference || "").trim();
+  const classificationInstruction = String(params?.classification_instruction || "");
+  if (operation === "classify_synthetic_test" && (!authorisationReference || !classificationInstruction)) throw new Error("workflow classification requires the verbatim current instruction and authorisation reference");
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
@@ -140,6 +145,7 @@ async function executeWorkflowControl(params) {
           ...(params?._approval_instruction_run_id ? { approval_instruction_run_id: String(params._approval_instruction_run_id) } : {}),
           ...(params?._approval_instruction_proof ? { approval_instruction_proof: String(params._approval_instruction_proof) } : {}),
           ...(params?.classification_instruction ? { classification_instruction: String(params.classification_instruction) } : {}),
+          ...(authorisationReference ? { authorisation_reference: authorisationReference } : {}),
           ...(params?._classification_instruction_run_id ? { classification_instruction_run_id: String(params._classification_instruction_run_id) } : {}),
           ...(params?._classification_instruction_proof ? { classification_instruction_proof: String(params._classification_instruction_proof) } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),

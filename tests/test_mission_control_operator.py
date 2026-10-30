@@ -77,7 +77,7 @@ class MissionControlOperatorTests(unittest.TestCase):
             WorkflowEntityClassification.create(
                 workspace_id="narratiive", entity_id="fixture", workflow_id=test.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
-                authorisation_reference="approval:test-fixture", reason="Authorised fixture.",
+                authorisation_reference="approval:test-fixture", authorisation_turn_id="turn-fixture", authorisation_proof="proof-fixture", reason="Authorised fixture.",
             ),
             states=[test], principal_id="telegram:founder",
         )
@@ -123,7 +123,7 @@ class MissionControlOperatorTests(unittest.TestCase):
             WorkflowEntityClassification.create(
                 workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id=loom.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
-                authorisation_reference="telegram-message:123", reason="Authorised test.",
+                authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="Authorised test.",
             ),
             states=[loom], principal_id="telegram:founder",
         )

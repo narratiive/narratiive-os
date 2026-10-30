@@ -24,15 +24,18 @@ export function hasExplicitWorkflowDecisionIntent(operation, instruction) {
   return /(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b/i.test(text);
 }
 
-export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction }) {
-  return [
+export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "" }) {
+  const normalized = normalizedOperation(operation);
+  const fields = [
     "narratiive-workflow-decision-v1",
     String(runId || ""),
-    normalizedOperation(operation),
+    normalized,
     String(reference || ""),
     String(approvalToken || ""),
     String(instruction || ""),
-  ].join("\0");
+  ];
+  if (normalized === CLASSIFICATION_OPERATION) fields.push(String(authorisationReference || ""));
+  return fields.join("\0");
 }
 
 export function signWorkflowDecisionProof(secret, fields) {
@@ -85,7 +88,7 @@ export function buildTrustedWorkflowClassificationParams(params, trustedTurn, br
     throw new Error("the current human instruction must explicitly classify this workflow as synthetic");
   }
   const reference = String(params?.reference || "").trim();
-  const authorisationReference = String(params?.inputs?.authorisation_reference || "").trim();
+  const authorisationReference = String(params?.authorisation_reference || "").trim();
   if (!reference || !authorisationReference) {
     throw new Error("workflow classification requires an exact entity reference and authorisation reference");
   }
@@ -98,6 +101,7 @@ export function buildTrustedWorkflowClassificationParams(params, trustedTurn, br
     reference,
     approvalToken: "",
     instruction,
+    authorisationReference,
   };
   return {
     ...params,

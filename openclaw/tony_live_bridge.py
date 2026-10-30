@@ -140,16 +140,20 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
 
 
 def workflow_decision_proof_material(
-    *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str
+    *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
+    authorisation_reference: str = "",
 ) -> bytes:
+    normalized_operation = operation.strip().casefold().replace("-", "_")
     values = (
         "narratiive-workflow-decision-v1",
         run_id,
-        operation.strip().casefold().replace("-", "_"),
+        normalized_operation,
         reference,
         approval_token,
         instruction,
     )
+    if normalized_operation == "classify_synthetic_test":
+        values = (*values, authorisation_reference)
     return "\0".join(values).encode("utf-8")
 
 
@@ -162,6 +166,7 @@ def verify_workflow_decision_proof(
     approval_token: str,
     instruction: str,
     proof: str,
+    authorisation_reference: str = "",
 ) -> bool:
     if not secret or not run_id or not proof:
         return False
@@ -173,6 +178,7 @@ def verify_workflow_decision_proof(
             reference=reference,
             approval_token=approval_token,
             instruction=instruction,
+            authorisation_reference=authorisation_reference,
         ),
         hashlib.sha256,
     ).hexdigest()
@@ -488,6 +494,7 @@ class LeadAwareTonyApplication:
                         approval_token="",
                         instruction=instruction,
                         proof=instruction_proof,
+                        authorisation_reference=authorisation_reference,
                     ):
                         raise ValueError("workflow classification lacks verified verbatim current-human instruction provenance")
                 principal = (

@@ -170,7 +170,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "/classify-synthetic-test safe-executive-run because authorised test",
             [],
             principal_id="telegram:founder",
-            inputs={"authorisation_reference": "telegram-message:123"},
+            inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
         )
         self.assertEqual(denied.data["error_code"], "exact_classification_authorisation_required")
 
@@ -178,7 +178,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "/classify-synthetic-test safe-lead because authorised internal test",
             [],
             principal_id="telegram:founder",
-            inputs={"authorisation_reference": "telegram-message:123"},
+            inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
         )
 
         self.assertEqual(result.status, "healthy")

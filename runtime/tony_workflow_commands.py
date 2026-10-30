@@ -111,7 +111,8 @@ class WorkflowCommandBackend(Protocol):
         rationale: str,
     ) -> WorkflowState: ...
     def classify_internal_synthetic_test(
-        self, state: WorkflowState, *, principal_id: str, authorisation_reference: str, reason: str
+        self, state: WorkflowState, *, principal_id: str, authorisation_reference: str,
+        authorisation_turn_id: str, authorisation_proof: str, reason: str
     ) -> WorkflowEntityClassification: ...
 
 
@@ -232,6 +233,8 @@ class FileWorkflowCommandBackend:
         *,
         principal_id: str,
         authorisation_reference: str,
+        authorisation_turn_id: str,
+        authorisation_proof: str,
         reason: str,
     ) -> WorkflowEntityClassification:
         if self.workspace_id is None or state.workspace_id != self.workspace_id:
@@ -253,6 +256,8 @@ class FileWorkflowCommandBackend:
                 classification=INTERNAL_SYNTHETIC_TEST,
                 classifier_id=principal_id,
                 authorisation_reference=authorisation_reference,
+                authorisation_turn_id=authorisation_turn_id,
+                authorisation_proof=authorisation_proof,
                 reason=reason,
             ),
             principal_id=principal_id,
@@ -778,7 +783,9 @@ class TonyWorkflowCommandService:
                     return self._error(name, "authorised_principal_required", "Classification requires Matt's authenticated identity.")
                 supplied = dict(inputs or {})
                 authorisation_reference = str(supplied.get("authorisation_reference") or "").strip()
-                if not rationale or not authorisation_reference or state.entity_id != reference:
+                authorisation_turn_id = str(supplied.get("classification_instruction_run_id") or "").strip()
+                authorisation_proof = str(supplied.get("classification_instruction_proof") or "").strip()
+                if not rationale or not authorisation_reference or not authorisation_turn_id or not authorisation_proof or state.entity_id != reference:
                     return self._error(
                         name,
                         "exact_classification_authorisation_required",
@@ -788,6 +795,8 @@ class TonyWorkflowCommandService:
                     state,
                     principal_id=principal_id,
                     authorisation_reference=authorisation_reference,
+                    authorisation_turn_id=authorisation_turn_id,
+                    authorisation_proof=authorisation_proof,
                     reason=rationale,
                 )
                 return CommandResponse(

@@ -335,6 +335,7 @@ class TelegramInboundTests(unittest.TestCase):
                 reference=entity_id,
                 approval_token="",
                 instruction=instruction,
+                authorisation_reference="telegram-message:513",
             ),
             hashlib.sha256,
         ).hexdigest()
@@ -343,6 +344,7 @@ class TelegramInboundTests(unittest.TestCase):
             body = {
                 "operation": "classify-synthetic-test", "reference": reference,
                 "rationale": "Founder-authorised internal certification record.",
+                "authorisation_reference": "telegram-message:513",
                 "inputs": {
                     "authorisation_reference": "telegram-message:513",
                     "classification_instruction": instruction,

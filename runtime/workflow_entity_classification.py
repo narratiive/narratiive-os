@@ -27,6 +27,8 @@ class WorkflowEntityClassification:
     classification: str
     classifier_id: str
     authorisation_reference: str
+    authorisation_turn_id: str
+    authorisation_proof: str
     reason: str
     occurred_at: str
     supersedes_event_id: str = ""
@@ -39,6 +41,8 @@ class WorkflowEntityClassification:
             ("workflow_id", self.workflow_id),
             ("classifier_id", self.classifier_id),
             ("authorisation_reference", self.authorisation_reference),
+            ("authorisation_turn_id", self.authorisation_turn_id),
+            ("authorisation_proof", self.authorisation_proof),
             ("reason", self.reason),
             ("occurred_at", self.occurred_at),
         ):
@@ -61,6 +65,8 @@ class WorkflowEntityClassification:
         classification: str,
         classifier_id: str,
         authorisation_reference: str,
+        authorisation_turn_id: str,
+        authorisation_proof: str,
         reason: str,
         supersedes_event_id: str = "",
     ) -> "WorkflowEntityClassification":
@@ -72,6 +78,8 @@ class WorkflowEntityClassification:
             classification=classification,
             classifier_id=classifier_id.strip(),
             authorisation_reference=authorisation_reference.strip(),
+            authorisation_turn_id=authorisation_turn_id.strip(),
+            authorisation_proof=authorisation_proof.strip(),
             reason=reason.strip(),
             occurred_at=datetime.now(timezone.utc).isoformat(),
             supersedes_event_id=supersedes_event_id.strip(),

@@ -72,7 +72,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "reference": "inbound-d1b96a67",
             "rationale": "Founder-authorised internal certification record.",
             "classification_instruction": prompt,
-            "inputs": {"authorisation_reference": "telegram-message:513"},
+            "authorisation_reference": "telegram-message:513",
         }
         result = self._node(
             f"buildTrustedWorkflowClassificationParams({json.dumps(params)},{{runId:'conversation-turn-1',prompt:{json.dumps(prompt)}}},'secret')"

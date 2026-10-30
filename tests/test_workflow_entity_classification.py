@@ -32,7 +32,8 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         return WorkflowEntityClassification.create(
             workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id="growth_diagnostic_to_blueprint_lite",
             classification=classification, classifier_id="telegram:founder",
-            authorisation_reference="telegram-message:123", reason="Authorised synthetic test classification.",
+            authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123",
+            authorisation_proof="proof-123", reason="Authorised synthetic test classification.",
             supersedes_event_id=supersedes,
         )
 
@@ -55,7 +56,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         foreign = WorkflowEntityClassification.create(
             workspace_id="other", entity_id=self.state.entity_id, workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
-            authorisation_reference="telegram-message:123", reason="No cross-workspace classification.",
+            authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No cross-workspace classification.",
         )
         with self.assertRaisesRegex(ValueError, "not registered"):
             self.journal.append(foreign, states=[self.state], principal_id="telegram:founder")
@@ -63,7 +64,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         unknown = WorkflowEntityClassification.create(
             workspace_id="narratiive", entity_id="other-entity", workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
-            authorisation_reference="telegram-message:123", reason="No implicit classification.",
+            authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No implicit classification.",
         )
         with self.assertRaisesRegex(ValueError, "not registered"):
             self.journal.append(unknown, states=[self.state], principal_id="telegram:founder")
@@ -92,7 +93,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
             WorkflowEntityClassification(
                 event_id="event", workspace_id="narratiive", entity_id=self.state.entity_id,
                 workflow_id=self.state.workflow_id, classification=INTERNAL_SYNTHETIC_TEST,
-                classifier_id="", authorisation_reference="", reason="", occurred_at="",
+                classifier_id="", authorisation_reference="", authorisation_turn_id="", authorisation_proof="", reason="", occurred_at="",
             )
         with self.assertRaisesRegex(PermissionError, "authorised classifier"):
             self.journal.append(
