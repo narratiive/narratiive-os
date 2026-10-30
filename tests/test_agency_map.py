@@ -6,8 +6,13 @@ from dataclasses import FrozenInstanceError
 from pathlib import Path
 
 from runtime.agency_map import (
+    PROVENANCE_NO_EVIDENCE_SUPPLIED,
+    PROVENANCE_REPOSITORY_FILE_CHECK,
+    PROVENANCE_STATIC_SOURCE_SCAN,
+    PROVENANCE_SUPPLIED_SNAPSHOT,
     ROSTER_SCOPE_NOTE,
     _ROSTER,
+    _configured_evidence,
     AgencyMapEntry,
     CapabilityEvidence,
     Evidence,
@@ -75,9 +80,27 @@ class AgencyMapRosterTests(unittest.TestCase):
                 )
                 seen[ref] = spec.agent_id
 
+    def test_orchestrator_does_not_claim_the_bounded_taste_triage_stages(self) -> None:
+        # Confirmed Codex finding: triage conflicts with both the
+        # Orchestrator's and Quality Reviewer's authoritative contracts.
+        # These stages must stay unattributed by every agent, not just moved
+        # off the Orchestrator onto someone else.
+        triage_stages = {
+            ("growth_blueprint_to_campaign_world", "triage_campaign_world_candidates"),
+            ("campaign_world_to_creative_bible", "triage_creative_bible"),
+        }
+        for spec in _ROSTER:
+            for ref in spec.canonical_stage_refs:
+                self.assertNotIn(
+                    ref,
+                    triage_stages,
+                    f"{spec.agent_id} must not claim the unattributed triage stage {ref}",
+                )
+
     def test_scope_note_disclaims_completeness_and_agent_invention(self) -> None:
         self.assertIn("not", ROSTER_SCOPE_NOTE.lower())
         self.assertIn("agents/*.md", ROSTER_SCOPE_NOTE)
+        self.assertIn("triage", ROSTER_SCOPE_NOTE.lower())
         self.assertTrue(len(ROSTER_SCOPE_NOTE) > 50)
 
 
@@ -89,7 +112,7 @@ class AgencyMapImmutabilityTests(unittest.TestCase):
         with self.assertRaises(FrozenInstanceError):
             entry.agent_id = "tampered"  # type: ignore[misc]
         with self.assertRaises(FrozenInstanceError):
-            entry.capability.defined = Evidence(False, "tampered")  # type: ignore[misc]
+            entry.capability.defined = Evidence(False, "tampered", PROVENANCE_NO_EVIDENCE_SUPPLIED)  # type: ignore[misc]
 
     def test_build_agency_map_returns_a_fresh_tuple_each_call(self) -> None:
         first = build_agency_map()
@@ -107,6 +130,8 @@ class AgencyMapStaticEvidenceTests(unittest.TestCase):
             self.assertTrue(entry.capability.implemented.value, entry.capability.implemented.evidence)
             self.assertTrue(entry.capability.tested.value, entry.capability.tested.evidence)
             self.assertTrue(entry.capability.configured.value, entry.capability.configured.evidence)
+            self.assertEqual(entry.capability.defined.provenance, PROVENANCE_REPOSITORY_FILE_CHECK)
+            self.assertEqual(entry.capability.configured.provenance, PROVENANCE_STATIC_SOURCE_SCAN)
 
     def test_configured_evidence_explicitly_disclaims_runtime_proof(self) -> None:
         for entry in build_agency_map():
@@ -116,48 +141,71 @@ class AgencyMapStaticEvidenceTests(unittest.TestCase):
                 f"{entry.agent_id}: configured evidence must disclaim runtime proof",
             )
 
+    def test_configured_requires_every_marker_not_just_one(self) -> None:
+        source = 'worker_id="claude-anthropic" and nothing else relevant here'
+        all_present = _configured_evidence(source, ('worker_id="claude-anthropic"',), "note")
+        partial = _configured_evidence(source, ('worker_id="claude-anthropic"', '"strategic_reasoning"'), "note")
+
+        self.assertTrue(all_present.value)
+        self.assertFalse(
+            partial.value,
+            "a partial marker match must report configured=False, not True -- this was the confirmed defect",
+        )
+        self.assertIn('"strategic_reasoning"', partial.evidence)
+
     def test_without_a_live_snapshot_runtime_connected_is_unverified_not_false(self) -> None:
         for entry in build_agency_map():
             self.assertIsNone(
                 entry.capability.runtime_connected.value,
                 f"{entry.agent_id}: runtime_connected must be None (unverified), not False, with no live snapshot",
             )
+            self.assertEqual(entry.capability.runtime_connected.provenance, PROVENANCE_NO_EVIDENCE_SUPPLIED)
 
-    def test_live_snapshot_containing_a_worker_id_marks_it_runtime_connected(self) -> None:
+    def test_live_snapshot_containing_a_worker_id_marks_it_runtime_connected_with_supplied_snapshot_provenance(self) -> None:
         entries = {
             e.agent_id: e
             for e in build_agency_map(live_worker_ids=frozenset({"narratiive-research-engine"}))
         }
-        self.assertTrue(entries["research_analyst"].capability.runtime_connected.value)
+        result = entries["research_analyst"].capability.runtime_connected
+        self.assertTrue(result.value)
+        self.assertEqual(result.provenance, PROVENANCE_SUPPLIED_SNAPSHOT)
+        self.assertNotIn("live and registered", result.evidence.lower())
 
     def test_live_snapshot_missing_a_worker_id_marks_it_not_runtime_connected(self) -> None:
         entries = {
             e.agent_id: e
             for e in build_agency_map(live_worker_ids=frozenset({"some-other-worker"}))
         }
-        self.assertFalse(entries["research_analyst"].capability.runtime_connected.value)
-
-    def test_quality_reviewer_structural_gates_have_no_worker_registry_runtime_check(self) -> None:
-        # The deterministic quality-gate functions run in-process; they are not
-        # dispatched through the capability worker registry, so a live
-        # worker-id snapshot cannot verify them either way.
-        entries = {
-            e.agent_id: e
-            for e in build_agency_map(live_worker_ids=frozenset({"narratiive-senior-strategist-reviewer"}))
-        }
-        # The senior-strategist review *is* worker-registry-dispatched, so this
-        # should report connected -- but it must be via that specific worker_id,
-        # not an inferred blanket claim for the whole agent.
-        self.assertTrue(entries["quality_reviewer"].capability.runtime_connected.value)
+        result = entries["research_analyst"].capability.runtime_connected
+        self.assertFalse(result.value)
+        self.assertEqual(result.provenance, PROVENANCE_SUPPLIED_SNAPSHOT)
 
 
 class AgencyMapWithoutInjectedStateTests(unittest.TestCase):
-    def test_live_verified_is_honestly_false_with_no_evidence(self) -> None:
+    def test_live_verified_is_unverified_not_false_with_no_snapshot(self) -> None:
         for entry in build_agency_map():
-            self.assertFalse(entry.capability.live_verified.value)
-            self.assertIn("no persisted WorkflowState", entry.capability.live_verified.evidence)
+            self.assertIsNone(
+                entry.capability.live_verified.value,
+                f"{entry.agent_id}: live_verified must be None (unverified) when no snapshot is supplied, not False",
+            )
+            self.assertEqual(entry.capability.live_verified.provenance, PROVENANCE_NO_EVIDENCE_SUPPLIED)
             self.assertEqual(entry.active_work, ())
             self.assertIsNone(entry.last_verified_activity)
+
+    def test_an_explicit_empty_snapshot_is_verified_false_not_unverified(self) -> None:
+        # Passing [] is a real, if empty, supplied snapshot -- the agent's
+        # stage was genuinely checked and not found, which is a different
+        # claim from "nothing was supplied to check at all" (None).
+        entries = {e.agent_id: e for e in build_agency_map([])}
+        result = entries["research_analyst"].capability.live_verified
+        self.assertFalse(result.value)
+        self.assertEqual(result.provenance, PROVENANCE_SUPPLIED_SNAPSHOT)
+
+    def test_orchestrator_has_no_canonical_stage_so_live_verified_is_unverified(self) -> None:
+        entries = {e.agent_id: e for e in build_agency_map([])}
+        result = entries["orchestrator"].capability.live_verified
+        self.assertIsNone(result.value)
+        self.assertEqual(result.provenance, PROVENANCE_NO_EVIDENCE_SUPPLIED)
 
 
 class AgencyMapStageAttributionTests(unittest.TestCase):
@@ -169,21 +217,24 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
         entries = {e.agent_id: e for e in build_agency_map([state])}
 
         self.assertTrue(entries["campaign_world_generator"].capability.live_verified.value)
-        self.assertFalse(
-            entries["orchestrator"].capability.live_verified.value,
-            "the generation stage completing must not verify the Orchestrator's separate triage stage",
-        )
+        for agent_id, entry in entries.items():
+            if agent_id == "campaign_world_generator":
+                continue
+            self.assertFalse(
+                entry.capability.live_verified.value,
+                f"the generation stage completing must not verify {agent_id}'s unrelated stage",
+            )
 
-    def test_triage_stage_completion_verifies_the_orchestrator_only(self) -> None:
+    def test_triage_stage_completion_verifies_no_agent_at_all(self) -> None:
         stage = StageRecord("triage_campaign_world_candidates", "tony-campaign-world-triage", status=StageStatus.COMPLETED)
         state = _state("growth_blueprint_to_campaign_world", "run-1", [stage])
         entries = {e.agent_id: e for e in build_agency_map([state])}
 
-        self.assertTrue(entries["orchestrator"].capability.live_verified.value)
-        self.assertFalse(
-            entries["campaign_world_generator"].capability.live_verified.value,
-            "the triage stage completing must not verify Campaign World Generator's separate generation stage",
-        )
+        for agent_id, entry in entries.items():
+            self.assertFalse(
+                entry.capability.live_verified.value,
+                f"the unattributed triage stage completing must not verify {agent_id}",
+            )
 
     def test_not_started_stage_does_not_count_as_live_verified(self) -> None:
         stage = StageRecord("generate_campaign_world", "claude-anthropic", status=StageStatus.NOT_STARTED)
@@ -199,11 +250,12 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
         creative_director = entries["creative_director"]
 
         self.assertTrue(creative_director.capability.live_verified.value)
+        self.assertEqual(creative_director.capability.live_verified.provenance, PROVENANCE_SUPPLIED_SNAPSHOT)
         self.assertEqual(len(creative_director.active_work), 1)
         self.assertEqual(creative_director.active_work[0]["stage_id"], "prepare_creative_bible")
         self.assertEqual(creative_director.last_verified_activity, "2026-10-30T09:00:00+00:00")
 
-    def test_creative_bible_to_asset_production_is_not_attributed_to_creative_director(self) -> None:
+    def test_creative_bible_to_asset_production_is_not_attributed_to_any_agent(self) -> None:
         # No agents/*.md contract claims asset-production execution; this must
         # stay unattributed rather than being folded into Creative Director.
         stage = StageRecord("execute_creative_asset_production", "configured-creative-production", status=StageStatus.COMPLETED)
@@ -216,7 +268,7 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
                 f"{entry.agent_id} must not claim creative_bible_to_asset_production activity",
             )
 
-    def test_to_dict_contains_the_expected_shape(self) -> None:
+    def test_to_dict_contains_the_expected_shape_including_provenance(self) -> None:
         entry = build_agency_map()[0]
         payload = entry.to_dict()
 
@@ -225,6 +277,7 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
         for key in ("defined", "implemented", "tested", "configured", "runtime_connected", "live_verified"):
             self.assertIn("value", payload["status"][key])
             self.assertIn("evidence", payload["status"][key])
+            self.assertIn("provenance", payload["status"][key])
         self.assertIsInstance(payload["active_work"], list)
         self.assertIsInstance(payload["dependencies"], list)
 
