@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 import json
+from html import escape
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any, Callable
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlencode
 
 
 SnapshotLoader = Callable[[], dict[str, Any]]
+
+
+def _safe_path_component(value: str) -> bool:
+    """Allow only one non-special path component from projected review metadata."""
+    return bool(value) and value not in {".", ".."} and Path(value).name == value
 
 
 class MissionControlWebApplication:
@@ -32,11 +38,67 @@ class MissionControlWebApplication:
         if path == "/mission-control/artifact":
             artifact_id = parse_qs(str(environ.get("QUERY_STRING", ""))).get("artifact_id", [""])[0]
             return self._artifact(artifact_id, start_response)
+        if path == "/mission-control/review":
+            artifact_id = parse_qs(str(environ.get("QUERY_STRING", ""))).get("artifact_id", [""])[0]
+            return self._review(artifact_id, start_response)
+        if path == "/mission-control/review-pdf":
+            artifact_id = parse_qs(str(environ.get("QUERY_STRING", ""))).get("artifact_id", [""])[0]
+            return self._review_pdf(artifact_id, start_response)
         return None
 
     def _artifact(self, artifact_id: str, start_response):
+        match, resolved, error = self._projected_artifact(artifact_id)
+        if error:
+            return self._response(start_response, error, b"Invalid artefact" if error is HTTPStatus.BAD_REQUEST else b"Artefact unavailable", "text/plain; charset=utf-8")
+        return self._response(start_response, HTTPStatus.OK, resolved.read_bytes(), "application/json; charset=utf-8", [("Cache-Control", "no-store"), ("Content-Security-Policy", "default-src 'none'")])
+
+    def _review(self, artifact_id: str, start_response):
+        match, error = self._projected_review_artifact(artifact_id)
+        if error:
+            return self._response(start_response, error, b"Artefact unavailable", "text/plain; charset=utf-8")
+        review_bytes, review = self._review_document(match)
+        if review_bytes is None:
+            return self._response(start_response, HTTPStatus.NOT_FOUND, b"Review document unavailable", "text/plain; charset=utf-8")
+        fields = {
+            "Title": str(review.get("product") or match.get("name") or "Review document"),
+            "Artefact ID": artifact_id,
+            "Checksum": str(match.get("checksum") or "Not recorded"),
+            "Version": str(match.get("version") or "Not recorded"),
+            "Quality": str(match.get("quality_status") or "Not recorded").replace("_", " "),
+            "Approval": str(match.get("approval_status") or "Not recorded").replace("_", " "),
+        }
+        details = "".join(
+            f"<dt>{escape(label)}</dt><dd>{escape(value)}</dd>" for label, value in fields.items()
+        )
+        pdf_url = "/mission-control/review-pdf?" + urlencode({"artifact_id": artifact_id})
+        body = REVIEW_HTML.format(details=details, pdf_url=escape(pdf_url, quote=True)).encode("utf-8")
+        return self._response(
+            start_response,
+            HTTPStatus.OK,
+            body,
+            "text/html; charset=utf-8",
+            [("Cache-Control", "no-store"), ("Content-Security-Policy", "default-src 'self'; style-src 'unsafe-inline'; object-src 'self'; frame-src 'self'")],
+        )
+
+    def _review_pdf(self, artifact_id: str, start_response):
+        match, error = self._projected_review_artifact(artifact_id)
+        if error:
+            return self._response(start_response, error, b"Artefact unavailable", "text/plain; charset=utf-8")
+        review_bytes, _review = self._review_document(match)
+        if review_bytes is None:
+            return self._response(start_response, HTTPStatus.NOT_FOUND, b"Review document unavailable", "text/plain; charset=utf-8")
+        return self._response(
+            start_response,
+            HTTPStatus.OK,
+            review_bytes,
+            "application/pdf",
+            [("Cache-Control", "no-store"), ("Content-Disposition", "inline")],
+            frame_options="SAMEORIGIN",
+        )
+
+    def _projected_artifact(self, artifact_id: str) -> tuple[dict[str, Any] | None, Path | None, HTTPStatus | None]:
         if not artifact_id or Path(artifact_id).name != artifact_id:
-            return self._response(start_response, HTTPStatus.BAD_REQUEST, b"Invalid artefact", "text/plain; charset=utf-8")
+            return None, None, HTTPStatus.BAD_REQUEST
         snapshot = self.snapshot_loader()
         matches = [
             artifact
@@ -46,25 +108,89 @@ class MissionControlWebApplication:
             if isinstance(artifact, dict) and artifact.get("artifact_id") == artifact_id
         ]
         if len(matches) != 1 or not matches[0].get("open_url"):
-            return self._response(start_response, HTTPStatus.NOT_FOUND, b"Artefact unavailable", "text/plain; charset=utf-8")
+            return None, None, HTTPStatus.NOT_FOUND
         resolved = Path(str(matches[0].get("location") or "")).resolve()
         try:
             resolved.relative_to(self.workflow_root)
         except ValueError:
-            return self._response(start_response, HTTPStatus.FORBIDDEN, b"Artefact unavailable", "text/plain; charset=utf-8")
+            return None, None, HTTPStatus.FORBIDDEN
         if not resolved.is_file():
-            return self._response(start_response, HTTPStatus.NOT_FOUND, b"Artefact unavailable", "text/plain; charset=utf-8")
-        return self._response(start_response, HTTPStatus.OK, resolved.read_bytes(), "application/json; charset=utf-8", [("Cache-Control", "no-store"), ("Content-Security-Policy", "default-src 'none'")])
+            return None, None, HTTPStatus.NOT_FOUND
+        return matches[0], resolved, None
+
+    def _projected_review_artifact(self, artifact_id: str) -> tuple[dict[str, Any] | None, HTTPStatus | None]:
+        """Return only a uniquely projected, checksum-bound review candidate.
+
+        The original structured artefact may reside in the shared immutable
+        runtime store and remain intentionally undisclosed.  The review PDF is
+        separately client-scoped and fully revalidated by ``_review_document``.
+        """
+        if not artifact_id or Path(artifact_id).name != artifact_id:
+            return None, HTTPStatus.BAD_REQUEST
+        matches = [
+            artifact
+            for opportunity in self.snapshot_loader().get("opportunities", [])
+            if isinstance(opportunity, dict)
+            for artifact in opportunity.get("artefacts", [])
+            if isinstance(artifact, dict) and artifact.get("artifact_id") == artifact_id
+        ]
+        if len(matches) != 1 or not matches[0].get("review_url"):
+            return None, HTTPStatus.NOT_FOUND
+        return matches[0], None
+
+    def _review_document(self, artifact: dict[str, Any]) -> tuple[bytes | None, dict[str, Any]]:
+        review = artifact.get("review")
+        if not isinstance(review, dict):
+            return None, {}
+        workspace_id = str(review.get("workspace_id") or "")
+        client_id = str(review.get("client_id") or "")
+        review_id = str(review.get("review_artifact_id") or "")
+        if not all(_safe_path_component(value) for value in (workspace_id, client_id, review_id)):
+            return None, {}
+        directory = self.workflow_root / "human-review-artifacts" / workspace_id / client_id / review_id
+        manifest_path = directory / "manifest.json"
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return None, {}
+        if not isinstance(manifest, dict):
+            return None, {}
+        path = Path(str(manifest.get("location") or "")).resolve()
+        try:
+            path.relative_to(directory.resolve())
+        except ValueError:
+            return None, {}
+        if (
+            path.suffix.casefold() != ".pdf"
+            or not path.is_file()
+            or str(manifest.get("review_artifact_id") or "") != review_id
+            or str(manifest.get("source_artifact_id") or "") != str(artifact.get("artifact_id") or "")
+            or str(manifest.get("source_artifact_checksum") or "") != str(artifact.get("checksum") or "")
+            or str(manifest.get("checksum") or "") != str(review.get("checksum") or "")
+        ):
+            return None, {}
+        import hashlib
+        pdf_bytes = path.read_bytes()
+        if hashlib.sha256(pdf_bytes).hexdigest() != str(manifest.get("checksum") or ""):
+            return None, {}
+        return pdf_bytes, manifest
 
     @staticmethod
     def _loopback(environ) -> bool:
         return str(environ.get("REMOTE_ADDR", "")).strip().casefold() in {"127.0.0.1", "::1", "localhost"}
 
     @staticmethod
-    def _response(start_response, status: HTTPStatus, body: bytes, content_type: str, extra=()):
-        headers = [("Content-Type", content_type), ("Content-Length", str(len(body))), ("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", "DENY"), ("Referrer-Policy", "no-referrer"), *extra]
+    def _response(start_response, status: HTTPStatus, body: bytes, content_type: str, extra=(), *, frame_options: str = "DENY"):
+        headers = [("Content-Type", content_type), ("Content-Length", str(len(body))), ("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", frame_options), ("Referrer-Policy", "no-referrer"), *extra]
         start_response(f"{status.value} {status.phrase}", headers)
         return [body]
+
+
+REVIEW_HTML = """<!doctype html>
+<html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
+<title>Founder review · Narratiive</title><style>
+body{{margin:0;background:#0b0d0c;color:#f1f3ef;font:15px/1.5 Inter,system-ui,sans-serif}}main{{max-width:1280px;margin:auto;padding:28px}}h1{{font:400 38px/1.1 Georgia,serif;margin:4px 0 22px}}p{{color:#b8c0ba}}dl{{display:grid;grid-template-columns:max-content 1fr;gap:6px 18px;background:#121513;border:1px solid #2b312d;padding:18px;margin:0 0 20px}}dt{{color:#929b94;text-transform:uppercase;letter-spacing:.08em;font-size:11px}}dd{{margin:0;word-break:break-word}}.pending{{border-left:3px solid #f0c77a;padding:12px 14px;background:#282317;margin:16px 0 20px}}object{{width:100%;height:calc(100vh - 390px);min-height:620px;border:1px solid #2b312d;background:white}}a{{color:#a8f0c2}}@media(max-width:700px){{main{{padding:16px}}h1{{font-size:30px}}object{{height:72vh;min-height:460px}}dl{{grid-template-columns:1fr}}}}
+</style></head><body><main><p>Narratiive · founder review</p><h1>Exact deliverable awaiting approval</h1><div class=\"pending\"><strong>Review only.</strong> This page does not record approval, start a workflow, or release the document.</div><dl>{details}</dl><object data=\"{pdf_url}\" type=\"application/pdf\"><p>Your browser cannot display this PDF. <a href=\"{pdf_url}\">Open the exact review PDF</a>.</p></object></main></body></html>"""
 
 
 HTML = r'''<!doctype html>
@@ -92,7 +218,7 @@ const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&
 function show(o){if(current==='all')return !o.synthetic;if(current==='test')return o.synthetic;if(o.synthetic)return false;if(current==='active')return o.lifecycle_stage!=='complete';if(current==='needs')return o.requires_matt;if(current==='blocked')return o.attention_state==='blocked';if(current==='external')return o.attention_state==='waiting_externally';return o.lifecycle_stage==='complete'}
 function render(){let s=data.summary;['active','matt','blocked','running'].forEach((x,i)=>document.getElementById('m-'+x).textContent=[s.active_opportunities,s.waiting_for_matt,s.blocked,s.running_autonomously][i]);document.getElementById('filters').innerHTML=filters.map(f=>`<button data-filter="${f[0]}" class="${current===f[0]?'active':''}">${f[1]}</button>`).join('');document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{current=b.dataset.filter;render()});document.getElementById('path').innerHTML=lifecycle.map(([id,label])=>{let os=data.opportunities.filter(o=>o.lifecycle_stage===id&&show(o));return `<section class="lane"><h3>${label} <span>${os.length}</span></h3>${os.length?os.map(card).join(''):'<span class="empty-lane sr">Empty</span>'}</section>`}).join('');document.querySelectorAll('[data-opp]').forEach(b=>b.onclick=()=>openDetail(b.dataset.opp));document.getElementById('queue').innerHTML=data.needs_you.length?data.needs_you.map(q=>`<article class="queue-item"><strong>${esc(q.company)}</strong><p>${esc(q.decision)}</p><small>${esc(q.safe_next_action)}</small></article>`).join(''):'<p class="empty">No genuine human gates are currently recorded.</p>';document.getElementById('attention').innerHTML=data.attention.length?data.attention.map(o=>`<article class="queue-item"><strong>${esc(o.company)}</strong><p>${esc(o.blocker||o.current_activity)}</p><small>${esc(o.attention_state.replaceAll('_',' '))}</small></article>`).join(''):'<p class="empty">No live blockers or failures recorded.</p>';document.getElementById('activity').innerHTML=data.activity.length?data.activity.slice(0,10).map(e=>`<article class="event"><strong>${esc(e.company)}</strong><p>${esc(e.label)}</p><small>${fmt(e.occurred_at)}</small></article>`).join(''):'<p class="empty">No meaningful workflow events recorded.</p>';let cs=data.system.connections;document.getElementById('systems').innerHTML=`<div class="system"><b>Narratiive OS</b><span class="state ${esc(data.system.status)}">${esc(data.system.status)}</span></div>`+cs.map(c=>`<div class="system" title="${esc(c.evidence||'No evidence supplied')}"><b>${esc(c.name)}</b><span class="state ${esc(c.state)}">${esc(c.state.replaceAll('_',' '))}</span></div>`).join('')}
 function card(o){return `<button class="opp" data-opp="${esc(o.id)}"><span class="tag ${o.synthetic?'test':'live'}">${o.kind}</span><strong>${esc(o.company)}</strong><small>${esc(o.current_activity)}</small>${o.requires_matt?'<small class="signal">◆ Matt required</small>':''}${o.blocked?`<small class="signal">! ${esc(o.blocker)}</small>`:''}</button>`}
-function openDetail(id){let o=data.opportunities.find(x=>x.id===id);if(!o)return;document.getElementById('d-name').textContent=o.company;let k=document.getElementById('d-kind');k.textContent=o.kind;k.className='tag '+(o.synthetic?'test':'live');document.getElementById('d-stage').textContent=o.lifecycle_stage.replaceAll('_',' ')+' / '+o.operational_substate.replaceAll('_',' ');document.getElementById('detail-body').innerHTML=`<h3 class="kicker">Journey</h3><div class="journey">${o.journey.map(x=>`<div class="step ${esc(x.state)}"><span>${esc(x.label)}</span></div>`).join('')}</div>${o.blocked?`<div class="blocked"><strong>BLOCKED</strong><p>${esc(o.blocker)}</p>${o.requires_matt?'<b>MATT REQUIRED</b>':''}</div>`:''}<h3 class="kicker">Now</h3><div class="now"><div><span>Current activity</span>${esc(o.current_activity)}</div><div><span>Owner</span>${esc(o.current_owner)}</div><div><span>Started</span>${fmt(o.started_at)}</div><div><span>Next</span>${esc(o.next_action)}</div><div><span>Blocked</span>${o.blocked?'Yes':'No'}</div><div><span>Matt needed</span>${o.requires_matt?'Yes':'No'}</div></div><h3 class="kicker">Governed artefacts</h3><div>${o.artefacts.length?o.artefacts.map(a=>`<article class="artifact"><div><strong>${esc(a.name)} v${a.version}</strong><small>${esc(a.producer||'Producer not recorded')} · ${fmt(a.created_at)}</small></div><span class="state ${a.quality_status==='passed'?'connected':a.quality_status==='failed'?'degraded':''}">${esc(a.quality_status.replaceAll('_',' '))}</span><small>${esc(a.approval_status.replaceAll('_',' '))}</small>${a.open_url?`<a target="_blank" rel="noreferrer" href="${esc(a.open_url)}">Open</a>`:'<small>Location unavailable</small>'}</article>`).join(''):'<p class="empty">No governed artefacts recorded.</p>'}</div><h3 class="kicker" style="margin-top:28px">Quality and revision history</h3><div>${o.quality_history.length?o.quality_history.map(q=>`<article class="event"><strong>Version ${q.version}: ${q.passed?'Passed quality gate':'Revision required'}</strong><p>${q.failed_criteria.length?esc(q.failed_criteria.join(', ')):'No failed criteria recorded'}</p></article>`).join(''):'<p class="empty">No quality review history recorded.</p>'}</div>`;document.getElementById('detail').showModal();location.hash=encodeURIComponent(id)}
+function openDetail(id){let o=data.opportunities.find(x=>x.id===id);if(!o)return;document.getElementById('d-name').textContent=o.company;let k=document.getElementById('d-kind');k.textContent=o.kind;k.className='tag '+(o.synthetic?'test':'live');document.getElementById('d-stage').textContent=o.lifecycle_stage.replaceAll('_',' ')+' / '+o.operational_substate.replaceAll('_',' ');document.getElementById('detail-body').innerHTML=`<h3 class="kicker">Journey</h3><div class="journey">${o.journey.map(x=>`<div class="step ${esc(x.state)}"><span>${esc(x.label)}</span></div>`).join('')}</div>${o.blocked?`<div class="blocked"><strong>BLOCKED</strong><p>${esc(o.blocker)}</p>${o.requires_matt?'<b>MATT REQUIRED</b>':''}</div>`:''}<h3 class="kicker">Now</h3><div class="now"><div><span>Current activity</span>${esc(o.current_activity)}</div><div><span>Owner</span>${esc(o.current_owner)}</div><div><span>Started</span>${fmt(o.started_at)}</div><div><span>Next</span>${esc(o.next_action)}</div><div><span>Blocked</span>${o.blocked?'Yes':'No'}</div><div><span>Matt needed</span>${o.requires_matt?'Yes':'No'}</div></div><h3 class="kicker">Governed artefacts</h3><div>${o.artefacts.length?o.artefacts.map(a=>`<article class="artifact"><div><strong>${esc(a.name)} v${a.version}</strong><small>${esc(a.producer||'Producer not recorded')} · ${fmt(a.created_at)}</small></div><span class="state ${a.quality_status==='passed'?'connected':a.quality_status==='failed'?'degraded':''}">${esc(a.quality_status.replaceAll('_',' '))}</span><small>${esc(a.approval_status.replaceAll('_',' '))}</small>${a.open_url?`<a target="_blank" rel="noreferrer" href="${esc(a.review_url||a.open_url)}">${a.review_url?'Review':'Technical details'}</a>`:'<small>Location unavailable</small>'}</article>`).join(''):'<p class="empty">No governed artefacts recorded.</p>'}</div><h3 class="kicker" style="margin-top:28px">Quality and revision history</h3><div>${o.quality_history.length?o.quality_history.map(q=>`<article class="event"><strong>Version ${q.version}: ${q.passed?'Passed quality gate':'Revision required'}</strong><p>${q.failed_criteria.length?esc(q.failed_criteria.join(', ')):'No failed criteria recorded'}</p></article>`).join(''):'<p class="empty">No quality review history recorded.</p>'}</div>`;document.getElementById('detail').showModal();location.hash=encodeURIComponent(id)}
 const commercialPhaseByLifecycle={lead:'groundwork',blueprint_lite:'groundwork',discovery:'discovery',proposal:'fieldwork',delivery:'fieldwork',commercial:'production',complete:'production'};
 function commercialPhase(o){return commercialPhaseByLifecycle[o.lifecycle_stage]||'unmapped'}
 function humanBlocker(code){const labels={'quality_failed:growth_blueprint_quality_gate':'Growth Blueprint needs revision','invalid_discovery_evidence_quarantined':'Discovery evidence needs review'};return labels[code]||'Workflow is blocked'}
@@ -102,7 +228,7 @@ const fieldworkStages=[['discovery','Discovery'],['proposal_brief','Proposal Bri
 const deliveryWorkflows=['growth_sprint_to_research_engine','research_to_strategic_synthesis','strategic_synthesis_to_strategy_thesis','research_to_growth_blueprint','strategy_thesis_to_growth_blueprint'];
 const sketchbookWorkflows=['growth_blueprint_to_campaign_world','campaign_world_to_creative_bible'];
 function fieldworkState(o,id){let ids=o.workflow_ids||[],arts=o.artefacts||[],rank={lead:0,blueprint_lite:1,discovery:2,proposal:3,delivery:4,commercial:5,complete:6}[o.lifecycle_stage]??-1,blocked=o.attention_state==='blocked'||o.attention_state==='failed';let proposal=ids.includes('discovery_evidence_to_growth_sprint_proposal'),proposalArtifact=arts.some(a=>a.name==='Growth Sprint Proposal'),proposalApproval=(arts.find(a=>a.name==='Growth Sprint Proposal')||{}).approval_status||'',growthBlueprint=arts.some(a=>a.name==='Growth Blueprint');if(id==='discovery')return ids.includes('blueprint_lite_to_discovery_preparation')?(blocked?'blocked':rank>2?'complete':'active'):'not_connected';if(id==='proposal_brief')return proposal?(blocked?'blocked':rank>3?'complete':'active'):'not_connected';if(id==='proposal_production')return proposalArtifact?(blocked||proposalApproval==='rejected'?'blocked':proposalApproval==='pending'?'awaiting':proposalApproval==='approved'?'complete':'active'):'not_connected';if(id==='proposal_approved')return proposalApproval==='approved'?'complete':proposalApproval==='rejected'||blocked?'blocked':proposalArtifact&&o.requires_matt?'awaiting':'not_connected';if(['sent','client_accepted','payment_verified','delivered'].includes(id))return 'not_connected';if(id==='fieldwork_running')return ids.some(w=>deliveryWorkflows.includes(w))?(blocked?'blocked':o.attention_state==='complete'?'complete':'active'):'not_connected';if(id==='founder_review')return growthBlueprint?(o.requires_matt?'awaiting':arts.some(a=>a.name==='Growth Blueprint'&&a.approval_status==='approved')?'complete':'active'):'not_connected';if(id==='sketchbook_opportunity')return ids.some(w=>sketchbookWorkflows.includes(w))?(blocked?'blocked':o.attention_state==='complete'?'complete':'active'):'not_connected';return 'not_connected'}
-function fieldworkCard(o){let stages=fieldworkStages.map(([id,label])=>{let state=fieldworkState(o,id);return `<span class="fieldwork-stage ${state}">${esc(label)} · ${state==='not_connected'?'Not connected':state}</span>`}).join(''),evidence=(o.artefacts||[]).map(a=>a.open_url?`<a target="_blank" rel="noreferrer" href="${esc(a.open_url)}">${esc(a.name)} v${a.version}</a>`:'').filter(Boolean).join('')||'<small class="health-note">No in-scope document link recorded.</small>';return `<article class="fieldwork-card"><span class="tag ${o.synthetic?'test':'live'}">${esc(o.kind)}</span><h3>${esc(o.company)}</h3><small class="canonical">Current canonical stage · ${esc(o.lifecycle_stage.replaceAll('_',' '))}</small><div class="fieldwork-meta"><div><span>Status</span>${esc(o.attention_state.replaceAll('_',' '))}</div><div><span>Responsible</span>${esc(o.current_owner||'Not connected')}</div><div><span>Last activity</span>${esc(o.last_meaningful_event||'Not recorded')} · ${fmt(o.updated_at)}</div><div><span>Next permitted action</span>${esc(o.next_action)}</div></div><div class="fieldwork-stages">${stages}</div><div class="fieldwork-evidence"><span class="kicker">Evidence and documents</span>${evidence}</div></article>`}
+function fieldworkCard(o){let stages=fieldworkStages.map(([id,label])=>{let state=fieldworkState(o,id);return `<span class="fieldwork-stage ${state}">${esc(label)} · ${state==='not_connected'?'Not connected':state}</span>`}).join(''),evidence=(o.artefacts||[]).map(a=>a.open_url?`<a target="_blank" rel="noreferrer" href="${esc(a.review_url||a.open_url)}">${esc(a.name)} v${a.version}${a.review_url?' · review':''}</a>`:'').filter(Boolean).join('')||'<small class="health-note">No in-scope document link recorded.</small>';return `<article class="fieldwork-card"><span class="tag ${o.synthetic?'test':'live'}">${esc(o.kind)}</span><h3>${esc(o.company)}</h3><small class="canonical">Current canonical stage · ${esc(o.lifecycle_stage.replaceAll('_',' '))}</small><div class="fieldwork-meta"><div><span>Status</span>${esc(o.attention_state.replaceAll('_',' '))}</div><div><span>Responsible</span>${esc(o.current_owner||'Not connected')}</div><div><span>Last activity</span>${esc(o.last_meaningful_event||'Not recorded')} · ${fmt(o.updated_at)}</div><div><span>Next permitted action</span>${esc(o.next_action)}</div></div><div class="fieldwork-stages">${stages}</div><div class="fieldwork-evidence"><span class="kicker">Evidence and documents</span>${evidence}</div></article>`}
 function healthItems(){let cs=data.system.connections||[],stripe=cs.find(c=>String(c.name||'').toLowerCase().includes('stripe')),tony=data.opportunities.find(o=>String(o.current_owner||'').toLowerCase()==='tony');let tonyText=tony?`${tony.company}: ${tony.current_activity} (${fmt(tony.updated_at)})`:'Not connected — no persisted Tony-owned workflow is available in this projection.';let stripeText=stripe?String(stripe.state||'unknown').replaceAll('_',' '):'Sandbox — Not Deployed';return `<div class="system"><b>Tony’s current workflow ownership</b><span class="health-note">${esc(tonyText)}</span></div><div class="system"><b>Stripe</b><span class="state ${stripe?'':'unknown'}">${esc(stripeText)}</span></div>`}
 function render(){let s=data.summary;['active','matt','blocked','running'].forEach((x,i)=>document.getElementById('m-'+x).textContent=[s.active_opportunities,s.waiting_for_matt,s.blocked,s.running_autonomously][i]);document.getElementById('filters').innerHTML=filters.map(f=>`<button data-filter="${f[0]}" class="${current===f[0]?'active':''}">${f[1]}</button>`).join('');document.querySelectorAll('[data-filter]').forEach(b=>b.onclick=()=>{current=b.dataset.filter;render()});document.getElementById('path').innerHTML=lifecycle.map(([id,label,note])=>{let os=data.opportunities.filter(o=>commercialPhase(o)===id&&show(o));return `<section class="lane"><h3>${label} <span>${os.length}</span></h3><small class="lane-note">${note}</small>${os.length?os.map(founderCard).join(''):'<span class="empty-lane sr">Empty</span>'}</section>`}).join('');document.querySelectorAll('[data-opp]').forEach(b=>b.onclick=()=>openDetail(b.dataset.opp));let journeys=data.opportunities.filter(show);document.getElementById('fieldwork-journeys').innerHTML=journeys.length?journeys.map(fieldworkCard).join(''):'<p class="empty">No persisted engagement is connected for this filter. Authorised synthetic demonstrations appear only under Test / Synthetic.</p>';document.getElementById('queue').innerHTML=data.needs_you.length?data.needs_you.map(approvalItem).join(''):'<p class="empty">No genuine human gates are currently recorded.</p>';document.getElementById('attention').innerHTML=data.attention.length?data.attention.map(o=>`<article class="queue-item"><strong>${esc(o.company)}</strong><p>${esc(humanBlocker(o.blocker))}</p><small>${esc(o.next_action)}</small><details><summary>Technical details</summary><code>${esc(o.blocker||'No diagnostic code recorded')}</code></details></article>`).join(''):'<p class="empty">No live blockers or failures recorded.</p>';document.getElementById('activity').innerHTML=data.activity.length?data.activity.slice(0,10).map(e=>`<article class="event"><strong>${esc(e.company)}</strong><p>${esc(e.label)}</p><small>${fmt(e.occurred_at)}</small></article>`).join(''):'<p class="empty">No meaningful workflow events recorded.</p>';let cs=data.system.connections;document.getElementById('systems').innerHTML=healthItems()+`<div class="system"><b>Narratiive OS</b><span class="state ${esc(data.system.status)}">${esc(data.system.status)}</span></div>`+cs.map(c=>`<div class="system" title="${esc(c.evidence||'No evidence supplied')}"><b>${esc(c.name)}</b><span class="state ${esc(c.state)}">${esc(c.state.replaceAll('_',' '))}</span></div>`).join('')}
 function fmt(v){if(!v)return 'Not recorded';let d=new Date(v);return Number.isNaN(d.valueOf())?esc(v):d.toLocaleString([], {dateStyle:'medium',timeStyle:'short'})}

@@ -35,6 +35,11 @@ DELIVERY_STEPS = {
     "growth_blueprint_to_campaign_world": "Campaign World",
     "campaign_world_to_creative_bible": "Creative Director's Bible",
 }
+
+
+def _safe_path_component(value: str) -> bool:
+    """Allow only one non-special path component from persisted workflow data."""
+    return bool(value) and value not in {".", ".."} and Path(value).name == value
 LEAD_STAGE = {
     "blueprint lite": "blueprint_lite", "discovery": "discovery", "meeting": "discovery",
     "proposal": "proposal", "delivery": "delivery", "invoice": "commercial",
@@ -355,6 +360,12 @@ class OperatorMissionControlProjector:
                         "producer": stage.agent_ref, "quality_status": "passed" if passed else "failed" if artifact.artifact_type == "worker_attempt_output" else "not_recorded",
                         "approval_status": state.approval_status, "checksum": artifact.checksum,
                         "location": artifact.location, "open_url": f"/mission-control/artifact?artifact_id={artifact.artifact_id}" if safe else None,
+                        # A human-review copy is independently scoped and checksum-bound to
+                        # this artefact.  Some legacy artefact records live in the runtime's
+                        # shared immutable store, so their source JSON is deliberately not
+                        # downloadable through Mission Control; that must not hide a valid
+                        # client-scoped review PDF.
+                        **self._review_link(state, artifact),
                         "parent_artifact_ids": list(artifact.metadata.get("parent_artifact_ids", [])),
                     })
         return items
@@ -369,6 +380,46 @@ class OperatorMissionControlProjector:
             return path.is_file()
         except (OSError, ValueError):
             return False
+
+    def _review_link(self, state: WorkflowState, artifact: ArtifactRef) -> dict[str, Any]:
+        if not _safe_path_component(state.workspace_id) or not _safe_path_component(state.client_id):
+            return {}
+        directory = self.workflow_root / "human-review-artifacts" / state.workspace_id / state.client_id
+        candidates: list[dict[str, Any]] = []
+        if not directory.is_dir():
+            return {}
+        for manifest_path in directory.glob("*/manifest.json"):
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+                location = Path(str(manifest.get("location") or "")).resolve()
+                location.relative_to(manifest_path.parent.resolve())
+                location.relative_to(directory.resolve())
+                checksum = str(manifest.get("checksum") or "")
+                if (
+                    str(manifest.get("source_artifact_id") or "") != artifact.artifact_id
+                    or str(manifest.get("source_artifact_checksum") or "") != artifact.checksum
+                    or not checksum
+                    or location.suffix.casefold() != ".pdf"
+                    or not location.is_file()
+                    or hashlib.sha256(location.read_bytes()).hexdigest() != checksum
+                ):
+                    continue
+                candidates.append({
+                    "review_artifact_id": str(manifest.get("review_artifact_id") or ""),
+                    "location": str(location),
+                    "checksum": checksum,
+                    "page_count": int(manifest.get("page_count") or 0),
+                    "workspace_id": state.workspace_id,
+                    "client_id": state.client_id,
+                })
+            except (OSError, ValueError, TypeError, json.JSONDecodeError):
+                continue
+        if len(candidates) != 1 or not candidates[0]["review_artifact_id"]:
+            return {}
+        return {
+            "review": candidates[0],
+            "review_url": f"/mission-control/review?artifact_id={artifact.artifact_id}",
+        }
 
     @staticmethod
     def _quality_history(runs: list[WorkflowState]) -> list[dict[str, Any]]:
