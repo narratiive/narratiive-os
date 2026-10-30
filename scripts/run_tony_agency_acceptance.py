@@ -172,7 +172,14 @@ def _prepare_workspaces(root: Path) -> None:
 
 
 def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token: str, bridge_token: str) -> dict[str, str]:
-    env = dict(os.environ)
+    # Do not inherit the operator environment. A narrow process allowlist keeps
+    # the local executable and certificate discovery working without allowing an
+    # ambient provider URL, credential, or production runtime setting through.
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if key in {"PATH", "TMPDIR", "LANG", "LC_ALL", "TERM", "SSL_CERT_FILE", "SSL_CERT_DIR"}
+    }
     state = root / "state"
     paths = {
         "TONY_INBOUND_LEADS_PATH": state / "inbound-leads.json",
@@ -206,16 +213,6 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
     paths["TONY_OBJECTS_ROOT"] = state / "objects"
     paths["TONY_BRIEFING_DECISION_REGISTER_PATH"] = state / "briefing-decision-register.jsonl"
     paths["TONY_BRIEFING_BASELINE_PATH"] = state / "briefing-last-delivered.json"
-    # Strip every Narratiive/Tony/OpenClaw setting from the parent before adding
-    # the explicitly enumerated sandbox configuration below. In particular,
-    # dispatch URLs and tokens must never inherit into an acceptance run.
-    prefixes = (
-        "ANTHROPIC_", "GOOGLE_", "META_", "TIKTOK_", "NOTION_", "GITHUB_",
-        "FIRELIES_", "FIREFLIES_", "N8N_", "GMAIL_", "TONY_", "NARRATIIVE_", "OPENCLAW_",
-    )
-    for key in list(env):
-        if key.startswith(prefixes):
-            env.pop(key, None)
     for key, value in paths.items():
         env[key] = str(value)
     env.update({

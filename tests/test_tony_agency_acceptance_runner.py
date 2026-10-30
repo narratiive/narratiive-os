@@ -32,6 +32,10 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
                 "TONY_DISPATCH_GMAIL_TOKEN": "must-not-leak",
                 "TONY_DISPATCH_CLAUDE_API_KEY": "must-not-leak",
                 "NARRATIIVE_RUNTIME_ROOT": "/production/runtime",
+                "OPENAI_API_KEY": "must-not-leak",
+                "OPENAI_BASE_URL": "https://provider.invalid/openai",
+                "OLLAMA_API_KEY": "must-not-leak",
+                "OLLAMA_HOST": "https://provider.invalid/ollama",
             }
             with mock.patch.dict("os.environ", inherited, clear=False):
                 env = _sandbox_env(root, 19002, 19001, "sandbox-token", "bridge-token")
@@ -41,6 +45,10 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             self.assertNotIn("TONY_DISPATCH_GMAIL_URL", env)
             self.assertNotIn("TONY_DISPATCH_GMAIL_TOKEN", env)
             self.assertNotIn("TONY_DISPATCH_CLAUDE_API_KEY", env)
+            self.assertNotIn("OPENAI_API_KEY", env)
+            self.assertNotIn("OPENAI_BASE_URL", env)
+            self.assertNotIn("OLLAMA_API_KEY", env)
+            self.assertNotIn("OLLAMA_HOST", env)
             self.assertEqual(env["TONY_HOSTED_MODEL_REQUEST_RESERVE_USD"], "0")
             self.assertEqual(Path(env["TONY_HOSTED_MODEL_USAGE_LEDGER"]).parent, root / "state")
             self.assertEqual(Path(env["NARRATIIVE_RUNTIME_ROOT"]), root / "state" / "runtime")
