@@ -777,8 +777,19 @@ class TonyWorkflowCommandService:
             if name in {"work", "approvals", "blockers"} and len(parts) == 1:
                 return self._queue(name, states)
             reference, rationale = self._arguments(parts[1:])
-            state = self._resolve(states, reference)
             if name == "classify-synthetic-test":
+                matching_entity_states = tuple(
+                    state for state in states if state.entity_id == reference
+                )
+                if not matching_entity_states:
+                    return self._error(
+                        name,
+                        "exact_workflow_entity_not_found",
+                        "Classification requires an exact persisted workflow entity ID.",
+                    )
+                state = max(
+                    matching_entity_states, key=lambda item: (item.updated_at, item.run_id)
+                )
                 if not principal_id.strip():
                     return self._error(name, "authorised_principal_required", "Classification requires Matt's authenticated identity.")
                 supplied = dict(inputs or {})
@@ -805,6 +816,7 @@ class TonyWorkflowCommandService:
                     "Recorded the authorised internal-test classification. The workflow remains in audit history and no workflow or approval state changed.",
                     {"event_id": event.event_id, "entity_id": event.entity_id, "workflow_id": event.workflow_id},
                 )
+            state = self._resolve(states, reference)
             if name in {"workflow", "work"}:
                 return self._status(state)
             if name == "approvals":

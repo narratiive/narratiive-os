@@ -160,6 +160,13 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertNotIn("input_payload", status.data)
 
     def test_classification_requires_exact_entity_authorisation_and_preserves_workflow(self) -> None:
+        self.runtime.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-secondary-run",
+            {"diagnostic_input_package": {"overall_score": 40}, "company": "SAFE Executive Workflow Test"},
+            entity_id="safe-lead",
+            correlation_id="safe-secondary-correlation",
+        )
         service = TonyWorkflowCommandService(
             FallbackCommands(),
             FileWorkflowCommandBackend(
@@ -172,7 +179,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             principal_id="telegram:founder",
             inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
         )
-        self.assertEqual(denied.data["error_code"], "exact_classification_authorisation_required")
+        self.assertEqual(denied.data["error_code"], "exact_workflow_entity_not_found")
 
         result = service.execute(
             "/classify-synthetic-test safe-lead because authorised internal test",
@@ -182,6 +189,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         )
 
         self.assertEqual(result.status, "healthy")
+        self.assertEqual(result.data["entity_id"], "safe-lead")
         state = next(item for item in service.backend.list_states() if item.run_id == "safe-executive-run")
         self.assertEqual(state.approval_status, "pending")
         journal = FileWorkflowEntityClassificationJournal(
