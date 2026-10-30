@@ -8,6 +8,13 @@ from runtime.campaign_production_planning_worker import (
     CampaignProductionPlanningError,
     CampaignProductionPlanningWorker,
 )
+from runtime.worker_registry import (
+    CapabilityWorkerRegistry,
+    WorkerAvailability,
+    WorkerMetadata,
+    WorkerRegistration,
+    WorkerSelectionPolicy,
+)
 from runtime.workflow_quality import production_planning_quality_gate
 from tests.test_workflow_quality import campaign_identity, creative_bible_output
 
@@ -51,6 +58,70 @@ class CampaignProductionPlanningWorkerTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CampaignProductionPlanningError, "checksum"):
             CampaignProductionPlanningWorker()(contract)
+
+    def test_without_a_registry_every_task_stays_unrouted(self) -> None:
+        result = CampaignProductionPlanningWorker()(planning_contract())
+
+        self.assertTrue(all(task["route_status"] == "unrouted" for task in result["production_tasks"]))
+        self.assertTrue(all(task["worker_id"] == "" for task in result["production_tasks"]))
+        self.assertTrue(production_planning_quality_gate(result)["passed"])
+
+    def test_registered_capability_routes_its_tasks_to_the_eligible_worker(self) -> None:
+        registry = CapabilityWorkerRegistry(
+            [
+                WorkerRegistration(
+                    metadata=WorkerMetadata(
+                        worker_id="image-worker-1",
+                        provider="Narratiive Image Studio",
+                        capabilities=("image_generation",),
+                        availability=WorkerAvailability.AVAILABLE,
+                    ),
+                    adapter=lambda payload: payload,
+                )
+            ]
+        )
+        worker = CampaignProductionPlanningWorker(registry=registry)
+
+        result = worker(planning_contract())
+        tasks = result["production_tasks"]
+        routed = [task for task in tasks if task["required_capability"] == "image_generation"]
+        unrouted = [task for task in tasks if task["required_capability"] != "image_generation"]
+
+        self.assertTrue(routed, "fixture must include at least one image_generation task")
+        self.assertTrue(all(task["route_status"] == "routed" for task in routed))
+        self.assertTrue(all(task["worker_id"] == "image-worker-1" for task in routed))
+        self.assertTrue(all(task["provider"] == "Narratiive Image Studio" for task in routed))
+        self.assertTrue(all(task["execution_authorised"] is False for task in routed))
+        self.assertTrue(unrouted, "fixture must include at least one task needing a different capability")
+        self.assertTrue(all(task["route_status"] == "unavailable" for task in unrouted))
+        self.assertTrue(all(task["worker_id"] == "" for task in unrouted))
+        self.assertTrue(production_planning_quality_gate(result)["passed"])
+
+    def test_configured_registry_does_not_grant_execution_or_spend_authority(self) -> None:
+        registry = CapabilityWorkerRegistry(
+            [
+                WorkerRegistration(
+                    metadata=WorkerMetadata(
+                        worker_id="image-worker-1",
+                        provider="Narratiive Image Studio",
+                        capabilities=("image_generation", "short_form_video_production", "audio_production", "layout_design"),
+                        availability=WorkerAvailability.AVAILABLE,
+                    ),
+                    adapter=lambda payload: payload,
+                )
+            ]
+        )
+        worker = CampaignProductionPlanningWorker(registry=registry, policy=WorkerSelectionPolicy(policy_id="test-policy"))
+
+        result = worker(planning_contract())
+
+        self.assertTrue(all(task["route_status"] == "routed" for task in result["production_tasks"]))
+        self.assertTrue(all(task["policy_id"] == "test-policy" for task in result["production_tasks"]))
+        self.assertFalse(result["production_executed"])
+        self.assertFalse(result["publication_authorised"])
+        self.assertFalse(result["media_spend_authorised"])
+        self.assertTrue(all(not task["execution_authorised"] for task in result["production_tasks"]))
+        self.assertTrue(production_planning_quality_gate(result)["passed"])
 
 
 if __name__ == "__main__":

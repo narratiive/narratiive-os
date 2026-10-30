@@ -6,13 +6,64 @@ import re
 from collections.abc import Mapping
 from typing import Any
 
+from runtime.worker_registry import (
+    CapabilityWorkerRegistry,
+    NoAvailableWorker,
+    WorkerSelectionPolicy,
+)
+
 
 class CampaignProductionPlanningError(ValueError):
     pass
 
 
 class CampaignProductionPlanningWorker:
-    """Derive a versioned, non-executing Production Pack from an approved Bible."""
+    """Derive a versioned, non-executing Production Pack from an approved Bible.
+
+    Routing is a preparation-time preview only: it never grants execution
+    authority. ``registry`` is optional so existing callers that construct
+    this worker without one keep their exact prior ``unrouted`` behaviour.
+    """
+
+    def __init__(
+        self,
+        *,
+        registry: CapabilityWorkerRegistry | None = None,
+        policy: WorkerSelectionPolicy | None = None,
+    ) -> None:
+        self.registry = registry
+        self.policy = policy or WorkerSelectionPolicy()
+
+    def _route(self, capability: str) -> dict[str, Any]:
+        if self.registry is None:
+            return {
+                "route_status": "unrouted",
+                "worker_id": "",
+                "provider": "",
+                "policy_id": "",
+                "selection_reason": "",
+            }
+        try:
+            resolution = self.registry.resolve(
+                capability,
+                side_effect="preparation",
+                policy=self.policy,
+            )
+        except NoAvailableWorker as exc:
+            return {
+                "route_status": "unavailable",
+                "worker_id": "",
+                "provider": "",
+                "policy_id": self.policy.policy_id,
+                "selection_reason": str(exc),
+            }
+        return {
+            "route_status": "routed",
+            "worker_id": resolution.worker_id,
+            "provider": resolution.registration.metadata.provider,
+            "policy_id": resolution.policy_id,
+            "selection_reason": resolution.reason,
+        }
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         context = contract.get("workflow_context")
@@ -83,8 +134,8 @@ class CampaignProductionPlanningWorker:
                 "source_bible_checksum": bible_checksum,
                 "expected_variants": 1,
                 "human_review_required": True,
-                "route_status": "unrouted",
                 "execution_authorised": False,
+                **self._route(capability),
             }
             asset = {
                 "asset_id": asset_id,
@@ -137,7 +188,7 @@ class CampaignProductionPlanningWorker:
             "asset_manifest": manifest_payload,
             "production_constraints": [str(item) for item in constraints],
             "production_gaps": [
-                "Every task remains unrouted until an eligible creative-tool adapter is configured and selected.",
+                _routing_gap_summary(tasks),
                 "Each exact provider payload requires separate human approval before production execution.",
             ],
             "external_action_taken": False,
@@ -146,6 +197,18 @@ class CampaignProductionPlanningWorker:
             "publication_authorised": False,
             "media_spend_authorised": False,
         }
+
+
+def _routing_gap_summary(tasks: list[dict[str, Any]]) -> str:
+    routed = sum(1 for task in tasks if task.get("route_status") == "routed")
+    unavailable = sum(1 for task in tasks if task.get("route_status") == "unavailable")
+    if routed == 0 and unavailable == 0:
+        return "Every task remains unrouted until an eligible creative-tool adapter is configured and selected."
+    return (
+        f"{routed} of {len(tasks)} task(s) have an eligible capability route prepared; "
+        f"{unavailable} remain unavailable pending a configured worker. "
+        "Routing is a preparation-time preview and never authorises execution."
+    )
 
 
 def _checksum(value: Any) -> str:
