@@ -31,6 +31,26 @@ class WorkflowEntityClassification:
     occurred_at: str
     supersedes_event_id: str = ""
 
+    def __post_init__(self) -> None:
+        for name, value in (
+            ("event_id", self.event_id),
+            ("workspace_id", self.workspace_id),
+            ("entity_id", self.entity_id),
+            ("workflow_id", self.workflow_id),
+            ("classifier_id", self.classifier_id),
+            ("authorisation_reference", self.authorisation_reference),
+            ("reason", self.reason),
+            ("occurred_at", self.occurred_at),
+        ):
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"{name} must not be empty")
+        if self.classification not in VALID_CLASSIFICATIONS:
+            raise ValueError("invalid workflow entity classification")
+        try:
+            datetime.fromisoformat(self.occurred_at.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise ValueError("occurred_at must be an ISO-8601 timestamp") from exc
+
     @classmethod
     def create(
         cls,
@@ -44,11 +64,6 @@ class WorkflowEntityClassification:
         reason: str,
         supersedes_event_id: str = "",
     ) -> "WorkflowEntityClassification":
-        for name, value in (("workspace_id", workspace_id), ("entity_id", entity_id), ("workflow_id", workflow_id), ("classifier_id", classifier_id), ("authorisation_reference", authorisation_reference), ("reason", reason)):
-            if not value.strip():
-                raise ValueError(f"{name} must not be empty")
-        if classification not in VALID_CLASSIFICATIONS:
-            raise ValueError("invalid workflow entity classification")
         return cls(
             event_id=str(uuid4()),
             workspace_id=workspace_id.strip(),
@@ -66,15 +81,21 @@ class WorkflowEntityClassification:
 class FileWorkflowEntityClassificationJournal:
     """Append-only workflow-entity classifications, scoped by workspace."""
 
-    def __init__(self, root: str | Path) -> None:
+    def __init__(self, root: str | Path, *, authorised_classifier_id: str = "") -> None:
         self.root = Path(root).resolve() / "entity-classifications"
+        self.authorised_classifier_id = authorised_classifier_id.strip()
 
     def append(
         self,
         event: WorkflowEntityClassification,
         *,
         states: Iterable[WorkflowState],
+        principal_id: str = "",
     ) -> WorkflowEntityClassification:
+        if not self.authorised_classifier_id:
+            raise PermissionError("classification journal is read-only without an authorised classifier")
+        if principal_id.strip() != self.authorised_classifier_id or event.classifier_id != self.authorised_classifier_id:
+            raise PermissionError("workflow entity classification requires the authorised classifier")
         matching = [
             state
             for state in states
@@ -109,6 +130,10 @@ class FileWorkflowEntityClassificationJournal:
         )
 
     def latest(self, workspace_id: str) -> dict[str, WorkflowEntityClassification]:
+        # A missing founder identity must never turn an old local record into a
+        # synthetic classification.  Showing the work is the safe failure mode.
+        if not self.authorised_classifier_id:
+            return {}
         latest: dict[str, WorkflowEntityClassification] = {}
         for event in self.read_workspace(workspace_id):
             prior = latest.get(event.entity_id)
@@ -135,6 +160,8 @@ class FileWorkflowEntityClassificationJournal:
                 raise ValueError(f"invalid workflow classification event at {path}:{line_number}") from exc
             if event.workspace_id != workspace_id or event.classification not in VALID_CLASSIFICATIONS:
                 raise ValueError(f"invalid workflow classification scope at {path}:{line_number}")
+            if self.authorised_classifier_id and event.classifier_id != self.authorised_classifier_id:
+                raise ValueError(f"unauthorised workflow classifier at {path}:{line_number}")
             events.append(event)
         return tuple(events)
 
@@ -168,4 +195,8 @@ class WorkflowEntityClassificationService:
             raise PermissionError("workflow entity classification requires the authorised classifier")
         if event.workspace_id != self.workspace_id or event.classifier_id != principal_id.strip():
             raise PermissionError("workflow entity classification scope or classifier mismatch")
-        return self.journal.append(event, states=tuple(self.states_loader()))
+        return self.journal.append(
+            event,
+            states=tuple(self.states_loader()),
+            principal_id=principal_id,
+        )

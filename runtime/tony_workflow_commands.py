@@ -25,6 +25,12 @@ from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersiste
 from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 from runtime.workflow_portfolio import project_client_portfolio
+from runtime.workflow_entity_classification import (
+    FileWorkflowEntityClassificationJournal,
+    INTERNAL_SYNTHETIC_TEST,
+    WorkflowEntityClassification,
+    WorkflowEntityClassificationService,
+)
 
 
 class WorkflowCommandBackend(Protocol):
@@ -104,6 +110,9 @@ class WorkflowCommandBackend(Protocol):
         requester: str,
         rationale: str,
     ) -> WorkflowState: ...
+    def classify_internal_synthetic_test(
+        self, state: WorkflowState, *, principal_id: str, authorisation_reference: str, reason: str
+    ) -> WorkflowEntityClassification: ...
 
 
 class FileWorkflowCommandBackend:
@@ -215,6 +224,38 @@ class FileWorkflowCommandBackend:
             target_workflow_id,
             inputs,
             commitment_id=commitment_id,
+        )
+
+    def classify_internal_synthetic_test(
+        self,
+        state: WorkflowState,
+        *,
+        principal_id: str,
+        authorisation_reference: str,
+        reason: str,
+    ) -> WorkflowEntityClassification:
+        if self.workspace_id is None or state.workspace_id != self.workspace_id:
+            raise ValueError("workflow classification workspace mismatch")
+        journal = FileWorkflowEntityClassificationJournal(
+            self.root, authorised_classifier_id=principal_id
+        )
+        service = WorkflowEntityClassificationService(
+            journal,
+            self.list_states,
+            workspace_id=state.workspace_id,
+            authorised_classifier_id=principal_id,
+        )
+        return service.record(
+            WorkflowEntityClassification.create(
+                workspace_id=state.workspace_id,
+                entity_id=state.entity_id,
+                workflow_id=state.workflow_id,
+                classification=INTERNAL_SYNTHETIC_TEST,
+                classifier_id=principal_id,
+                authorisation_reference=authorisation_reference,
+                reason=reason,
+            ),
+            principal_id=principal_id,
         )
 
     def begin_promised_delivery(self, state: WorkflowState, *, delivery_key: str, kind: str) -> WorkflowState:
@@ -573,6 +614,7 @@ class TonyWorkflowCommandService:
         "drive-preview", "persist-drive",
         "worlds", "select-world", "bible", "approve-bible", "assets", "approve-assets",
         "campaigns", "clients", "learning", "learning-queue", "sync-learning",
+        "classify-synthetic-test",
     }
 
     def __init__(
@@ -731,6 +773,29 @@ class TonyWorkflowCommandService:
                 return self._queue(name, states)
             reference, rationale = self._arguments(parts[1:])
             state = self._resolve(states, reference)
+            if name == "classify-synthetic-test":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Classification requires Matt's authenticated identity.")
+                supplied = dict(inputs or {})
+                authorisation_reference = str(supplied.get("authorisation_reference") or "").strip()
+                if not rationale or not authorisation_reference or state.entity_id != reference:
+                    return self._error(
+                        name,
+                        "exact_classification_authorisation_required",
+                        "Use the exact workflow entity ID with a verified authorisation reference and reason.",
+                    )
+                event = self.backend.classify_internal_synthetic_test(
+                    state,
+                    principal_id=principal_id,
+                    authorisation_reference=authorisation_reference,
+                    reason=rationale,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "Recorded the authorised internal-test classification. The workflow remains in audit history and no workflow or approval state changed.",
+                    {"event_id": event.event_id, "entity_id": event.entity_id, "workflow_id": event.workflow_id},
+                )
             if name in {"workflow", "work"}:
                 return self._status(state)
             if name == "approvals":

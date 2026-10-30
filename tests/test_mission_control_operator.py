@@ -22,7 +22,9 @@ class MissionControlOperatorTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.classifications = FileWorkflowEntityClassificationJournal(self.root)
+        self.classifications = FileWorkflowEntityClassificationJournal(
+            self.root, authorised_classifier_id="telegram:founder"
+        )
         self.projector = OperatorMissionControlProjector(workflow_root=self.root, workflow_workspace_id="narratiive", classifications=self.classifications)
 
     def tearDown(self):
@@ -77,7 +79,7 @@ class MissionControlOperatorTests(unittest.TestCase):
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
                 authorisation_reference="approval:test-fixture", reason="Authorised fixture.",
             ),
-            states=[test],
+            states=[test], principal_id="telegram:founder",
         )
         lead = InboundLead("fixture", "Tester", company="Synthetic Tester")
         result = self.projector.project(states=[live, test], leads=[lead], generated_at="2026-10-04T12:00:00Z")
@@ -123,7 +125,7 @@ class MissionControlOperatorTests(unittest.TestCase):
                 classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
                 authorisation_reference="telegram-message:123", reason="Authorised test.",
             ),
-            states=[loom],
+            states=[loom], principal_id="telegram:founder",
         )
 
         loom_lead = InboundLead("inbound-d1b96a67", "Loom", company="Loom Loft")
