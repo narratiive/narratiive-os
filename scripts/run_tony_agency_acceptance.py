@@ -227,6 +227,10 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         "TONY_AGENT_CONTROL_PLANE_URL": f"http://127.0.0.1:{bridge_port}/control-plane",
         "TONY_BRIDGE_HOST": "127.0.0.1", "TONY_BRIDGE_PORT": str(bridge_port), "TONY_BRIDGE_TOKEN": bridge_token,
         "NARRATIIVE_API_KEY": bridge_token,
+        # This acceptance run has no Narratiive runtime gateway. Fail closed on
+        # an unused loopback port rather than falling back to the host runtime.
+        "NARRATIIVE_GATEWAY_ENDPOINT": "http://127.0.0.1:9/",
+        "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT": "http://127.0.0.1:9/health",
         "TONY_EXECUTIVE_WORKSPACE_ID": "narratiive", "TONY_TELEGRAM_CHAT_ID": "999000111",
         "TONY_INBOUND_LEAD_SOURCE": "local_projection",
         "NARRATIIVE_RUNTIME_ENV_FILE": str(root / "runtime.env"),
@@ -510,7 +514,11 @@ def run(output_dir: Path, *, max_gate_turns: int = 14) -> dict[str, Any]:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output-dir", type=Path, default=ROOT / ".runtime" / "tony-agency-acceptance")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path(tempfile.gettempdir()) / "narratiive-agency-acceptance",
+    )
     parser.add_argument("--max-gate-turns", type=int, default=14)
     args = parser.parse_args()
     report = run(args.output_dir.resolve(), max_gate_turns=args.max_gate_turns)

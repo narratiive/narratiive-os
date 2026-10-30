@@ -53,6 +53,8 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             self.assertEqual(Path(env["TONY_HOSTED_MODEL_USAGE_LEDGER"]).parent, root / "state")
             self.assertEqual(Path(env["NARRATIIVE_RUNTIME_ROOT"]), root / "state" / "runtime")
             self.assertEqual(Path(env["TONY_BRIEFING_DECISION_REGISTER_PATH"]).parent, root / "state")
+            self.assertEqual(env["NARRATIIVE_GATEWAY_ENDPOINT"], "http://127.0.0.1:9/")
+            self.assertEqual(env["NARRATIIVE_GATEWAY_HEALTH_ENDPOINT"], "http://127.0.0.1:9/health")
 
 
 if __name__ == "__main__":
