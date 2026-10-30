@@ -8,6 +8,7 @@ import unittest
 from pathlib import Path
 
 from openclaw.mission_control_web import MissionControlWebApplication
+from openclaw.mission_control_web import HTML
 from runtime.inbound_leads import InboundLead
 from runtime.mission_control_operator import OperatorMissionControlProjector
 from runtime.models import ArtifactRef, StageRecord, StageStatus, WorkflowState, WorkflowStatus
@@ -69,6 +70,23 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertTrue(any(not row["passed"] for row in item["quality_history"]))
         self.assertEqual(item["activity"][0]["label"], "Quality review failed")
         self.assertNotIn("approval_token", json.dumps(result))
+
+    def test_founder_presentation_keeps_commercial_labels_and_technical_details(self):
+        self.assertIn("GROUNDWORK", HTML)
+        self.assertIn("SKETCHBOOK · provisional", HTML)
+        self.assertIn("Technical details", HTML)
+        self.assertIn("Growth Blueprint needs revision", HTML)
+        for lifecycle, commercial_phase in {
+            "lead": "groundwork",
+            "blueprint_lite": "groundwork",
+            "discovery": "discovery",
+            "proposal": "fieldwork",
+            "delivery": "fieldwork",
+            "commercial": "production",
+            "complete": "production",
+        }.items():
+            self.assertIn(f"{lifecycle}:'{commercial_phase}'", HTML)
+        self.assertIn("||'unmapped'", HTML)
 
     def test_synthetic_is_labelled_and_excluded_from_executive_counts(self):
         live = self._state()
@@ -134,6 +152,7 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertEqual(result["summary"]["waiting_for_matt"], 1)
         self.assertEqual(result["summary"]["active_opportunities"], 1)
         self.assertEqual([item["company"] for item in result["needs_you"]], ["CatKin"])
+        self.assertTrue(any(item["company"] == "CatKin" and not item["synthetic"] for item in result["opportunities"]))
         audit = next(item for item in result["opportunities"] if item["id"] == "loom-client")
         self.assertEqual(audit["kind"], "TEST")
         self.assertTrue(audit["requires_matt"])
