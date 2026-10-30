@@ -23,6 +23,7 @@ from runtime.fieldwork_payments import (
     stripe_signature,
 )
 from openclaw.fieldwork_payment_bridge import FieldworkPaymentApplication
+from scripts.run_fieldwork_payment_bridge import _downstream_actions
 
 
 NOW = 1_800_000_000
@@ -435,6 +436,20 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
 
 
 class FieldworkPaymentApplicationTests(unittest.TestCase):
+    def test_bridge_wires_existing_crm_and_workflow_actions_and_fails_without_crm(self):
+        with mock.patch(
+            "scripts.run_fieldwork_payment_bridge.build_http_dispatchers",
+            return_value={"Notion": lambda _contract: {"verified": True}, "Gmail": lambda _contract: {"verified": True}},
+        ):
+            actions = _downstream_actions(Path("/safe-workflows"), "narratiive", {})
+        self.assertIn("crm_update", actions)
+        self.assertIn("workflow_authorisation", actions)
+        self.assertIn("client_confirmation", actions)
+        self.assertNotIn("founder_notification", actions)
+        with mock.patch("scripts.run_fieldwork_payment_bridge.build_http_dispatchers", return_value={}):
+            with self.assertRaisesRegex(RuntimeError, "Notion dispatcher"):
+                _downstream_actions(Path("/safe-workflows"), "narratiive", {})
+
     def test_checkout_requires_bridge_auth_and_webhook_requires_stripe_signature(self):
         with tempfile.TemporaryDirectory() as temporary:
             stripe = FakeStripe()

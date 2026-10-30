@@ -20,6 +20,14 @@ from runtime.fieldwork_payments import (
     StripeApiClient,
 )
 from runtime.fieldwork_payment_integrations import verify_approved_proposal
+from runtime.fieldwork_payment_integrations import (
+    gmail_client_confirmation,
+    notion_payment_recorder,
+    telegram_founder_notifier,
+    tony_workflow_authoriser,
+)
+from runtime.tony_dispatch_adapters import build_http_dispatchers
+from openclaw.telegram_outbound import TelegramConfig, TelegramSender
 
 
 def main() -> int:
@@ -32,6 +40,7 @@ def main() -> int:
     workflow_root = Path(_required("FIELDWORK_WORKFLOW_RUNTIME_ROOT")).expanduser().resolve()
     workspace_id = _required("FIELDWORK_WORKSPACE_ID")
     stripe = StripeApiClient(_required("STRIPE_SECRET_KEY"))
+    actions = _downstream_actions(workflow_root, workspace_id, os.environ)
     service = FieldworkPaymentService(
         FieldworkPaymentStore(runtime_root),
         stripe,
@@ -39,6 +48,7 @@ def main() -> int:
         success_url=_required("FIELDWORK_CHECKOUT_SUCCESS_URL"),
         cancel_url=_required("FIELDWORK_CHECKOUT_CANCEL_URL"),
         proposal_verifier=verify_approved_proposal(workflow_root, workspace_id=workspace_id),
+        **actions,
     )
 
     def load_proposal(proposal_id: str) -> ApprovedFieldworkProposal:
@@ -63,6 +73,33 @@ def main() -> int:
         print(f"FIELDWORK Stripe test bridge listening on {host}:{port}")
         server.serve_forever()
     return 0
+
+
+def _downstream_actions(workflow_root: Path, workspace_id: str, environ) -> dict:
+    """Wire existing governed adapters; fail closed when the required CRM is absent."""
+
+    dispatchers = build_http_dispatchers(environ)
+    notion = dispatchers.get("Notion")
+    if notion is None:
+        raise RuntimeError("FIELDWORK payment bridge requires the configured Notion dispatcher")
+    actions = {
+        "crm_update": notion_payment_recorder(notion),
+        "workflow_authorisation": tony_workflow_authoriser(
+            workflow_root,
+            workspace_id=workspace_id,
+            dispatchers=dispatchers,
+            environ=environ,
+        ),
+    }
+    gmail = dispatchers.get("Gmail")
+    if gmail is not None:
+        actions["client_confirmation"] = gmail_client_confirmation(gmail)
+    if str(environ.get("TONY_TELEGRAM_BOT_TOKEN") or "").strip() and str(environ.get("TONY_TELEGRAM_CHAT_ID") or "").strip():
+        actions["founder_notification"] = telegram_founder_notifier(
+            TelegramSender(TelegramConfig.from_env(environ)),
+            str(environ["TONY_TELEGRAM_CHAT_ID"]).strip(),
+        )
+    return actions
 
 
 def _required(name: str) -> str:
