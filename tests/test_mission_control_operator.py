@@ -99,6 +99,10 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertIn("Needs Your Attention", HTML)
         self.assertIn("fieldworkStages", HTML)
 
+    def test_rejected_proposal_is_not_presented_as_complete(self):
+        self.assertIn("proposalApproval==='rejected'?'blocked'", HTML)
+        self.assertIn("Tony’s current workflow ownership", HTML)
+
     def test_synthetic_is_labelled_and_excluded_from_executive_counts(self):
         live = self._state()
         test = self._state(client="fixture", synthetic=True)
