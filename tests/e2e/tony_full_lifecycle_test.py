@@ -967,11 +967,12 @@ class TonyFullLifecycleTest(unittest.TestCase):
         self.assertTrue(all(item.continuation_command.startswith("/") for item in gated))
         self.assertTrue(all(f"/continue {item.input_state['run_id']}" in item.continuation_command for item in gated))
 
-    def test_native_continuous_chain_completes_with_bounded_run_ids(self) -> None:
+    def test_native_continuous_chain_stops_at_the_verified_payment_boundary(self) -> None:
         with tempfile.TemporaryDirectory(prefix="northstar-test-native-chain-") as directory:
             runtime, reached, failure = execute_native_lifecycle_until_failure(Path(directory))
-        self.assertIsNone(failure)
-        self.assertEqual(reached, [definition.workflow_id for definition in _ordered_definitions(runtime)])
+        self.assertIsInstance(failure, ValueError)
+        self.assertIn("verified payment authorisation", str(failure))
+        self.assertEqual(reached, [definition.workflow_id for definition in _ordered_definitions(runtime)[:3]])
 
     def test_duplicate_intake_is_idempotent_and_conflicting_replay_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(prefix="northstar-test-duplicate-") as directory:

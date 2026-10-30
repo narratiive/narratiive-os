@@ -80,6 +80,7 @@ def session_object(*, amount: int = 300_000, payment_intent: str = "pi_test_fiel
     item = proposal()
     return {
         "id": "cs_test_fieldwork_1",
+        "livemode": False,
         "mode": "payment",
         "payment_status": status,
         "amount_total": amount,

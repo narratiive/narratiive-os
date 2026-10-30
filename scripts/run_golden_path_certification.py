@@ -201,28 +201,35 @@ def run(root: Path) -> dict:
         },
     )
     _approval(service, proposal.data["run_id"], proposal.data["approval_token"], "Growth Sprint proposal")
-    thesis = service.execute(
-        f"/continue {proposal.data['run_id']}",
-        [],
-        inputs={
-            "research_sources": [
-                {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
-                {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
-            ]
-        },
+    proposal_state = next(item for item in backend.list_states() if item.run_id == proposal.data["run_id"])
+    research_inputs = {
+        "approved_growth_sprint_scope": ["Synthetic FIELDWORK certification scope"],
+        "research_requirements": ["Synthetic category and audience evidence"],
+        "research_sources": [
+            {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
+            {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
+        ],
+        "client_context": {"company": COMPANY, "synthetic_test": True},
+    }
+    research, replayed = backend.commission(
+        proposal_state,
+        target_workflow_id="growth_sprint_to_research_engine",
+        inputs=research_inputs,
+        commitment_id="synthetic-certification-verified-payment",
     )
+    if replayed:
+        raise RuntimeError("initial synthetic payment-authorised commission replayed")
+    thesis = service.execute(f"/continue {research.run_id}", [])
+    while thesis.data.get("workflow_id") != "strategic_synthesis_to_strategy_thesis":
+        thesis = service.execute(f"/continue {thesis.data['run_id']}", [])
     before_replay = len(backend.list_states())
-    replay = service.execute(
-        f"/continue {proposal.data['run_id']}",
-        [],
-        inputs={
-            "research_sources": [
-                {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
-                {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
-            ]
-        },
+    replay, replayed = backend.commission(
+        proposal_state,
+        target_workflow_id="growth_sprint_to_research_engine",
+        inputs=research_inputs,
+        commitment_id="synthetic-certification-verified-payment",
     )
-    if len(backend.list_states()) != before_replay or replay.data.get("run_id") != thesis.data.get("run_id"):
+    if len(backend.list_states()) != before_replay or not replayed or replay.run_id != research.run_id:
         raise RuntimeError("duplicate handoff was not idempotent")
     _approval(service, thesis.data["run_id"], thesis.data["approval_token"], "Strategy Thesis")
     weak = service.execute(f"/continue {thesis.data['run_id']}", [])

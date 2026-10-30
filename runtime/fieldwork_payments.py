@@ -385,6 +385,8 @@ class FieldworkPaymentService:
         if not session_id:
             raise FieldworkPaymentError("proposal has no Checkout session")
         remote = dict(self.stripe.retrieve_checkout(session_id))
+        if remote.get("livemode") is not False:
+            raise FieldworkPaymentError("live-mode Stripe sessions are disabled")
         if str(remote.get("payment_status") or "") != "paid":
             checkout.update({"status": str(remote.get("status") or "unknown"), "payment_status": str(remote.get("payment_status") or "unknown"), "reconciled_at": _now()})
             proposal["checkout"] = checkout
