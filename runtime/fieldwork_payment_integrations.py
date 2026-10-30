@@ -132,9 +132,12 @@ def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspa
     binding = approval.get("approval_binding") if isinstance(approval, Mapping) else None
     if not isinstance(binding, Mapping):
         raise FieldworkPaymentError("parent proposal workflow lacks an exact approval binding")
-    approval_digest = _text(binding.get("approval_binding_digest"))
-    if not approval_digest or _text(proposal.get("founder_approval_id")) != approval_digest:
-        raise FieldworkPaymentError("founder approval does not match the exact proposal workflow gate")
+    offer = binding.get("fieldwork_commercial_offer")
+    approval_record_id = _text(approval.get("approval_record_id"))
+    if not isinstance(offer, Mapping) or not approval_record_id or _text(binding.get("approval_record_id")) != approval_record_id:
+        raise FieldworkPaymentError("parent proposal workflow lacks a complete canonical commercial approval")
+    if _text(proposal.get("founder_approval_id")) != approval_record_id:
+        raise FieldworkPaymentError("founder approval does not match the exact approved commercial offer")
     if _text(proposal.get("founder_approved_at")) != _text(approval.get("approved_at")):
         raise FieldworkPaymentError("founder approval timestamp does not match workflow evidence")
     artifacts = [artifact for stage in parent.stages for artifact in stage.output_artifacts]
@@ -153,10 +156,19 @@ def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspa
     ):
         raise FieldworkPaymentError("founder approval binding does not match the exact workflow artefact")
     if (
-        _text(binding.get("client_email")).casefold() != _text(proposal.get("client_email")).casefold()
-        or _text(binding.get("proposal_url")) != _text(proposal.get("proposal_url"))
+        _text(offer.get("canonical_workspace_id")) != workspace_id
+        or _text(offer.get("canonical_client_id")) != client_id
+        or _text(offer.get("proposal_id")) != _text(proposal.get("proposal_id"))
+        or _text(offer.get("recipient_email")).casefold() != _text(proposal.get("client_email")).casefold()
+        or _text(offer.get("proposal_url")) != _text(proposal.get("proposal_url"))
+        or _text(offer.get("proposal_artifact_id")) != _text(getattr(artifact, "artifact_id", ""))
+        or _text(offer.get("proposal_artifact_version")) != expected_version
+        or _text(offer.get("proposal_artifact_checksum")).removeprefix("sha256:") != artifact_checksum
+        or offer.get("fixed_investment_minor") != proposal.get("total_amount_minor")
+        or offer.get("deposit_amount_minor") != proposal.get("deposit_amount_minor")
+        or _text(offer.get("currency")).casefold() != _text(proposal.get("currency")).casefold()
     ):
-        raise FieldworkPaymentError("founder approval does not bind the proposed client recipient and document URL")
+        raise FieldworkPaymentError("founder commercial approval does not match the requested proposal, recipient, artefact or terms")
     return parent
 
 

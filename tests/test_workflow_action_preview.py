@@ -106,9 +106,25 @@ class WorkflowActionPreviewTests(unittest.TestCase):
         review = self.service.execute(f"/deliver-review {run_id}", [])
         self.assertTrue(review.data["delivered"])
         token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        state = next(item for item in self.service.backend.list_states() if item.run_id == run_id)
+        artifact = state.stages[-1].output_artifacts[-1]
+        offer = {
+            "proposal_id": "safe-katkin-fieldwork-v1", "recipient_email": "client@example.invalid",
+            "proposal_url": "https://drive.example.invalid/safe-katkin-fieldwork-v1",
+            "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+            "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+            "deposit_amount_minor": 300000, "currency": "GBP",
+        }
+        offer_preview = self.service.execute(
+            f"/fieldwork-offer {run_id}", [],
+            inputs={"approval_token": token, "fieldwork_commercial_offer": offer},
+        )
         self.service.execute(
             f"/approve {run_id} because approved Growth Sprint proposal",
-            [], principal_id="telegram:123", inputs={"approval_token": token},
+            [], principal_id="telegram:123", inputs={
+                "approval_token": token, "fieldwork_commercial_offer": offer,
+                "commercial_offer_digest": offer_preview.data["commercial_offer_digest"],
+            },
         )
 
         detail = self.service.execute(f"/artifact-detail {run_id}", [])

@@ -168,11 +168,28 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             proposal_run = proposal.data["run_id"]
             self.assertEqual(proposal.data["workflow_id"], "discovery_evidence_to_growth_sprint_proposal")
             self.assertEqual(proposal.data["status"], "awaiting_approval")
+            proposal_state = next(item for item in commands().backend.list_states() if item.run_id == proposal_run)
+            artifact = proposal_state.stages[-1].output_artifacts[-1]
+            offer = {
+                "proposal_id": "safe-final-fieldwork-v1", "recipient_email": "client@example.invalid",
+                "proposal_url": "https://drive.example.invalid/safe-final-fieldwork-v1",
+                "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+                "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+                "deposit_amount_minor": 300000, "currency": "GBP",
+            }
+            offer_preview = service.execute(
+                f"/fieldwork-offer {proposal_run}", [],
+                inputs={"approval_token": proposal.data["approval_token"], "fieldwork_commercial_offer": offer},
+            )
             service.execute(
                 f"/approve {proposal_run} because SAFE Growth Sprint scope reviewed",
                 [],
                 principal_id="openclaw:native-approval",
-                inputs={"approval_token": proposal.data["approval_token"]},
+                inputs={
+                    "approval_token": proposal.data["approval_token"],
+                    "fieldwork_commercial_offer": offer,
+                    "commercial_offer_digest": offer_preview.data["commercial_offer_digest"],
+                },
             )
 
             thesis = service.execute(

@@ -358,13 +358,22 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
 
     def test_tony_authoriser_binds_payment_to_exact_approved_proposal_artifact(self):
         approved_at = "2026-10-30T09:00:00+00:00"
+        approval_record_id = "fieldwork-commercial-approval-safe-1"
+        offer = {
+            "canonical_workspace_id": "narratiive", "canonical_client_id": "synthetic-client-001",
+            "proposal_id": "proposal-fieldwork-001", "recipient_email": "client@example.invalid",
+            "proposal_url": "https://drive.example.invalid/proposal-fieldwork-001",
+            "proposal_artifact_id": "proposal-artifact-1", "proposal_artifact_version": "v1",
+            "proposal_artifact_checksum": "synthetic-proposal-v1", "fixed_investment_minor": 600_000,
+            "deposit_amount_minor": 300_000, "currency": "GBP",
+        }
         parent = SimpleNamespace(
             run_id="proposal-run-synthetic-001", client_id="synthetic-client-001", workspace_id="narratiive", workflow_id="discovery_evidence_to_growth_sprint_proposal",
-            approval_status="approved", approval_history=[{"approved_at": approved_at, "approval_binding": {
+            approval_status="approved", approval_history=[{"approved_at": approved_at, "approval_record_id": approval_record_id, "approval_binding": {
                 "workflow_id": "discovery_evidence_to_growth_sprint_proposal", "run_id": "proposal-run-synthetic-001",
                 "artifact_id": "proposal-artifact-1", "artifact_checksum": "synthetic-proposal-v1", "artifact_version": "v1",
-                "approval_binding_digest": "binding-safe-1", "client_email": "client@example.invalid",
-                "proposal_url": "https://drive.example.invalid/proposal-fieldwork-001",
+                "approval_binding_digest": "binding-safe-1", "approval_record_id": approval_record_id,
+                "fieldwork_commercial_offer": offer, "fieldwork_commercial_offer_digest": "offer-digest-safe-1",
             }}],
             stages=[SimpleNamespace(revision_count=0, output_artifacts=[SimpleNamespace(artifact_id="proposal-artifact-1", checksum="synthetic-proposal-v1", metadata={})])],
         )
@@ -376,7 +385,7 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
         backend.list_states.return_value = (parent,)
         backend.commission.return_value = (commissioned, False)
         proposal_record = FieldworkPaymentService._proposal_record(proposal())
-        proposal_record["founder_approval_id"] = "binding-safe-1"
+        proposal_record["founder_approval_id"] = approval_record_id
         proposal_record["founder_approved_at"] = approved_at
         context = {"proposal": proposal_record, "payment": {"payment_intent": "pi_test_1"}, "acceptance": {"accepted": True}}
 
@@ -389,6 +398,39 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
         proposal_record["proposal_checksum"] = "sha256:wrong"
         with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
             with self.assertRaisesRegex(RuntimeError, "checksum"):
+                tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
+
+        proposal_record["proposal_checksum"] = "sha256:synthetic-proposal-v1"
+        proposal_record["client_email"] = "substituted@example.invalid"
+        with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
+            with self.assertRaisesRegex(RuntimeError, "commercial approval"):
+                tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
+
+        proposal_record["client_email"] = "client@example.invalid"
+        for field, replacement in (
+            ("proposal_url", "https://drive.example.invalid/substituted-proposal"),
+            ("total_amount_minor", 600_001),
+            ("deposit_amount_minor", 300_001),
+            ("currency", "USD"),
+        ):
+            proposal_record[field] = replacement
+            with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
+                with self.assertRaisesRegex(RuntimeError, "commercial approval"):
+                    tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
+            proposal_record = FieldworkPaymentService._proposal_record(proposal())
+            proposal_record["founder_approval_id"] = approval_record_id
+            proposal_record["founder_approved_at"] = approved_at
+            context["proposal"] = proposal_record
+
+        offer["proposal_artifact_version"] = "v2"
+        with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
+            with self.assertRaisesRegex(RuntimeError, "commercial approval"):
+                tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
+        offer["proposal_artifact_version"] = "v1"
+
+        parent.approval_history[-1]["approval_binding"].pop("fieldwork_commercial_offer")
+        with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
+            with self.assertRaisesRegex(RuntimeError, "complete canonical commercial approval"):
                 tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
 
 
