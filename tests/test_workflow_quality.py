@@ -587,7 +587,10 @@ class WorkflowQualityTests(unittest.TestCase):
     def test_proposal_quality_rejects_unbound_fee_amounts_in_any_currency_or_words(self) -> None:
         for field, claim in (
             ("headline", "FIELDWORK costs AUD 12,000 while approval remains pending."),
+            ("headline", "Commercial investment: CAD twelve thousand, pending approval."),
             ("headline", "The agreed investment is twelve thousand pounds."),
+            ("headline", "The agreed investment is twelve thousand yen."),
+            ("headline", "The agreed investment is one hundred thousand rupees."),
         ):
             output = proposal_output()
             output["commercial_opportunity"][field] = claim

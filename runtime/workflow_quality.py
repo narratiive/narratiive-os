@@ -1353,6 +1353,22 @@ def _fieldwork_offer(value: Any) -> bool:
     )
 
 
+_WRITTEN_AMOUNT = (
+    r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+    r"thirty|forty|fifty|sixty|seventy|eighty|ninety)"
+    r"(?:[ -]+(?:hundred|thousand|million|billion|and|one|two|three|four|five|"
+    r"six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+    r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|"
+    r"eighty|ninety))*"
+)
+_CURRENCY_NAME = (
+    r"(?:pounds?|dollars?|euros?|yen|yuan|renminbi|rupees?|francs?|krona|"
+    r"kronor|koruna|zloty|pesos?|reais|rands?|dirhams?|dinars?|riyals?|ringgit|"
+    r"baht|won|lira|shekels?|forint|hryvnia|lei|lev|lari|taka|dong|naira|shillings?)"
+)
+
+
 def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool:
     """Only the checksum-validated renderer may state an approved FIELDWORK fee."""
     proposal = dict(output)
@@ -1367,7 +1383,7 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
         # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
         # currency amount regardless of its code or whether it is expressed in
         # words; otherwise an unbound FIELDWORK fee can reach a review copy.
-        r"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b[A-Z]{3}\s*\d|\b(?:\d[\d,.]*|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)(?:[ -]+(?:hundred|thousand|million|billion|and|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety))*[ -]+(?:pounds?|dollars?|euros?)\b)",
+        rf"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b(?-i:[A-Z]{{3}})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})[ -]+{_CURRENCY_NAME}\b)",
         text,
         flags=re.IGNORECASE,
     )
