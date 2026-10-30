@@ -232,6 +232,10 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         # an unused loopback port rather than falling back to the host runtime.
         "NARRATIIVE_GATEWAY_ENDPOINT": "http://127.0.0.1:9/",
         "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT": "http://127.0.0.1:9/health",
+        # OpenClaw requires a provider registration even for the locally running
+        # Ollama daemon. This is a fixed non-secret marker, not an inherited key.
+        "OLLAMA_API_KEY": "narratiive-synthetic-local-only",
+        "OLLAMA_HOST": "http://127.0.0.1:11434",
         "TONY_EXECUTIVE_WORKSPACE_ID": "narratiive", "TONY_TELEGRAM_CHAT_ID": "999000111",
         "TONY_INBOUND_LEAD_SOURCE": "local_projection",
         "NARRATIIVE_RUNTIME_ENV_FILE": str(root / "runtime.env"),
