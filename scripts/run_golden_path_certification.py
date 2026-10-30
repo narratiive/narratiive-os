@@ -216,6 +216,7 @@ def run(root: Path) -> dict:
         target_workflow_id="growth_sprint_to_research_engine",
         inputs=research_inputs,
         commitment_id="synthetic-certification-verified-payment",
+        payment_authorised=True,
     )
     if replayed:
         raise RuntimeError("initial synthetic payment-authorised commission replayed")
@@ -228,6 +229,7 @@ def run(root: Path) -> dict:
         target_workflow_id="growth_sprint_to_research_engine",
         inputs=research_inputs,
         commitment_id="synthetic-certification-verified-payment",
+        payment_authorised=True,
     )
     if len(backend.list_states()) != before_replay or not replayed or replay.run_id != research.run_id:
         raise RuntimeError("duplicate handoff was not idempotent")

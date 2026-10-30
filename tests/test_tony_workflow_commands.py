@@ -789,6 +789,19 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(binding["fieldwork_commercial_offer"]["recipient_email"], "client@example.invalid")
         self.assertEqual(binding["fieldwork_commercial_offer"]["proposal_url"], offer["proposal_url"])
         self.assertTrue(persisted.approval_history[-1]["approval_record_id"].startswith("fieldwork-commercial-approval-"))
+        bypass = self.service.execute(
+            f"/commission {run_id}", [],
+            inputs={
+                "target_workflow_id": "growth_sprint_to_research_engine",
+                "commitment_id": "forged-fieldwork-commission",
+                "approved_growth_sprint_scope": ["forged"],
+                "research_requirements": ["forged"],
+                "research_sources": [{"source_id": "forged", "source_type": "document", "uri": "synthetic:forged"}],
+                "client_context": {"company": "SAFE Executive Workflow Test"},
+            },
+        )
+        self.assertEqual(bypass.status, "error")
+        self.assertEqual(bypass.data["error_code"], "fieldwork_payment_required")
 
     def test_fieldwork_proposal_can_be_rejected_without_an_offer_binding(self) -> None:
         blueprint_token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]

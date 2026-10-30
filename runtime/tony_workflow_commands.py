@@ -100,6 +100,7 @@ class WorkflowCommandBackend(Protocol):
         target_workflow_id: str,
         inputs: Mapping[str, Any],
         commitment_id: str,
+        payment_authorised: bool = False,
     ) -> tuple[WorkflowState, bool]: ...
     def begin_promised_delivery(self, state: WorkflowState, *, delivery_key: str, kind: str) -> WorkflowState: ...
     def finish_promised_delivery(self, state: WorkflowState, *, delivery_key: str, evidence: Mapping[str, Any]) -> WorkflowState: ...
@@ -225,6 +226,7 @@ class FileWorkflowCommandBackend:
         target_workflow_id: str,
         inputs: Mapping[str, Any],
         commitment_id: str,
+        payment_authorised: bool = False,
     ) -> tuple[WorkflowState, bool]:
         runtime = self._runtime(state)
         return runtime.commission(
@@ -232,6 +234,7 @@ class FileWorkflowCommandBackend:
             target_workflow_id,
             inputs,
             commitment_id=commitment_id,
+            payment_authorised=payment_authorised,
         )
 
     def classify_internal_synthetic_test(
@@ -1072,6 +1075,12 @@ class TonyWorkflowCommandService:
                     )
                 return CommandResponse(name, "healthy", message, delivery)
             if name == "commission":
+                if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+                    return self._error(
+                        name,
+                        "fieldwork_payment_required",
+                        "FIELDWORK research can be commissioned only after verified payment authorisation.",
+                    )
                 supplied = dict(inputs or {})
                 target_workflow_id = str(supplied.pop("target_workflow_id", "")).strip()
                 commitment_id = str(supplied.pop("commitment_id", "")).strip()

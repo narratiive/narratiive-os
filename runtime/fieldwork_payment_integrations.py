@@ -89,6 +89,7 @@ def tony_workflow_authoriser(
             target_workflow_id=target_workflow_id,
             inputs=inputs,
             commitment_id=f"fieldwork-payment:{proposal.get('proposal_id')}:{payment.get('payment_intent')}",
+            payment_authorised=True,
         )
         return {
             "verified": True,
