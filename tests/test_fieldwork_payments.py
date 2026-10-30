@@ -359,9 +359,14 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
     def test_tony_authoriser_binds_payment_to_exact_approved_proposal_artifact(self):
         approved_at = "2026-10-30T09:00:00+00:00"
         parent = SimpleNamespace(
-            run_id="proposal-run-synthetic-001", client_id="synthetic-client-001", workspace_id="narratiive",
-            approval_status="approved", approval_history=[{"approved_at": approved_at}],
-            stages=[SimpleNamespace(revision_count=0, output_artifacts=[SimpleNamespace(checksum="synthetic-proposal-v1")])],
+            run_id="proposal-run-synthetic-001", client_id="synthetic-client-001", workspace_id="narratiive", workflow_id="discovery_evidence_to_growth_sprint_proposal",
+            approval_status="approved", approval_history=[{"approved_at": approved_at, "approval_binding": {
+                "workflow_id": "discovery_evidence_to_growth_sprint_proposal", "run_id": "proposal-run-synthetic-001",
+                "artifact_id": "proposal-artifact-1", "artifact_checksum": "synthetic-proposal-v1", "artifact_version": "v1",
+                "approval_binding_digest": "binding-safe-1", "client_email": "client@example.invalid",
+                "proposal_url": "https://drive.example.invalid/proposal-fieldwork-001",
+            }}],
+            stages=[SimpleNamespace(revision_count=0, output_artifacts=[SimpleNamespace(artifact_id="proposal-artifact-1", checksum="synthetic-proposal-v1", metadata={})])],
         )
         commissioned = SimpleNamespace(
             run_id="research-run-001", workflow_id="growth_sprint_to_research_engine",
@@ -371,7 +376,7 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
         backend.list_states.return_value = (parent,)
         backend.commission.return_value = (commissioned, False)
         proposal_record = FieldworkPaymentService._proposal_record(proposal())
-        proposal_record["founder_approval_id"] = "approval-proposal-run-synthetic-001-0"
+        proposal_record["founder_approval_id"] = "binding-safe-1"
         proposal_record["founder_approved_at"] = approved_at
         context = {"proposal": proposal_record, "payment": {"payment_intent": "pi_test_1"}, "acceptance": {"accepted": True}}
 

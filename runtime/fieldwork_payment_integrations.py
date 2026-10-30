@@ -129,16 +129,34 @@ def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspa
     if parent.approval_status != "approved" or not parent.approval_history or not parent.stages:
         raise FieldworkPaymentError("parent proposal workflow lacks recorded human approval")
     approval = parent.approval_history[-1]
-    expected_approval_id = f"approval-{parent.run_id}-{parent.stages[-1].revision_count}"
-    if _text(proposal.get("founder_approval_id")) != expected_approval_id:
+    binding = approval.get("approval_binding") if isinstance(approval, Mapping) else None
+    if not isinstance(binding, Mapping):
+        raise FieldworkPaymentError("parent proposal workflow lacks an exact approval binding")
+    approval_digest = _text(binding.get("approval_binding_digest"))
+    if not approval_digest or _text(proposal.get("founder_approval_id")) != approval_digest:
         raise FieldworkPaymentError("founder approval does not match the exact proposal workflow gate")
     if _text(proposal.get("founder_approved_at")) != _text(approval.get("approved_at")):
         raise FieldworkPaymentError("founder approval timestamp does not match workflow evidence")
     artifacts = [artifact for stage in parent.stages for artifact in stage.output_artifacts]
-    artifact_checksum = _text(artifacts[-1].checksum if artifacts else "").removeprefix("sha256:")
+    artifact = artifacts[-1] if artifacts else None
+    artifact_checksum = _text(artifact.checksum if artifact else "").removeprefix("sha256:")
     proposal_checksum = _text(proposal.get("proposal_checksum")).removeprefix("sha256:")
     if not artifact_checksum or artifact_checksum != proposal_checksum:
         raise FieldworkPaymentError("proposal checksum does not match the approved workflow artefact")
+    expected_version = _text(getattr(artifact, "metadata", {}).get("version") if artifact else "") or f"v{parent.stages[-1].revision_count + 1}"
+    if (
+        _text(binding.get("workflow_id")) != _text(getattr(parent, "workflow_id", ""))
+        or _text(binding.get("run_id")) != parent.run_id
+        or _text(binding.get("artifact_id")) != _text(getattr(artifact, "artifact_id", ""))
+        or _text(binding.get("artifact_checksum")).removeprefix("sha256:") != artifact_checksum
+        or _text(binding.get("artifact_version")) != expected_version
+    ):
+        raise FieldworkPaymentError("founder approval binding does not match the exact workflow artefact")
+    if (
+        _text(binding.get("client_email")).casefold() != _text(proposal.get("client_email")).casefold()
+        or _text(binding.get("proposal_url")) != _text(proposal.get("proposal_url"))
+    ):
+        raise FieldworkPaymentError("founder approval does not bind the proposed client recipient and document URL")
     return parent
 
 

@@ -186,8 +186,10 @@ complete:
    service-terms URL, branding, receipt/invoice settings, webhook endpoint and
    test signing secret.
 3. A protected approved-proposal registry is populated from the exact approved
-   workflow artefact and Notion record. No hand-entered amount should bypass that
-   binding.
+   workflow artefact and Notion record. Its founder approval identifier is the
+   recorded approval-binding digest, and the binding records the exact proposal
+   checksum, version, recipient email and proposal URL. No hand-entered amount,
+   recipient or URL can bypass that binding.
 4. The test bridge is deployed behind the existing secure ingress/tunnel and its
    webhook endpoint is registered in Stripe test mode, with TLS 1.2+ and Stripe
    source-IP filtering in addition to mandatory signature verification.
