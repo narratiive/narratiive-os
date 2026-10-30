@@ -36,6 +36,7 @@ Call with an explicit `workspace_id` and a private configuration mapping, or omi
 | `COMPANY_NAME` | Exact synthetic prospect/company label shown in the preview |
 | `ENTITY_ID` | Exact safe workflow entity identifier |
 | `DISCOVERY_PREPARATION_REF` | Exact existing Discovery Preparation artefact reference |
+| `DISCOVERY_EVIDENCE_REFS_JSON` | Non-empty JSON list of authoritative, in-scope Discovery source references |
 | `MEETING_DURATION_MINUTES` | Must be `30` for this founder-approved invitation path |
 
 Keep these values in private runtime configuration outside Git (mode `0600`
@@ -55,7 +56,7 @@ preview = build_invitation_preview(workspace_id="synthetic-test")
 
 The return value contains private addresses: display it only to the authorised
 internal reviewer; do not log it or commit generated output. Missing or invalid
-configuration returns named blockers and no email/digest. Supplied authority
+configuration returns named blockers and no email/digest. Each displayed insight must reference the configured authoritative Discovery source set; a nonempty but unrelated reference is rejected. Supplied authority
 references are configuration assertions, not independently verified evidence.
 The booking-page route avoids inventing available slots.
 Control characters are rejected before trimming configuration whitespace. The

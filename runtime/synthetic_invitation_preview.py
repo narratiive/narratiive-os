@@ -40,7 +40,7 @@ def build_invitation_preview(
         "WORKSPACE_ID", "RECIPIENT", "GMAIL_SENDER", "SENDER_AUTHORITY_REF",
         "BOOKING_URL", "BOOKING_AUTHORITY_REF", "COMPANY_NAME", "ENTITY_ID",
         "DISCOVERY_PREPARATION_REF", "MEETING_DURATION_MINUTES",
-        "INSIGHTS_JSON", "FOUNDER_SIGNATURE",
+        "INSIGHTS_JSON", "DISCOVERY_EVIDENCE_REFS_JSON", "FOUNDER_SIGNATURE",
     )
     raw_values = {key: source.get(PREFIX + key, "") for key in fields}
     values = {key: value.strip() for key, value in raw_values.items()}
@@ -56,14 +56,28 @@ def build_invitation_preview(
     except json.JSONDecodeError:
         insights = []
         blockers.append(f"Configure valid JSON for {PREFIX}INSIGHTS_JSON.")
-    if not isinstance(insights, list) or len(insights) != len(INVITATION_SECTIONS):
+    try:
+        discovery_evidence_refs = json.loads(values["DISCOVERY_EVIDENCE_REFS_JSON"])
+    except json.JSONDecodeError:
+        discovery_evidence_refs = []
+        blockers.append(f"Configure valid JSON for {PREFIX}DISCOVERY_EVIDENCE_REFS_JSON.")
+    if not isinstance(discovery_evidence_refs, list) or not discovery_evidence_refs or not all(
+        isinstance(ref, str) and ref.strip() for ref in discovery_evidence_refs
+    ):
+        blockers.append("Provide a non-empty authoritative Discovery evidence reference set.")
+        discovery_evidence_refs = []
+    if not isinstance(insights, list) or not 1 <= len(insights) <= len(INVITATION_SECTIONS):
         blockers.append(
-            "Provide exactly three validated insight/question pairs for the Discovery invitation."
+            "Provide one to three validated insight/question pairs for the Discovery invitation."
         )
         insights = []
     for insight in insights:
         if not isinstance(insight, dict) or not all(str(insight.get(key, "")).strip() for key in ("observation", "question", "source_ref")):
             blockers.append("Each insight must retain observation, question and source reference.")
+            insights = []
+            break
+        if str(insight.get("source_ref") or "").strip() not in discovery_evidence_refs:
+            blockers.append("Each invitation insight must reference the authoritative Discovery evidence set.")
             insights = []
             break
     for key in ("RECIPIENT", "GMAIL_SENDER"):
@@ -107,7 +121,7 @@ def build_invitation_preview(
         "subject": (
             "Loom Loft — what could we build together?"
             if _uses_founder_approved_synthetic_copy(values)
-            else f"[SYNTHETIC TEST] {values['COMPANY_NAME']} — three things worth discussing"
+            else f"[SYNTHETIC TEST] {values['COMPANY_NAME']} — a conversation worth having"
         ),
         "body": _render_text(values, insights),
     }
@@ -119,6 +133,7 @@ def build_invitation_preview(
         "company_name": values["COMPANY_NAME"],
         "entity_id": values["ENTITY_ID"],
         "discovery_preparation_ref": values["DISCOVERY_PREPARATION_REF"],
+        "authoritative_discovery_evidence_refs": sorted(discovery_evidence_refs),
         "meeting_duration_minutes": 30,
         "meeting_evidence_source": "google_meet_transcript_and_gemini_notes",
         "booking_mechanism": "configured_authorised_booking_page",
@@ -158,7 +173,7 @@ def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
         f"<p style=\"color:#10243e;line-height:1.5;margin:7px 0 5px\">{html.escape(str(item['observation']))}</p>"
         f"<p style=\"color:#38506b;line-height:1.5;margin:0\">{html.escape(str(item['question']))}</p>"
         "</td></tr>"
-        for title, item in zip(INVITATION_SECTIONS, insights, strict=True)
+        for title, item in zip(INVITATION_SECTIONS, insights)
     )
     return (
         "<!doctype html><html><body style=\"margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#10243e\">"
@@ -181,7 +196,7 @@ def _render_text(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
         return _founder_approved_synthetic_text(values["BOOKING_URL"])
     sections = "\n\n".join(
         f"{title}\n{item['observation']}\n{item['question']}"
-        for title, item in zip(INVITATION_SECTIONS, insights, strict=True)
+        for title, item in zip(INVITATION_SECTIONS, insights)
     )
     return (
         "Hello,\n\n"

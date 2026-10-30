@@ -29,6 +29,7 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
                 {"observation": "Validated fixture audience.", "question": "Who matters most here?", "source_ref": "fixture:2"},
                 {"observation": "Validated fixture distinction.", "question": "What should be unmissable?", "source_ref": "fixture:3"},
             ]),
+            "DISCOVERY_EVIDENCE_REFS_JSON": json.dumps(["fixture:1", "fixture:2", "fixture:3"]),
             "FOUNDER_SIGNATURE": "Matt Franks\nFounder, Narratiive",
         }.items()}
 
@@ -170,11 +171,24 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
     def test_missing_or_unsafe_insights_block_personalised_preview(self):
         missing = {**self.config, PREFIX + "INSIGHTS_JSON": "[]"}
         self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=missing)["status"], "blocked")
+        one_insight = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
+            {"observation": "One.", "question": "Why?", "source_ref": "fixture:1"},
+        ])}
+        one_preview = build_invitation_preview(workspace_id="synthetic-test", config=one_insight)
+        self.assertEqual(one_preview["status"], "awaiting_approval")
+        self.assertEqual(len(one_preview["approval_digest"]["validated_insights"]), 1)
+        self.assertNotIn("three things worth discussing", one_preview["email_preview"]["subject"])
         incomplete = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "One.", "question": "Why?", "source_ref": "fixture:1"},
             {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
+            {"observation": "Three.", "question": "Why?", "source_ref": "fixture:3"},
+            {"observation": "Four.", "question": "Why?", "source_ref": "fixture:3"},
         ])}
         self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=incomplete)["status"], "blocked")
+        forged = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
+            {"observation": "One.", "question": "Why?", "source_ref": "forged:source"},
+        ])}
+        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=forged)["status"], "blocked")
         unsafe = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "<script>", "question": "Why?", "source_ref": "fixture:1"},
             {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
