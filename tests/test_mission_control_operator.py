@@ -126,9 +126,11 @@ class MissionControlOperatorTests(unittest.TestCase):
             states=[loom],
         )
 
-        result = self.projector.project(states=[loom, katkin], leads=[])
+        loom_lead = InboundLead("inbound-d1b96a67", "Loom", company="Loom Loft")
+        result = self.projector.project(states=[loom, katkin], leads=[loom_lead])
 
         self.assertEqual(result["summary"]["waiting_for_matt"], 1)
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
         self.assertEqual([item["company"] for item in result["needs_you"]], ["CatKin"])
         audit = next(item for item in result["opportunities"] if item["id"] == "loom-client")
         self.assertEqual(audit["kind"], "TEST")

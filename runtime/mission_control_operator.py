@@ -116,13 +116,20 @@ class OperatorMissionControlProjector:
         scoped = tuple(policy_states)
         lead_by_id = {lead.lead_id: lead for lead in visible_leads}
         grouped: dict[str, list[WorkflowState]] = defaultdict(list)
+        lead_by_workflow_key: dict[str, InboundLead] = {}
         for state in scoped:
-            grouped[state.client_id or state.entity_id].append(state)
+            key = state.client_id or state.entity_id
+            grouped[key].append(state)
+            for identity in (state.client_id, state.entity_id):
+                lead = lead_by_id.get(identity)
+                if lead is not None:
+                    lead_by_workflow_key[key] = lead
         for lead in visible_leads:
-            grouped.setdefault(lead.lead_id, [])
+            if lead not in lead_by_workflow_key.values():
+                grouped.setdefault(lead.lead_id, [])
 
         opportunities = [
-            self._opportunity(key, runs, lead_by_id.get(key), now, classifications)
+            self._opportunity(key, runs, lead_by_workflow_key.get(key), now, classifications)
             for key, runs in grouped.items()
         ]
         opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
