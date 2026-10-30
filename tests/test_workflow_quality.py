@@ -597,6 +597,8 @@ class WorkflowQualityTests(unittest.TestCase):
             ("headline", "The agreed investment is cad 12,000."),
             ("headline", "The agreed investment is £ twelve thousand."),
             ("headline", "The agreed investment is ₹12,000."),
+            ("headline", "The agreed investment is isk 12,000."),
+            ("headline", "The agreed investment is ₴12,000."),
             ("headline", "The agreed investment is 12,000 United Arab Emirates dirhams."),
         ):
             output = proposal_output()

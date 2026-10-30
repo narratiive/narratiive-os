@@ -1369,7 +1369,7 @@ _CURRENCY_NAME = (
 )
 _ISO_CURRENCY_CODE = (
     r"(?:AED|ARS|AUD|BDT|BGN|BHD|BRL|CAD|CHF|CLP|CNY|COP|CZK|DKK|EGP|EUR|GBP|"
-    r"HKD|HUF|IDR|ILS|INR|JPY|KES|KRW|KWD|LKR|MAD|MXN|MYR|NGN|NOK|NZD|OMR|PHP|"
+    r"HKD|HUF|IDR|ILS|INR|ISK|JPY|KES|KRW|KWD|LKR|MAD|MXN|MYR|NGN|NOK|NZD|OMR|PHP|"
     r"PKR|PLN|QAR|RON|RSD|RUB|SAR|SEK|SGD|THB|TRY|TWD|UAH|USD|VND|ZAR)"
 )
 
@@ -1395,7 +1395,7 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
         # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
         # currency amount regardless of its code or whether it is expressed in
         # words; otherwise an unbound FIELDWORK fee can reach a review copy.
-        rf"(?:\b(?:fee|price|pricing|costs?)\b|[\$£€¥₹₩₽₺₫₱₦₪]\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:(?-i:[A-Z]{{3}})|{_ISO_CURRENCY_CODE})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,5}}[ -]+{_CURRENCY_NAME}\b)",
+        rf"(?:\b(?:fee|price|pricing|costs?)\b|[\$£€¥₹₩₽₺₫₱₦₴₪]\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:(?-i:[A-Z]{{3}})|{_ISO_CURRENCY_CODE})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,5}}[ -]+{_CURRENCY_NAME}\b)",
         text,
         flags=re.IGNORECASE,
     )
