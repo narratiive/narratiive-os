@@ -371,6 +371,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
                 output[field] = contract[field]
         return output
 
+    production_planning_worker = CampaignProductionPlanningWorker()
     workers = CapabilityWorkerRegistry((
         WorkerRegistration(
             WorkerMetadata(
@@ -432,7 +433,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
                 side_effect_permissions=("preparation",),
                 max_attempts=1,
             ),
-            CampaignProductionPlanningWorker(),
+            production_planning_worker,
         ),
         WorkerRegistration(
             WorkerMetadata(
@@ -457,6 +458,7 @@ def _build_runtime(root: Path, adapter=None) -> TonyWorkflowRuntime:
             DeliveryFollowUpPreparationWorker(),
         ),
     ))
+    production_planning_worker.registry = workers
     validators = {
         "blueprint_lite_quality_gate": TonyInboundBlueprintLiteService._quality_gate,
         "discovery_preparation_quality_gate": discovery_preparation_quality_gate,
