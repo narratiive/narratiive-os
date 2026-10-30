@@ -99,32 +99,6 @@ Before handoff:
 - client-facing release, dispatch, publication, export, or sending still
   requires the authorised human approval defined by the relevant contract.
 
-## PROVE mode: Loom Loft journey
-
-Until the synthetic Loom Loft journey is proven end-to-end, engineering work
-prioritises the persisted path `Lead → GROUNDWORK → Discovery → Transcript →
-Proposal → FIELDWORK → SKETCHBOOK → Creative output` over architectural
-expansion. Resume from the existing entity and durable state; never recreate a
-completed run, evidence pack, lead, or approval.
-
-For routine changes, run only the tests directly covering the change, its
-immediate upstream/downstream handoff, and critical approval, external-action,
-and data-integrity controls. Use one controlled live acceptance check for an
-external integration. Do not rerun the repository-wide suite unless required by
-CI, a broad architectural change, or the final HARDEN process. Required CI and
-all approval/security gates remain mandatory.
-
-Record non-critical defects, apply only a safe bounded workaround, and continue
-the rehearsal. For a critical defect, repair the smallest affected component,
-run focused verification, and resume from persisted state. Every handoff report
-must state: `CURRENT STAGE`, `LAST VERIFIED HANDOFF`, `NEXT HANDOFF`, `BLOCKER`,
-and `FOUNDER ACTION`.
-
-After the complete journey, prepare a prioritised defect list separating
-critical reliability/security issues from quality improvements and cosmetic
-issues. HARDEN runs overnight: it may execute the full suite, identify failures
-and prepare bounded draft PRs, but never merges or deploys automatically.
-
 ## Standing repository merge delegation
 
 Matt has granted a standing repository-administration delegation for

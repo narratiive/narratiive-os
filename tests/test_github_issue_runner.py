@@ -426,6 +426,69 @@ class GitHubIssueRunnerTests(unittest.TestCase):
         self.assertEqual(len(codex.prompts), 2)
         self.assertEqual(github.blocked, [])
 
+    def test_capacity_retry_blocks_an_ambiguous_changed_worktree(self) -> None:
+        issue = Issue(
+            504, "Canary", "Safe canary.",
+            "https://github.com/narratiive/narratiive-os/issues/504",
+            "trusted-owner", "2026-10-28T10:00:00Z", (READY_LABEL,),
+        )
+        github = FakeGitHub(issue)
+        repository = FakeRepository(self.root / "worktrees" / "issue-504")
+        codex = CapacityThenSuccessCodex(repository)
+        store = StateStore(self.config.state_root, REPOSITORY)
+        service = GitHubIssueRunner(
+            self.config, store=store, github=github, repository=repository, codex=codex
+        )
+
+        self.assertEqual(service.run_once(), "codex_capacity_wait")
+        waiting = store.load()
+        repository.disposition = "dirty"
+        store.transition({**waiting, "capacity_retry_at": "2000-01-01T00:00:00+00:00"})
+
+        self.assertEqual(service.run_once(), "blocked")
+        self.assertEqual(len(codex.prompts), 1)
+        self.assertEqual(github.blocked, [504])
+
+    def test_capacity_retry_limit_blocks_without_an_infinite_loop(self) -> None:
+        issue = Issue(
+            504, "Canary", "Safe canary.",
+            "https://github.com/narratiive/narratiive-os/issues/504",
+            "trusted-owner", "2026-10-28T10:00:00Z", (READY_LABEL,),
+        )
+        github = FakeGitHub(issue)
+        repository = FakeRepository(self.root / "worktrees" / "issue-504")
+        codex = CapacityThenSuccessCodex(repository)
+        codex.remaining_capacity_failures = 2
+        store = StateStore(self.config.state_root, REPOSITORY)
+        service = GitHubIssueRunner(
+            self.config, store=store, github=github, repository=repository, codex=codex
+        )
+
+        self.assertEqual(service.run_once(), "codex_capacity_wait")
+        waiting = store.load()
+        store.transition({**waiting, "capacity_retry_at": "2000-01-01T00:00:00+00:00"})
+
+        self.assertEqual(service.run_once(), "blocked")
+        self.assertEqual(len(codex.prompts), 2)
+        self.assertEqual(github.blocked, [504])
+
+    def test_codex_attempt_logs_are_immutable_and_distinct(self) -> None:
+        executor = CodexExecutor(self.config)
+        first = executor._persist_output(
+            {"run_id": "issue-504", "attempt": 1}, "first", "first-error"
+        )
+        second = executor._persist_output(
+            {"run_id": "issue-504", "attempt": 2}, "second", "second-error"
+        )
+
+        self.assertNotEqual(first["stdout_path"], second["stdout_path"])
+        self.assertEqual(Path(first["stdout_path"]).read_text(encoding="utf-8"), "first")
+        self.assertEqual(Path(second["stdout_path"]).read_text(encoding="utf-8"), "second")
+        with self.assertRaisesRegex(IssueRunnerError, "evidence"):
+            executor._persist_output(
+                {"run_id": "issue-504", "attempt": 1}, "replacement", "replacement-error"
+            )
+
     def test_codex_environment_excludes_github_token_and_records_hashes_only(self) -> None:
         worktree = self.root / "worktree"
         worktree.mkdir()

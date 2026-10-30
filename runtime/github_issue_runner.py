@@ -25,6 +25,7 @@ BLOCKED_LABEL = "agent:blocked"
 DONE_LABEL = "agent:done"
 FOLLOW_UP_PREFIX = "/agent-follow-up "
 TERMINAL_STAGES = {"review", "blocked"}
+MAX_CODEX_ATTEMPTS = 2
 RUNNER_STAGES = {
     "selected",
     "claimed",
@@ -708,12 +709,18 @@ class CodexExecutor:
 
     def _persist_output(self, job: Mapping[str, Any], stdout: str, stderr: str) -> dict[str, str]:
         run_id = _safe_slug(str(job.get("run_id", "manual"))) or "manual"
+        attempt = int(job.get("attempt", 0))
+        if attempt < 1:
+            attempt = 1
         root = self.config.state_root.resolve() / _safe_slug(self.config.repository) / "runs" / run_id
         try:
             root.mkdir(parents=True, exist_ok=True, mode=0o700)
-            paths = {"stdout_path": root / "codex.stdout.log", "stderr_path": root / "codex.stderr.log"}
+            paths = {
+                "stdout_path": root / f"codex.attempt-{attempt}.stdout.log",
+                "stderr_path": root / f"codex.attempt-{attempt}.stderr.log",
+            }
             for key, value in (("stdout_path", stdout), ("stderr_path", stderr)):
-                descriptor = os.open(paths[key], os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+                descriptor = os.open(paths[key], os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
                 with os.fdopen(descriptor, "w", encoding="utf-8", errors="replace") as handle:
                     handle.write(value or "")
             return {key: str(path) for key, path in paths.items()}
@@ -879,13 +886,19 @@ class GitHubIssueRunner:
                     retry_at = _parse_retry_at(str(job.get("capacity_retry_at", "")))
                     if retry_at is not None and datetime.now(timezone.utc) < retry_at:
                         return "capacity_wait"
+                    disposition = self.repository.inspect(job)
+                    if disposition != "base_clean":
+                        raise IssueRunnerError(
+                            "capacity-limited Codex worktree is not safely retryable: "
+                            f"{disposition}"
+                        )
                     job = self._move(job, "worktree_ready", capacity_resumed_at=utc_now())
                 elif stage == "codex_running":
                     disposition = self.repository.inspect(job)
                     if disposition == "committed":
                         verified = self.repository.verify(job)
                         job = self._move(job, "codex_complete", recovery="verified_after_restart", **verified)
-                    elif disposition == "base_clean" and int(job.get("attempt", 0)) < 2:
+                    elif disposition == "base_clean" and int(job.get("attempt", 0)) < MAX_CODEX_ATTEMPTS:
                         job = self._run_codex(self._move(job, "worktree_ready"))
                     else:
                         raise IssueRunnerError(
@@ -898,7 +911,7 @@ class GitHubIssueRunner:
                     except IssueRunnerError as exc:
                         if (
                             "base_clean" in str(exc)
-                            and int(job.get("attempt", 0)) < 2
+                            and int(job.get("attempt", 0)) < MAX_CODEX_ATTEMPTS
                         ):
                             job = self._run_codex(
                                 self._move(job, "worktree_ready", retry="no_local_commit")
@@ -962,6 +975,17 @@ class GitHubIssueRunner:
         except CodexCapacityExhausted as exc:
             latest = self.store.load() or job
             retries = int(latest.get("capacity_retry_count", 0)) + 1
+            if retries >= MAX_CODEX_ATTEMPTS:
+                blocked = self._move(
+                    latest,
+                    "blocking",
+                    error="Codex capacity retry limit reached; work remains claimed for manual recovery.",
+                    failed_stage="codex_capacity_wait",
+                    process_evidence=exc.evidence,
+                    capacity_retry_count=retries,
+                    capacity_reason="temporary_usage_or_rate_limit",
+                )
+                return self._publish_block(blocked)
             retry_after = min(3600, max(5, exc.retry_after_seconds))
             retry_at = datetime.now(timezone.utc).timestamp() + retry_after
             return_stage = self._move(
