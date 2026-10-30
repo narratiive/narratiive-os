@@ -594,6 +594,10 @@ class WorkflowQualityTests(unittest.TestCase):
             ("headline", "The agreed investment is twelve thousand Canadian dollars."),
             ("headline", "The agreed investment is 12,000 Australian dollars."),
             ("headline", "The agreed investment is twelve thousand US dollars."),
+            ("headline", "The agreed investment is cad 12,000."),
+            ("headline", "The agreed investment is £ twelve thousand."),
+            ("headline", "The agreed investment is ₹12,000."),
+            ("headline", "The agreed investment is 12,000 United Arab Emirates dirhams."),
         ):
             output = proposal_output()
             output["commercial_opportunity"][field] = claim
@@ -601,6 +605,17 @@ class WorkflowQualityTests(unittest.TestCase):
             with self.subTest(claim=claim):
                 self.assertFalse(result["passed"])
                 self.assertIn("model output does not claim fee approval", result["failed_checks"])
+
+        output = proposal_output()
+        output["commercial_opportunity"]["monetary_estimate"] = {
+            "amount": 12000,
+            "currency": "GBP",
+            "basis": "The FIELDWORK fee is ₹12,000.",
+            "evidence_refs": ["meeting:notes:1"],
+        }
+        result = growth_sprint_proposal_quality_gate(output)
+        self.assertFalse(result["passed"])
+        self.assertIn("model output does not claim fee approval", result["failed_checks"])
 
     def test_proposal_quality_rejects_generic_hypothesis_legacy_name_and_repetition(self) -> None:
         weak = proposal_output()

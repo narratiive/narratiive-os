@@ -1367,6 +1367,11 @@ _CURRENCY_NAME = (
     r"kronor|koruna|zloty|pesos?|reais|rands?|dirhams?|dinars?|riyals?|ringgit|"
     r"baht|won|lira|shekels?|forint|hryvnia|lei|lev|lari|taka|dong|naira|shillings?)"
 )
+_ISO_CURRENCY_CODE = (
+    r"(?:AED|ARS|AUD|BDT|BGN|BHD|BRL|CAD|CHF|CLP|CNY|COP|CZK|DKK|EGP|EUR|GBP|"
+    r"HKD|HUF|IDR|ILS|INR|JPY|KES|KRW|KWD|LKR|MAD|MXN|MYR|NGN|NOK|NZD|OMR|PHP|"
+    r"PKR|PLN|QAR|RON|RSD|RUB|SAR|SEK|SGD|THB|TRY|TWD|UAH|USD|VND|ZAR)"
+)
 
 
 def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool:
@@ -1374,16 +1379,23 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
     proposal = dict(output)
     opportunity = proposal.get("commercial_opportunity")
     if isinstance(opportunity, Mapping):
-        proposal["commercial_opportunity"] = {
-            key: value for key, value in opportunity.items() if key != "monetary_estimate"
-        }
+        safe_opportunity = dict(opportunity)
+        estimate = safe_opportunity.get("monetary_estimate")
+        if isinstance(estimate, Mapping):
+            # The structured amount/currency is validated separately against
+            # Discovery provenance. Its free-text basis remains model output
+            # and must be screened like every other rendered field.
+            safe_opportunity["monetary_estimate"] = {
+                key: value for key, value in estimate.items() if key not in {"amount", "currency"}
+            }
+        proposal["commercial_opportunity"] = safe_opportunity
     text = _model_text(proposal)
     return not re.search(
         # The validated renderer supports any ISO-style three-letter currency,
         # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
         # currency amount regardless of its code or whether it is expressed in
         # words; otherwise an unbound FIELDWORK fee can reach a review copy.
-        rf"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b(?-i:[A-Z]{{3}})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,2}}[ -]+{_CURRENCY_NAME}\b)",
+        rf"(?:\b(?:fee|price|pricing|costs?)\b|[\$£€¥₹₩₽₺₫₱₦₪]\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:(?-i:[A-Z]{{3}})|{_ISO_CURRENCY_CODE})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,5}}[ -]+{_CURRENCY_NAME}\b)",
         text,
         flags=re.IGNORECASE,
     )
