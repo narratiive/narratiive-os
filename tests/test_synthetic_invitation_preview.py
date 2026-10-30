@@ -76,6 +76,24 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.runs.save(state)
         return artifact.artifact_id
 
+    def persist_discovery_attempt(self, *, entity_id):
+        state = WorkflowState(
+            workflow_id="blueprint_lite_to_discovery_preparation",
+            run_id=f"attempt-{entity_id}",
+            stages=[StageRecord("prepare_discovery", "Claude")],
+            workspace_id="synthetic-test",
+            client_id="synthetic-client",
+            entity_id=entity_id,
+        )
+        artifact = self.artifacts.persist_attempt(
+            state, "prepare_discovery", {"evidence_lineage": [
+                {"claim": "Unaccepted attempt", "source_refs": ["fixture:1"]}
+            ]}, attempt_number=1,
+        )
+        state.stage("prepare_discovery").output_artifacts = [artifact]
+        self.runs.save(state)
+        return artifact.artifact_id
+
     def test_exact_preview_and_digest_are_deterministic_without_side_effects(self):
         before = copy.deepcopy(self.config)
         with patch("socket.socket", side_effect=AssertionError("network forbidden")), \
@@ -272,6 +290,13 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         artifact = self.runs.load("discovery-synthetic-entity-1").stage("prepare_discovery").output_artifacts[0]
         Path(artifact.location).write_text('{"evidence_lineage":[]}', encoding="utf-8")
         self.assertEqual(self.preview()["status"], "blocked")
+        attempt_entity = "attempt-only"
+        attempt_ref = self.persist_discovery_attempt(entity_id=attempt_entity)
+        self.assertEqual(self.preview(config={
+            **self.config,
+            PREFIX + "ENTITY_ID": attempt_entity,
+            PREFIX + "DISCOVERY_PREPARATION_REF": attempt_ref,
+        })["status"], "blocked")
 
     def test_founder_approved_loom_loft_copy_is_exact_and_isolated(self):
         config = {

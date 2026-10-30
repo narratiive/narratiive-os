@@ -45,10 +45,21 @@ class DiscoveryEvidenceResolver:
                 and state.entity_id == entity_id
                 and state.workflow_id == "blueprint_lite_to_discovery_preparation"
             ):
-                matches.extend(
-                    artifact for stage in state.stages for artifact in stage.output_artifacts
-                    if artifact.artifact_id == discovery_preparation_ref
-                )
+                for stage in state.stages:
+                    if stage.stage_id != "prepare_discovery":
+                        continue
+                    matches.extend(
+                        artifact for artifact in stage.output_artifacts
+                        if (
+                            artifact.artifact_id == discovery_preparation_ref
+                            and artifact.artifact_type == "workflow_step_output"
+                            and artifact.metadata.get("workspace_id") == workspace_id
+                            and artifact.metadata.get("entity_id") == entity_id
+                            and artifact.metadata.get("workflow_id") == state.workflow_id
+                            and artifact.metadata.get("run_id") == state.run_id
+                            and artifact.metadata.get("stage_id") == "prepare_discovery"
+                        )
+                    )
         if len(matches) != 1:
             raise ValueError("discovery preparation artefact is not uniquely resolved")
         artifact = matches[0]
