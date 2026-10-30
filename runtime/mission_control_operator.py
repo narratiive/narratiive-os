@@ -106,14 +106,16 @@ class OperatorMissionControlProjector:
         # but do not allow that stale lead projection to reintroduce the test
         # entity into the founder's live portfolio or approval queue.
         synthetic_state_keys = {
-            state.client_id or state.entity_id
+            identifier.strip().casefold()
             for state in all_states
             if self._explicit_synthetic(state)
+            for identifier in (state.client_id, state.entity_id)
+            if identifier.strip()
         }
         visible_leads = tuple(
             lead
             for lead in self.visibility.visible_leads(all_leads)
-            if lead.lead_id not in synthetic_state_keys
+            if lead.lead_id.strip().casefold() not in synthetic_state_keys
             and not self._lead_is_synthetic(lead)
         )
         policy_states = self.visibility.visible_workflows(all_states, all_leads)
@@ -284,18 +286,7 @@ class OperatorMissionControlProjector:
                 OperatorMissionControlProjector._contains_synthetic_marker(item)
                 for item in value
             )
-        if not isinstance(value, str):
-            return False
-        marker = value.strip().casefold()
-        return marker.startswith("synthetic:") or any(
-            phrase in marker
-            for phrase in (
-                "synthetic internal test",
-                "synthetic acceptance evidence",
-                "test-only",
-                "test only",
-            )
-        )
+        return False
 
     @staticmethod
     def _lead_is_synthetic(lead: InboundLead) -> bool:

@@ -98,6 +98,17 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertEqual(result["summary"]["synthetic_hidden"], 1)
         self.assertEqual(result["opportunities"], [])
 
+    def test_synthetic_state_hides_lead_matched_by_entity_id(self):
+        state = self._state(client="client-42")
+        state.entity_id = "notion-lead-abc"
+        state.input_payload = {"diagnostic": {"synthetic_test": True}}
+        lead = InboundLead("notion-lead-abc", "Tester", company="Synthetic Tester")
+
+        result = self.projector.project(states=[state], leads=[lead])
+
+        self.assertEqual(result["summary"]["active_opportunities"], 0)
+        self.assertEqual(result["opportunities"], [])
+
     def test_explicit_test_only_text_in_canonical_input_is_not_live_work(self):
         state = self._state(client="certification")
         state.input_payload = {
@@ -112,6 +123,20 @@ class MissionControlOperatorTests(unittest.TestCase):
 
         self.assertEqual(result["summary"]["active_opportunities"], 0)
         self.assertEqual(result["summary"]["synthetic_hidden"], 1)
+
+    def test_client_free_text_does_not_hide_live_work(self):
+        state = self._state(client="live-client")
+        state.input_payload = {
+            "company": "Live Client",
+            "diagnostic": {
+                "challenge": "Customers need a test only environment before buying."
+            },
+        }
+
+        result = self.projector.project(states=[state], leads=[])
+
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
+        self.assertEqual(result["opportunities"][0]["id"], "live-client")
 
     def test_archived_suppressed_and_completed_leads_do_not_enter_projection(self):
         states = [
