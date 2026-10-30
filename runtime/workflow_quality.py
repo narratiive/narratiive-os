@@ -1362,8 +1362,7 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
     )
     text = " ".join(_model_text(field) for field in fields)
     return not re.search(
-        r"(?:\b(?:fee|price|pricing|investment|commercial terms)\b.{0,100}\b(?:approved|agreed|confirmed)\b|"
-        r"\b(?:approved|agreed|confirmed)\b.{0,100}\b(?:fee|price|pricing|investment|commercial terms)\b)",
+        r"(?:\b(?:fee|price|pricing)\b|[£$€]\s*\d|\b(?:GBP|USD|EUR)\s*\d)",
         text,
         flags=re.IGNORECASE,
     )

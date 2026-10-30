@@ -569,6 +569,7 @@ class WorkflowQualityTests(unittest.TestCase):
         for field, claim in (
             ("recommendation", "FIELDWORK fee is approved at £12,000."),
             ("draft_client_communication", "The FIELDWORK fee is approved at £12,000; this draft remains for review."),
+            ("recommendation", "The FIELDWORK fee remains pending at £12,000."),
         ):
             output = proposal_output()
             if field == "recommendation":
