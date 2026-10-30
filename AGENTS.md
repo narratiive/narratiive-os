@@ -193,6 +193,12 @@ Narratiive OS is an internal prototype. The current priority is a working,
 observable, end-to-end synthetic-client journey, not preservation of obsolete
 interfaces or accumulation of disconnected infrastructure.
 
+**Founder-approved operating direction — 30 October 2026.** Matt has approved
+prioritising integration, testing and operational demonstration over unnecessary
+architectural expansion. This direction retains mandatory security controls,
+human approvals, independent review and truthful evidence; it does not alter
+the existing governance hierarchy or reserved decisions.
+
 **Build → Integrate → Test → Demonstrate → Improve.**
 
 - Prefer the smallest change that makes a real workflow capability operate.
@@ -223,9 +229,12 @@ interfaces or accumulation of disconnected infrastructure.
 ### Current engineering coordination
 
 For the rapid-prototype programme, Codex coordinates integration, Mission
-Control, deployment, and the synthetic end-to-end demonstration. Claude Code
-focuses on specialist capabilities, agent handoffs, production routing, and
-quality behaviour. These are working assignments, not grants of additional
+Control, deployment, and the synthetic end-to-end demonstration. Tony remains
+the operational orchestrator: runtime workflow routing, specialist handoffs and
+operational coordination remain Tony's responsibility. Claude Code may implement
+assigned specialist-capability engineering work, but does not acquire Tony's
+runtime operational authority. Matt retains commercial decisions and approval
+authority. These are working assignments, not grants of additional
 constitutional authority. Coordinate cross-owned files and avoid duplicate
 implementations; the AI Constitution and decision-authority contracts prevail.
 

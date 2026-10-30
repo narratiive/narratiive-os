@@ -61,9 +61,11 @@ The Chief Product Officer contract does not independently grant permission to
 change runtime behaviour. If the assignment conflicts with those documents,
 stop at that boundary and request the appropriate authorisation or routing.
 
-For the current prototype programme, focus on the specialist capabilities,
-production routing, agent handoffs, and quality behaviour that Codex integrates
-into the canonical runtime and Mission Control. Coordinate changes to
+For the current prototype programme, focus on assigned specialist-capability
+engineering and quality behaviour that Codex integrates into the canonical
+runtime and Mission Control. Tony retains runtime operational routing,
+specialist handoffs and operational coordination; Claude Code does not acquire
+that authority. Coordinate changes to
 integration-owned files rather than introducing a competing implementation.
 Complete existing reviewed PR corrections before starting unrelated work.
 
