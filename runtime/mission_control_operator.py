@@ -5,7 +5,7 @@ import json
 from collections import defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from runtime.inbound_leads import InboundLead
 from runtime.executive_visibility import ExecutiveVisibilityPolicy
@@ -101,7 +101,21 @@ class OperatorMissionControlProjector:
         all_leads = tuple(leads)
         if any(state.workspace_id != self.workflow_workspace_id for state in all_states):
             raise ValueError("workflow state workspace mismatch")
-        visible_leads = self.visibility.visible_leads(all_leads)
+        # A live lead can predate the workflow payload that explicitly marks an
+        # internal rehearsal as synthetic.  Keep the canonical records intact,
+        # but do not allow that stale lead projection to reintroduce the test
+        # entity into the founder's live portfolio or approval queue.
+        synthetic_state_keys = {
+            state.client_id or state.entity_id
+            for state in all_states
+            if self._explicit_synthetic(state)
+        }
+        visible_leads = tuple(
+            lead
+            for lead in self.visibility.visible_leads(all_leads)
+            if lead.lead_id not in synthetic_state_keys
+            and not self._lead_is_synthetic(lead)
+        )
         policy_states = self.visibility.visible_workflows(all_states, all_leads)
         scoped = tuple(state for state in policy_states if not self._explicit_synthetic(state))
         visible_keys = {
@@ -242,9 +256,45 @@ class OperatorMissionControlProjector:
 
     @staticmethod
     def _explicit_synthetic(state: WorkflowState) -> bool:
-        payload = state.input_payload
-        return payload.get("synthetic") is True or payload.get("test_fixture") is True or any(
-            str(item).startswith("synthetic:") for item in payload.get("evidence", []) if isinstance(item, str)
+        return OperatorMissionControlProjector._contains_synthetic_marker(
+            state.input_payload
+        )
+
+    @staticmethod
+    def _contains_synthetic_marker(value: Any) -> bool:
+        """Recognise only explicit, persisted test markers in canonical input."""
+
+        if isinstance(value, Mapping):
+            for key, item in value.items():
+                normalized = str(key).strip().casefold().replace("-", "_")
+                if normalized in {
+                    "synthetic",
+                    "synthetic_test",
+                    "test_fixture",
+                    "internal_test",
+                    "test_only",
+                    "test_record",
+                } and item is True:
+                    return True
+                if OperatorMissionControlProjector._contains_synthetic_marker(item):
+                    return True
+            return False
+        if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
+            return any(
+                OperatorMissionControlProjector._contains_synthetic_marker(item)
+                for item in value
+            )
+        if not isinstance(value, str):
+            return False
+        marker = value.strip().casefold()
+        return marker.startswith("synthetic:") or any(
+            phrase in marker
+            for phrase in (
+                "synthetic internal test",
+                "synthetic acceptance evidence",
+                "test-only",
+                "test only",
+            )
         )
 
     @staticmethod
@@ -252,7 +302,10 @@ class OperatorMissionControlProjector:
         if lead.disposition in {"suppressed", "test", "archived"}:
             return True
         label = f"{lead.company} {lead.contact}".strip().casefold()
-        return label.startswith(("safe ", "test ", "qa test ", "qa proposition "))
+        if label.startswith(("safe ", "test ", "qa test ", "qa proposition ")):
+            return True
+        notes = f"{lead.notes} {lead.ai_summary}".casefold()
+        return "synthetic internal test" in notes or "not a real " in notes
 
     @staticmethod
     def _lifecycle(runs: list[WorkflowState], lead: InboundLead | None) -> str:

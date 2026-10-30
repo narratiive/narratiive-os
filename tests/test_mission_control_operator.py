@@ -71,6 +71,48 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertEqual(result["summary"]["synthetic_hidden"], 1)
         self.assertEqual([item["id"] for item in result["opportunities"]], ["catkin"])
 
+    def test_nested_synthetic_marker_hides_matching_active_lead_and_gate(self):
+        state = self._state(
+            client="loom-loft",
+            status=WorkflowStatus.AWAITING_APPROVAL,
+            approval="pending",
+        )
+        state.input_payload = {
+            "company": "Loom Loft",
+            "diagnostic": {"raw_answers": {"synthetic_test": True}},
+        }
+        lead = InboundLead(
+            "loom-loft",
+            "Tester",
+            company="Loom Loft",
+            disposition="active",
+            notes="SYNTHETIC INTERNAL TEST — do not contact.",
+        )
+
+        result = self.projector.project(
+            states=[state], leads=[lead], generated_at="2026-10-04T12:00:00Z"
+        )
+
+        self.assertEqual(result["summary"]["active_opportunities"], 0)
+        self.assertEqual(result["summary"]["waiting_for_matt"], 0)
+        self.assertEqual(result["summary"]["synthetic_hidden"], 1)
+        self.assertEqual(result["opportunities"], [])
+
+    def test_explicit_test_only_text_in_canonical_input_is_not_live_work(self):
+        state = self._state(client="certification")
+        state.input_payload = {
+            "company": "FOUNDER CERTIFICATION — DO NOT CONTACT",
+            "diagnostic": {
+                "challenge": "Certification of the client journey; synthetic data only.",
+                "raw_answers": {"test_record": True},
+            },
+        }
+
+        result = self.projector.project(states=[state], leads=[])
+
+        self.assertEqual(result["summary"]["active_opportunities"], 0)
+        self.assertEqual(result["summary"]["synthetic_hidden"], 1)
+
     def test_archived_suppressed_and_completed_leads_do_not_enter_projection(self):
         states = [
             self._state(client="archived"),
