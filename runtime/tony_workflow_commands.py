@@ -1067,17 +1067,28 @@ class TonyWorkflowCommandService:
                     inputs=supplied,
                     commitment_id=commitment_id,
                 )
+                summary = self._summary(commissioned)
+                waiting_to_start = summary.get("execution_state") == "waiting_to_start"
+                if waiting_to_start:
+                    message = (
+                        "The work is commissioned but has not started. "
+                        "The worker has not been invoked; continue this exact run to execute it."
+                    )
+                elif replay:
+                    message = (
+                        "That exact governed work is already commissioned; no duplicate run was created. "
+                        "Check its execution state before taking another action."
+                    )
+                else:
+                    message = (
+                        "The work is commissioned. Check its execution state; commissioning alone "
+                        "does not prove that a worker has started."
+                    )
                 return CommandResponse(
                     name,
                     "healthy",
-                    (
-                        "That exact governed work is already commissioned; no duplicate run was created. "
-                        "Read its workflow status for the current execution state."
-                        if replay
-                        else "I’ve commissioned that work against the persisted evidence and will return here "
-                        "when it reaches the next review gate."
-                    ),
-                    {**self._summary(commissioned), "commissioned": True, "replay": replay},
+                    message,
+                    {**summary, "commissioned": True, "replay": replay},
                 )
             if name == "research":
                 if not rationale:
