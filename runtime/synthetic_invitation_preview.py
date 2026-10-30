@@ -9,7 +9,7 @@ import os
 import re
 from copy import deepcopy
 from collections.abc import Mapping
-from typing import Any
+from typing import Any, Protocol
 from urllib.parse import urlsplit
 
 from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS
@@ -25,13 +25,26 @@ FOUNDER_APPROVED_SYNTHETIC_ENTITY = "inbound-d1b96a67"
 FOUNDER_APPROVED_SYNTHETIC_COMPANY = "Loom Loft"
 
 
+class DiscoveryEvidenceResolver(Protocol):
+    """Resolve the immutable, workspace-scoped source set for one preparation."""
+
+    def __call__(
+        self, *, workspace_id: str, entity_id: str, discovery_preparation_ref: str
+    ) -> Mapping[str, Any]: ...
+
+
 def build_invitation_preview(
-    *, workspace_id: str, config: Mapping[str, str] | None = None
+    *,
+    workspace_id: str,
+    config: Mapping[str, str] | None = None,
+    discovery_evidence_resolver: DiscoveryEvidenceResolver | None = None,
 ) -> dict[str, Any]:
     """Resolve private configuration at call time, never probe a provider.
 
     The returned private review copy is not an approval token or executable
-    dispatch. Configured authority references are assertions, not live evidence.
+    dispatch. Sender and booking authority references are configuration
+    assertions; invitation evidence is resolved from the authoritative workflow
+    boundary, never asserted in configuration.
     """
     if not re.fullmatch(r"[A-Za-z0-9_-]+", workspace_id):
         raise ValueError("workspace_id must be a safe identifier")
@@ -39,8 +52,8 @@ def build_invitation_preview(
     fields = (
         "WORKSPACE_ID", "RECIPIENT", "GMAIL_SENDER", "SENDER_AUTHORITY_REF",
         "BOOKING_URL", "BOOKING_AUTHORITY_REF", "COMPANY_NAME", "ENTITY_ID",
-        "DISCOVERY_PREPARATION_REF", "MEETING_DURATION_MINUTES",
-        "INSIGHTS_JSON", "DISCOVERY_EVIDENCE_REFS_JSON", "FOUNDER_SIGNATURE",
+        "DISCOVERY_PREPARATION_REF", "MEETING_DURATION_MINUTES", "INSIGHTS_JSON",
+        "FOUNDER_SIGNATURE",
     )
     raw_values = {key: source.get(PREFIX + key, "") for key in fields}
     values = {key: value.strip() for key, value in raw_values.items()}
@@ -56,16 +69,13 @@ def build_invitation_preview(
     except json.JSONDecodeError:
         insights = []
         blockers.append(f"Configure valid JSON for {PREFIX}INSIGHTS_JSON.")
-    try:
-        discovery_evidence_refs = json.loads(values["DISCOVERY_EVIDENCE_REFS_JSON"])
-    except json.JSONDecodeError:
-        discovery_evidence_refs = []
-        blockers.append(f"Configure valid JSON for {PREFIX}DISCOVERY_EVIDENCE_REFS_JSON.")
-    if not isinstance(discovery_evidence_refs, list) or not discovery_evidence_refs or not all(
-        isinstance(ref, str) and ref.strip() for ref in discovery_evidence_refs
-    ):
-        blockers.append("Provide a non-empty authoritative Discovery evidence reference set.")
-        discovery_evidence_refs = []
+    discovery_evidence_refs, discovery_evidence_checksum = _resolve_discovery_evidence(
+        resolver=discovery_evidence_resolver,
+        workspace_id=workspace_id,
+        entity_id=values["ENTITY_ID"],
+        discovery_preparation_ref=values["DISCOVERY_PREPARATION_REF"],
+        blockers=blockers,
+    )
     if not isinstance(insights, list) or not 1 <= len(insights) <= len(INVITATION_SECTIONS):
         blockers.append(
             "Provide one to three validated insight/question pairs for the Discovery invitation."
@@ -134,6 +144,7 @@ def build_invitation_preview(
         "entity_id": values["ENTITY_ID"],
         "discovery_preparation_ref": values["DISCOVERY_PREPARATION_REF"],
         "authoritative_discovery_evidence_refs": sorted(discovery_evidence_refs),
+        "authoritative_discovery_evidence_checksum": discovery_evidence_checksum,
         "meeting_duration_minutes": 30,
         "meeting_evidence_source": "google_meet_transcript_and_gemini_notes",
         "booking_mechanism": "configured_authorised_booking_page",
@@ -180,7 +191,7 @@ def _render_html(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
         "<table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\"><tr><td align=\"center\" style=\"padding:20px\">"
         "<table role=\"presentation\" width=\"600\" cellspacing=\"0\" cellpadding=\"0\" style=\"max-width:600px;width:100%;background:#fff\">"
         "<tr><td style=\"padding:26px 28px 12px;font-size:22px;font-weight:bold;letter-spacing:.5px\">NARRATIIVE</td></tr>"
-        f"<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">{company}: three things worth exploring</h1>"
+        f"<tr><td style=\"padding:8px 28px\"><span style=\"font-size:12px;color:#596b80\">SYNTHETIC TEST</span><h1 style=\"font-size:25px;line-height:1.2;margin:8px 0\">{company}: a conversation worth having</h1>"
         f"<p style=\"line-height:1.5;margin:0\">Thanks for reaching out. We've had an interesting look around {company}, and there's something we'd love to explore with you.</p></td></tr>"
         "<tr><td style=\"padding:18px 28px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\" style=\"background:#f0f5fa\"><tr><td style=\"padding:16px\"><table role=\"presentation\" width=\"100%\" cellspacing=\"0\" cellpadding=\"0\">"
         + sections + "</table></td></tr></table></td></tr>"
@@ -210,6 +221,65 @@ def _render_text(values: Mapping[str, str], insights: list[Mapping[str, Any]]) -
         "source; Fireflies is only an optional fallback.\n\n"
         f"{values['FOUNDER_SIGNATURE']}"
     )
+
+
+def _resolve_discovery_evidence(
+    *,
+    resolver: DiscoveryEvidenceResolver | None,
+    workspace_id: str,
+    entity_id: str,
+    discovery_preparation_ref: str,
+    blockers: list[str],
+) -> tuple[list[str], str]:
+    """Accept evidence only from an immutable, correctly scoped preparation record."""
+    if not entity_id or not discovery_preparation_ref:
+        return [], ""
+    if resolver is None:
+        blockers.append("Resolve Discovery evidence through the authoritative workflow record.")
+        return [], ""
+    try:
+        record = resolver(
+            workspace_id=workspace_id,
+            entity_id=entity_id,
+            discovery_preparation_ref=discovery_preparation_ref,
+        )
+    except Exception:
+        blockers.append("The authoritative Discovery evidence record could not be resolved.")
+        return [], ""
+    if not isinstance(record, Mapping):
+        blockers.append("The authoritative Discovery evidence record is invalid.")
+        return [], ""
+    if (
+        record.get("workspace_id") != workspace_id
+        or record.get("entity_id") != entity_id
+        or record.get("discovery_preparation_ref") != discovery_preparation_ref
+        or record.get("immutable") is not True
+    ):
+        blockers.append("Discovery evidence does not match the requested workspace, entity and preparation.")
+        return [], ""
+    source_refs = record.get("source_refs")
+    if not isinstance(source_refs, list) or not source_refs or not all(
+        isinstance(ref, str) and re.fullmatch(r"[A-Za-z0-9._:-]{1,256}", ref)
+        for ref in source_refs
+    ):
+        blockers.append("The authoritative Discovery evidence source set is invalid.")
+        return [], ""
+    if len(source_refs) != len(set(source_refs)):
+        blockers.append("The authoritative Discovery evidence source set is ambiguous.")
+        return [], ""
+    checksum_material = {
+        "workspace_id": workspace_id,
+        "entity_id": entity_id,
+        "discovery_preparation_ref": discovery_preparation_ref,
+        "source_refs": sorted(source_refs),
+    }
+    checksum = hashlib.sha256(json.dumps(
+        checksum_material, sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")).hexdigest()
+    if record.get("source_set_checksum") != checksum:
+        blockers.append("The authoritative Discovery evidence source set failed integrity validation.")
+        return [], ""
+    return list(source_refs), checksum
 
 
 def _uses_founder_approved_synthetic_copy(values: Mapping[str, str]) -> bool:

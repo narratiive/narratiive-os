@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import unittest
 from unittest.mock import Mock, patch
@@ -29,12 +30,41 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
                 {"observation": "Validated fixture audience.", "question": "Who matters most here?", "source_ref": "fixture:2"},
                 {"observation": "Validated fixture distinction.", "question": "What should be unmissable?", "source_ref": "fixture:3"},
             ]),
-            "DISCOVERY_EVIDENCE_REFS_JSON": json.dumps(["fixture:1", "fixture:2", "fixture:3"]),
             "FOUNDER_SIGNATURE": "Matt Franks\nFounder, Narratiive",
         }.items()}
+        self.evidence_record = self.authoritative_evidence_record()
 
     def preview(self, **kwargs):
-        return build_invitation_preview(workspace_id="synthetic-test", config=self.config, **kwargs)
+        resolver = kwargs.pop("discovery_evidence_resolver", self.resolve_evidence)
+        config = kwargs.pop("config", self.config)
+        return build_invitation_preview(
+            workspace_id="synthetic-test",
+            config=config,
+            discovery_evidence_resolver=resolver,
+            **kwargs,
+        )
+
+    def authoritative_evidence_record(self, **overrides):
+        record = {
+            "workspace_id": "synthetic-test",
+            "entity_id": "synthetic-entity-1",
+            "discovery_preparation_ref": "artifact-synthetic-discovery-v1",
+            "immutable": True,
+            "source_refs": ["fixture:1", "fixture:2", "fixture:3"],
+        }
+        record.update(overrides)
+        material = {
+            key: record[key]
+            for key in ("workspace_id", "entity_id", "discovery_preparation_ref")
+        }
+        material["source_refs"] = sorted(record["source_refs"])
+        record["source_set_checksum"] = hashlib.sha256(json.dumps(
+            material, sort_keys=True, separators=(",", ":")
+        ).encode("utf-8")).hexdigest()
+        return record
+
+    def resolve_evidence(self, **_kwargs):
+        return self.evidence_record
 
     def test_exact_preview_and_digest_are_deterministic_without_side_effects(self):
         before = copy.deepcopy(self.config)
@@ -73,9 +103,13 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
 
     def test_configuration_resolves_at_call_time_and_ignores_credentials(self):
         with patch.dict("os.environ", self.config, clear=True):
-            first = build_invitation_preview(workspace_id="synthetic-test")
+            first = build_invitation_preview(
+                workspace_id="synthetic-test", discovery_evidence_resolver=self.resolve_evidence
+            )
             with patch.dict("os.environ", {PREFIX + "RECIPIENT": "other@example.net"}):
-                second = build_invitation_preview(workspace_id="synthetic-test")
+                second = build_invitation_preview(
+                    workspace_id="synthetic-test", discovery_evidence_resolver=self.resolve_evidence
+                )
         self.assertNotEqual(first["approval_digest"]["checksum"], second["approval_digest"]["checksum"])
         self.config["UNRELATED_API_KEY"] = "synthetic-secret-do-not-copy"
         self.assertNotIn("synthetic-secret-do-not-copy", json.dumps(self.preview()))
@@ -95,7 +129,7 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
                     continue
                 with self.subTest(key=key, control=repr(control)):
                     config = {**self.config, key: control + value + control}
-                    result = build_invitation_preview(workspace_id="synthetic-test", config=config)
+                    result = self.preview(config=config)
                     self.assertEqual(result["status"], "blocked")
                     self.assertIsNone(result["email_preview"])
                     self.assertIsNone(result["approval_digest"])
@@ -106,12 +140,12 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             config = dict(self.config)
             del config[key]
             with self.subTest(key=key):
-                result = build_invitation_preview(workspace_id="synthetic-test", config=config)
+                result = self.preview(config=config)
                 self.assertEqual(result["status"], "blocked")
                 self.assertIsNone(result["email_preview"])
                 self.assertIsNone(result["approval_digest"])
                 self.assertIn(key, " ".join(result["blockers"]))
-        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config={})["status"], "blocked")
+        self.assertEqual(self.preview(config={})["status"], "blocked")
 
     def test_invalid_or_cross_workspace_configuration_is_blocked(self):
         for key, value in (
@@ -130,7 +164,7 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         ):
             with self.subTest(key=key, value=value):
                 config = {**self.config, PREFIX + key: value}
-                result = build_invitation_preview(workspace_id="synthetic-test", config=config)
+                result = self.preview(config=config)
                 self.assertEqual(result["status"], "blocked")
                 self.assertIsNone(result["email_preview"])
 
@@ -149,11 +183,21 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         for key, changed_value in changed_values.items():
             config = dict(self.config)
             config[PREFIX + key] = changed_value
-            result = build_invitation_preview(workspace_id="synthetic-test", config=config)
+            record_overrides = {}
+            if key == "ENTITY_ID":
+                record_overrides["entity_id"] = changed_value
+            if key == "DISCOVERY_PREPARATION_REF":
+                record_overrides["discovery_preparation_ref"] = changed_value
+            result = self.preview(
+                config=config,
+                discovery_evidence_resolver=lambda **_kwargs: self.authoritative_evidence_record(
+                    **record_overrides
+                ),
+            )
             self.assertNotEqual(original, result["approval_digest"]["checksum"])
 
         invalid_duration = {**self.config, PREFIX + "MEETING_DURATION_MINUTES": "10"}
-        result = build_invitation_preview(workspace_id="synthetic-test", config=invalid_duration)
+        result = self.preview(config=invalid_duration)
         self.assertEqual(result["status"], "blocked")
         self.assertIsNone(result["approval_digest"])
 
@@ -170,33 +214,67 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
 
     def test_missing_or_unsafe_insights_block_personalised_preview(self):
         missing = {**self.config, PREFIX + "INSIGHTS_JSON": "[]"}
-        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=missing)["status"], "blocked")
+        self.assertEqual(self.preview(config=missing)["status"], "blocked")
         one_insight = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "One.", "question": "Why?", "source_ref": "fixture:1"},
         ])}
-        one_preview = build_invitation_preview(workspace_id="synthetic-test", config=one_insight)
+        one_preview = self.preview(config=one_insight)
         self.assertEqual(one_preview["status"], "awaiting_approval")
         self.assertEqual(len(one_preview["approval_digest"]["validated_insights"]), 1)
-        self.assertNotIn("three things worth discussing", one_preview["email_preview"]["subject"])
+        self.assertNotIn("three things", one_preview["email_preview"]["subject"].casefold())
+        self.assertNotIn("three things", one_preview["email_preview"]["html"].casefold())
+        for count in (2, 3):
+            preview = self.preview(config={
+                **self.config,
+                PREFIX + "INSIGHTS_JSON": json.dumps([
+                    {"observation": f"Observation {index}.", "question": f"Question {index}?", "source_ref": f"fixture:{index}"}
+                    for index in range(1, count + 1)
+                ]),
+            })
+            self.assertEqual(preview["status"], "awaiting_approval")
+            self.assertNotIn("three things", preview["email_preview"]["html"].casefold())
         incomplete = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "One.", "question": "Why?", "source_ref": "fixture:1"},
             {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
             {"observation": "Three.", "question": "Why?", "source_ref": "fixture:3"},
             {"observation": "Four.", "question": "Why?", "source_ref": "fixture:3"},
         ])}
-        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=incomplete)["status"], "blocked")
+        self.assertEqual(self.preview(config=incomplete)["status"], "blocked")
         forged = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "One.", "question": "Why?", "source_ref": "forged:source"},
         ])}
-        self.assertEqual(build_invitation_preview(workspace_id="synthetic-test", config=forged)["status"], "blocked")
+        self.assertEqual(self.preview(config=forged)["status"], "blocked")
         unsafe = {**self.config, PREFIX + "INSIGHTS_JSON": json.dumps([
             {"observation": "<script>", "question": "Why?", "source_ref": "fixture:1"},
             {"observation": "Two.", "question": "Why?", "source_ref": "fixture:2"},
             {"observation": "Three.", "question": "Why?", "source_ref": "fixture:3"},
         ])}
-        result = build_invitation_preview(workspace_id="synthetic-test", config=unsafe)
+        result = self.preview(config=unsafe)
         self.assertEqual(result["status"], "awaiting_approval")
         self.assertNotIn("<script>", result["email_preview"]["html"])
+
+    def test_authoritative_evidence_must_match_scope_preparation_and_integrity(self):
+        self.assertEqual(
+            build_invitation_preview(workspace_id="synthetic-test", config=self.config)["status"],
+            "blocked",
+        )
+        for record in (
+            self.authoritative_evidence_record(workspace_id="other-workspace"),
+            self.authoritative_evidence_record(entity_id="other-entity"),
+            self.authoritative_evidence_record(discovery_preparation_ref="other-preparation"),
+            self.authoritative_evidence_record(immutable=False),
+            self.authoritative_evidence_record(source_refs=["unknown:source"]),
+        ):
+            with self.subTest(record=record):
+                result = self.preview(discovery_evidence_resolver=lambda **_kwargs: record)
+                self.assertEqual(result["status"], "blocked")
+                self.assertIsNone(result["email_preview"])
+        tampered = self.authoritative_evidence_record()
+        tampered["source_set_checksum"] = "0" * 64
+        self.assertEqual(
+            self.preview(discovery_evidence_resolver=lambda **_kwargs: tampered)["status"],
+            "blocked",
+        )
 
     def test_founder_approved_loom_loft_copy_is_exact_and_isolated(self):
         config = {
@@ -204,8 +282,9 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             PREFIX + "COMPANY_NAME": "Loom Loft",
             PREFIX + "ENTITY_ID": "inbound-d1b96a67",
         }
-        email = build_invitation_preview(
-            workspace_id="synthetic-test", config=config
+        loom_evidence = self.authoritative_evidence_record(entity_id="inbound-d1b96a67")
+        email = self.preview(
+            config=config, discovery_evidence_resolver=lambda **_kwargs: loom_evidence
         )["email_preview"]
         expected = (
             "Hi [First Name],\n\n"
@@ -233,9 +312,10 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.assertIn("Book a 30-minute conversation&nbsp; →", email["html"])
         self.assertNotIn("The submitted diagnostic", email["html"])
 
-        non_synthetic = build_invitation_preview(
-            workspace_id="synthetic-test",
+        other_evidence = self.authoritative_evidence_record(entity_id="another-entity")
+        non_synthetic = self.preview(
             config={**config, PREFIX + "ENTITY_ID": "another-entity"},
+            discovery_evidence_resolver=lambda **_kwargs: other_evidence,
         )["email_preview"]
         self.assertNotEqual(non_synthetic["body"], expected)
 

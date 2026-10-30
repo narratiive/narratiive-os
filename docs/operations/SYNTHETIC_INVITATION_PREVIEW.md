@@ -13,8 +13,9 @@ The permanent Discovery-invitation default is a warm, concise conversation:
 **THE BIGGER AMBITION**, **THE PEOPLE WHO MATTER**, and **WHAT MAKES YOU
 UNMISSABLE**. Each section requires one validated GROUNDWORK observation and
 one question, with its internal source reference retained only in the approval
-material. The renderer fails closed unless all three are present; it never
-manufactures company-specific copy.
+material. The renderer accepts one to three pairs and fails closed unless every
+source reference is resolved from the immutable, in-scope Discovery preparation
+record; it never manufactures company-specific copy.
 
 The authorised Loom Loft rehearsal (`inbound-d1b96a67`) is the sole exception:
 it uses the founder-approved fictional copy exactly as approved. That copy is
@@ -36,7 +37,6 @@ Call with an explicit `workspace_id` and a private configuration mapping, or omi
 | `COMPANY_NAME` | Exact synthetic prospect/company label shown in the preview |
 | `ENTITY_ID` | Exact safe workflow entity identifier |
 | `DISCOVERY_PREPARATION_REF` | Exact existing Discovery Preparation artefact reference |
-| `DISCOVERY_EVIDENCE_REFS_JSON` | Non-empty JSON list of authoritative, in-scope Discovery source references |
 | `MEETING_DURATION_MINUTES` | Must be `30` for this founder-approved invitation path |
 
 Keep these values in private runtime configuration outside Git (mode `0600`
@@ -51,13 +51,20 @@ Example invocation inside an authorised internal Python caller:
 ```python
 from runtime.synthetic_invitation_preview import build_invitation_preview
 
-preview = build_invitation_preview(workspace_id="synthetic-test")
+preview = build_invitation_preview(
+    workspace_id="synthetic-test",
+    discovery_evidence_resolver=authoritative_discovery_evidence_resolver,
+)
 ```
 
 The return value contains private addresses: display it only to the authorised
 internal reviewer; do not log it or commit generated output. Missing or invalid
-configuration returns named blockers and no email/digest. Each displayed insight must reference the configured authoritative Discovery source set; a nonempty but unrelated reference is rejected. Supplied authority
-references are configuration assertions, not independently verified evidence.
+configuration returns named blockers and no email/digest. Each displayed insight
+must reference the resolver's immutable source set for the exact workspace,
+entity and Discovery preparation artefact. The resolver record includes a
+canonical source-set checksum; a mismatched scope, preparation, source, or
+checksum is rejected. Sender and booking authority references remain private
+configuration assertions, not evidence authority.
 The booking-page route avoids inventing available slots.
 Control characters are rejected before trimming configuration whitespace. The
 email preview is a separate display copy: editing it does not change the digest's
