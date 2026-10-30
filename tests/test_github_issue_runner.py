@@ -92,6 +92,7 @@ class FakeRepository:
         self.worktree = worktree
         self.disposition = "base_clean"
         self.pushes = 0
+        self.commit_dispositions: list[str] = []
 
     def prepare(self, issue_number):
         self.worktree.mkdir(parents=True, exist_ok=True)
@@ -109,7 +110,8 @@ class FakeRepository:
         return {"head_commit": "b" * 40, "changed_files": ["runtime/safe.py"]}
 
     def commit(self, job):
-        if self.disposition == "base_clean":
+        self.commit_dispositions.append(self.disposition)
+        if self.disposition == "dirty":
             self.disposition = "committed"
 
     def push(self, job):
@@ -124,6 +126,23 @@ class FakeCodex:
     def execute(self, job, prompt):
         self.prompts.append(prompt)
         self.repository.disposition = "committed"
+        return {
+            "returncode": 0,
+            "stdout": {"bytes": 0, "sha256": "0" * 64},
+            "stderr": {"bytes": 0, "sha256": "0" * 64},
+        }
+
+
+class DirtyHandoffCodex(FakeCodex):
+    """Models the required child-to-parent handoff without self-committing."""
+
+    def execute(self, job, prompt):
+        self.prompts.append(prompt)
+        if "leave the completed requested change uncommitted" not in prompt.casefold():
+            raise AssertionError("Codex prompt omitted the required uncommitted handoff")
+        if "leave the worktree clean" in prompt.casefold():
+            raise AssertionError("Codex prompt contradicts the required handoff")
+        self.repository.disposition = "dirty"
         return {
             "returncode": 0,
             "stdout": {"bytes": 0, "sha256": "0" * 64},
@@ -223,6 +242,31 @@ class GitHubIssueRunnerTests(unittest.TestCase):
         self.assertIn("Keep the public API compatible.", codex.prompts[0])
         self.assertIn("Do not push", codex.prompts[0])
         self.assertIn("trusted parent runner", codex.prompts[0])
+
+    def test_dirty_child_handoff_is_committed_by_the_parent_runner(self) -> None:
+        issue = Issue(
+            502,
+            "Safe runner",
+            "Implement the bounded runner.",
+            "https://github.com/narratiive/narratiive-os/issues/502",
+            "trusted-owner",
+            "2026-10-28T10:00:00Z",
+            (READY_LABEL,),
+        )
+        github = FakeGitHub(issue)
+        repository = FakeRepository(self.root / "worktrees" / "issue-502")
+        codex = DirtyHandoffCodex(repository)
+        service = GitHubIssueRunner(
+            self.config,
+            store=StateStore(self.config.state_root, REPOSITORY),
+            github=github,
+            repository=repository,
+            codex=codex,
+        )
+
+        self.assertEqual(service.run_once(), "review")
+        self.assertEqual(repository.commit_dispositions, ["dirty"])
+        self.assertEqual(repository.disposition, "committed")
 
     def test_restart_with_dirty_codex_worktree_blocks_without_rerun(self) -> None:
         issue = Issue(

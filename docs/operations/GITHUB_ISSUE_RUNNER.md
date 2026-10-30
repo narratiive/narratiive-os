@@ -9,23 +9,6 @@ moves the Issue to `agent:review`. A safe failure is commented and labelled
 post-merge process; this runner never applies it. It never merges, deploys, releases, sends messages, or treats
 arbitrary comments as instructions.
 
-## PROVE-mode execution policy
-
-The active priority is one persisted synthetic Loom Loft journey from Lead to
-Creative output. The runner must select only explicitly authorised work that
-advances its next durable handoff. For routine changes, Codex runs focused
-change, adjacent-handoff, and approval/external-action/data-integrity tests;
-it does not launch the repository-wide suite by default. Mandatory CI remains
-unchanged and may run the full suite independently.
-
-If a non-critical defect is found, the runner records it and may apply a safe,
-bounded workaround before continuing the rehearsal. A critical defect stops
-only the affected handoff until repaired and verified. Every issue update must
-state current stage, last verified handoff, next handoff, blocker, and founder
-action. Overnight HARDEN work may prepare draft fixes after a full suite, but
-the runner never merges, deploys, sends external communications, or crosses a
-founder approval gate.
-
 ## Configure
 
 Copy `github-issue-runner.config.example.json` outside the repository to:
