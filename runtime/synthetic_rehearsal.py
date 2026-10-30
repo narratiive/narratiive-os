@@ -108,8 +108,7 @@ class SyntheticRehearsalService:
             if existing.event_type == event_type:
                 raise ValueError("a different synthetic commercial event is already recorded for this proposal")
         event = WorkflowEvent.create(event_id=event_id, run_id=proposal.run_id, event_type=event_type, payload=payload, workspace_id=proposal.workspace_id)
-        self.events.append(event)
-        return event
+        return self.events.append_if_absent(event)
 
 
 def _artifact_version(artifact) -> str:

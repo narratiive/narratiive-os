@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import fcntl
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -30,6 +31,8 @@ class EventLog(Protocol):
     def append(self, event: "WorkflowEvent") -> None: ...
 
     def read(self, run_id: str) -> list["WorkflowEvent"]: ...
+
+    def append_if_absent(self, event: "WorkflowEvent") -> "WorkflowEvent": ...
 
 
 @dataclass(frozen=True, slots=True)
@@ -163,6 +166,37 @@ class JsonlEventLog:
             handle.write("\n")
             handle.flush()
             os.fsync(handle.fileno())
+
+    def append_if_absent(self, event: WorkflowEvent) -> WorkflowEvent:
+        """Append one event identity exactly once across concurrent retries."""
+
+        if event.workspace_id != self.workspace_id:
+            raise ValueError("event belongs to a different workspace")
+        path = self._path(event.run_id)
+        encoded = json.dumps(event.to_dict(), separators=(",", ":"), sort_keys=True)
+        with path.open("a+", encoding="utf-8") as handle:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+            try:
+                handle.seek(0)
+                for line_number, line in enumerate(handle, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        existing = WorkflowEvent.from_dict(json.loads(line))
+                    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                        raise ValueError(f"invalid event at {path}:{line_number}") from exc
+                    if existing.workspace_id != self.workspace_id:
+                        raise ValueError("event belongs to a different workspace")
+                    if existing.event_id == event.event_id:
+                        return existing
+                handle.seek(0, os.SEEK_END)
+                handle.write(encoded)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
+                return event
+            finally:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def read(self, run_id: str) -> list[WorkflowEvent]:
         path = self._path(run_id)

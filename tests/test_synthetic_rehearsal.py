@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -110,3 +111,24 @@ class SyntheticRehearsalTests(unittest.TestCase):
         self.proposal.approval_history[-1]["approval_binding"]["human_decision"]["explicit_decision_intent"] = "request_revision"
         with self.assertRaises(PermissionError):
             self.service.record_acceptance(self.proposal, self.acceptance)
+
+    def test_concurrent_replay_writes_each_synthetic_event_once(self):
+        barrier = threading.Barrier(2)
+        errors = []
+
+        def record():
+            try:
+                barrier.wait()
+                self.service.record_acceptance(self.proposal, self.acceptance)
+            except Exception as exc:  # pragma: no cover - asserted below
+                errors.append(exc)
+
+        first = threading.Thread(target=record)
+        second = threading.Thread(target=record)
+        first.start(); second.start(); first.join(); second.join()
+        self.assertEqual(errors, [])
+        events = self.events.read(self.proposal.run_id)
+        self.assertEqual(
+            [item.event_type for item in events],
+            ["synthetic_proposal_accepted", "synthetic_payment_recorded"],
+        )
