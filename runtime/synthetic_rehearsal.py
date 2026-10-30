@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from typing import Callable
 
 from runtime.models import WorkflowState
 from runtime.repositories import EventLog, WorkflowEvent
@@ -35,32 +36,58 @@ class SyntheticRehearsalService:
         self,
         events: EventLog,
         classifications: FileWorkflowEntityClassificationJournal,
+        state_loader: Callable[[str, str, str], WorkflowState],
     ) -> None:
-        self.events, self.classifications = events, classifications
+        self.events = events
+        self.classifications = classifications
+        self.state_loader = state_loader
 
     def record_acceptance(self, proposal: WorkflowState, acceptance: SyntheticAcceptance) -> tuple[WorkflowEvent, WorkflowEvent]:
-        classification = self.classifications.latest(proposal.workspace_id).get(proposal.entity_id)
+        canonical = self.state_loader(
+            proposal.workspace_id,
+            proposal.client_id,
+            proposal.run_id,
+        )
+        if (
+            canonical.workspace_id != proposal.workspace_id
+            or canonical.client_id != proposal.client_id
+            or canonical.entity_id != proposal.entity_id
+            or canonical.workflow_id != proposal.workflow_id
+            or canonical.run_id != proposal.run_id
+        ):
+            raise PermissionError("synthetic acceptance state does not match the authoritative scoped run")
+        classification = self.classifications.latest(canonical.workspace_id).get(canonical.entity_id)
         if (
             classification is None
             or classification.classification != INTERNAL_SYNTHETIC_TEST
-            or classification.workspace_id != proposal.workspace_id
-            or classification.workflow_id != proposal.workflow_id
+            or classification.workspace_id != canonical.workspace_id
+            or classification.workflow_id != canonical.workflow_id
         ):
             raise PermissionError("synthetic acceptance is available only to an authenticated synthetic workflow entity")
-        if proposal.entity_id != acceptance.entity_id or proposal.approval_status != "approved":
+        if canonical.entity_id != acceptance.entity_id or canonical.approval_status != "approved":
             raise ValueError("synthetic acceptance requires the exact approved proposal workflow")
-        artifact = next((a for stage in proposal.stages for a in stage.output_artifacts if a.artifact_id == acceptance.proposal_id), None)
-        if artifact is None or artifact.checksum != acceptance.proposal_checksum:
+        artifact = next((a for stage in canonical.stages for a in stage.output_artifacts if a.artifact_id == acceptance.proposal_id), None)
+        if (
+            artifact is None
+            or artifact.checksum != acceptance.proposal_checksum
+            or acceptance.proposal_version != _artifact_version(artifact)
+        ):
             raise ValueError("synthetic acceptance proposal binding does not match the persisted artefact")
+        approval = _matching_approval(canonical, artifact)
+        if approval is None or acceptance.actor != str(approval["approver"]):
+            raise PermissionError("synthetic acceptance requires the exact authorised proposal approval")
         payload = {
             "classification": "SYNTHETIC / TEST", "classification_event_id": classification.event_id,
             "provider": "none", "stripe_transaction": None,
+            "workspace_id": canonical.workspace_id, "client_id": canonical.client_id,
             "entity_id": acceptance.entity_id, "proposal_id": acceptance.proposal_id,
             "proposal_version": acceptance.proposal_version, "proposal_checksum": acceptance.proposal_checksum,
             "actor": acceptance.actor, "source_reference": acceptance.source_reference,
+            "approval_recorded_at": str(approval["approved_at"]),
+            "approval_binding_digest": str(approval["approval_binding"]["approval_binding_digest"]),
         }
-        accepted = self._event(proposal, "synthetic_proposal_accepted", payload)
-        paid = self._event(proposal, "synthetic_payment_recorded", {**payload, "payment_status": "simulated_paid", "financial_authorisation": False})
+        accepted = self._event(canonical, "synthetic_proposal_accepted", payload)
+        paid = self._event(canonical, "synthetic_payment_recorded", {**payload, "payment_status": "simulated_paid", "financial_authorisation": False})
         return accepted, paid
 
     def _event(self, proposal: WorkflowState, event_type: str, payload: dict[str, object]) -> WorkflowEvent:
@@ -79,3 +106,30 @@ class SyntheticRehearsalService:
         event = WorkflowEvent.create(event_id=event_id, run_id=proposal.run_id, event_type=event_type, payload=payload, workspace_id=proposal.workspace_id)
         self.events.append(event)
         return event
+
+
+def _artifact_version(artifact) -> str:
+    value = str(artifact.metadata.get("version") or "").strip()
+    return f"v{value.removeprefix('v')}" if value else "v1"
+
+
+def _matching_approval(proposal: WorkflowState, artifact) -> dict[str, object] | None:
+    """Find the exact human approval already persisted for this immutable artefact."""
+
+    for record in reversed(proposal.approval_history):
+        binding = record.get("approval_binding")
+        if not isinstance(binding, dict):
+            continue
+        if (
+            str(record.get("approver") or "").strip()
+            and str(record.get("approved_at") or "").strip()
+            and str(binding.get("approval_binding_digest") or "").strip()
+            and binding.get("workflow_id") == proposal.workflow_id
+            and binding.get("run_id") == proposal.run_id
+            and binding.get("artifact_id") == artifact.artifact_id
+            and binding.get("artifact_checksum") == artifact.checksum
+            and binding.get("artifact_version") == _artifact_version(artifact)
+            and isinstance(binding.get("human_decision"), dict)
+        ):
+            return record
+    return None
