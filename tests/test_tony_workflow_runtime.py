@@ -4,7 +4,9 @@ import hashlib
 import json
 import tempfile
 import unittest
+from pathlib import Path
 
+from runtime.campaign_production_planning_worker import CampaignProductionPlanningWorker
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 from tests.test_deliverable_production import commercial_intelligence, source_register
@@ -619,6 +621,72 @@ class TonyWorkflowRuntimeIntegrationTests(unittest.TestCase):
                 "quality_accepted_and_human_approved",
             )
             self.assertFalse(downstream.external_action_taken)
+
+    def test_production_planning_worker_is_wired_to_the_live_capability_registry(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            resolution = runtime.coordinator.workers.resolve(
+                "production_planning",
+                side_effect="preparation",
+            )
+            planning_adapter = resolution.registration.adapter
+
+            self.assertIsInstance(planning_adapter, CampaignProductionPlanningWorker)
+            self.assertIsNotNone(planning_adapter.registry)
+            self.assertIs(planning_adapter.registry, runtime.coordinator.workers)
+
+    def test_production_planning_stage_reports_real_route_status_through_the_live_runtime(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="agency",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            bible = creative_bible_output()["creative_directors_bible"]
+            bible_checksum = hashlib.sha256(
+                json.dumps(bible, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
+            ).hexdigest()
+            runtime.enqueue(
+                "creative_bible_to_asset_production",
+                "safe-production-run",
+                {
+                    "campaign_identity": campaign_identity(),
+                    "approved_creative_bible": bible,
+                    "creative_bible_approval": {
+                        "decision": "creative_bible_approval",
+                        "approver": "telegram:matt",
+                        "rationale": "Approved exact version.",
+                        "creative_bible_checksum": bible_checksum,
+                    },
+                    "production_constraints": ["No publication", "Human review required"],
+                },
+                entity_id="safe-client",
+                correlation_id="safe-production-run",
+            )
+            runtime.advance("safe-production-run", _lifecycle("safe-client"))
+            state = runtime.runs.load_run("safe-production-run")
+            plan_stage = state.stage("plan_creative_asset_production")
+            output = json.loads(Path(plan_stage.output_artifacts[-1].location).read_text(encoding="utf-8"))
+            tasks = output["production_tasks"]
+
+            self.assertTrue(tasks)
+            # No capability worker for these per-task capabilities is registered
+            # in the live runtime today, so every task must honestly report
+            # "unavailable" rather than the pre-wiring placeholder "unrouted" --
+            # this is the live, wired registry making a real decision.
+            self.assertTrue(all(task["route_status"] == "unavailable" for task in tasks))
+            self.assertTrue(all(task["worker_id"] == "" for task in tasks))
+            self.assertIn("All", output["production_gaps"][0])
+            self.assertFalse(output["production_executed"])
+            self.assertTrue(all(not task["execution_authorised"] for task in tasks))
 
 
 if __name__ == "__main__":

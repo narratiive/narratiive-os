@@ -696,33 +696,43 @@ def build_tony_workflow_runtime(
         scoped_root / "blueprint-director-learning.jsonl",
         retrieval_limit=3,
     )
+    # The planning worker needs a reference to the very capability registry
+    # it will help populate, so it is constructed first with no registry,
+    # threaded through build_tony_worker_registry below, and then given the
+    # resulting registry once it exists. It never routes its own
+    # "production_planning" capability -- only the per-task capabilities
+    # (image_generation, short_form_video_production, ...) declared on the
+    # Production Pack it just built -- so this has no circular dispatch.
+    production_planning_adapter = CampaignProductionPlanningWorker()
+    workers_registry = build_tony_worker_registry(
+        configured_dispatchers,
+        environ,
+        research_adapter=ResearchWorkflowAdapter(
+            scoped_root,
+            fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
+        ),
+        document_adapter=document_adapter,
+        campaign_world_triage_adapter=CampaignWorldTriageWorker(),
+        creative_bible_triage_adapter=CreativeBibleTriageWorker(),
+        production_planning_adapter=production_planning_adapter,
+        creative_production_adapter=(
+            CreativeProductionWorkflowAdapter(configured_dispatchers["Creative Production"])
+            if "Creative Production" in configured_dispatchers
+            else None
+        ),
+        delivery_preparation_adapter=AssetDeliveryPreparationWorker(),
+        client_delivery_adapter=(
+            ClientAssetDeliveryAdapter(configured_dispatchers["Client Delivery"])
+            if "Client Delivery" in configured_dispatchers
+            else None
+        ),
+        follow_up_planning_adapter=DeliveryFollowUpPreparationWorker(),
+        senior_strategist_review_adapter=SeniorStrategistReviewWorker(),
+    )
+    production_planning_adapter.registry = workers_registry
     coordinator = WorkflowExecutionCoordinator(
         registry=build_narratiive_workflow_registry(),
-        workers=build_tony_worker_registry(
-            configured_dispatchers,
-            environ,
-            research_adapter=ResearchWorkflowAdapter(
-                scoped_root,
-                fireflies_dispatcher=configured_dispatchers.get("Fireflies"),
-            ),
-            document_adapter=document_adapter,
-            campaign_world_triage_adapter=CampaignWorldTriageWorker(),
-            creative_bible_triage_adapter=CreativeBibleTriageWorker(),
-            production_planning_adapter=CampaignProductionPlanningWorker(),
-            creative_production_adapter=(
-                CreativeProductionWorkflowAdapter(configured_dispatchers["Creative Production"])
-                if "Creative Production" in configured_dispatchers
-                else None
-            ),
-            delivery_preparation_adapter=AssetDeliveryPreparationWorker(),
-            client_delivery_adapter=(
-                ClientAssetDeliveryAdapter(configured_dispatchers["Client Delivery"])
-                if "Client Delivery" in configured_dispatchers
-                else None
-            ),
-            follow_up_planning_adapter=DeliveryFollowUpPreparationWorker(),
-            senior_strategist_review_adapter=SeniorStrategistReviewWorker(),
-        ),
+        workers=workers_registry,
         runs=runs,
         artifacts=FileWorkflowArtifactStore(scoped_root / "artifacts"),
         quality_validators=validators,
