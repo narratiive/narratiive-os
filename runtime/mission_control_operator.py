@@ -247,6 +247,11 @@ class OperatorMissionControlProjector:
             "attention_state": attention,
             "updated_at": latest.updated_at if latest else (lead.created_at if lead else ""),
             "last_meaningful_event": events[0]["label"] if events else (current_activity if latest else "Lead recorded"),
+            # Presentation clients may group canonical workflow records, but must not
+            # infer a transition from the grouping alone.  These identifiers let the
+            # read-only Mission Control view state exactly which persisted workflow
+            # evidence supports a FIELDWORK journey card.
+            "workflow_ids": sorted({state.workflow_id for state in runs}),
             "journey": self._journey(lifecycle, runs),
             "artefacts": artefacts,
             "quality_history": self._quality_history(runs),
