@@ -195,10 +195,10 @@ complete:
    webhook endpoint is registered in Stripe test mode, with TLS 1.2+ and Stripe
    source-IP filtering in addition to mandatory signature verification.
 5. A live-local synthetic acceptance run exercises the real test-mode Stripe
-   API only with `FIELDWORK_PAYMENT_DOWNSTREAM_MODE=sandbox_isolated`, explicit
-   synthetic proposal IDs and an exact internal test recipient. Notion, Telegram
-   and workflow effects are rejected for any other proposal or recipient; client
-   confirmation email is disabled pending its own exact delivery approval.
+   API while Gmail, Notion, Telegram and workflow effects remain redirected to
+   dedicated test fixtures or disabled. This bridge deliberately wires no
+   downstream provider adapter; a separately reviewed deployment must prove a
+   dedicated sandbox identity and exact target allowlists before enabling one.
 6. Independent review is recorded against the exact commit, all repository checks
    pass, and the production wiring receives the required commercial, legal,
    security and client-facing approvals.
