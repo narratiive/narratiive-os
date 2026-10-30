@@ -7,11 +7,13 @@ from typing import Any
 
 from runtime.models import StageStatus, WorkflowState
 
-# Read-only paths into the live orchestration/capability-registration source.
-# This module only ever reads this text to confirm a registration literally
-# exists in source; it never imports, executes, or writes to either file.
+# Read-only paths into the live orchestration/capability-registration/
+# dispatch-instruction source. This module only ever reads this text to
+# confirm a registration or an ownership statement literally exists in
+# source; it never imports, executes, or writes to any of these files.
 _WORKER_REGISTRY_SOURCE = Path(__file__).with_name("worker_registry.py")
 _TONY_WORKFLOW_RUNTIME_SOURCE = Path(__file__).with_name("tony_workflow_runtime.py")
+_WORKFLOW_INSTRUCTIONS_SOURCE = Path(__file__).with_name("workflow_instructions.py")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
@@ -20,9 +22,9 @@ ROSTER_SCOPE_NOTE = (
     "agents/*.md. It is a snapshot of today's authoritative contracts, not a "
     "ceiling or complete catalogue of every specialist capability Narratiive "
     "will ever have. Live workflow activity that does not match any of these "
-    "contracts (for example, asset-production execution, the Blueprint "
-    "Director editorial pass, or the bounded quality/taste triage stages) is "
-    "real and wired, but is deliberately left unattributed here rather than "
+    "contracts (for example, asset-production execution or the bounded "
+    "quality/taste triage stages) is real and wired, but is deliberately "
+    "left unattributed here rather than "
     "folded into a contract that does not claim it -- attributing triage to "
     "the Orchestrator or Quality Reviewer without a versioned authority "
     "decision was a confirmed error in an earlier version of this module. "
@@ -200,21 +202,26 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         responsibilities=(
             "Converts supplied research into the Growth Blueprint's strategic "
             "diagnosis, positioning, narrative platform and activation "
-            "principles. This projector does not attribute the subsequent "
-            "editorial 'director' pass or the review stage that follow it in "
-            "strategy_thesis_to_growth_blueprint to Strategy Director -- no "
-            "agents/*.md contract currently names an owner for the director "
-            "pass, and the review stage matches Quality Reviewer's contract "
-            "instead. Discovery Preparation (prepare_discovery) IS attributed "
-            "here as an explicit ownership-assignment decision, not a "
-            "reinterpretation of agents/strategy_director.md's own text: that "
-            "contract names only Growth Blueprint population, but the stage "
-            "runs through the identical strategic_reasoning capability and "
-            "turns evidence into forward strategic judgement, the same work "
-            "the contract already describes for the Blueprint itself. This is "
-            "the one accountability assignment made in this round; see "
-            "docs/engineering/campaign-engine-foundation.md and the project "
-            "conversation record dated 2026-10-30 for the decision basis."
+            "principles. Two further stages are attributed here with two "
+            "different strengths of evidence, which a reader must not "
+            "collapse into one claim: (1) direct_growth_blueprint (the "
+            "'Blueprint Director' editorial pass) is TEXTUALLY CONFIRMED as "
+            "Strategy Director's own responsibility by the live dispatch "
+            "instruction itself (runtime/workflow_instructions.py), which "
+            "states verbatim: 'You are the Blueprint Director: the final "
+            "editorial commission inside the Strategy Director's existing "
+            "ownership, not a new research or strategy agent.' (2) "
+            "prepare_discovery (Discovery Preparation) is a REASONED "
+            "ASSIGNMENT only -- the live instruction for that stage contains "
+            "no equivalent ownership statement. The assignment rests on "
+            "shared capability (strategic_reasoning) and methodological "
+            "similarity, not on confirmed text; agents/strategy_director.md "
+            "itself is left unedited either way, to avoid diluting its "
+            "clean, single-purpose scoping with a bolted-on secondary "
+            "responsibility. review_growth_blueprint is NOT attributed here "
+            "-- its own instruction text ('Act as the independent senior "
+            "strategist reviewer') matches Quality Reviewer's contract "
+            "instead, already attributed there."
         ),
         defined_in="agents/strategy_director.md",
         implemented_in=("runtime/worker_registry.py",),
@@ -225,12 +232,18 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             "Generator's and Creative Director's generation stages"
         ),
         tested_in=("tests/test_worker_registry.py",),
-        configured_markers=('worker_id="claude-anthropic"', '"strategic_reasoning"'),
+        configured_markers=(
+            'worker_id="claude-anthropic"',
+            '"strategic_reasoning"',
+            "the final editorial commission inside the Strategy Director's existing ownership",
+        ),
         configured_note=(
             "static source match only; this worker is shared across three specialists' "
             "generation stages and is only registered when a 'Claude' dispatcher name is "
             "present in the live process's dispatcher map -- a condition this static check "
-            "cannot observe"
+            "cannot observe. The third marker confirms runtime/workflow_instructions.py "
+            "itself still states the Blueprint Director pass is Strategy Director's "
+            "ownership, not merely this roster's own claim"
         ),
         worker_ids=("claude-anthropic",),
         canonical_stage_refs=(
@@ -238,6 +251,7 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             ("research_to_strategic_synthesis", "prepare_strategic_synthesis"),
             ("strategic_synthesis_to_strategy_thesis", "prepare_strategy_thesis"),
             ("strategy_thesis_to_growth_blueprint", "prepare_growth_blueprint"),
+            ("strategy_thesis_to_growth_blueprint", "direct_growth_blueprint"),
         ),
         dependencies=("Approved research evidence from the Research Analyst stage", "A configured 'Claude' dispatcher"),
     ),
@@ -364,9 +378,10 @@ def _read_combined_source() -> str | None:
     try:
         runtime_text = _TONY_WORKFLOW_RUNTIME_SOURCE.read_text(encoding="utf-8")
         registry_text = _WORKER_REGISTRY_SOURCE.read_text(encoding="utf-8")
+        instructions_text = _WORKFLOW_INSTRUCTIONS_SOURCE.read_text(encoding="utf-8")
     except OSError:
         return None
-    return runtime_text + "\n" + registry_text
+    return runtime_text + "\n" + registry_text + "\n" + instructions_text
 
 
 def _configured_evidence(source: str | None, markers: tuple[str, ...], note: str) -> Evidence:

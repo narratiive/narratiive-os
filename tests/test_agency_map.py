@@ -285,6 +285,31 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
                 f"Discovery Preparation completing must not verify {agent_id}",
             )
 
+    def test_blueprint_director_pass_is_assigned_to_strategy_director_with_textual_confirmation(self) -> None:
+        # Unlike Discovery Preparation, this attribution is textually
+        # confirmed by the live dispatch instruction itself, not merely
+        # reasoned by this module -- the "configured" check must actually
+        # verify that ownership text is present in
+        # runtime/workflow_instructions.py, not just assert it in prose.
+        entries = {e.agent_id: e for e in build_agency_map()}
+        strategy_director = entries["strategy_director"]
+
+        self.assertTrue(strategy_director.capability.configured.value, strategy_director.capability.configured.evidence)
+        self.assertIn("Strategy Director's existing ownership", strategy_director.capability.configured.evidence)
+
+        stage = StageRecord("direct_growth_blueprint", "claude-anthropic", status=StageStatus.COMPLETED)
+        state = _state("strategy_thesis_to_growth_blueprint", "run-5", [stage])
+        verified = {e.agent_id: e for e in build_agency_map([state])}
+
+        self.assertTrue(verified["strategy_director"].capability.live_verified.value)
+        for agent_id, entry in verified.items():
+            if agent_id == "strategy_director":
+                continue
+            self.assertFalse(
+                entry.capability.live_verified.value,
+                f"the Blueprint Director pass completing must not verify {agent_id}",
+            )
+
     def test_to_dict_contains_the_expected_shape_including_provenance(self) -> None:
         entry = build_agency_map()[0]
         payload = entry.to_dict()
