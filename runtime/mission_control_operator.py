@@ -112,7 +112,6 @@ class OperatorMissionControlProjector:
             raise ValueError("workflow state workspace mismatch")
         visible_leads = self.visibility.visible_leads(all_leads)
         policy_states = self.visibility.visible_workflows(all_states, all_leads)
-        classifications = self.classifications.latest(self.workflow_workspace_id)
         scoped = tuple(policy_states)
         lead_by_id = {lead.lead_id: lead for lead in visible_leads}
         grouped: dict[str, list[WorkflowState]] = defaultdict(list)
@@ -129,7 +128,7 @@ class OperatorMissionControlProjector:
                 grouped.setdefault(lead.lead_id, [])
 
         opportunities = [
-            self._opportunity(key, runs, lead_by_workflow_key.get(key), now, classifications)
+            self._opportunity(key, runs, lead_by_workflow_key.get(key), now, all_states)
             for key, runs in grouped.items()
         ]
         opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
@@ -172,7 +171,7 @@ class OperatorMissionControlProjector:
         runs: list[WorkflowState],
         lead: InboundLead | None,
         generated_at: str,
-        classifications: Mapping[str, WorkflowEntityClassification],
+        all_states: tuple[WorkflowState, ...],
     ) -> dict[str, Any]:
         runs.sort(key=lambda state: (state.updated_at, state.run_id))
         latest = runs[-1] if runs else None
@@ -180,7 +179,7 @@ class OperatorMissionControlProjector:
         if not name:
             name = next((workflow_state_name(state) for state in runs if workflow_state_name(state) not in {state.client_id, state.entity_id}), key)
         synthetic = any(
-            getattr(classifications.get(state.entity_id), "classification", None)
+            getattr(self.classifications.classification_for(state, states=all_states), "classification", None)
             == INTERNAL_SYNTHETIC_TEST
             for state in runs
         )

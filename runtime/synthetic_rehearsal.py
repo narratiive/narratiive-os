@@ -37,10 +37,12 @@ class SyntheticRehearsalService:
         events: EventLog,
         classifications: FileWorkflowEntityClassificationJournal,
         state_loader: Callable[[str, str, str], WorkflowState],
+        states_loader: Callable[[str], tuple[WorkflowState, ...]],
     ) -> None:
         self.events = events
         self.classifications = classifications
         self.state_loader = state_loader
+        self.states_loader = states_loader
 
     def record_acceptance(self, proposal: WorkflowState, acceptance: SyntheticAcceptance) -> tuple[WorkflowEvent, WorkflowEvent]:
         canonical = self.state_loader(
@@ -56,7 +58,9 @@ class SyntheticRehearsalService:
             or canonical.run_id != proposal.run_id
         ):
             raise PermissionError("synthetic acceptance state does not match the authoritative scoped run")
-        classification = self.classifications.latest(canonical.workspace_id).get(canonical.entity_id)
+        classification = self.classifications.classification_for(
+            canonical, states=self.states_loader(canonical.workspace_id)
+        )
         if (
             classification is None
             or classification.classification != INTERNAL_SYNTHETIC_TEST
@@ -130,6 +134,8 @@ def _matching_approval(proposal: WorkflowState, artifact) -> dict[str, object] |
             and binding.get("artifact_checksum") == artifact.checksum
             and binding.get("artifact_version") == _artifact_version(artifact)
             and isinstance(binding.get("human_decision"), dict)
+            and binding["human_decision"].get("explicit_decision_intent") == "approve"
+            and binding["human_decision"].get("verbatim_current_human_instruction_verified") is True
         ):
             return record
     return None

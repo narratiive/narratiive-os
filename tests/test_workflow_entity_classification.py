@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import json
+from dataclasses import asdict
 from pathlib import Path
 
 from runtime.models import WorkflowState
@@ -30,7 +32,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
 
     def _event(self, classification: str, *, supersedes: str = "") -> WorkflowEntityClassification:
         return WorkflowEntityClassification.create(
-            workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id="growth_diagnostic_to_blueprint_lite",
+            workspace_id="narratiive", client_id=self.state.client_id, entity_id="inbound-d1b96a67", workflow_id="growth_diagnostic_to_blueprint_lite",
             classification=classification, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123",
             authorisation_proof="proof-123", reason="Authorised synthetic test classification.",
@@ -42,7 +44,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
             self._event(INTERNAL_SYNTHETIC_TEST), states=[self.state], principal_id="telegram:founder"
         )
 
-        self.assertEqual(self.journal.latest("narratiive")[self.state.entity_id], event)
+        self.assertEqual(self.journal.classification_for(self.state, states=[self.state]), event)
         self.assertEqual(self.journal.history("narratiive", self.state.entity_id), (event,))
 
     def test_reclassification_supersedes_without_rewriting_history(self) -> None:
@@ -50,11 +52,11 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         second = self.journal.append(self._event(GENUINE_CLIENT, supersedes=first.event_id), states=[self.state], principal_id="telegram:founder")
 
         self.assertEqual(self.journal.history("narratiive", self.state.entity_id), (first, second))
-        self.assertEqual(self.journal.latest("narratiive")[self.state.entity_id], second)
+        self.assertEqual(self.journal.classification_for(self.state, states=[self.state]), second)
 
     def test_cross_workspace_or_unknown_entity_is_rejected(self) -> None:
         foreign = WorkflowEntityClassification.create(
-            workspace_id="other", entity_id=self.state.entity_id, workflow_id=self.state.workflow_id,
+            workspace_id="other", client_id=self.state.client_id, entity_id=self.state.entity_id, workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No cross-workspace classification.",
         )
@@ -62,7 +64,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
             self.journal.append(foreign, states=[self.state], principal_id="telegram:founder")
 
         unknown = WorkflowEntityClassification.create(
-            workspace_id="narratiive", entity_id="other-entity", workflow_id=self.state.workflow_id,
+            workspace_id="narratiive", client_id=self.state.client_id, entity_id="other-entity", workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No implicit classification.",
         )
@@ -73,6 +75,38 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         self.journal.append(self._event(INTERNAL_SYNTHETIC_TEST), states=[self.state], principal_id="telegram:founder")
         with self.assertRaisesRegex(ValueError, "supersession"):
             self.journal.append(self._event(GENUINE_CLIENT, supersedes="wrong"), states=[self.state], principal_id="telegram:founder")
+
+    def test_classification_does_not_cross_client_scope_for_shared_entity_identity(self) -> None:
+        event = self.journal.append(
+            self._event(INTERNAL_SYNTHETIC_TEST), states=[self.state], principal_id="telegram:founder"
+        )
+        sibling = WorkflowState(
+            self.state.workflow_id, "sibling-run", [], workspace_id="narratiive",
+            client_id="other-client", entity_id=self.state.entity_id,
+        )
+        self.assertEqual(
+            self.journal.classification_for(self.state, states=[self.state, sibling]),
+            event,
+        )
+        self.assertIsNone(self.journal.classification_for(sibling, states=[self.state, sibling]))
+
+    def test_legacy_clientless_record_requires_unambiguous_authoritative_client_scope(self) -> None:
+        legacy = WorkflowEntityClassification(
+            event_id="legacy-event", workspace_id="narratiive", entity_id=self.state.entity_id,
+            workflow_id=self.state.workflow_id, classification=INTERNAL_SYNTHETIC_TEST,
+            classifier_id="telegram:founder", authorisation_reference="telegram:legacy",
+            authorisation_turn_id="turn-legacy", authorisation_proof="proof-legacy",
+            reason="Historical authorised classification.", occurred_at="2026-10-30T10:00:00+00:00",
+        )
+        path = Path(self.temp.name) / "entity-classifications" / "narratiive.jsonl"
+        path.parent.mkdir(parents=True)
+        path.write_text(json.dumps(asdict(legacy)) + "\n")
+        sibling = WorkflowState(
+            self.state.workflow_id, "sibling-run", [], workspace_id="narratiive",
+            client_id="other-client", entity_id=self.state.entity_id,
+        )
+        self.assertEqual(self.journal.classification_for(self.state, states=[self.state]), legacy)
+        self.assertIsNone(self.journal.classification_for(self.state, states=[self.state, sibling]))
 
     def test_only_the_configured_principal_can_append_a_classification(self) -> None:
         service = WorkflowEntityClassificationService(
@@ -86,7 +120,10 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
             service.record(self._event(INTERNAL_SYNTHETIC_TEST), principal_id="telegram:other")
 
         recorded = service.record(self._event(INTERNAL_SYNTHETIC_TEST), principal_id="telegram:founder")
-        self.assertEqual(self.journal.latest("narratiive")[self.state.entity_id], recorded)
+        self.assertEqual(
+            self.journal.classification_for(self.state, states=[self.state]),
+            recorded,
+        )
 
     def test_directly_constructed_or_unauthorised_events_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "classifier_id"):

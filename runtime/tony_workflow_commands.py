@@ -251,6 +251,7 @@ class FileWorkflowCommandBackend:
         return service.record(
             WorkflowEntityClassification.create(
                 workspace_id=state.workspace_id,
+                client_id=state.client_id,
                 entity_id=state.entity_id,
                 workflow_id=state.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST,

@@ -31,16 +31,21 @@ class SyntheticRehearsalTests(unittest.TestCase):
                 "artifact_id": artifact.artifact_id,
                 "artifact_checksum": artifact.checksum,
                 "artifact_version": "v3",
-                "human_decision": {"explicit_decision_intent": "approve"},
+                "human_decision": {
+                    "explicit_decision_intent": "approve",
+                    "verbatim_current_human_instruction_verified": True,
+                },
             },
         })
-        event = WorkflowEntityClassification.create(workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id=self.proposal.workflow_id, classification=INTERNAL_SYNTHETIC_TEST, classifier_id=self.classifier_id, authorisation_reference="telegram:1", authorisation_turn_id="turn-1", authorisation_proof="proof", reason="test")
+        event = WorkflowEntityClassification.create(workspace_id="narratiive", client_id="loom", entity_id="inbound-d1b96a67", workflow_id=self.proposal.workflow_id, classification=INTERNAL_SYNTHETIC_TEST, classifier_id=self.classifier_id, authorisation_reference="telegram:1", authorisation_turn_id="turn-1", authorisation_proof="proof", reason="test")
         self.events = JsonlEventLog(Path(self.tmp.name), workspace_id="narratiive")
         self.classifications = FileWorkflowEntityClassificationJournal(
             Path(self.tmp.name), authorised_classifier_id=self.classifier_id,
         )
         self.classifications.append(event, states=[self.proposal], principal_id=self.classifier_id)
-        self.service = SyntheticRehearsalService(self.events, self.classifications, self._load_state)
+        self.service = SyntheticRehearsalService(
+            self.events, self.classifications, self._load_state, self._load_states,
+        )
         self.acceptance = SyntheticAcceptance("inbound-d1b96a67", "proposal-v3", "v3", "checksum-v3", self.classifier_id, "test-directive:loom")
 
     def _load_state(self, workspace_id, client_id, run_id):
@@ -49,6 +54,11 @@ class SyntheticRehearsalTests(unittest.TestCase):
         ):
             raise KeyError(run_id)
         return self.proposal
+
+    def _load_states(self, workspace_id):
+        if workspace_id != self.proposal.workspace_id:
+            return ()
+        return (self.proposal,)
 
     def test_records_distinct_idempotent_test_acceptance_and_payment(self):
         first = self.service.record_acceptance(self.proposal, self.acceptance)
@@ -68,10 +78,13 @@ class SyntheticRehearsalTests(unittest.TestCase):
                 Path(self.tmp.name) / "unclassified", authorised_classifier_id=self.classifier_id,
             ),
             self._load_state,
+            self._load_states,
         )
         with self.assertRaises(PermissionError): self.service.record_acceptance(self.proposal, self.acceptance)
         changed = SyntheticAcceptance("inbound-d1b96a67", "proposal-v3", "v3", "other", "founder:synthetic-rehearsal", "test-directive:loom")
-        service = SyntheticRehearsalService(self.events, self.classifications, self._load_state)
+        service = SyntheticRehearsalService(
+            self.events, self.classifications, self._load_state, self._load_states,
+        )
         with self.assertRaises(ValueError): service.record_acceptance(self.proposal, changed)
 
     def test_rejects_conflicting_replay_after_the_exact_test_event(self):
@@ -90,5 +103,10 @@ class SyntheticRehearsalTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.service.record_acceptance(self.proposal, wrong_version)
         self.proposal.approval_history.clear()
+        with self.assertRaises(PermissionError):
+            self.service.record_acceptance(self.proposal, self.acceptance)
+
+    def test_rejects_non_approval_human_decision(self):
+        self.proposal.approval_history[-1]["approval_binding"]["human_decision"]["explicit_decision_intent"] = "request_revision"
         with self.assertRaises(PermissionError):
             self.service.record_acceptance(self.proposal, self.acceptance)

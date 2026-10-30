@@ -195,7 +195,10 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         journal = FileWorkflowEntityClassificationJournal(
             self.root, authorised_classifier_id="telegram:founder"
         )
-        self.assertEqual(journal.latest("narratiive")["safe-lead"].workflow_id, state.workflow_id)
+        self.assertEqual(
+            journal.classification_for(state, states=[state]).workflow_id,
+            state.workflow_id,
+        )
 
     def test_campaign_portfolio_reports_one_safe_current_position_per_client(self) -> None:
         second = build_tony_workflow_runtime(

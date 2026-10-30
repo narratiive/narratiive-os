@@ -32,6 +32,7 @@ class WorkflowEntityClassification:
     reason: str
     occurred_at: str
     supersedes_event_id: str = ""
+    client_id: str = ""
 
     def __post_init__(self) -> None:
         for name, value in (
@@ -60,6 +61,7 @@ class WorkflowEntityClassification:
         cls,
         *,
         workspace_id: str,
+        client_id: str,
         entity_id: str,
         workflow_id: str,
         classification: str,
@@ -73,6 +75,7 @@ class WorkflowEntityClassification:
         return cls(
             event_id=str(uuid4()),
             workspace_id=workspace_id.strip(),
+            client_id=client_id.strip(),
             entity_id=entity_id.strip(),
             workflow_id=workflow_id.strip(),
             classification=classification,
@@ -108,12 +111,18 @@ class FileWorkflowEntityClassificationJournal:
             state
             for state in states
             if state.workspace_id == event.workspace_id
+            and state.client_id == event.client_id
             and state.entity_id == event.entity_id
             and state.workflow_id == event.workflow_id
         ]
+        if not event.client_id:
+            raise ValueError("workflow entity classification requires an exact client scope")
         if not matching:
             raise ValueError("workflow entity and workflow are not registered in the requested workspace")
-        prior = self.history(event.workspace_id, event.entity_id)
+        prior = self.history(
+            event.workspace_id, event.entity_id,
+            workflow_id=event.workflow_id, client_id=event.client_id,
+        )
         if prior:
             if not event.supersedes_event_id:
                 raise ValueError("classification revision must supersede the latest event")
@@ -132,10 +141,54 @@ class FileWorkflowEntityClassificationJournal:
             os.fsync(handle.fileno())
         return event
 
-    def history(self, workspace_id: str, entity_id: str) -> tuple[WorkflowEntityClassification, ...]:
+    def history(
+        self,
+        workspace_id: str,
+        entity_id: str,
+        *,
+        workflow_id: str = "",
+        client_id: str = "",
+    ) -> tuple[WorkflowEntityClassification, ...]:
         return tuple(
-            event for event in self.read_workspace(workspace_id) if event.entity_id == entity_id
+            event
+            for event in self.read_workspace(workspace_id)
+            if event.entity_id == entity_id
+            and (not workflow_id or event.workflow_id == workflow_id)
+            and (not client_id or event.client_id == client_id)
         )
+
+    def classification_for(
+        self,
+        state: WorkflowState,
+        *,
+        states: Iterable[WorkflowState],
+    ) -> WorkflowEntityClassification | None:
+        """Resolve a classification only within the exact client/workflow scope.
+
+        Legacy append-only records without ``client_id`` remain readable, but are
+        honoured only when all matching persisted states resolve to one client.
+        New classification records always carry ``client_id``.
+        """
+
+        if not self.authorised_classifier_id:
+            return None
+        candidates = [
+            event for event in self.read_workspace(state.workspace_id)
+            if event.entity_id == state.entity_id and event.workflow_id == state.workflow_id
+        ]
+        scoped = [event for event in candidates if event.client_id == state.client_id]
+        if scoped:
+            return scoped[-1]
+        legacy = [event for event in candidates if not event.client_id]
+        matching_clients = {
+            item.client_id for item in states
+            if item.workspace_id == state.workspace_id
+            and item.entity_id == state.entity_id
+            and item.workflow_id == state.workflow_id
+        }
+        if len(matching_clients) == 1 and state.client_id in matching_clients:
+            return legacy[-1] if legacy else None
+        return None
 
     def latest(self, workspace_id: str) -> dict[str, WorkflowEntityClassification]:
         # A missing founder identity must never turn an old local record into a
@@ -144,13 +197,19 @@ class FileWorkflowEntityClassificationJournal:
             return {}
         latest: dict[str, WorkflowEntityClassification] = {}
         for event in self.read_workspace(workspace_id):
-            prior = latest.get(event.entity_id)
+            if not event.client_id:
+                # Client-less legacy evidence is deliberately unavailable to
+                # broad entity lookups. Call classification_for with the
+                # authoritative state to resolve it safely.
+                continue
+            key = f"{event.client_id}\0{event.entity_id}\0{event.workflow_id}"
+            prior = latest.get(key)
             if prior is None:
                 if event.supersedes_event_id:
                     raise ValueError("initial classification event cannot supersede another event")
             elif event.supersedes_event_id != prior.event_id:
                 raise ValueError("classification history is not an exact append-only revision chain")
-            latest[event.entity_id] = event
+            latest[key] = event
         return latest
 
     def read_workspace(self, workspace_id: str) -> tuple[WorkflowEntityClassification, ...]:
