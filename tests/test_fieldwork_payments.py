@@ -114,6 +114,15 @@ class FieldworkPaymentTests(unittest.TestCase):
                 return {"verified": True, "status": "verified", "receipt_id": identity}
             return run
 
+        def verify(context):
+            item = context["proposal"]
+            return {
+                "verified": True,
+                "proposal_id": item["proposal_id"],
+                "proposal_checksum": item["proposal_checksum"],
+                "founder_approval_id": item["founder_approval_id"],
+            }
+
         self.service = FieldworkPaymentService(
             FieldworkPaymentStore(Path(self.temp.name)),
             self.stripe,
@@ -124,6 +133,7 @@ class FieldworkPaymentTests(unittest.TestCase):
             founder_notification=action("notify"),
             workflow_authorisation=action("workflow"),
             client_confirmation=action("confirmation"),
+            proposal_verifier=verify,
             clock=lambda: NOW,
         )
 
@@ -139,9 +149,7 @@ class FieldworkPaymentTests(unittest.TestCase):
             proposal_sends.append(contract)
             return {"verified": True, "sent": True, "message_id": "gmail-test-proposal-1", "mutation_count": 1}
 
-        delivery = gmail_proposal_delivery(fake_gmail)(
-            created["email"], proposal_id=proposal().proposal_id, approval_id=proposal().founder_approval_id
-        )
+        delivery = gmail_proposal_delivery(fake_gmail, self.service.proposal_verifier)(proposal(), checkout_url=created["checkout"]["url"])
         self.assertTrue(delivery["verified"])
         self.assertEqual(len(proposal_sends), 1)
         payload, key = self.stripe.created[0]
@@ -265,6 +273,7 @@ class FieldworkPaymentTests(unittest.TestCase):
             founder_notification=lambda _context: {"verified": True, "message_id": "telegram-1"},
             workflow_authorisation=workflow,
             client_confirmation=lambda _context: {"verified": True, "message_id": "gmail-1"},
+            proposal_verifier=self.service.proposal_verifier,
             clock=lambda: NOW,
         )
         service.create_checkout(proposal())
@@ -282,6 +291,25 @@ class FieldworkPaymentTests(unittest.TestCase):
         self.assertFalse(first["replay"])
         self.assertTrue(second["replay"])
         self.assertEqual(len(self.stripe.created), 1)
+
+    def test_checkout_fails_closed_without_exact_proposal_verification(self):
+        service = FieldworkPaymentService(
+            FieldworkPaymentStore(Path(self.temp.name) / "unverified"), self.stripe,
+            webhook_secret=WEBHOOK_SECRET, success_url="https://example.invalid/success", cancel_url="https://example.invalid/cancel",
+        )
+        with self.assertRaisesRegex(RuntimeError, "approved proposal verification failed"):
+            service.create_checkout(proposal())
+        self.assertEqual(self.stripe.created, [])
+
+    def test_corrupt_payment_journal_fails_before_state_is_used(self):
+        self.service.create_checkout(proposal())
+        journal = Path(self.temp.name) / "fieldwork-payment-events.jsonl"
+        lines = journal.read_text().splitlines()
+        record = json.loads(lines[0])
+        record["proposal_id"] = "tampered"
+        journal.write_text(json.dumps(record) + "\n")
+        with self.assertRaisesRegex(RuntimeError, "integrity check failed"):
+            self.service.create_checkout(proposal())
 
 
 class FieldworkIntegrationAdapterTests(unittest.TestCase):
@@ -306,12 +334,12 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
             calls.append(contract)
             return {"verified": True, "message_id": f"gmail-{len(calls)}", "mutation_count": 1}
 
-        proposal_action = gmail_proposal_delivery(gmail)
-        proposal_result = proposal_action(
-            {"recipient": "client@example.invalid", "subject": "FIELDWORK", "body": "Approved proposal"},
-            proposal_id="proposal-1",
-            approval_id="approval-1",
+        item = proposal()
+        proposal_action = gmail_proposal_delivery(
+            gmail,
+            lambda context: {"verified": True, "proposal_id": context["proposal"]["proposal_id"], "proposal_checksum": context["proposal"]["proposal_checksum"], "founder_approval_id": context["proposal"]["founder_approval_id"]},
         )
+        proposal_result = proposal_action(item, checkout_url="https://checkout.example.invalid/test")
         confirm_action = gmail_client_confirmation(gmail)
         confirm_result = confirm_action(
             {
@@ -324,7 +352,7 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
         )
         self.assertTrue(proposal_result["verified"])
         self.assertTrue(confirm_result["verified"])
-        self.assertEqual(calls[0]["payload"]["html_body"], "")
+        self.assertIn("checkout.example.invalid", calls[0]["payload"]["html_body"])
         self.assertNotEqual(calls[0]["idempotency_key"], calls[1]["idempotency_key"])
         self.assertIn("seven-day FIELDWORK delivery window is now under way", calls[1]["payload"]["body"])
 
@@ -368,6 +396,7 @@ class FieldworkPaymentApplicationTests(unittest.TestCase):
                 webhook_secret=WEBHOOK_SECRET,
                 success_url="https://example.invalid/success",
                 cancel_url="https://example.invalid/cancel",
+                proposal_verifier=lambda context: {"verified": True, "proposal_id": context["proposal"]["proposal_id"], "proposal_checksum": context["proposal"]["proposal_checksum"], "founder_approval_id": context["proposal"]["founder_approval_id"]},
                 clock=lambda: NOW,
             )
             app = FieldworkPaymentApplication(service, bridge_token="safe-token", proposal_loader=lambda _proposal_id: proposal())

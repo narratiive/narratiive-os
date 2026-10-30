@@ -189,6 +189,7 @@ class FieldworkPaymentStore:
 
     def load(self) -> dict[str, Any]:
         with self._lock:
+            self._validate_journal()
             try:
                 value = json.loads(self.state_path.read_text(encoding="utf-8"))
             except FileNotFoundError:
@@ -224,17 +225,35 @@ class FieldworkPaymentStore:
             return record
 
     def _last_checksum(self) -> str:
+        records = self._validate_journal()
+        return str(records[-1]["checksum"]) if records else ""
+
+    def _validate_journal(self) -> list[dict[str, Any]]:
         try:
             lines = self.events_path.read_text(encoding="utf-8").splitlines()
         except FileNotFoundError:
-            return ""
-        if not lines:
-            return ""
-        try:
-            value = json.loads(lines[-1])
-        except json.JSONDecodeError as exc:
-            raise FieldworkPaymentError("payment event journal is corrupt") from exc
-        return str(value.get("checksum") or "")
+            return []
+        previous = ""
+        records: list[dict[str, Any]] = []
+        for line in lines:
+            try:
+                value = json.loads(line)
+            except json.JSONDecodeError as exc:
+                raise FieldworkPaymentError("payment event journal is corrupt") from exc
+            if not isinstance(value, dict):
+                raise FieldworkPaymentError("payment event journal is corrupt")
+            checksum = str(value.pop("checksum", ""))
+            if not checksum or str(value.get("previous_checksum") or "") != previous:
+                raise FieldworkPaymentError("payment event journal integrity check failed")
+            actual = hashlib.sha256(
+                json.dumps(value, sort_keys=True, separators=(",", ":")).encode("utf-8")
+            ).hexdigest()
+            if not hmac.compare_digest(actual, checksum):
+                raise FieldworkPaymentError("payment event journal integrity check failed")
+            value["checksum"] = checksum
+            records.append(value)
+            previous = checksum
+        return records
 
 
 class FieldworkPaymentService:
@@ -254,6 +273,7 @@ class FieldworkPaymentService:
         founder_notification: Action | None = None,
         workflow_authorisation: Action | None = None,
         client_confirmation: Action | None = None,
+        proposal_verifier: Action | None = None,
         clock: Callable[[], float] = time.time,
         signature_tolerance_seconds: int = 300,
     ) -> None:
@@ -270,6 +290,7 @@ class FieldworkPaymentService:
         self.founder_notification = founder_notification
         self.workflow_authorisation = workflow_authorisation
         self.client_confirmation = client_confirmation
+        self.proposal_verifier = proposal_verifier
         self.clock = clock
         self.signature_tolerance_seconds = signature_tolerance_seconds
         self._service_lock = threading.RLock()
@@ -286,6 +307,8 @@ class FieldworkPaymentService:
             checkout = existing.get("checkout") if isinstance(existing.get("checkout"), dict) else {}
             if checkout.get("session_id") and checkout.get("url"):
                 return {"proposal": proposal_record, "checkout": dict(checkout), "replay": True, "email": self._proposal_email(proposal, str(checkout["url"]))}
+
+        verification = self._verify_proposal(proposal)
 
         payload = self._checkout_payload(proposal)
         stripe_session = self.stripe.create_checkout(
@@ -304,7 +327,11 @@ class FieldworkPaymentService:
             "created_at": _now(),
             "mode": "test",
         }
-        state["proposals"][proposal.proposal_id] = {**proposal_record, "checkout": checkout}
+        state["proposals"][proposal.proposal_id] = {
+            **proposal_record,
+            "approval_verification": verification,
+            "checkout": checkout,
+        }
         self.store.save(state, {"kind": "checkout_created", "proposal_id": proposal.proposal_id, "session_id": session_id, "mode": "test"})
         return {"proposal": proposal_record, "checkout": checkout, "replay": False, "email": self._proposal_email(proposal, checkout_url)}
 
@@ -394,6 +421,8 @@ class FieldworkPaymentService:
         proposal = state["proposals"].get(proposal_id)
         if not isinstance(proposal, dict):
             return self._reject_event(state, event_id, event_type, "proposal_not_found", raw_body)
+        if not isinstance(proposal.get("approval_verification"), Mapping) or proposal["approval_verification"].get("verified") is not True:
+            return self._reject_event(state, event_id, event_type, "proposal_approval_not_verified", raw_body, proposal_id=proposal_id)
         checks = self._payment_checks(proposal, session, metadata)
         failures = [name for name, passed in checks.items() if not passed]
         if failures:
@@ -506,6 +535,19 @@ class FieldworkPaymentService:
         }
         confirmation = self._action_once(prior.get("client_confirmation"), self.client_confirmation, confirmation_context, required=False)
         return {"crm": crm, "founder_notification": notify, "workflow": workflow, "client_confirmation": confirmation}
+
+    def _verify_proposal(self, proposal: ApprovedFieldworkProposal) -> dict[str, Any]:
+        context = {"proposal": self._proposal_record(proposal)}
+        result = self._action(self.proposal_verifier, context, required=True)
+        if not result["verified"]:
+            raise FieldworkPaymentError("approved proposal verification failed")
+        if (
+            str(result.get("proposal_id") or "") != proposal.proposal_id
+            or str(result.get("proposal_checksum") or "") != proposal.proposal_checksum
+            or str(result.get("founder_approval_id") or "") != proposal.founder_approval_id
+        ):
+            raise FieldworkPaymentError("approved proposal verification does not bind the exact proposal")
+        return result
 
     @classmethod
     def _action_once(cls, previous: Any, action: Action | None, context: Mapping[str, Any], *, required: bool) -> dict[str, Any]:

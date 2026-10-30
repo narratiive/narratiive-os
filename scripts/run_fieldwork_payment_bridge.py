@@ -19,6 +19,7 @@ from runtime.fieldwork_payments import (
     FieldworkPaymentStore,
     StripeApiClient,
 )
+from runtime.fieldwork_payment_integrations import verify_approved_proposal
 
 
 def main() -> int:
@@ -28,6 +29,8 @@ def main() -> int:
     if stat.S_IMODE(proposal_path.stat().st_mode) & 0o077:
         raise RuntimeError("approved proposal registry must use mode 0600")
     runtime_root = Path(os.getenv("FIELDWORK_PAYMENT_RUNTIME_ROOT", ".runtime/fieldwork-payments")).expanduser().resolve()
+    workflow_root = Path(_required("FIELDWORK_WORKFLOW_RUNTIME_ROOT")).expanduser().resolve()
+    workspace_id = _required("FIELDWORK_WORKSPACE_ID")
     stripe = StripeApiClient(_required("STRIPE_SECRET_KEY"))
     service = FieldworkPaymentService(
         FieldworkPaymentStore(runtime_root),
@@ -35,6 +38,7 @@ def main() -> int:
         webhook_secret=_required("STRIPE_WEBHOOK_SECRET"),
         success_url=_required("FIELDWORK_CHECKOUT_SUCCESS_URL"),
         cancel_url=_required("FIELDWORK_CHECKOUT_CANCEL_URL"),
+        proposal_verifier=verify_approved_proposal(workflow_root, workspace_id=workspace_id),
     )
 
     def load_proposal(proposal_id: str) -> ApprovedFieldworkProposal:

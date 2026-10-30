@@ -66,6 +66,7 @@ def tony_workflow_authoriser(
 
         proposal = _mapping(context.get("proposal"))
         payment = _mapping(context.get("payment"))
+        verification = verify_approved_proposal(workflow_root, workspace_id=workspace_id)(context)
         parent_run_id = _text(proposal.get("parent_workflow_run_id"))
         target_workflow_id = _text(proposal.get("target_workflow_id"))
         client_id = _text(proposal.get("client_id"))
@@ -77,27 +78,7 @@ def tony_workflow_authoriser(
             environ=environ,
             workspace_id=workspace_id,
         )
-        matches = [
-            state
-            for state in backend.list_states()
-            if state.run_id == parent_run_id and state.client_id == client_id and state.workspace_id == workspace_id
-        ]
-        if len(matches) != 1:
-            raise FieldworkPaymentError("exact approved parent workflow run was not found")
-        parent = matches[0]
-        if parent.approval_status != "approved" or not parent.approval_history:
-            raise FieldworkPaymentError("parent proposal workflow lacks recorded human approval")
-        approval = parent.approval_history[-1]
-        expected_approval_id = f"approval-{parent.run_id}-{parent.stages[-1].revision_count}"
-        if _text(proposal.get("founder_approval_id")) != expected_approval_id:
-            raise FieldworkPaymentError("founder approval does not match the exact proposal workflow gate")
-        if _text(proposal.get("founder_approved_at")) != _text(approval.get("approved_at")):
-            raise FieldworkPaymentError("founder approval timestamp does not match workflow evidence")
-        artifacts = [artifact for stage in parent.stages for artifact in stage.output_artifacts]
-        artifact_checksum = _text(artifacts[-1].checksum if artifacts else "").removeprefix("sha256:")
-        proposal_checksum = _text(proposal.get("proposal_checksum")).removeprefix("sha256:")
-        if not artifact_checksum or artifact_checksum != proposal_checksum:
-            raise FieldworkPaymentError("proposal checksum does not match the approved workflow artefact")
+        parent = _approved_parent_workflow(backend, proposal, workspace_id)
         inputs = dict(_mapping(proposal.get("workflow_inputs")))
         inputs["verified_acceptance"] = dict(_mapping(context.get("acceptance")))
         inputs["verified_payment"] = dict(payment)
@@ -119,6 +100,46 @@ def tony_workflow_authoriser(
         }
 
     return authorise
+
+
+def verify_approved_proposal(workflow_root: Path, *, workspace_id: str, dispatchers: Mapping[str, Callable] | None = None, environ: Mapping[str, str] | None = None):
+    """Prove the registry entry is the exact approved workflow artefact before Checkout."""
+    def verify(context: Mapping[str, Any]) -> Mapping[str, Any]:
+        from runtime.tony_workflow_commands import FileWorkflowCommandBackend
+        proposal = _mapping(context.get("proposal"))
+        backend = FileWorkflowCommandBackend(workflow_root, dispatchers=dispatchers, environ=environ, workspace_id=workspace_id)
+        parent = _approved_parent_workflow(backend, proposal, workspace_id)
+        return {
+            "verified": True,
+            "proposal_id": _text(proposal.get("proposal_id")),
+            "proposal_checksum": _text(proposal.get("proposal_checksum")),
+            "founder_approval_id": _text(proposal.get("founder_approval_id")),
+            "parent_run_id": parent.run_id,
+        }
+    return verify
+
+
+def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspace_id: str):
+    parent_run_id = _text(proposal.get("parent_workflow_run_id"))
+    client_id = _text(proposal.get("client_id"))
+    matches = [state for state in backend.list_states() if state.run_id == parent_run_id and state.client_id == client_id and state.workspace_id == workspace_id]
+    if len(matches) != 1:
+        raise FieldworkPaymentError("exact approved parent workflow run was not found")
+    parent = matches[0]
+    if parent.approval_status != "approved" or not parent.approval_history or not parent.stages:
+        raise FieldworkPaymentError("parent proposal workflow lacks recorded human approval")
+    approval = parent.approval_history[-1]
+    expected_approval_id = f"approval-{parent.run_id}-{parent.stages[-1].revision_count}"
+    if _text(proposal.get("founder_approval_id")) != expected_approval_id:
+        raise FieldworkPaymentError("founder approval does not match the exact proposal workflow gate")
+    if _text(proposal.get("founder_approved_at")) != _text(approval.get("approved_at")):
+        raise FieldworkPaymentError("founder approval timestamp does not match workflow evidence")
+    artifacts = [artifact for stage in parent.stages for artifact in stage.output_artifacts]
+    artifact_checksum = _text(artifacts[-1].checksum if artifacts else "").removeprefix("sha256:")
+    proposal_checksum = _text(proposal.get("proposal_checksum")).removeprefix("sha256:")
+    if not artifact_checksum or artifact_checksum != proposal_checksum:
+        raise FieldworkPaymentError("proposal checksum does not match the approved workflow artefact")
+    return parent
 
 
 def telegram_founder_notifier(sender: Any, chat_id: str):
@@ -191,11 +212,18 @@ def gmail_client_confirmation(gmail_dispatcher: Callable[[dict[str, Any]], Mappi
     return send
 
 
-def gmail_proposal_delivery(gmail_dispatcher: Callable[[dict[str, Any]], Mapping[str, Any]]):
+def gmail_proposal_delivery(gmail_dispatcher: Callable[[dict[str, Any]], Mapping[str, Any]], proposal_verifier: Action):
     """Use only after the exact proposal and client send have founder approval."""
 
-    def send(email: Mapping[str, Any], *, proposal_id: str, approval_id: str) -> Mapping[str, Any]:
-        key = hashlib.sha256(f"fieldwork-proposal:{proposal_id}:{approval_id}".encode("utf-8")).hexdigest()
+    def send(proposal, *, checkout_url: str) -> Mapping[str, Any]:
+        from runtime.fieldwork_payments import FieldworkPaymentService
+        verified = proposal_verifier({"proposal": FieldworkPaymentService._proposal_record(proposal)})
+        if verified.get("verified") is not True:
+            raise FieldworkPaymentError("proposal delivery lacks exact founder approval evidence")
+        if _text(verified.get("proposal_id")) != _text(getattr(proposal, "proposal_id", "")) or _text(verified.get("proposal_checksum")) != _text(getattr(proposal, "proposal_checksum", "")):
+            raise FieldworkPaymentError("proposal delivery approval does not bind the exact proposal")
+        email = FieldworkPaymentService._proposal_email(proposal, checkout_url)
+        key = hashlib.sha256(f"fieldwork-proposal:{proposal.proposal_id}:{proposal.founder_approval_id}".encode("utf-8")).hexdigest()
         return gmail_dispatcher(
             {
                 "worker": "Gmail",
@@ -203,13 +231,13 @@ def gmail_proposal_delivery(gmail_dispatcher: Callable[[dict[str, Any]], Mapping
                 "approval_granted": True,
                 "approval_scope": "founder_approved_fieldwork_proposal_send",
                 "idempotency_key": key,
-                "target": {"recipient_email": email.get("recipient", "")},
+                "target": {"recipient_email": email["recipient"]},
                 "payload": {
                     "kind": "fieldwork_proposal_delivery",
-                    "recipient_email": email.get("recipient", ""),
-                    "subject": email.get("subject", ""),
-                    "body": email.get("body", ""),
-                    "html_body": email.get("html_body", ""),
+                    "recipient_email": email["recipient"],
+                    "subject": email["subject"],
+                    "body": email["body"],
+                    "html_body": email["html_body"],
                 },
                 "instruction": "Send the exact founder-approved FIELDWORK proposal email with its approved proposal and Stripe Checkout links. Do not alter commercial terms.",
                 "expected_evidence": "verified Gmail send with message identifier",

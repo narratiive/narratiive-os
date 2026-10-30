@@ -38,6 +38,15 @@ def main() -> int:
             return receipt
         return run
 
+    def verify(context):
+        item = context["proposal"]
+        return {
+            "verified": True,
+            "proposal_id": item["proposal_id"],
+            "proposal_checksum": item["proposal_checksum"],
+            "founder_approval_id": item["founder_approval_id"],
+        }
+
     with tempfile.TemporaryDirectory() as temporary:
         service = FieldworkPaymentService(
             FieldworkPaymentStore(Path(temporary)),
@@ -49,6 +58,7 @@ def main() -> int:
             founder_notification=action("tony_telegram_notification"),
             workflow_authorisation=action("fieldwork_authorised_and_existing_workflow_initiated"),
             client_confirmation=action("client_confirmation_and_invoice_notice"),
+            proposal_verifier=verify,
             clock=lambda: now,
         )
         proposal = ApprovedFieldworkProposal(
