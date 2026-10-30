@@ -64,6 +64,8 @@ class CampaignProductionPlanningWorkerTests(unittest.TestCase):
 
         self.assertTrue(all(task["route_status"] == "unrouted" for task in result["production_tasks"]))
         self.assertTrue(all(task["worker_id"] == "" for task in result["production_tasks"]))
+        self.assertTrue(all(task["worker_availability"] == "" for task in result["production_tasks"]))
+        self.assertIn("unrouted", result["production_gaps"][0])
         self.assertTrue(production_planning_quality_gate(result)["passed"])
 
     def test_registered_capability_routes_its_tasks_to_the_eligible_worker(self) -> None:
@@ -91,11 +93,40 @@ class CampaignProductionPlanningWorkerTests(unittest.TestCase):
         self.assertTrue(all(task["route_status"] == "routed" for task in routed))
         self.assertTrue(all(task["worker_id"] == "image-worker-1" for task in routed))
         self.assertTrue(all(task["provider"] == "Narratiive Image Studio" for task in routed))
+        self.assertTrue(all(task["worker_availability"] == "available" for task in routed))
         self.assertTrue(all(task["execution_authorised"] is False for task in routed))
         self.assertTrue(unrouted, "fixture must include at least one task needing a different capability")
         self.assertTrue(all(task["route_status"] == "unavailable" for task in unrouted))
         self.assertTrue(all(task["worker_id"] == "" for task in unrouted))
+        self.assertTrue(all(task["worker_availability"] == "" for task in unrouted))
+        self.assertIn("Partially routed", result["production_gaps"][0])
         self.assertTrue(production_planning_quality_gate(result)["passed"])
+
+    def test_degraded_worker_is_routed_but_its_degraded_status_is_not_hidden(self) -> None:
+        registry = CapabilityWorkerRegistry(
+            [
+                WorkerRegistration(
+                    metadata=WorkerMetadata(
+                        worker_id="meta-ads-read",
+                        provider="Meta",
+                        capabilities=("image_generation",),
+                        availability=WorkerAvailability.DEGRADED,
+                    ),
+                    adapter=lambda payload: payload,
+                )
+            ]
+        )
+        worker = CampaignProductionPlanningWorker(registry=registry)
+
+        result = worker(planning_contract())
+        routed = [task for task in result["production_tasks"] if task["required_capability"] == "image_generation"]
+
+        self.assertTrue(routed)
+        self.assertTrue(all(task["route_status"] == "routed" for task in routed))
+        self.assertTrue(
+            all(task["worker_availability"] == "degraded" for task in routed),
+            "a routed task must carry the worker's own declared availability, not imply it is fully healthy",
+        )
 
     def test_configured_registry_does_not_grant_execution_or_spend_authority(self) -> None:
         registry = CapabilityWorkerRegistry(
@@ -117,6 +148,7 @@ class CampaignProductionPlanningWorkerTests(unittest.TestCase):
 
         self.assertTrue(all(task["route_status"] == "routed" for task in result["production_tasks"]))
         self.assertTrue(all(task["policy_id"] == "test-policy" for task in result["production_tasks"]))
+        self.assertIn("fully routed", result["production_gaps"][0])
         self.assertFalse(result["production_executed"])
         self.assertFalse(result["publication_authorised"])
         self.assertFalse(result["media_spend_authorised"])
