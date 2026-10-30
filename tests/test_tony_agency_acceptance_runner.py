@@ -25,6 +25,7 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             root = Path(directory)
             config = _sandbox_config(root, 19001, "sandbox-token")
             self.assertEqual(config["auth"]["profiles"], {})
+            self.assertEqual(config["agents"]["defaults"]["model"], SANDBOX_MODEL)
             self.assertTrue(all(agent["model"] == SANDBOX_MODEL for agent in config["agents"]["list"]))
             inherited = {
                 "ANTHROPIC_API_KEY": "must-not-leak",
@@ -47,8 +48,8 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             self.assertNotIn("TONY_DISPATCH_CLAUDE_API_KEY", env)
             self.assertNotIn("OPENAI_API_KEY", env)
             self.assertNotIn("OPENAI_BASE_URL", env)
-            self.assertNotIn("OLLAMA_API_KEY", env)
-            self.assertNotIn("OLLAMA_HOST", env)
+            self.assertEqual(env["OLLAMA_API_KEY"], "narratiive-synthetic-local-only")
+            self.assertEqual(env["OLLAMA_HOST"], "http://127.0.0.1:11434")
             self.assertEqual(env["TONY_HOSTED_MODEL_REQUEST_RESERVE_USD"], "0")
             self.assertEqual(Path(env["TONY_HOSTED_MODEL_USAGE_LEDGER"]).parent, root / "state")
             self.assertEqual(Path(env["NARRATIIVE_RUNTIME_ROOT"]), root / "state" / "runtime")

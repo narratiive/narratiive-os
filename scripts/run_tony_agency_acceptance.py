@@ -133,6 +133,7 @@ def _write_json(path: Path, value: Any, *, mode: int | None = None) -> None:
 
 def _sandbox_config(root: Path, gateway_port: int, gateway_token: str) -> dict[str, Any]:
     config = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
+    config.setdefault("agents", {}).setdefault("defaults", {})["model"] = SANDBOX_MODEL
     for agent in config["agents"]["list"]:
         agent["workspace"] = str(root / "workspaces" / str(agent["id"]))
         agent.pop("heartbeat", None)
@@ -231,6 +232,10 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         # an unused loopback port rather than falling back to the host runtime.
         "NARRATIIVE_GATEWAY_ENDPOINT": "http://127.0.0.1:9/",
         "NARRATIIVE_GATEWAY_HEALTH_ENDPOINT": "http://127.0.0.1:9/health",
+        # OpenClaw requires a provider registration even for the locally running
+        # Ollama daemon. This is a fixed non-secret marker, not an inherited key.
+        "OLLAMA_API_KEY": "narratiive-synthetic-local-only",
+        "OLLAMA_HOST": "http://127.0.0.1:11434",
         "TONY_EXECUTIVE_WORKSPACE_ID": "narratiive", "TONY_TELEGRAM_CHAT_ID": "999000111",
         "TONY_INBOUND_LEAD_SOURCE": "local_projection",
         "NARRATIIVE_RUNTIME_ENV_FILE": str(root / "runtime.env"),
