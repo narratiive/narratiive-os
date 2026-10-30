@@ -1,19 +1,29 @@
 from __future__ import annotations
 
 import copy
-import hashlib
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
-from runtime.synthetic_invitation_preview import PREFIX, build_invitation_preview
+from runtime.models import StageRecord, WorkflowState
+from runtime.repositories import FileWorkflowRunRepository
+from runtime.synthetic_invitation_preview import DiscoveryEvidenceResolver, PREFIX, build_invitation_preview
 from runtime.tony_structured_action_execution import (
     StructuredActionExecutionError, TonyStructuredActionExecutor,
 )
+from runtime.workflow_execution_coordinator import FileWorkflowArtifactStore
 
 
 class SyntheticInvitationPreviewTests(unittest.TestCase):
     def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.root = Path(self.temporary.name)
+        self.runs = FileWorkflowRunRepository(self.root / "runs", workspace_id="synthetic-test", client_id="synthetic-client")
+        self.artifacts = FileWorkflowArtifactStore(self.root / "artifacts")
+        self.evidence_resolver = DiscoveryEvidenceResolver(self.runs, self.artifacts.root)
+        self.preparation = self.persist_discovery_preparation()
         self.config = {PREFIX + key: value for key, value in {
             "WORKSPACE_ID": "synthetic-test",
             "RECIPIENT": "synthetic-prospect@example.net",
@@ -23,7 +33,7 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             "BOOKING_AUTHORITY_REF": "synthetic-booking-authority-1",
             "COMPANY_NAME": "Synthetic Company",
             "ENTITY_ID": "synthetic-entity-1",
-            "DISCOVERY_PREPARATION_REF": "artifact-synthetic-discovery-v1",
+            "DISCOVERY_PREPARATION_REF": self.preparation,
             "MEETING_DURATION_MINUTES": "30",
             "INSIGHTS_JSON": json.dumps([
                 {"observation": "Validated fixture ambition.", "question": "What would make it more useful?", "source_ref": "fixture:1"},
@@ -32,10 +42,12 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             ]),
             "FOUNDER_SIGNATURE": "Matt Franks\nFounder, Narratiive",
         }.items()}
-        self.evidence_record = self.authoritative_evidence_record()
+
+    def tearDown(self):
+        self.temporary.cleanup()
 
     def preview(self, **kwargs):
-        resolver = kwargs.pop("discovery_evidence_resolver", self.resolve_evidence)
+        resolver = kwargs.pop("discovery_evidence_resolver", self.evidence_resolver)
         config = kwargs.pop("config", self.config)
         return build_invitation_preview(
             workspace_id="synthetic-test",
@@ -44,27 +56,25 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             **kwargs,
         )
 
-    def authoritative_evidence_record(self, **overrides):
-        record = {
-            "workspace_id": "synthetic-test",
-            "entity_id": "synthetic-entity-1",
-            "discovery_preparation_ref": "artifact-synthetic-discovery-v1",
-            "immutable": True,
-            "source_refs": ["fixture:1", "fixture:2", "fixture:3"],
-        }
-        record.update(overrides)
-        material = {
-            key: record[key]
-            for key in ("workspace_id", "entity_id", "discovery_preparation_ref")
-        }
-        material["source_refs"] = sorted(record["source_refs"])
-        record["source_set_checksum"] = hashlib.sha256(json.dumps(
-            material, sort_keys=True, separators=(",", ":")
-        ).encode("utf-8")).hexdigest()
-        return record
-
-    def resolve_evidence(self, **_kwargs):
-        return self.evidence_record
+    def persist_discovery_preparation(self, *, entity_id="synthetic-entity-1", source_refs=None):
+        state = WorkflowState(
+            workflow_id="blueprint_lite_to_discovery_preparation",
+            run_id=f"discovery-{entity_id}",
+            stages=[StageRecord("prepare_discovery", "Claude")],
+            workspace_id="synthetic-test",
+            client_id="synthetic-client",
+            entity_id=entity_id,
+        )
+        artifact = self.artifacts.persist(
+            state,
+            "prepare_discovery",
+            {"evidence_lineage": [
+                {"claim": "Synthetic source lineage", "source_refs": source_refs or ["fixture:1", "fixture:2", "fixture:3"]}
+            ]},
+        )
+        state.stage("prepare_discovery").output_artifacts = [artifact]
+        self.runs.save(state)
+        return artifact.artifact_id
 
     def test_exact_preview_and_digest_are_deterministic_without_side_effects(self):
         before = copy.deepcopy(self.config)
@@ -104,11 +114,11 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
     def test_configuration_resolves_at_call_time_and_ignores_credentials(self):
         with patch.dict("os.environ", self.config, clear=True):
             first = build_invitation_preview(
-                workspace_id="synthetic-test", discovery_evidence_resolver=self.resolve_evidence
+                workspace_id="synthetic-test", discovery_evidence_resolver=self.evidence_resolver
             )
             with patch.dict("os.environ", {PREFIX + "RECIPIENT": "other@example.net"}):
                 second = build_invitation_preview(
-                    workspace_id="synthetic-test", discovery_evidence_resolver=self.resolve_evidence
+                    workspace_id="synthetic-test", discovery_evidence_resolver=self.evidence_resolver
                 )
         self.assertNotEqual(first["approval_digest"]["checksum"], second["approval_digest"]["checksum"])
         self.config["UNRELATED_API_KEY"] = "synthetic-secret-do-not-copy"
@@ -183,18 +193,11 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         for key, changed_value in changed_values.items():
             config = dict(self.config)
             config[PREFIX + key] = changed_value
-            record_overrides = {}
-            if key == "ENTITY_ID":
-                record_overrides["entity_id"] = changed_value
-            if key == "DISCOVERY_PREPARATION_REF":
-                record_overrides["discovery_preparation_ref"] = changed_value
-            result = self.preview(
-                config=config,
-                discovery_evidence_resolver=lambda **_kwargs: self.authoritative_evidence_record(
-                    **record_overrides
-                ),
-            )
-            self.assertNotEqual(original, result["approval_digest"]["checksum"])
+            result = self.preview(config=config)
+            if key in {"ENTITY_ID", "DISCOVERY_PREPARATION_REF"}:
+                self.assertEqual(result["status"], "blocked")
+            else:
+                self.assertNotEqual(original, result["approval_digest"]["checksum"])
 
         invalid_duration = {**self.config, PREFIX + "MEETING_DURATION_MINUTES": "10"}
         result = self.preview(config=invalid_duration)
@@ -258,23 +261,17 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             build_invitation_preview(workspace_id="synthetic-test", config=self.config)["status"],
             "blocked",
         )
-        for record in (
-            self.authoritative_evidence_record(workspace_id="other-workspace"),
-            self.authoritative_evidence_record(entity_id="other-entity"),
-            self.authoritative_evidence_record(discovery_preparation_ref="other-preparation"),
-            self.authoritative_evidence_record(immutable=False),
-            self.authoritative_evidence_record(source_refs=["unknown:source"]),
-        ):
-            with self.subTest(record=record):
-                result = self.preview(discovery_evidence_resolver=lambda **_kwargs: record)
-                self.assertEqual(result["status"], "blocked")
-                self.assertIsNone(result["email_preview"])
-        tampered = self.authoritative_evidence_record()
-        tampered["source_set_checksum"] = "0" * 64
+        forged_record = {
+            "workspace_id": "synthetic-test", "entity_id": "synthetic-entity-1",
+            "discovery_preparation_ref": self.preparation, "source_refs": ["fixture:1"],
+        }
         self.assertEqual(
-            self.preview(discovery_evidence_resolver=lambda **_kwargs: tampered)["status"],
+            self.preview(discovery_evidence_resolver=lambda **_kwargs: forged_record)["status"],
             "blocked",
         )
+        artifact = self.runs.load("discovery-synthetic-entity-1").stage("prepare_discovery").output_artifacts[0]
+        Path(artifact.location).write_text('{"evidence_lineage":[]}', encoding="utf-8")
+        self.assertEqual(self.preview()["status"], "blocked")
 
     def test_founder_approved_loom_loft_copy_is_exact_and_isolated(self):
         config = {
@@ -282,9 +279,9 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
             PREFIX + "COMPANY_NAME": "Loom Loft",
             PREFIX + "ENTITY_ID": "inbound-d1b96a67",
         }
-        loom_evidence = self.authoritative_evidence_record(entity_id="inbound-d1b96a67")
+        loom_preparation = self.persist_discovery_preparation(entity_id="inbound-d1b96a67")
         email = self.preview(
-            config=config, discovery_evidence_resolver=lambda **_kwargs: loom_evidence
+            config={**config, PREFIX + "DISCOVERY_PREPARATION_REF": loom_preparation}
         )["email_preview"]
         expected = (
             "Hi [First Name],\n\n"
@@ -312,10 +309,13 @@ class SyntheticInvitationPreviewTests(unittest.TestCase):
         self.assertIn("Book a 30-minute conversation&nbsp; →", email["html"])
         self.assertNotIn("The submitted diagnostic", email["html"])
 
-        other_evidence = self.authoritative_evidence_record(entity_id="another-entity")
+        other_preparation = self.persist_discovery_preparation(entity_id="another-entity")
         non_synthetic = self.preview(
-            config={**config, PREFIX + "ENTITY_ID": "another-entity"},
-            discovery_evidence_resolver=lambda **_kwargs: other_evidence,
+            config={
+                **config,
+                PREFIX + "ENTITY_ID": "another-entity",
+                PREFIX + "DISCOVERY_PREPARATION_REF": other_preparation,
+            },
         )["email_preview"]
         self.assertNotEqual(non_synthetic["body"], expected)
 

@@ -9,9 +9,11 @@ import os
 import re
 from copy import deepcopy
 from collections.abc import Mapping
-from typing import Any, Protocol
+from pathlib import Path
+from typing import Any
 from urllib.parse import urlsplit
 
+from runtime.repositories import WorkflowRunRepository
 from runtime.tony_internal_review_delivery import INTERNAL_REVIEW_ADDRESS
 
 
@@ -25,12 +27,60 @@ FOUNDER_APPROVED_SYNTHETIC_ENTITY = "inbound-d1b96a67"
 FOUNDER_APPROVED_SYNTHETIC_COMPANY = "Loom Loft"
 
 
-class DiscoveryEvidenceResolver(Protocol):
-    """Resolve the immutable, workspace-scoped source set for one preparation."""
+class DiscoveryEvidenceResolver:
+    """Read verified source lineage from persisted Discovery workflow evidence."""
 
-    def __call__(
+    def __init__(self, runs: WorkflowRunRepository, artifact_root: str | Path) -> None:
+        self.runs = runs
+        self.artifact_root = Path(artifact_root).resolve()
+
+    def resolve(
         self, *, workspace_id: str, entity_id: str, discovery_preparation_ref: str
-    ) -> Mapping[str, Any]: ...
+    ) -> Mapping[str, Any]:
+        matches = []
+        for run_id in self.runs.list_run_ids():
+            state = self.runs.load(run_id)
+            if (
+                state.workspace_id == workspace_id
+                and state.entity_id == entity_id
+                and state.workflow_id == "blueprint_lite_to_discovery_preparation"
+            ):
+                matches.extend(
+                    artifact for stage in state.stages for artifact in stage.output_artifacts
+                    if artifact.artifact_id == discovery_preparation_ref
+                )
+        if len(matches) != 1:
+            raise ValueError("discovery preparation artefact is not uniquely resolved")
+        artifact = matches[0]
+        location = Path(artifact.location).resolve()
+        if self.artifact_root not in location.parents or location.suffix != ".json":
+            raise ValueError("discovery preparation artefact escapes the immutable store")
+        content = location.read_bytes()
+        if not artifact.checksum or hashlib.sha256(content.rstrip(b"\n")).hexdigest() != artifact.checksum:
+            raise ValueError("discovery preparation artefact integrity failed")
+        output = json.loads(content)
+        if not isinstance(output, Mapping):
+            raise ValueError("discovery preparation artefact is invalid")
+        source_refs = sorted({
+            str(ref)
+            for item in output.get("evidence_lineage", ())
+            if isinstance(item, Mapping)
+            for ref in item.get("source_refs", ())
+            if isinstance(ref, str)
+        })
+        if not source_refs:
+            raise ValueError("discovery preparation artefact has no source lineage")
+        checksum_material = {
+            "workspace_id": workspace_id,
+            "entity_id": entity_id,
+            "discovery_preparation_ref": discovery_preparation_ref,
+            "artifact_checksum": artifact.checksum,
+            "source_refs": source_refs,
+        }
+        return {
+            **checksum_material,
+            "source_set_checksum": _value_checksum(checksum_material),
+        }
 
 
 def build_invitation_preview(
@@ -238,7 +288,9 @@ def _resolve_discovery_evidence(
         blockers.append("Resolve Discovery evidence through the authoritative workflow record.")
         return [], ""
     try:
-        record = resolver(
+        if not isinstance(resolver, DiscoveryEvidenceResolver):
+            raise ValueError("an authoritative Discovery evidence resolver is required")
+        record = resolver.resolve(
             workspace_id=workspace_id,
             entity_id=entity_id,
             discovery_preparation_ref=discovery_preparation_ref,
@@ -253,7 +305,6 @@ def _resolve_discovery_evidence(
         record.get("workspace_id") != workspace_id
         or record.get("entity_id") != entity_id
         or record.get("discovery_preparation_ref") != discovery_preparation_ref
-        or record.get("immutable") is not True
     ):
         blockers.append("Discovery evidence does not match the requested workspace, entity and preparation.")
         return [], ""
@@ -271,15 +322,20 @@ def _resolve_discovery_evidence(
         "workspace_id": workspace_id,
         "entity_id": entity_id,
         "discovery_preparation_ref": discovery_preparation_ref,
+        "artifact_checksum": record.get("artifact_checksum"),
         "source_refs": sorted(source_refs),
     }
-    checksum = hashlib.sha256(json.dumps(
-        checksum_material, sort_keys=True, separators=(",", ":"), ensure_ascii=False
-    ).encode("utf-8")).hexdigest()
+    checksum = _value_checksum(checksum_material)
     if record.get("source_set_checksum") != checksum:
         blockers.append("The authoritative Discovery evidence source set failed integrity validation.")
         return [], ""
     return list(source_refs), checksum
+
+
+def _value_checksum(value: Mapping[str, Any]) -> str:
+    return hashlib.sha256(json.dumps(
+        dict(value), sort_keys=True, separators=(",", ":"), ensure_ascii=False
+    ).encode("utf-8")).hexdigest()
 
 
 def _uses_founder_approved_synthetic_copy(values: Mapping[str, str]) -> bool:
