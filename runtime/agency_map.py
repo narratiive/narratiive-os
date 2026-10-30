@@ -1,41 +1,66 @@
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from runtime.models import WorkflowState
+from runtime.models import StageStatus, WorkflowState
 
-# Read-only path to the live orchestration construction. We only ever read
-# this file's text to confirm an adapter is literally wired into Tony's
-# runtime; we never import or execute it, and we never write to it.
+# Read-only paths into the live orchestration/capability-registration source.
+# This module only ever reads this text to confirm a registration literally
+# exists in source; it never imports, executes, or writes to either file.
+_WORKER_REGISTRY_SOURCE = Path(__file__).with_name("worker_registry.py")
 _TONY_WORKFLOW_RUNTIME_SOURCE = Path(__file__).with_name("tony_workflow_runtime.py")
 
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 
+ROSTER_SCOPE_NOTE = (
+    "This roster reflects only the specialist contracts currently defined in "
+    "agents/*.md. It is a snapshot of today's authoritative contracts, not a "
+    "ceiling or complete catalogue of every specialist capability Narratiive "
+    "will ever have. Live workflow activity that does not match any of these "
+    "contracts (for example, asset-production execution or the Blueprint "
+    "Director editorial pass) is real and wired, but is deliberately left "
+    "unattributed here rather than folded into a contract that does not "
+    "claim it. Adding a new agent contract to this roster is a product-canon "
+    "change, not a fact this projector can decide on its own."
+)
+
+
+@dataclass(frozen=True, slots=True)
+class Evidence:
+    """One honestly-labelled signal with its own supporting evidence text.
+
+    ``value`` is ``True``/``False`` when evidence was available to decide it,
+    or ``None`` when no evidence was available to decide it at all -- ``None``
+    must never be rendered as a negative; it means "unverified here", not
+    "no".
+    """
+
+    value: bool | None
+    evidence: str
+
 
 @dataclass(frozen=True, slots=True)
 class CapabilityEvidence:
-    """One honestly-labelled maturity signal, always carrying its own evidence.
-
-    Each flag is independently verifiable and must not be inferred from a
-    weaker one: a module existing on disk (``implemented``) does not imply a
-    test exists (``tested``); a test existing does not imply the live runtime
-    actually wires the adapter in (``connected``); being wired in does not
-    imply it has ever executed against real evidence (``live_verified``).
+    """Six independently-verifiable maturity signals. None may be inferred
+    from another: a module existing on disk (``implemented``) does not imply
+    a test exists (``tested``); a test existing does not imply the capability
+    is registered in source (``configured``); being registered in source does
+    not imply the live, running process actually has it active
+    (``runtime_connected`` -- a static source-text match is NOT a runtime
+    connectivity check and must never be presented as proof an agent is
+    operational); being configured or runtime-connected does not imply it has
+    ever executed against real evidence (``live_verified``).
     """
 
-    defined: bool
-    defined_evidence: str
-    implemented: bool
-    implemented_evidence: str
-    tested: bool
-    tested_evidence: str
-    connected: bool
-    connected_evidence: str
-    live_verified: bool
-    live_verified_evidence: str
+    defined: Evidence
+    implemented: Evidence
+    tested: Evidence
+    configured: Evidence
+    runtime_connected: Evidence
+    live_verified: Evidence
     blocked: bool = False
     blocker: str = ""
 
@@ -53,6 +78,9 @@ class AgencyMapEntry:
     last_verified_activity: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        def _evidence(item: Evidence) -> dict[str, Any]:
+            return {"value": item.value, "evidence": item.evidence}
+
         return {
             "agent_id": self.agent_id,
             "title": self.title,
@@ -60,16 +88,12 @@ class AgencyMapEntry:
             "responsibilities": self.responsibilities,
             "defined_in": self.defined_in,
             "status": {
-                "defined": self.capability.defined,
-                "defined_evidence": self.capability.defined_evidence,
-                "implemented": self.capability.implemented,
-                "implemented_evidence": self.capability.implemented_evidence,
-                "tested": self.capability.tested,
-                "tested_evidence": self.capability.tested_evidence,
-                "connected": self.capability.connected,
-                "connected_evidence": self.capability.connected_evidence,
-                "live_verified": self.capability.live_verified,
-                "live_verified_evidence": self.capability.live_verified_evidence,
+                "defined": _evidence(self.capability.defined),
+                "implemented": _evidence(self.capability.implemented),
+                "tested": _evidence(self.capability.tested),
+                "configured": _evidence(self.capability.configured),
+                "runtime_connected": _evidence(self.capability.runtime_connected),
+                "live_verified": _evidence(self.capability.live_verified),
                 "blocked": self.capability.blocked,
                 "blocker": self.capability.blocker,
             },
@@ -87,12 +111,17 @@ class _AgentSpec:
     responsibilities: str
     defined_in: str
     implemented_in: tuple[str, ...]
+    implemented_note: str
     tested_in: tuple[str, ...]
-    connected_markers: tuple[str, ...]
-    canonical_workflow_ids: tuple[str, ...]
+    configured_markers: tuple[str, ...]
+    configured_note: str
+    worker_ids: tuple[str, ...]
+    # (workflow_id, stage_id) pairs this agent's own contract can defensibly
+    # claim -- a workflow can have stages owned by a different specialist
+    # (e.g. Tony's bounded taste triage inside a specialist's workflow), so
+    # attribution is always at stage granularity, never whole-workflow.
+    canonical_stage_refs: tuple[tuple[str, str], ...]
     dependencies: tuple[str, ...]
-    blocked_marker: str = ""
-    blocker: str = ""
 
 
 _ROSTER: tuple[_AgentSpec, ...] = (
@@ -104,13 +133,26 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             "Determines which agent runs next, validates required inputs before "
             "dispatching work, maintains workflow state, detects failures and "
             "retry logic, records completion status, prepares handoffs. Never "
-            "creates client deliverables itself."
+            "creates client deliverables itself. Also performs the bounded taste "
+            "triage on Campaign World candidates and the Creative Director's "
+            "Bible -- a distinct responsibility from Quality Reviewer's "
+            "independent structural verdict on the same artefacts."
         ),
         defined_in="agents/orchestrator.md",
         implemented_in=("runtime/tony_workflow_runtime.py", "runtime/workflow_execution_coordinator.py"),
+        implemented_note="orchestration core; the two triage workers below implement the taste-triage responsibility specifically",
         tested_in=("tests/test_tony_workflow_runtime.py", "tests/test_workflow_execution_coordinator.py"),
-        connected_markers=("coordinator = WorkflowExecutionCoordinator(",),
-        canonical_workflow_ids=(),
+        configured_markers=(
+            "coordinator = WorkflowExecutionCoordinator(",
+            'worker_id="tony-campaign-world-triage"',
+            'worker_id="tony-creative-bible-triage"',
+        ),
+        configured_note="static source match only; does not confirm the running process executed any of this",
+        worker_ids=("tony-campaign-world-triage", "tony-creative-bible-triage"),
+        canonical_stage_refs=(
+            ("growth_blueprint_to_campaign_world", "triage_campaign_world_candidates"),
+            ("campaign_world_to_creative_bible", "triage_creative_bible"),
+        ),
         dependencies=(),
     ),
     _AgentSpec(
@@ -124,9 +166,12 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         ),
         defined_in="agents/research_analyst.md",
         implemented_in=("runtime/research_engine.py", "runtime/research_workflow_adapter.py"),
+        implemented_note="dedicated, agent-specific module",
         tested_in=("tests/test_research_engine.py", "tests/test_research_workflow_adapter.py"),
-        connected_markers=("research_adapter=ResearchWorkflowAdapter(",),
-        canonical_workflow_ids=("growth_sprint_to_research_engine",),
+        configured_markers=('worker_id="narratiive-research-engine"',),
+        configured_note="static source match only; does not confirm the running process executed any of this",
+        worker_ids=("narratiive-research-engine",),
+        canonical_stage_refs=(("growth_sprint_to_research_engine", "orchestrate_research"),),
         dependencies=("Fireflies transcript dispatcher (optional, degrades without it)",),
     ),
     _AgentSpec(
@@ -134,24 +179,36 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         title="Strategy Director",
         department="Delivery Engine — Growth Blueprint pipeline",
         responsibilities=(
-            "Converts supplied research into the founder- and CMO-ready Growth "
-            "Blueprint: strategic diagnosis, positioning, narrative platform and "
-            "activation principles, preserving the canonical template structure."
+            "Converts supplied research into the Growth Blueprint's strategic "
+            "diagnosis, positioning, narrative platform and activation "
+            "principles. Does not claim the subsequent editorial 'director' "
+            "pass or the Quality Reviewer's review stage that follow it in "
+            "strategy_thesis_to_growth_blueprint -- no agents/*.md contract "
+            "currently names an owner for those stages."
         ),
         defined_in="agents/strategy_director.md",
-        implemented_in=("runtime/blueprint_orchestrator.py", "runtime/blueprint_director.py"),
-        tested_in=("tests/test_blueprint_orchestrator.py", "tests/test_blueprint_director.py"),
-        connected_markers=(
-            "document_adapter=document_adapter,",
-            "blueprint_director_commission=BlueprintDirectorCommissionBuilder(",
+        implemented_in=("runtime/worker_registry.py",),
+        implemented_note=(
+            "no dedicated per-agent module exists; this stage is served by the "
+            "single shared, conditionally-registered Claude capability worker "
+            "(worker_id=claude-anthropic) that also serves Campaign World "
+            "Generator's and Creative Director's generation stages"
         ),
-        canonical_workflow_ids=(
-            "research_to_strategic_synthesis",
-            "strategic_synthesis_to_strategy_thesis",
-            "strategy_thesis_to_growth_blueprint",
-            "research_to_growth_blueprint",
+        tested_in=("tests/test_worker_registry.py",),
+        configured_markers=('worker_id="claude-anthropic"', '"strategic_reasoning"'),
+        configured_note=(
+            "static source match only; this worker is shared across three specialists' "
+            "generation stages and is only registered when a 'Claude' dispatcher name is "
+            "present in the live process's dispatcher map -- a condition this static check "
+            "cannot observe"
         ),
-        dependencies=("Approved research evidence from the Research Analyst stage",),
+        worker_ids=("claude-anthropic",),
+        canonical_stage_refs=(
+            ("research_to_strategic_synthesis", "prepare_strategic_synthesis"),
+            ("strategic_synthesis_to_strategy_thesis", "prepare_strategy_thesis"),
+            ("strategy_thesis_to_growth_blueprint", "prepare_growth_blueprint"),
+        ),
+        dependencies=("Approved research evidence from the Research Analyst stage", "A configured 'Claude' dispatcher"),
     ),
     _AgentSpec(
         agent_id="campaign_world_generator",
@@ -160,44 +217,58 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         responsibilities=(
             "Translates an approved Growth Blueprint into Campaign World "
             "candidates: campaign territories, narrative tension and emotional "
-            "promise, preserving the canonical template structure."
+            "promise. Does not claim the subsequent bounded taste triage of "
+            "those candidates -- that is the Orchestrator's responsibility."
         ),
         defined_in="agents/campaign_world_generator.md",
-        implemented_in=("runtime/campaign_world_triage_worker.py",),
-        tested_in=("tests/test_campaign_world_triage_worker.py",),
-        connected_markers=("campaign_world_triage_adapter=CampaignWorldTriageWorker(),",),
-        canonical_workflow_ids=("growth_blueprint_to_campaign_world",),
-        dependencies=("Matt's approved Growth Blueprint",),
+        implemented_in=("runtime/worker_registry.py",),
+        implemented_note=(
+            "no dedicated per-agent module exists; this stage is served by the "
+            "shared Claude capability worker (worker_id=claude-anthropic), not by "
+            "runtime/campaign_world_triage_worker.py -- that module implements the "
+            "Orchestrator's taste triage of this agent's output, a separate stage"
+        ),
+        tested_in=("tests/test_worker_registry.py",),
+        configured_markers=('worker_id="claude-anthropic"', '"strategic_reasoning"'),
+        configured_note=(
+            "static source match only; this worker is shared across three specialists' "
+            "generation stages and is only registered when a 'Claude' dispatcher name is "
+            "present in the live process's dispatcher map -- a condition this static check "
+            "cannot observe"
+        ),
+        worker_ids=("claude-anthropic",),
+        canonical_stage_refs=(("growth_blueprint_to_campaign_world", "generate_campaign_world"),),
+        dependencies=("Matt's approved Growth Blueprint", "A configured 'Claude' dispatcher"),
     ),
     _AgentSpec(
         agent_id="creative_director",
         title="Creative Director",
         department="Delivery Engine — Growth Blueprint pipeline",
         responsibilities=(
-            "Translates an approved Campaign World into production-ready "
-            "creative direction (the Creative Director's Bible) suitable for "
-            "downstream execution, asset production and human creative review."
+            "Translates an approved Campaign World into the Creative Director's "
+            "Bible. Does not claim the subsequent bounded taste triage of the "
+            "Bible (the Orchestrator's responsibility) or the downstream "
+            "production-planning/asset-execution stages in "
+            "creative_bible_to_asset_production -- no agents/*.md contract "
+            "currently names an owner for asset production."
         ),
         defined_in="agents/creative_director.md",
-        implemented_in=(
-            "runtime/creative_bible_triage_worker.py",
-            "runtime/campaign_production_planning_worker.py",
-            "runtime/creative_production_workflow_adapter.py",
+        implemented_in=("runtime/worker_registry.py",),
+        implemented_note=(
+            "no dedicated per-agent module exists; this stage is served by the "
+            "shared Claude capability worker (worker_id=claude-anthropic)"
         ),
-        tested_in=(
-            "tests/test_creative_bible_triage_worker.py",
-            "tests/test_campaign_production_planning_worker.py",
+        tested_in=("tests/test_worker_registry.py",),
+        configured_markers=('worker_id="claude-anthropic"', '"copy_drafting"'),
+        configured_note=(
+            "static source match only; this worker is shared across three specialists' "
+            "generation stages and is only registered when a 'Claude' dispatcher name is "
+            "present in the live process's dispatcher map -- a condition this static check "
+            "cannot observe"
         ),
-        connected_markers=("creative_bible_triage_adapter=CreativeBibleTriageWorker(),",),
-        canonical_workflow_ids=("campaign_world_to_creative_bible", "creative_bible_to_asset_production"),
-        dependencies=("Matt's approved Campaign World", "A configured 'Creative Production' dispatcher for asset execution"),
-        blocked_marker='if "Creative Production" in configured_dispatchers',
-        blocker=(
-            "Review/triage is wired and live; final asset-production execution is only "
-            "constructed when a 'Creative Production' dispatcher is present in the live "
-            "environment's configured_dispatchers. No such dispatcher is configured by "
-            "default, so execution fails closed rather than silently claiming output."
-        ),
+        worker_ids=("claude-anthropic",),
+        canonical_stage_refs=(("campaign_world_to_creative_bible", "prepare_creative_bible"),),
+        dependencies=("Matt's approved Campaign World", "A configured 'Claude' dispatcher"),
     ),
     _AgentSpec(
         agent_id="quality_reviewer",
@@ -210,10 +281,20 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             "Never rewrites work silently."
         ),
         defined_in="agents/quality_reviewer.md",
-        implemented_in=("runtime/workflow_quality.py",),
-        tested_in=("tests/test_workflow_quality.py",),
-        connected_markers=('"campaign_world_quality_gate": campaign_world_quality_gate,',),
-        canonical_workflow_ids=(),
+        implemented_in=("runtime/workflow_quality.py", "runtime/senior_strategist_review_worker.py"),
+        implemented_note=(
+            "deterministic structural quality-gate functions evaluated in-process "
+            "(not dispatched through the capability worker registry) plus the "
+            "dedicated senior-strategist review stage, which is dispatched through it"
+        ),
+        tested_in=("tests/test_workflow_quality.py", "tests/test_senior_strategist_review_worker.py"),
+        configured_markers=(
+            '"campaign_world_quality_gate": campaign_world_quality_gate,',
+            'worker_id="narratiive-senior-strategist-reviewer"',
+        ),
+        configured_note="static source match only; does not confirm the running process executed any of this",
+        worker_ids=("narratiive-senior-strategist-reviewer",),
+        canonical_stage_refs=(("strategy_thesis_to_growth_blueprint", "review_growth_blueprint"),),
         dependencies=("Output from the specialist stage under review",),
     ),
 )
@@ -223,74 +304,108 @@ def _repo_path(relative: str) -> Path:
     return _REPO_ROOT / relative
 
 
-def _file_evidence(paths: tuple[str, ...]) -> tuple[bool, str]:
+def _file_evidence(paths: tuple[str, ...], note: str = "") -> Evidence:
     if not paths:
-        return False, "no path declared"
+        return Evidence(False, "no path declared")
     existing = [path for path in paths if _repo_path(path).is_file()]
+    suffix = f" ({note})" if note else ""
     if len(existing) == len(paths):
-        return True, f"found: {', '.join(paths)}"
+        return Evidence(True, f"found: {', '.join(paths)}{suffix}")
     if existing:
         missing = [path for path in paths if path not in existing]
-        return False, f"found only {', '.join(existing)}; missing {', '.join(missing)}"
-    return False, f"none found: {', '.join(paths)}"
+        return Evidence(False, f"found only {', '.join(existing)}; missing {', '.join(missing)}{suffix}")
+    return Evidence(False, f"none found: {', '.join(paths)}{suffix}")
 
 
-def _read_tony_workflow_runtime_source() -> str | None:
+def _read_combined_source() -> str | None:
     try:
-        return _TONY_WORKFLOW_RUNTIME_SOURCE.read_text(encoding="utf-8")
+        runtime_text = _TONY_WORKFLOW_RUNTIME_SOURCE.read_text(encoding="utf-8")
+        registry_text = _WORKER_REGISTRY_SOURCE.read_text(encoding="utf-8")
     except OSError:
         return None
+    return runtime_text + "\n" + registry_text
 
 
-def _connected_evidence(source: str | None, markers: tuple[str, ...]) -> tuple[bool, str]:
+def _configured_evidence(source: str | None, markers: tuple[str, ...], note: str) -> Evidence:
     if source is None:
-        return False, "runtime/tony_workflow_runtime.py could not be read"
+        return Evidence(None, "source files could not be read; unverified")
     if not markers:
-        return False, "no connection marker declared"
+        return Evidence(False, "no configuration marker declared for this agent")
     present = [marker for marker in markers if marker in source]
-    if len(present) == len(markers):
-        return True, f"runtime/tony_workflow_runtime.py contains: {present}"
     missing = [marker for marker in markers if marker not in present]
-    return False, f"runtime/tony_workflow_runtime.py is missing: {missing}"
+    found_any = bool(present)
+    detail = f"found {present}" + (f"; missing {missing}" if missing else "")
+    return Evidence(found_any, f"{detail} ({note})")
 
 
-def _blocked_evidence(source: str | None, marker: str) -> bool:
-    if not marker or source is None:
-        return False
-    return marker in source
+def _runtime_connected_evidence(worker_ids: tuple[str, ...], live_worker_ids: frozenset[str] | None) -> Evidence:
+    if not worker_ids:
+        return Evidence(
+            None,
+            "this agent's capability is not dispatched through the capability worker "
+            "registry, so there is no live worker_id to verify against",
+        )
+    if live_worker_ids is None:
+        return Evidence(
+            None,
+            f"no live capability-worker-registry snapshot was supplied to verify {worker_ids} against; "
+            "a static source match is not a runtime connectivity check",
+        )
+    present = [worker_id for worker_id in worker_ids if worker_id in live_worker_ids]
+    if present:
+        return Evidence(True, f"found live and registered: {present}")
+    return Evidence(False, f"none of {worker_ids} were present in the supplied live worker-registry snapshot")
 
 
 def _live_verified(
     spec: _AgentSpec,
-    states_by_workflow: Mapping[str, tuple[WorkflowState, ...]],
-) -> tuple[bool, str, tuple[dict[str, Any], ...], str | None]:
-    if not spec.canonical_workflow_ids:
-        return False, "this agent has no single canonical workflow_id to verify against", (), None
-    matching: list[WorkflowState] = []
-    for workflow_id in spec.canonical_workflow_ids:
-        matching.extend(states_by_workflow.get(workflow_id, ()))
-    if not matching:
+    states: tuple[WorkflowState, ...],
+) -> tuple[Evidence, tuple[dict[str, Any], ...], str | None]:
+    if not spec.canonical_stage_refs:
         return (
-            False,
-            f"no persisted WorkflowState was supplied for {spec.canonical_workflow_ids}",
+            Evidence(False, "this agent has no single canonical (workflow_id, stage_id) pair to verify against"),
             (),
             None,
         )
-    active = [state for state in matching if state.status.value not in {"complete", "failed"}]
+    completed_matches: list[tuple[WorkflowState, str]] = []
+    active_matches: list[tuple[WorkflowState, str]] = []
+    for state in states:
+        for workflow_id, stage_id in spec.canonical_stage_refs:
+            if state.workflow_id != workflow_id:
+                continue
+            stage = next((item for item in state.stages if item.stage_id == stage_id), None)
+            if stage is None:
+                continue
+            if stage.status == StageStatus.COMPLETED:
+                completed_matches.append((state, stage_id))
+            elif stage.status == StageStatus.RUNNING:
+                active_matches.append((state, stage_id))
+    if not completed_matches and not active_matches:
+        return (
+            Evidence(
+                False,
+                f"no persisted WorkflowState has a completed or running stage matching {spec.canonical_stage_refs}",
+            ),
+            (),
+            None,
+        )
     active_work = tuple(
         {
             "run_id": state.run_id,
             "workflow_id": state.workflow_id,
+            "stage_id": stage_id,
             "client_id": state.client_id,
-            "status": state.status.value,
-            "current_step": state.current_stage_id,
         }
-        for state in sorted(active, key=lambda item: item.updated_at, reverse=True)
+        for state, stage_id in sorted(active_matches, key=lambda item: item[0].updated_at, reverse=True)
     )
-    last_updated = max((state.updated_at for state in matching), default=None)
+    all_matches = [state for state, _ in (*completed_matches, *active_matches)]
+    last_updated = max((state.updated_at for state in all_matches), default=None)
     return (
-        True,
-        f"{len(matching)} persisted WorkflowState run(s) found for {spec.canonical_workflow_ids}",
+        Evidence(
+            True,
+            f"{len(completed_matches)} completed and {len(active_matches)} running stage match(es) found "
+            f"for {spec.canonical_stage_refs}",
+        ),
         active_work,
         last_updated,
     )
@@ -298,30 +413,42 @@ def _live_verified(
 
 def build_agency_map(
     workflow_states: Iterable[WorkflowState] | None = None,
+    *,
+    live_worker_ids: frozenset[str] | None = None,
 ) -> tuple[AgencyMapEntry, ...]:
     """Project the authoritative agent roster against real repository and run evidence.
 
     This is a pure, dependency-injected read: nothing is written, nothing is
     executed, and nothing is inferred beyond what the supplied evidence
-    actually shows. ``workflow_states`` is optional; when omitted, every
-    ``live_verified`` flag is honestly ``False`` with an explicit
-    "no evidence supplied" reason rather than guessed.
+    actually shows.
+
+    - ``workflow_states`` is optional. Omitting it means every
+      ``live_verified`` flag is honestly ``False`` with an explicit
+      "no evidence supplied" reason, never guessed.
+    - ``live_worker_ids`` is optional and represents a snapshot of worker_ids
+      actually present in a live, running ``CapabilityWorkerRegistry`` (for
+      example from a diagnostics/capability command). Omitting it means every
+      ``runtime_connected`` flag is honestly ``None`` ("unverified"), never
+      inferred from the static ``configured`` source match.
+
+    Attribution is always at (workflow_id, stage_id) granularity. A workflow
+    can have stages owned by different specialists (for example, the
+    Orchestrator's bounded taste triage runs inside the same workflow_id as a
+    specialist's generation stage); this function never attributes a stage
+    to an agent whose contract does not claim it.
     """
 
-    source = _read_tony_workflow_runtime_source()
-    states_by_workflow: dict[str, tuple[WorkflowState, ...]] = {}
-    for state in workflow_states or ():
-        states_by_workflow.setdefault(state.workflow_id, ())
-        states_by_workflow[state.workflow_id] = (*states_by_workflow[state.workflow_id], state)
+    source = _read_combined_source()
+    states = tuple(workflow_states or ())
 
     entries = []
     for spec in _ROSTER:
-        defined_ok, defined_evidence = _file_evidence((spec.defined_in,))
-        implemented_ok, implemented_evidence = _file_evidence(spec.implemented_in)
-        tested_ok, tested_evidence = _file_evidence(spec.tested_in)
-        connected_ok, connected_evidence = _connected_evidence(source, spec.connected_markers)
-        live_ok, live_evidence, active_work, last_verified = _live_verified(spec, states_by_workflow)
-        blocked = _blocked_evidence(source, spec.blocked_marker)
+        defined = _file_evidence((spec.defined_in,))
+        implemented = _file_evidence(spec.implemented_in, spec.implemented_note)
+        tested = _file_evidence(spec.tested_in)
+        configured = _configured_evidence(source, spec.configured_markers, spec.configured_note)
+        runtime_connected = _runtime_connected_evidence(spec.worker_ids, live_worker_ids)
+        live_verified, active_work, last_verified = _live_verified(spec, states)
 
         entries.append(
             AgencyMapEntry(
@@ -331,18 +458,12 @@ def build_agency_map(
                 responsibilities=spec.responsibilities,
                 defined_in=spec.defined_in,
                 capability=CapabilityEvidence(
-                    defined=defined_ok,
-                    defined_evidence=defined_evidence,
-                    implemented=implemented_ok,
-                    implemented_evidence=implemented_evidence,
-                    tested=tested_ok,
-                    tested_evidence=tested_evidence,
-                    connected=connected_ok,
-                    connected_evidence=connected_evidence,
-                    live_verified=live_ok,
-                    live_verified_evidence=live_evidence,
-                    blocked=blocked,
-                    blocker=spec.blocker if blocked else "",
+                    defined=defined,
+                    implemented=implemented,
+                    tested=tested,
+                    configured=configured,
+                    runtime_connected=runtime_connected,
+                    live_verified=live_verified,
                 ),
                 dependencies=spec.dependencies,
                 active_work=active_work,
