@@ -591,6 +591,9 @@ class WorkflowQualityTests(unittest.TestCase):
             ("headline", "The agreed investment is twelve thousand pounds."),
             ("headline", "The agreed investment is twelve thousand yen."),
             ("headline", "The agreed investment is one hundred thousand rupees."),
+            ("headline", "The agreed investment is twelve thousand Canadian dollars."),
+            ("headline", "The agreed investment is 12,000 Australian dollars."),
+            ("headline", "The agreed investment is twelve thousand US dollars."),
         ):
             output = proposal_output()
             output["commercial_opportunity"][field] = claim

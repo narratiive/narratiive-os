@@ -1383,7 +1383,7 @@ def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool
         # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
         # currency amount regardless of its code or whether it is expressed in
         # words; otherwise an unbound FIELDWORK fee can reach a review copy.
-        rf"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b(?-i:[A-Z]{{3}})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})[ -]+{_CURRENCY_NAME}\b)",
+        rf"(?:\b(?:fee|price|pricing|costs?)\b|[£$€]\s*\d|\b(?-i:[A-Z]{{3}})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,2}}[ -]+{_CURRENCY_NAME}\b)",
         text,
         flags=re.IGNORECASE,
     )
