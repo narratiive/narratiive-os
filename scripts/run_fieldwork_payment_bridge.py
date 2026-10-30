@@ -21,7 +21,6 @@ from runtime.fieldwork_payments import (
 )
 from runtime.fieldwork_payment_integrations import verify_approved_proposal
 from runtime.fieldwork_payment_integrations import (
-    gmail_client_confirmation,
     notion_payment_recorder,
     telegram_founder_notifier,
     tony_workflow_authoriser,
@@ -76,29 +75,56 @@ def main() -> int:
 
 
 def _downstream_actions(workflow_root: Path, workspace_id: str, environ) -> dict:
-    """Wire existing governed adapters; fail closed when the required CRM is absent."""
+    """Wire only explicitly isolated sandbox effects for a test-mode bridge."""
+
+    if str(environ.get("FIELDWORK_PAYMENT_DOWNSTREAM_MODE") or "").strip() != "sandbox_isolated":
+        raise RuntimeError("FIELDWORK payment bridge requires FIELDWORK_PAYMENT_DOWNSTREAM_MODE=sandbox_isolated")
+    allowed_proposals = {
+        item.strip() for item in str(environ.get("FIELDWORK_PAYMENT_SANDBOX_PROPOSAL_IDS") or "").split(",")
+        if item.strip()
+    }
+    test_recipient = str(environ.get("FIELDWORK_PAYMENT_SANDBOX_TEST_RECIPIENT") or "").strip().casefold()
+    if not allowed_proposals or not test_recipient or "@" not in test_recipient:
+        raise RuntimeError("sandbox downstream actions require explicit proposal IDs and a test recipient")
+
+    def sandbox_only(action):
+        def guarded(context):
+            proposal = context.get("proposal") if isinstance(context, dict) else None
+            if not isinstance(proposal, dict):
+                raise RuntimeError("sandbox downstream action lacks proposal evidence")
+            if str(proposal.get("proposal_id") or "").strip() not in allowed_proposals:
+                raise RuntimeError("sandbox downstream action rejected an unapproved proposal")
+            if str(proposal.get("client_email") or "").strip().casefold() != test_recipient:
+                raise RuntimeError("sandbox downstream action rejected a non-test recipient")
+            return action(context)
+        return guarded
 
     dispatchers = build_http_dispatchers(environ)
     notion = dispatchers.get("Notion")
     if notion is None:
         raise RuntimeError("FIELDWORK payment bridge requires the configured Notion dispatcher")
     actions = {
-        "crm_update": notion_payment_recorder(notion),
-        "workflow_authorisation": tony_workflow_authoriser(
-            workflow_root,
-            workspace_id=workspace_id,
-            dispatchers=dispatchers,
-            environ=environ,
+        "crm_update": sandbox_only(notion_payment_recorder(notion)),
+        "workflow_authorisation": sandbox_only(
+            tony_workflow_authoriser(
+                workflow_root,
+                workspace_id=workspace_id,
+                dispatchers=dispatchers,
+                environ=environ,
+            )
         ),
     }
-    gmail = dispatchers.get("Gmail")
-    if gmail is not None:
-        actions["client_confirmation"] = gmail_client_confirmation(gmail)
     if str(environ.get("TONY_TELEGRAM_BOT_TOKEN") or "").strip() and str(environ.get("TONY_TELEGRAM_CHAT_ID") or "").strip():
+        sandbox_chat_id = str(environ.get("FIELDWORK_PAYMENT_SANDBOX_TELEGRAM_CHAT_ID") or "").strip()
+        if sandbox_chat_id != str(environ["TONY_TELEGRAM_CHAT_ID"]).strip():
+            raise RuntimeError("sandbox Telegram routing must use the explicitly configured internal test chat")
         actions["founder_notification"] = telegram_founder_notifier(
             TelegramSender(TelegramConfig.from_env(environ)),
-            str(environ["TONY_TELEGRAM_CHAT_ID"]).strip(),
+            sandbox_chat_id,
         )
+        actions["founder_notification"] = sandbox_only(actions["founder_notification"])
+    # A Stripe payment never creates a client-facing send without a separate
+    # exact delivery approval, so client_confirmation is deliberately omitted.
     return actions
 
 

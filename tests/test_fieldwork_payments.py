@@ -441,14 +441,26 @@ class FieldworkPaymentApplicationTests(unittest.TestCase):
             "scripts.run_fieldwork_payment_bridge.build_http_dispatchers",
             return_value={"Notion": lambda _contract: {"verified": True}, "Gmail": lambda _contract: {"verified": True}},
         ):
-            actions = _downstream_actions(Path("/safe-workflows"), "narratiive", {})
+            actions = _downstream_actions(
+                Path("/safe-workflows"), "narratiive",
+                {"FIELDWORK_PAYMENT_DOWNSTREAM_MODE": "sandbox_isolated", "FIELDWORK_PAYMENT_SANDBOX_PROPOSAL_IDS": "safe-proposal", "FIELDWORK_PAYMENT_SANDBOX_TEST_RECIPIENT": "client@example.invalid"},
+            )
         self.assertIn("crm_update", actions)
         self.assertIn("workflow_authorisation", actions)
-        self.assertIn("client_confirmation", actions)
+        self.assertNotIn("client_confirmation", actions)
         self.assertNotIn("founder_notification", actions)
+        with self.assertRaisesRegex(RuntimeError, "unapproved proposal"):
+            actions["crm_update"]({"proposal": {"proposal_id": "wrong", "client_email": "client@example.invalid"}})
+        with self.assertRaisesRegex(RuntimeError, "non-test recipient"):
+            actions["crm_update"]({"proposal": {"proposal_id": "safe-proposal", "client_email": "real@example.invalid"}})
         with mock.patch("scripts.run_fieldwork_payment_bridge.build_http_dispatchers", return_value={}):
             with self.assertRaisesRegex(RuntimeError, "Notion dispatcher"):
-                _downstream_actions(Path("/safe-workflows"), "narratiive", {})
+                _downstream_actions(
+                    Path("/safe-workflows"), "narratiive",
+                    {"FIELDWORK_PAYMENT_DOWNSTREAM_MODE": "sandbox_isolated", "FIELDWORK_PAYMENT_SANDBOX_PROPOSAL_IDS": "safe-proposal", "FIELDWORK_PAYMENT_SANDBOX_TEST_RECIPIENT": "client@example.invalid"},
+                )
+        with self.assertRaisesRegex(RuntimeError, "DOWNSTREAM_MODE"):
+            _downstream_actions(Path("/safe-workflows"), "narratiive", {})
 
     def test_checkout_requires_bridge_auth_and_webhook_requires_stripe_signature(self):
         with tempfile.TemporaryDirectory() as temporary:
