@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 
 const DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
+const CLASSIFICATION_OPERATION = "classify_synthetic_test";
 const TARGET_PATTERN = /\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|creative(?:\s+director(?:'s|’s))?\s+bible|proposal|version|current\s+work)\b/i;
 const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b/i;
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
@@ -67,5 +68,41 @@ export function buildTrustedWorkflowDecisionParams(params, trustedTurn, bridgeTo
     approval_instruction: instruction,
     _approval_instruction_run_id: trustedTurn.runId,
     _approval_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
+  };
+}
+
+export function buildTrustedWorkflowClassificationParams(params, trustedTurn, bridgeToken) {
+  const operation = normalizedOperation(params?.operation);
+  if (operation !== CLASSIFICATION_OPERATION) return params;
+  if (!trustedTurn?.runId || typeof trustedTurn.prompt !== "string") {
+    throw new Error("workflow classification requires the current trusted human turn");
+  }
+  const instruction = String(params?.classification_instruction || "");
+  if (!instruction || instruction !== trustedTurn.prompt) {
+    throw new Error("classification_instruction must exactly equal the verbatim current human instruction");
+  }
+  if (!/\bclassif(?:y|ication)\b/i.test(instruction) || !/\bsynthetic\b/i.test(instruction)) {
+    throw new Error("the current human instruction must explicitly classify this workflow as synthetic");
+  }
+  const reference = String(params?.reference || "").trim();
+  const authorisationReference = String(params?.inputs?.authorisation_reference || "").trim();
+  if (!reference || !authorisationReference) {
+    throw new Error("workflow classification requires an exact entity reference and authorisation reference");
+  }
+  if (!instruction.includes(reference)) {
+    throw new Error("the current human instruction must name the exact workflow entity reference");
+  }
+  const fields = {
+    runId: trustedTurn.runId,
+    operation,
+    reference,
+    approvalToken: "",
+    instruction,
+  };
+  return {
+    ...params,
+    classification_instruction: instruction,
+    _classification_instruction_run_id: trustedTurn.runId,
+    _classification_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
   };
 }

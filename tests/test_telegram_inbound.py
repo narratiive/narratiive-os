@@ -319,6 +319,48 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertFalse(response["ok"])
         self.assertEqual(workflows.calls, [])
 
+    def test_synthetic_classification_uses_trusted_turn_proof_and_exact_entity(self):
+        workflows = FakeWorkflowCommands()
+        app = LeadAwareTonyApplication(
+            FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),
+            workflow_command_service=workflows, authorised_principal_id="telegram:123",
+        )
+        entity_id = "inbound-d1b96a67"
+        instruction = "Classify inbound-d1b96a67 as a synthetic internal test."
+        proof = hmac.new(
+            b"secret",
+            workflow_decision_proof_material(
+                run_id="openclaw-conversation-turn-1",
+                operation="classify-synthetic-test",
+                reference=entity_id,
+                approval_token="",
+                instruction=instruction,
+            ),
+            hashlib.sha256,
+        ).hexdigest()
+
+        def call(reference: str):
+            body = {
+                "operation": "classify-synthetic-test", "reference": reference,
+                "rationale": "Founder-authorised internal certification record.",
+                "inputs": {
+                    "authorisation_reference": "telegram-message:513",
+                    "classification_instruction": instruction,
+                    "classification_instruction_run_id": "openclaw-conversation-turn-1",
+                    "classification_instruction_proof": proof,
+                },
+                "source": "openclaw_telegram_workflow_tool",
+            }
+            raw = json.dumps(body).encode("utf-8")
+            environ = {"REQUEST_METHOD": "POST", "PATH_INFO": "/workflow/control", "CONTENT_LENGTH": str(len(raw)),
+                       "HTTP_AUTHORIZATION": "Bearer secret", "wsgi.input": io.BytesIO(raw)}
+            return json.loads(b"".join(app(environ, lambda status, headers: None)).decode("utf-8"))
+
+        self.assertTrue(call(entity_id)["ok"])
+        self.assertEqual(workflows.calls[-1]["principal_id"], "telegram:123")
+        self.assertIn(entity_id, workflows.calls[-1]["text"])
+        self.assertFalse(call("different-entity")["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,7 +17,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         script = (
-            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowDecisionParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
+            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
             f"console.log(JSON.stringify({expression}));"
         )
         completed = subprocess.run([node, "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
@@ -64,6 +64,30 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         self.assertEqual(result["approval_instruction"], prompt)
         self.assertEqual(result["_approval_instruction_run_id"], "turn-1")
         self.assertEqual(len(result["_approval_instruction_proof"]), 64)
+
+    def test_synthetic_classification_binds_current_turn_and_exact_entity(self) -> None:
+        prompt = "Classify inbound-d1b96a67 as a synthetic internal test."
+        params = {
+            "operation": "classify_synthetic_test",
+            "reference": "inbound-d1b96a67",
+            "rationale": "Founder-authorised internal certification record.",
+            "classification_instruction": prompt,
+            "inputs": {"authorisation_reference": "telegram-message:513"},
+        }
+        result = self._node(
+            f"buildTrustedWorkflowClassificationParams({json.dumps(params)},{{runId:'conversation-turn-1',prompt:{json.dumps(prompt)}}},'secret')"
+        )
+        self.assertEqual(result["classification_instruction"], prompt)
+        self.assertEqual(result["_classification_instruction_run_id"], "conversation-turn-1")
+        self.assertEqual(len(result["_classification_instruction_proof"]), 64)
+
+        altered = dict(params, reference="another-entity")
+        expression = (
+            "(()=>{try{buildTrustedWorkflowClassificationParams("
+            f"{json.dumps(altered)},{{runId:'conversation-turn-1',prompt:{json.dumps(prompt)}}},'secret');return 'allowed'"
+            "}catch(error){return error.message}})()"
+        )
+        self.assertIn("exact workflow entity", self._node(expression))
 
 
 if __name__ == "__main__":

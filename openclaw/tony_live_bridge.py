@@ -478,8 +478,8 @@ class LeadAwareTonyApplication:
                     authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
                     if not instruction or "classif" not in instruction.casefold() or "synthetic" not in instruction.casefold():
                         raise ValueError("workflow classification requires an explicit current-human classification instruction")
-                    if instruction_run_id != reference or not authorisation_reference:
-                        raise ValueError("workflow classification requires the exact run and authorisation reference")
+                    if not instruction_run_id or not authorisation_reference:
+                        raise ValueError("workflow classification requires trusted-turn provenance and an authorisation reference")
                     if not verify_workflow_decision_proof(
                         str(self.base.bridge_token or ""),
                         run_id=instruction_run_id,
