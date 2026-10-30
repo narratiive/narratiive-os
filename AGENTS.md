@@ -186,3 +186,56 @@ The existing runtime test command is:
 
 Python 3.10 or newer is required by the repository; CI currently runs the suite
 on Python 3.12. Do not invent new mandatory tooling without an approved change.
+
+## Rapid prototype execution mandate
+
+Narratiive OS is an internal prototype. The current priority is a working,
+observable, end-to-end synthetic-client journey, not preservation of obsolete
+interfaces or accumulation of disconnected infrastructure.
+
+**Build → Integrate → Test → Demonstrate → Improve.**
+
+- Prefer the smallest change that makes a real workflow capability operate.
+- Extend the canonical Tony runtime and authoritative WorkflowState; do not
+  create parallel orchestration, business state, or Mission Control systems.
+- Integrate capabilities promptly and demonstrate their behaviour with actual
+  runtime evidence. Mission Control is an evidence-backed view, not a separate
+  source of truth.
+- Treat commercial journey labels (GROUNDWORK, Discovery, FIELDWORK,
+  provisional SKETCHBOOK, Creative Production, Campaign Preparation) as
+  presentation groupings, not replacements for canonical workflow stages.
+  Identify unimplemented or unverified stages explicitly.
+- Use clearly labelled synthetic clients and isolated test adapters to exercise
+  transitions, specialist handoffs, artefacts, quality gates, and approvals.
+  Never represent simulated execution as a genuine provider action or human
+  approval.
+- Retire obsolete prototype UI or experimental paths when their dependencies
+  have been checked and doing so preserves authoritative records, evidence,
+  version lineage, security, and required approval gates. Backward compatibility
+  is not an end in itself for synthetic prototype views.
+- Prefer focused development tests and meaningful end-to-end verification;
+  required CI and independent review remain mandatory. Avoid redundant full
+  local test-suite runs.
+- Report **WORKING**, **VERIFIED**, **BLOCKED**, and **NEXT**, distinguishing
+  implemented, tested, independently reviewed, merged, deployed, and
+  operationally verified. Passing tests alone is not live verification.
+
+### Current engineering coordination
+
+For the rapid-prototype programme, Codex coordinates integration, Mission
+Control, deployment, and the synthetic end-to-end demonstration. Claude Code
+focuses on specialist capabilities, agent handoffs, production routing, and
+quality behaviour. These are working assignments, not grants of additional
+constitutional authority. Coordinate cross-owned files and avoid duplicate
+implementations; the AI Constitution and decision-authority contracts prevail.
+
+### Prototype safety boundaries
+
+Speed does not permit exposing credentials, paid-provider calls, media spend,
+external publication, unapproved client communications, invented evidence,
+fabricated founder approvals, or bypassing independent review. Genuine external
+or client-facing actions retain their exact-version human approval gates.
+
+**Success means a synthetic client can progress through implemented stages,
+with attributable agent work, inspectable artefacts, quality results, recorded
+state transitions, and truthful status in Mission Control.**
