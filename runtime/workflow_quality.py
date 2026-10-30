@@ -1347,7 +1347,7 @@ def _fieldwork_offer(value: Any) -> bool:
         and _substantive_text(value.get("recommendation"), minimum_words=10)
         and _meaningful_list(value.get("deliverables"), minimum=3)
         and _substantive_text(value.get("duration"), minimum_words=1)
-        and "approved" in str(value.get("investment_status") or "").casefold()
+        and str(value.get("investment_status") or "").casefold() == "pending human commercial approval"
         and value.get("fee_source") == "commercial_context.approved_fieldwork_fee"
     )
 
