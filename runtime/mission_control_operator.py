@@ -12,6 +12,11 @@ from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.mission_control import VALID_CONNECTION_STATES
 from runtime.models import ArtifactRef, StageRecord, WorkflowState
 from runtime.repositories import WorkflowEvent
+from runtime.workflow_entity_classification import (
+    FileWorkflowEntityClassificationJournal,
+    INTERNAL_SYNTHETIC_TEST,
+    WorkflowEntityClassification,
+)
 from runtime.workflow_mission_control import workflow_state_name
 
 
@@ -77,10 +82,14 @@ class OperatorMissionControlProjector:
         workflow_root: str | Path,
         workflow_workspace_id: str,
         worker_timeout_seconds: Mapping[str, int] | None = None,
+        classifications: FileWorkflowEntityClassificationJournal | None = None,
     ) -> None:
         self.workflow_root = Path(workflow_root).resolve()
         self.workflow_workspace_id = workflow_workspace_id
         self.evidence = FileWorkflowEvidenceReader(self.workflow_root)
+        self.classifications = classifications or FileWorkflowEntityClassificationJournal(
+            self.workflow_root
+        )
         self.visibility = ExecutiveVisibilityPolicy()
         self.worker_timeout_seconds = {
             str(capability): int(seconds)
@@ -103,30 +112,33 @@ class OperatorMissionControlProjector:
             raise ValueError("workflow state workspace mismatch")
         visible_leads = self.visibility.visible_leads(all_leads)
         policy_states = self.visibility.visible_workflows(all_states, all_leads)
-        scoped = tuple(state for state in policy_states if not self._explicit_synthetic(state))
-        visible_keys = {
-            *(lead.lead_id for lead in visible_leads),
-            *(state.client_id or state.entity_id for state in scoped),
-        }
-        all_keys = {
-            *(lead.lead_id for lead in all_leads),
-            *(state.client_id or state.entity_id for state in all_states),
-        }
+        classifications = self.classifications.latest(self.workflow_workspace_id)
+        scoped = tuple(policy_states)
         lead_by_id = {lead.lead_id: lead for lead in visible_leads}
         grouped: dict[str, list[WorkflowState]] = defaultdict(list)
+        lead_by_workflow_key: dict[str, InboundLead] = {}
         for state in scoped:
-            grouped[state.client_id or state.entity_id].append(state)
+            key = state.client_id or state.entity_id
+            grouped[key].append(state)
+            for identity in (state.client_id, state.entity_id):
+                lead = lead_by_id.get(identity)
+                if lead is not None:
+                    lead_by_workflow_key[key] = lead
         for lead in visible_leads:
-            grouped.setdefault(lead.lead_id, [])
+            if lead not in lead_by_workflow_key.values():
+                grouped.setdefault(lead.lead_id, [])
 
-        opportunities = [self._opportunity(key, runs, lead_by_id.get(key), now) for key, runs in grouped.items()]
+        opportunities = [
+            self._opportunity(key, runs, lead_by_workflow_key.get(key), now, classifications)
+            for key, runs in grouped.items()
+        ]
         opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
         live = [item for item in opportunities if not item["synthetic"]]
         active = [item for item in live if item["lifecycle_stage"] != "complete"]
         needs_you = [self._queue_item(item) for item in live if item["requires_matt"]]
         attention = [item for item in live if item["attention_state"] in {"blocked", "waiting_externally", "failed", "stale"}]
         activity = sorted(
-            (event for item in opportunities for event in item["activity"]),
+            (event for item in live for event in item["activity"]),
             key=lambda item: item["occurred_at"], reverse=True,
         )[:30]
         running = sum(item["attention_state"] == "running" for item in active)
@@ -140,7 +152,7 @@ class OperatorMissionControlProjector:
                 "waiting_for_matt": len(needs_you),
                 "blocked": sum(item["attention_state"] == "blocked" for item in active),
                 "running_autonomously": running,
-                "synthetic_hidden": len(all_keys - visible_keys),
+                "synthetic_hidden": sum(item["synthetic"] for item in opportunities),
             },
             "system": {
                 "status": str((system_snapshot or {}).get("status") or "unknown"),
@@ -160,14 +172,17 @@ class OperatorMissionControlProjector:
         runs: list[WorkflowState],
         lead: InboundLead | None,
         generated_at: str,
+        classifications: Mapping[str, WorkflowEntityClassification],
     ) -> dict[str, Any]:
         runs.sort(key=lambda state: (state.updated_at, state.run_id))
         latest = runs[-1] if runs else None
         name = (lead.company or lead.contact).strip() if lead else ""
         if not name:
             name = next((workflow_state_name(state) for state in runs if workflow_state_name(state) not in {state.client_id, state.entity_id}), key)
-        synthetic = bool(lead and self._lead_is_synthetic(lead)) or any(
-            self._explicit_synthetic(state) for state in runs
+        synthetic = any(
+            getattr(classifications.get(state.entity_id), "classification", None)
+            == INTERNAL_SYNTHETIC_TEST
+            for state in runs
         )
         lifecycle = self._lifecycle(runs, lead)
         blocker = next(
@@ -239,20 +254,6 @@ class OperatorMissionControlProjector:
             "acquisition_path": "inbound" if lead and lead.source.strip().casefold() in {"tally", "growth diagnostic", "website"} else "unknown",
             "evidence": [f"workflow:{state.run_id}" for state in runs] + ([f"lead:{lead.lead_id}"] if lead else []),
         }
-
-    @staticmethod
-    def _explicit_synthetic(state: WorkflowState) -> bool:
-        payload = state.input_payload
-        return payload.get("synthetic") is True or payload.get("test_fixture") is True or any(
-            str(item).startswith("synthetic:") for item in payload.get("evidence", []) if isinstance(item, str)
-        )
-
-    @staticmethod
-    def _lead_is_synthetic(lead: InboundLead) -> bool:
-        if lead.disposition in {"suppressed", "test", "archived"}:
-            return True
-        label = f"{lead.company} {lead.contact}".strip().casefold()
-        return label.startswith(("safe ", "test ", "qa test ", "qa proposition "))
 
     @staticmethod
     def _lifecycle(runs: list[WorkflowState], lead: InboundLead | None) -> str:

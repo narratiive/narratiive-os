@@ -1,6 +1,7 @@
 import { createHmac } from "node:crypto";
 
 const DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
+const CLASSIFICATION_OPERATION = "classify_synthetic_test";
 const TARGET_PATTERN = /\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|creative(?:\s+director(?:'s|’s))?\s+bible|proposal|version|current\s+work)\b/i;
 const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b/i;
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
@@ -23,15 +24,18 @@ export function hasExplicitWorkflowDecisionIntent(operation, instruction) {
   return /(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b/i.test(text);
 }
 
-export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction }) {
-  return [
+export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "" }) {
+  const normalized = normalizedOperation(operation);
+  const fields = [
     "narratiive-workflow-decision-v1",
     String(runId || ""),
-    normalizedOperation(operation),
+    normalized,
     String(reference || ""),
     String(approvalToken || ""),
     String(instruction || ""),
-  ].join("\0");
+  ];
+  if (normalized === CLASSIFICATION_OPERATION) fields.push(String(authorisationReference || ""));
+  return fields.join("\0");
 }
 
 export function signWorkflowDecisionProof(secret, fields) {
@@ -67,5 +71,42 @@ export function buildTrustedWorkflowDecisionParams(params, trustedTurn, bridgeTo
     approval_instruction: instruction,
     _approval_instruction_run_id: trustedTurn.runId,
     _approval_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
+  };
+}
+
+export function buildTrustedWorkflowClassificationParams(params, trustedTurn, bridgeToken) {
+  const operation = normalizedOperation(params?.operation);
+  if (operation !== CLASSIFICATION_OPERATION) return params;
+  if (!trustedTurn?.runId || typeof trustedTurn.prompt !== "string") {
+    throw new Error("workflow classification requires the current trusted human turn");
+  }
+  const instruction = String(params?.classification_instruction || "");
+  if (!instruction || instruction !== trustedTurn.prompt) {
+    throw new Error("classification_instruction must exactly equal the verbatim current human instruction");
+  }
+  if (!/\bclassif(?:y|ication)\b/i.test(instruction) || !/\bsynthetic\b/i.test(instruction)) {
+    throw new Error("the current human instruction must explicitly classify this workflow as synthetic");
+  }
+  const reference = String(params?.reference || "").trim();
+  const authorisationReference = String(params?.authorisation_reference || "").trim();
+  if (!reference || !authorisationReference) {
+    throw new Error("workflow classification requires an exact entity reference and authorisation reference");
+  }
+  if (!instruction.includes(reference)) {
+    throw new Error("the current human instruction must name the exact workflow entity reference");
+  }
+  const fields = {
+    runId: trustedTurn.runId,
+    operation,
+    reference,
+    approvalToken: "",
+    instruction,
+    authorisationReference,
+  };
+  return {
+    ...params,
+    classification_instruction: instruction,
+    _classification_instruction_run_id: trustedTurn.runId,
+    _classification_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
   };
 }

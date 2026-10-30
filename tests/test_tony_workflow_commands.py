@@ -11,6 +11,7 @@ from runtime.serialization import workflow_to_dict
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from runtime.workflow_entity_classification import FileWorkflowEntityClassificationJournal
 from tests.test_workflow_quality import (
     blueprint_director_output,
     campaign_world_candidates_output,
@@ -157,6 +158,44 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(len(approvals.data["runs"]), 1)
         self.assertIn("blueprint_lite", artefact.data["artefact_fields"])
         self.assertNotIn("input_payload", status.data)
+
+    def test_classification_requires_exact_entity_authorisation_and_preserves_workflow(self) -> None:
+        self.runtime.enqueue(
+            "growth_diagnostic_to_blueprint_lite",
+            "safe-secondary-run",
+            {"diagnostic_input_package": {"overall_score": 40}, "company": "SAFE Executive Workflow Test"},
+            entity_id="safe-lead",
+            correlation_id="safe-secondary-correlation",
+        )
+        service = TonyWorkflowCommandService(
+            FallbackCommands(),
+            FileWorkflowCommandBackend(
+                self.root, dispatchers=self.dispatchers, environ={}, workspace_id="narratiive"
+            ),
+        )
+        denied = service.execute(
+            "/classify-synthetic-test safe-executive-run because authorised test",
+            [],
+            principal_id="telegram:founder",
+            inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
+        )
+        self.assertEqual(denied.data["error_code"], "exact_workflow_entity_not_found")
+
+        result = service.execute(
+            "/classify-synthetic-test safe-lead because authorised internal test",
+            [],
+            principal_id="telegram:founder",
+            inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
+        )
+
+        self.assertEqual(result.status, "healthy")
+        self.assertEqual(result.data["entity_id"], "safe-lead")
+        state = next(item for item in service.backend.list_states() if item.run_id == "safe-executive-run")
+        self.assertEqual(state.approval_status, "pending")
+        journal = FileWorkflowEntityClassificationJournal(
+            self.root, authorised_classifier_id="telegram:founder"
+        )
+        self.assertEqual(journal.latest("narratiive")["safe-lead"].workflow_id, state.workflow_id)
 
     def test_campaign_portfolio_reports_one_safe_current_position_per_client(self) -> None:
         second = build_tony_workflow_runtime(

@@ -4,7 +4,7 @@ import { buildNativeApprovalRequirement, buildWorkflowApprovalRequirement } from
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 import { resolveBridgeToken } from "./bridge-auth.js";
-import { buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
+import { buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
@@ -41,6 +41,7 @@ const WORKFLOW_OPERATIONS = [
   "resume", "recover", "projection", "sync_notion",
   "additional_research", "deliver_internal_review",
   "commission", "artifact_detail", "action_preview", "execute_action",
+  "classify_synthetic_test",
 ];
 const WORKFLOW_ARTIFACT_DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
 const WORKFLOW_DECISION_OPERATIONS = new Set([...WORKFLOW_ARTIFACT_DECISION_OPERATIONS, "execute_action"]);
@@ -56,6 +57,8 @@ const WORKFLOW_SCHEMA = {
   recipient: { type: "string", minLength: 1, maxLength: 320 },
   workflow_id: { type: "string", minLength: 1, maxLength: 200 },
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
+  classification_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human instruction explicitly classifying this exact workflow entity as an internal synthetic test." },
+  authorisation_reference: { type: "string", minLength: 1, maxLength: 500, description: "Durable reference for the explicit founder authorisation." },
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {
@@ -110,7 +113,7 @@ async function executeWorkflowControl(params) {
   const reference = String(params?.reference || "").trim();
   const rationale = String(params?.rationale || "").trim();
   if (!WORKFLOW_REFERENCE_OPTIONAL.has(operation) && !reference) throw new Error("workflow reference is required");
-  if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation) || operation === "commission") && !rationale) throw new Error("workflow decisions require a rationale");
+  if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation) || operation === "commission" || operation === "classify_synthetic_test") && !rationale) throw new Error("workflow decisions require a rationale");
   if (operation === "commission" && (!params?.workflow_id || !params?.commitment_id)) throw new Error("commission requires workflow_id and commitment_id");
   const approvalToken = String(params?.approval_token || "").trim();
   if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
@@ -119,6 +122,9 @@ async function executeWorkflowControl(params) {
   if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !hasExplicitWorkflowDecisionIntent(operation, approvalInstruction)) throw new Error(`the current human instruction does not explicitly ${operation.replace("_", " ")} this artefact`);
   const actionDigest = String(params?.action_digest || "").trim();
   if (operation === "execute_action" && !actionDigest) throw new Error("action execution requires the exact preview action digest");
+  const authorisationReference = String(params?.authorisation_reference || "").trim();
+  const classificationInstruction = String(params?.classification_instruction || "");
+  if (operation === "classify_synthetic_test" && (!authorisationReference || !classificationInstruction)) throw new Error("workflow classification requires the verbatim current instruction and authorisation reference");
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
@@ -138,6 +144,10 @@ async function executeWorkflowControl(params) {
           ...(approvalInstruction ? { approval_instruction: approvalInstruction } : {}),
           ...(params?._approval_instruction_run_id ? { approval_instruction_run_id: String(params._approval_instruction_run_id) } : {}),
           ...(params?._approval_instruction_proof ? { approval_instruction_proof: String(params._approval_instruction_proof) } : {}),
+          ...(params?.classification_instruction ? { classification_instruction: String(params.classification_instruction) } : {}),
+          ...(authorisationReference ? { authorisation_reference: authorisationReference } : {}),
+          ...(params?._classification_instruction_run_id ? { classification_instruction_run_id: String(params._classification_instruction_run_id) } : {}),
+          ...(params?._classification_instruction_proof ? { classification_instruction_proof: String(params._classification_instruction_proof) } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),
@@ -290,14 +300,17 @@ export default definePluginEntry({
     };
     api.on("before_agent_run", rememberTrustedTurn);
     api.on("before_tool_call", async (event, ctx) => {
-      if (event.toolName === "narratiive_workflow_control" && WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase())) {
+      if (event.toolName === "narratiive_workflow_control" && (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase()) || String(event.params?.operation || "").toLowerCase() === "classify_synthetic_test")) {
         const runId = String(ctx?.runId || event.runId || "").trim();
         const trustedTurn = trustedTurns.get(runId);
         if (!trustedTurn || Date.now() - trustedTurn.recordedAt > 10 * 60 * 1000) {
           return { block: true, blockReason: "Workflow artefact decision requires a current trusted human turn." };
         }
         try {
-          return { params: buildTrustedWorkflowDecisionParams(event.params || {}, trustedTurn, resolveBridgeToken()) };
+          const params = String(event.params?.operation || "").toLowerCase() === "classify_synthetic_test"
+            ? buildTrustedWorkflowClassificationParams(event.params || {}, trustedTurn, resolveBridgeToken())
+            : buildTrustedWorkflowDecisionParams(event.params || {}, trustedTurn, resolveBridgeToken());
+          return { params };
         } catch (error) {
           return { block: true, blockReason: String(error?.message || error) };
         }

@@ -11,13 +11,21 @@ from openclaw.mission_control_web import MissionControlWebApplication
 from runtime.inbound_leads import InboundLead
 from runtime.mission_control_operator import OperatorMissionControlProjector
 from runtime.models import ArtifactRef, StageRecord, StageStatus, WorkflowState, WorkflowStatus
+from runtime.workflow_entity_classification import (
+    FileWorkflowEntityClassificationJournal,
+    INTERNAL_SYNTHETIC_TEST,
+    WorkflowEntityClassification,
+)
 
 
 class MissionControlOperatorTests(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
-        self.projector = OperatorMissionControlProjector(workflow_root=self.root, workflow_workspace_id="narratiive")
+        self.classifications = FileWorkflowEntityClassificationJournal(
+            self.root, authorised_classifier_id="telegram:founder"
+        )
+        self.projector = OperatorMissionControlProjector(workflow_root=self.root, workflow_workspace_id="narratiive", classifications=self.classifications)
 
     def tearDown(self):
         self.tmp.cleanup()
@@ -65,11 +73,70 @@ class MissionControlOperatorTests(unittest.TestCase):
     def test_synthetic_is_labelled_and_excluded_from_executive_counts(self):
         live = self._state()
         test = self._state(client="fixture", synthetic=True)
-        lead = InboundLead("fixture", "Tester", company="Synthetic Tester", disposition="test")
+        self.classifications.append(
+            WorkflowEntityClassification.create(
+                workspace_id="narratiive", entity_id="fixture", workflow_id=test.workflow_id,
+                classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
+                authorisation_reference="approval:test-fixture", authorisation_turn_id="turn-fixture", authorisation_proof="proof-fixture", reason="Authorised fixture.",
+            ),
+            states=[test], principal_id="telegram:founder",
+        )
+        lead = InboundLead("fixture", "Tester", company="Synthetic Tester")
         result = self.projector.project(states=[live, test], leads=[lead], generated_at="2026-10-04T12:00:00Z")
         self.assertEqual(result["summary"]["active_opportunities"], 1)
         self.assertEqual(result["summary"]["synthetic_hidden"], 1)
-        self.assertEqual([item["id"] for item in result["opportunities"]], ["catkin"])
+        self.assertEqual([item["id"] for item in result["opportunities"]], ["fixture", "catkin"])
+        self.assertTrue(next(item for item in result["opportunities"] if item["id"] == "fixture")["synthetic"])
+
+    def test_payload_and_lead_text_cannot_hide_live_work(self):
+        state = self._state(client="live-client", synthetic=True)
+        state.input_payload = {"synthetic": True, "notes": "SYNTHETIC INTERNAL TEST"}
+        lead = InboundLead("live-client", "Live", company="Live Client")
+
+        result = self.projector.project(states=[state], leads=[lead])
+
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
+        self.assertFalse(result["opportunities"][0]["synthetic"])
+
+    def test_legacy_test_disposition_cannot_hide_an_unclassified_workflow(self):
+        state = self._state(client="legacy-test")
+        lead = InboundLead("legacy-test", "Tester", company="Test-looking Client", disposition="test")
+
+        result = self.projector.project(states=[state], leads=[lead])
+
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
+        self.assertFalse(result["opportunities"][0]["synthetic"])
+
+    def test_classified_entity_hides_only_its_approval_and_retains_katkin(self):
+        loom = self._state(
+            client="loom-client", status=WorkflowStatus.AWAITING_APPROVAL,
+            approval="pending",
+        )
+        loom.entity_id = "inbound-d1b96a67"
+        katkin = self._state(
+            client="katkin", status=WorkflowStatus.AWAITING_APPROVAL,
+            approval="pending",
+        )
+        katkin.entity_id = "katkin-growth-blueprint-deliverable-v5-canonical-handoff-r8"
+        katkin.input_payload["company"] = "CatKin"
+        self.classifications.append(
+            WorkflowEntityClassification.create(
+                workspace_id="narratiive", entity_id="inbound-d1b96a67", workflow_id=loom.workflow_id,
+                classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
+                authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="Authorised test.",
+            ),
+            states=[loom], principal_id="telegram:founder",
+        )
+
+        loom_lead = InboundLead("inbound-d1b96a67", "Loom", company="Loom Loft")
+        result = self.projector.project(states=[loom, katkin], leads=[loom_lead])
+
+        self.assertEqual(result["summary"]["waiting_for_matt"], 1)
+        self.assertEqual(result["summary"]["active_opportunities"], 1)
+        self.assertEqual([item["company"] for item in result["needs_you"]], ["CatKin"])
+        audit = next(item for item in result["opportunities"] if item["id"] == "loom-client")
+        self.assertEqual(audit["kind"], "TEST")
+        self.assertTrue(audit["requires_matt"])
 
     def test_archived_suppressed_and_completed_leads_do_not_enter_projection(self):
         states = [
@@ -89,7 +156,7 @@ class MissionControlOperatorTests(unittest.TestCase):
 
         self.assertEqual([item["id"] for item in result["opportunities"]], ["live"])
         self.assertEqual(result["summary"]["active_opportunities"], 1)
-        self.assertEqual(result["summary"]["synthetic_hidden"], 3)
+        self.assertEqual(result["summary"]["synthetic_hidden"], 0)
         self.assertTrue(all(item["company"] == "Live" for item in result["activity"]))
 
     def test_artifact_route_rejects_unprojected_foreign_scope(self):

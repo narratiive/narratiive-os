@@ -95,6 +95,7 @@ from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCo
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
+from runtime.workflow_entity_classification import FileWorkflowEntityClassificationJournal
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
@@ -139,16 +140,20 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
 
 
 def workflow_decision_proof_material(
-    *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str
+    *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
+    authorisation_reference: str = "",
 ) -> bytes:
+    normalized_operation = operation.strip().casefold().replace("-", "_")
     values = (
         "narratiive-workflow-decision-v1",
         run_id,
-        operation.strip().casefold().replace("-", "_"),
+        normalized_operation,
         reference,
         approval_token,
         instruction,
     )
+    if normalized_operation == "classify_synthetic_test":
+        values = (*values, authorisation_reference)
     return "\0".join(values).encode("utf-8")
 
 
@@ -161,6 +166,7 @@ def verify_workflow_decision_proof(
     approval_token: str,
     instruction: str,
     proof: str,
+    authorisation_reference: str = "",
 ) -> bool:
     if not secret or not run_id or not proof:
         return False
@@ -172,6 +178,7 @@ def verify_workflow_decision_proof(
             reference=reference,
             approval_token=approval_token,
             instruction=instruction,
+            authorisation_reference=authorisation_reference,
         ),
         hashlib.sha256,
     ).hexdigest()
@@ -420,6 +427,7 @@ class LeadAwareTonyApplication:
                 "campaign-learning": "learning",
                 "campaign-learning-queue": "learning-queue",
                 "sync-campaign-learning": "sync-learning",
+                "classify-synthetic-test": "classify-synthetic-test",
             }
             command_name = commands.get(operation)
             if command_name is None:
@@ -432,7 +440,7 @@ class LeadAwareTonyApplication:
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
-                "sync-campaign-learning",
+                "sync-campaign-learning", "classify-synthetic-test",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
@@ -440,7 +448,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 if operation in {"approve", "reject", "request-revision"}:
@@ -469,6 +477,26 @@ class LeadAwareTonyApplication:
                         "verbatim_current_human_instruction_verified": True,
                         "explicit_decision_intent": operation.replace("-", "_"),
                     }
+                if operation == "classify-synthetic-test":
+                    instruction = str((inputs or {}).get("classification_instruction") or "")
+                    instruction_run_id = str((inputs or {}).get("classification_instruction_run_id") or "").strip()
+                    instruction_proof = str((inputs or {}).get("classification_instruction_proof") or "").strip()
+                    authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
+                    if not instruction or "classif" not in instruction.casefold() or "synthetic" not in instruction.casefold():
+                        raise ValueError("workflow classification requires an explicit current-human classification instruction")
+                    if not instruction_run_id or not authorisation_reference:
+                        raise ValueError("workflow classification requires trusted-turn provenance and an authorisation reference")
+                    if not verify_workflow_decision_proof(
+                        str(self.base.bridge_token or ""),
+                        run_id=instruction_run_id,
+                        operation=operation,
+                        reference=reference,
+                        approval_token="",
+                        instruction=instruction,
+                        proof=instruction_proof,
+                        authorisation_reference=authorisation_reference,
+                    ):
+                        raise ValueError("workflow classification lacks verified verbatim current-human instruction provenance")
                 principal = (
                     f"matt:{self.authorised_principal_id}"
                     if operation == "sync-campaign-learning"
@@ -1020,6 +1048,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         Path(os.getenv("TONY_CONVERSATION_WORK_ROOT", str(REPOSITORY_ROOT / ".runtime" / "conversation-work"))).resolve()
     )
     conversation_ingress = TonyConversationIngress(conversation_store, workspace_id=workspace_id)
+    classification_principal_id = (
+        f"telegram:{os.getenv('TONY_TELEGRAM_CHAT_ID', '').strip()}"
+        if os.getenv("TONY_TELEGRAM_CHAT_ID", "").strip()
+        else ""
+    )
     operator_projector = OperatorMissionControlProjector(
         workflow_root=workflow_runtime_root,
         workflow_workspace_id=(
@@ -1033,6 +1066,9 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
                 or CLAUDE_DEFAULT_TIMEOUT_SECONDS
             )
         },
+        classifications=FileWorkflowEntityClassificationJournal(
+            workflow_runtime_root, authorised_classifier_id=classification_principal_id
+        ),
     )
 
     def load_operator_snapshot() -> dict[str, Any]:
@@ -1118,11 +1154,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         agent_gateway=build_gateway(),
         blueprint_lite_service=blueprint_lite_service,
         workflow_command_service=workflow_command_service,
-        authorised_principal_id=(
-            f"telegram:{os.getenv('TONY_TELEGRAM_CHAT_ID', '').strip()}"
-            if os.getenv("TONY_TELEGRAM_CHAT_ID", "").strip()
-            else ""
-        ),
+        authorised_principal_id=classification_principal_id,
         attention_service=attention_service,
         conversation_ingress=conversation_ingress,
         media_control=media_control,
