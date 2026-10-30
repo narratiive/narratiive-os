@@ -202,6 +202,9 @@ def _normalise_fieldwork_commercial_offer(
     proposal_id = text("proposal_id")
     recipient_email = text("recipient_email").casefold()
     proposal_url = text("proposal_url")
+    scope_summary = text("scope_summary")
+    balance_terms = text("balance_terms")
+    service_terms_url = text("service_terms_url")
     artifact_id = text("proposal_artifact_id")
     artifact_version = text("proposal_artifact_version")
     artifact_checksum = text("proposal_artifact_checksum").removeprefix("sha256:")
@@ -210,6 +213,10 @@ def _normalise_fieldwork_commercial_offer(
         raise InternalReviewDeliveryError("commercial offer requires an exact approved recipient email and proposal ID")
     if not proposal_url.startswith("https://"):
         raise InternalReviewDeliveryError("commercial offer proposal URL must use HTTPS")
+    if not scope_summary or not balance_terms:
+        raise InternalReviewDeliveryError("commercial offer requires the exact approved scope and balance terms")
+    if not service_terms_url.startswith("https://"):
+        raise InternalReviewDeliveryError("commercial offer service terms URL must use HTTPS")
     if len(currency) != 3 or not currency.isalpha():
         raise InternalReviewDeliveryError("commercial offer currency must be a three-letter ISO code")
     if (
@@ -229,6 +236,9 @@ def _normalise_fieldwork_commercial_offer(
         "proposal_id": proposal_id,
         "recipient_email": recipient_email,
         "proposal_url": proposal_url,
+        "scope_summary": scope_summary,
+        "balance_terms": balance_terms,
+        "service_terms_url": service_terms_url,
         "proposal_artifact_id": artifact_id,
         "proposal_artifact_version": artifact_version,
         "proposal_artifact_checksum": artifact_checksum,

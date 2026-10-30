@@ -161,6 +161,9 @@ def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspa
         or _text(offer.get("proposal_id")) != _text(proposal.get("proposal_id"))
         or _text(offer.get("recipient_email")).casefold() != _text(proposal.get("client_email")).casefold()
         or _text(offer.get("proposal_url")) != _text(proposal.get("proposal_url"))
+        or _text(offer.get("scope_summary")) != _text(proposal.get("scope_summary"))
+        or _text(offer.get("balance_terms")) != _text(proposal.get("balance_terms"))
+        or _text(offer.get("service_terms_url")) != _text(proposal.get("service_terms_url"))
         or _text(offer.get("proposal_artifact_id")) != _text(getattr(artifact, "artifact_id", ""))
         or _text(offer.get("proposal_artifact_version")) != expected_version
         or _text(offer.get("proposal_artifact_checksum")).removeprefix("sha256:") != artifact_checksum

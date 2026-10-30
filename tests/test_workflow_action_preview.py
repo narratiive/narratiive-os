@@ -114,6 +114,9 @@ class WorkflowActionPreviewTests(unittest.TestCase):
             "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
             "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
             "deposit_amount_minor": 300000, "currency": "GBP",
+            "scope_summary": "Synthetic FIELDWORK scope for action-preview coverage.",
+            "balance_terms": "Synthetic balance due on delivery.",
+            "service_terms_url": "https://narratiive.example.invalid/terms",
         }
         offer_preview = self.service.execute(
             f"/fieldwork-offer {run_id}", [],

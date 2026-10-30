@@ -20,7 +20,7 @@ commission paid specialist work during acceptance testing.
 | Capability | Existing operational evidence | Reuse decision |
 | --- | --- | --- |
 | Proposal production | `discovery_evidence_to_growth_sprint_proposal` produces a governed Growth Sprint proposal with evidence lineage and commercial inputs. | Reuse. |
-| Founder review | Workflow approval binds the decision to the exact artefact checksum and approval token. | Reuse; checkout registration requires the recorded founder approval ID and proposal checksum. |
+| Founder review | Workflow approval binds the decision to the exact client, proposal ID and HTTPS URL, artefact ID/version/checksum, scope summary, fixed investment, deposit, currency, balance terms, service-terms URL and approval token. | Reuse; checkout registration requires the recorded founder approval ID and revalidates every approved commercial value. |
 | Proposal email | Gmail has an approval-gated, idempotent send adapter with verified message IDs. The current post-Discovery service separately gates proposal send and Notion stage sync. | Reuse through the narrow FIELDWORK proposal delivery adapter. |
 | Proposal outcome | Tony already monitors the exact Gmail thread and distinguishes acceptance intent, objection, decline and silence. | Retain for non-Checkout replies; Stripe becomes the payment proof. |
 | Commercial lifecycle | Notion is authoritative for live lead/commercial state. The repository also exposes `ClientLifecycleRecord` and Mission Control projections. | Reuse the exact existing Notion record; do not create a duplicate client. |

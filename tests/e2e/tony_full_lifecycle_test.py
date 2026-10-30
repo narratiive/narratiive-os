@@ -709,6 +709,9 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
                         "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
                         "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
                         "deposit_amount_minor": 300000, "currency": "GBP",
+                        "scope_summary": "Synthetic FIELDWORK scope for full lifecycle coverage.",
+                        "balance_terms": "Synthetic balance due on delivery.",
+                        "service_terms_url": "https://narratiive.example.invalid/terms",
                     }
                     preview = fieldwork_commercial_offer_preview(state, token, offer)
                     binding = approval_binding_evidence(
@@ -848,6 +851,9 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
                         "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
                         "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
                         "deposit_amount_minor": 300000, "currency": "GBP",
+                        "scope_summary": "Synthetic FIELDWORK scope for full lifecycle coverage.",
+                        "balance_terms": "Synthetic balance due on delivery.",
+                        "service_terms_url": "https://narratiive.example.invalid/terms",
                     }
                     preview = fieldwork_commercial_offer_preview(state, token, offer)
                     kwargs["approval_binding"] = approval_binding_evidence(

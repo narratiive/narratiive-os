@@ -749,12 +749,23 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
             "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
             "deposit_amount_minor": 300000, "currency": "GBP",
+            "scope_summary": "Synthetic FIELDWORK scope for approval-binding regression coverage.",
+            "balance_terms": "Synthetic balance due on delivery.",
+            "service_terms_url": "https://narratiive.example.invalid/terms",
         }
         preview = self.service.execute(
             f"/fieldwork-offer {run_id}", [], inputs={"approval_token": token, "fieldwork_commercial_offer": offer},
         )
         self.assertEqual(preview.status, "attention_required")
         self.assertFalse(preview.data["external_action_taken"])
+        for required_field in ("scope_summary", "balance_terms", "service_terms_url"):
+            missing = {key: value for key, value in offer.items() if key != required_field}
+            missing_preview = self.service.execute(
+                f"/fieldwork-offer {run_id}", [],
+                inputs={"approval_token": token, "fieldwork_commercial_offer": missing},
+            )
+            self.assertEqual(missing_preview.status, "error")
+            self.assertIn("commercial offer", missing_preview.message)
         with self.assertRaisesRegex(ValueError, "current exact commercial offer binding"):
             self.runtime.approve(
                 run_id,

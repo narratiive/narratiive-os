@@ -366,6 +366,9 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
             "proposal_artifact_id": "proposal-artifact-1", "proposal_artifact_version": "v1",
             "proposal_artifact_checksum": "synthetic-proposal-v1", "fixed_investment_minor": 600_000,
             "deposit_amount_minor": 300_000, "currency": "GBP",
+            "scope_summary": "A two-page FIELDWORK strategic growth sprint covering the agreed evidence, diagnosis and action plan.",
+            "balance_terms": "The remaining balance is due on delivery of the agreed FIELDWORK output.",
+            "service_terms_url": "https://narratiive.example.invalid/terms",
         }
         parent = SimpleNamespace(
             run_id="proposal-run-synthetic-001", client_id="synthetic-client-001", workspace_id="narratiive", workflow_id="discovery_evidence_to_growth_sprint_proposal",
@@ -412,6 +415,9 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
             ("total_amount_minor", 600_001),
             ("deposit_amount_minor", 300_001),
             ("currency", "USD"),
+            ("scope_summary", "Substituted scope"),
+            ("balance_terms", "Substituted balance terms"),
+            ("service_terms_url", "https://narratiive.example.invalid/substituted-terms"),
         ):
             proposal_record[field] = replacement
             with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
