@@ -570,10 +570,13 @@ class WorkflowQualityTests(unittest.TestCase):
             ("recommendation", "FIELDWORK fee is approved at £12,000."),
             ("draft_client_communication", "The FIELDWORK fee is approved at £12,000; this draft remains for review."),
             ("recommendation", "The FIELDWORK fee remains pending at £12,000."),
+            ("commercial_insight", "The FIELDWORK fee remains pending at £12,000."),
         ):
             output = proposal_output()
             if field == "recommendation":
                 output["fieldwork_offer"][field] = claim + " We recommend FIELDWORK to resolve the strategic choices in the supplied evidence."
+            elif field == "commercial_insight":
+                output["commercial_opportunity"][field] = claim
             else:
                 output[field] = claim + " The proposal remains a founder-review draft and no work has been commissioned."
             result = growth_sprint_proposal_quality_gate(output)

@@ -1355,12 +1355,13 @@ def _fieldwork_offer(value: Any) -> bool:
 
 def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool:
     """Only the checksum-validated renderer may state an approved FIELDWORK fee."""
-    fields = (
-        output.get("fieldwork_offer"),
-        output.get("commercial_proposal_inputs"),
-        output.get("draft_client_communication"),
-    )
-    text = " ".join(_model_text(field) for field in fields)
+    proposal = dict(output)
+    opportunity = proposal.get("commercial_opportunity")
+    if isinstance(opportunity, Mapping):
+        proposal["commercial_opportunity"] = {
+            key: value for key, value in opportunity.items() if key != "monetary_estimate"
+        }
+    text = _model_text(proposal)
     return not re.search(
         r"(?:\b(?:fee|price|pricing)\b|[£$€]\s*\d|\b(?:GBP|USD|EUR)\s*\d)",
         text,
