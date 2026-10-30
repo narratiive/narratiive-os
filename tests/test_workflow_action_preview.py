@@ -64,7 +64,7 @@ class WorkflowActionPreviewTests(unittest.TestCase):
             {
                 "diagnostic_input_package": {"overall_score": 40},
                 "company": "KatKin",
-                "commercial_context": {"company": "KatKin"},
+                "commercial_context": {"company": "KatKin", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}},
             },
             entity_id="safe-katkin",
             correlation_id="safe-katkin",
@@ -97,7 +97,8 @@ class WorkflowActionPreviewTests(unittest.TestCase):
                 "discovery_evidence": {
                     "notes": "SAFE discovery evidence.",
                     "sources": [{"source_id": "safe", "source_type": "notes", "location": "safe:test"}],
-                }
+                },
+                "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}},
             },
         ).data["run_id"]
 
