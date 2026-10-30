@@ -213,7 +213,15 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             "ownership, not a new research or strategy agent.' (2) "
             "prepare_discovery (Discovery Preparation) is a REASONED "
             "ASSIGNMENT only -- the live instruction for that stage contains "
-            "no equivalent ownership statement. The assignment rests on "
+            "no equivalent ownership statement. The same is true of "
+            "prepare_blueprint_lite (GROUNDWORK itself, "
+            "growth_diagnostic_to_blueprint_lite) -- its instruction also "
+            "contains no ownership statement, but its output "
+            "(provisional_opportunity, growth_tension) is strategic "
+            "judgement, not evidence-labelling, which the Research Analyst "
+            "contract explicitly disclaims ('avoiding strategic "
+            "recommendations'); strategic_reasoning is the right capability "
+            "regardless of which specialist nominally owns it. Both rest on "
             "shared capability (strategic_reasoning) and methodological "
             "similarity, not on confirmed text; agents/strategy_director.md "
             "itself is left unedited either way, to avoid diluting its "
@@ -247,6 +255,7 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         ),
         worker_ids=("claude-anthropic",),
         canonical_stage_refs=(
+            ("growth_diagnostic_to_blueprint_lite", "prepare_blueprint_lite"),
             ("blueprint_lite_to_discovery_preparation", "prepare_discovery"),
             ("research_to_strategic_synthesis", "prepare_strategic_synthesis"),
             ("strategic_synthesis_to_strategy_thesis", "prepare_strategy_thesis"),

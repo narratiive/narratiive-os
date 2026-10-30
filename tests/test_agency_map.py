@@ -310,6 +310,24 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
                 f"the Blueprint Director pass completing must not verify {agent_id}",
             )
 
+    def test_groundwork_blueprint_lite_stage_is_assigned_to_strategy_director(self) -> None:
+        # GROUNDWORK itself (growth_diagnostic_to_blueprint_lite) uses the
+        # identical strategic_reasoning capability as the other stages
+        # already attributed to Strategy Director -- found while
+        # investigating the warm-lead-to-GROUNDWORK pipeline.
+        stage = StageRecord("prepare_blueprint_lite", "claude-anthropic", status=StageStatus.COMPLETED)
+        state = _state("growth_diagnostic_to_blueprint_lite", "run-6", [stage])
+        entries = {e.agent_id: e for e in build_agency_map([state])}
+
+        self.assertTrue(entries["strategy_director"].capability.live_verified.value)
+        for agent_id, entry in entries.items():
+            if agent_id == "strategy_director":
+                continue
+            self.assertFalse(
+                entry.capability.live_verified.value,
+                f"GROUNDWORK completing must not verify {agent_id}",
+            )
+
     def test_to_dict_contains_the_expected_shape_including_provenance(self) -> None:
         entry = build_agency_map()[0]
         payload = entry.to_dict()
