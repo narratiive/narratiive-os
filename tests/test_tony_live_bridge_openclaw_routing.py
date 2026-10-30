@@ -11,6 +11,7 @@ from unittest import mock
 from openclaw.tony_agent_gateway import TonyAgentGatewayError
 from openclaw.tony_live_bridge import LeadAwareTonyApplication
 from runtime.inbound_leads import FileInboundLeadStore
+from runtime.model_usage_budget import ModelBudgetConfigurationError
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
 
 
@@ -116,6 +117,49 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
         self.assertTrue(status.startswith("200"))
         self.assertNotEqual(payload["reply"], "NO_REPLY")
         self.assertIn("persisted work", payload["reply"])
+
+    def test_budget_accounting_configuration_failure_returns_a_safe_conversation_error(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _, gateway = self._app(tmp)
+            gateway.config.work_timeout_seconds = 30
+            app.model_budget_guard = mock.Mock()
+            app.model_budget_guard.reserve_capacity.side_effect = ModelBudgetConfigurationError("private detail")
+            status, payload = self._request(app, "Tony, what is the next action?")
+
+        self.assertTrue(status.startswith("503"))
+        self.assertEqual(payload["error"]["code"], "hosted_model_budget_unavailable")
+        self.assertNotIn("private detail", payload["error"]["message"])
+        gateway.converse.assert_not_called()
+
+    def test_post_dispatch_accounting_failure_never_claims_no_action_was_taken(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _, gateway = self._app(tmp)
+            gateway.config.work_timeout_seconds = 30
+            app.model_budget_guard = mock.Mock()
+            app.model_budget_guard.reserve_capacity.return_value = object()
+            app.model_budget_guard.release_reservation.side_effect = ModelBudgetConfigurationError("private detail")
+            status, payload = self._request(app, "Tony, what is the next action?")
+
+        self.assertTrue(status.startswith("503"))
+        self.assertEqual(payload["error"]["code"], "hosted_model_outcome_unconfirmed")
+        self.assertNotIn("private detail", payload["error"]["message"])
+        self.assertIn("action is unconfirmed", payload["error"]["message"])
+        gateway.converse.assert_called_once()
+
+    def test_gateway_failure_with_accounting_retention_error_reports_unconfirmed_outcome(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            app, _, gateway = self._app(tmp)
+            gateway.config.work_timeout_seconds = 30
+            gateway.converse.side_effect = TonyAgentGatewayError("gateway unavailable")
+            app.model_budget_guard = mock.Mock()
+            app.model_budget_guard.reserve_capacity.return_value = object()
+            app.model_budget_guard.retain_ambiguous_reservation.side_effect = ModelBudgetConfigurationError("private detail")
+            status, payload = self._request(app, "Tony, what is the next action?")
+
+        self.assertTrue(status.startswith("503"))
+        self.assertEqual(payload["error"]["code"], "hosted_model_outcome_unconfirmed")
+        self.assertIn("action is unconfirmed", payload["error"]["message"])
+        self.assertNotIn("private detail", payload["error"]["message"])
 
     def test_substantive_work_is_persisted_and_acknowledged_without_waiting_for_openclaw(self):
         with tempfile.TemporaryDirectory() as tmp:

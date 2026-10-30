@@ -92,6 +92,7 @@ class TonyAgentGatewayTests(unittest.TestCase):
         self.assertIn("Complete the explicitly requested safe milestone before returning", contract)
         self.assertIn("use `sessions_yield` when its result is required", contract)
         self.assertIn("answer the external execution question first and explicitly", contract)
+        self.assertIn("a bare affirmation such as `yes` or `yes please` does not select one", contract)
 
     def test_independent_telegram_turns_share_the_same_openresponses_user(self):
         bodies = []
