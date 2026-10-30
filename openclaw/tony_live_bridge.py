@@ -1110,8 +1110,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
                     "last_checked_at": record.occurred_at if record else None,
                 }
             )
+        runtime_root = Path(
+            os.getenv("NARRATIIVE_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime"))
+        ).expanduser()
         certification_reports = sorted(
-            (REPOSITORY_ROOT / ".runtime" / "golden-path-certification").glob("*/report.json"),
+            (runtime_root / "golden-path-certification").glob("*/report.json"),
             key=lambda path: path.stat().st_mtime,
             reverse=True,
         )
