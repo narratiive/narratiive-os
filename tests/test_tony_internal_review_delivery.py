@@ -148,6 +148,43 @@ class TonyInternalReviewDeliveryTests(unittest.TestCase):
         self.assertEqual(len(state.external_action_receipts), 1)
         self.assertEqual(state.approval_status, "pending")
 
+    def test_exact_approved_artifact_can_be_delivered_to_internal_reviewer(self) -> None:
+        gate = self.service.execute("/workflow safe-review-run", []).data
+        self.service.execute(
+            "/approve safe-review-run because the synthetic fixture is review-ready",
+            [],
+            principal_id="telegram:123",
+            inputs={"approval_token": gate["approval_token"]},
+        )
+
+        response = self.service.execute("/deliver-review safe-review-run", [])
+
+        self.assertEqual(response.status, "healthy")
+        self.assertTrue(response.data["delivered"])
+        self.assertEqual(self.gmail_calls[0]["payload"]["recipient_email"], "hello@narratiive.com")
+        self.assertIn("already approved", self.gmail_calls[0]["payload"]["body"])
+        self.assertNotIn("Approval is pending", self.gmail_calls[0]["payload"]["body"])
+        self.assertIn("already approved", response.message)
+        self.assertNotIn("current gate", response.message)
+        self.assertEqual(self.runtime.runs.load_run("safe-review-run").approval_status, "approved")
+
+    def test_retry_after_approval_never_reuses_pending_gate_notification(self) -> None:
+        self.service.execute("/deliver-review safe-review-run", [])
+        gate = self.service.execute("/workflow safe-review-run", []).data
+        self.service.execute(
+            "/approve safe-review-run because the synthetic fixture is review-ready",
+            [],
+            principal_id="telegram:123",
+            inputs={"approval_token": gate["approval_token"]},
+        )
+
+        response = self.service.execute("/deliver-review safe-review-run", [])
+
+        self.assertTrue(response.data["duplicate_suppressed"])
+        self.assertEqual(len(self.gmail_calls), 1)
+        self.assertIn("already approved", response.message)
+        self.assertNotIn("current gate", response.message)
+
     def test_non_allowlisted_recipient_fails_closed(self) -> None:
         response = self.service.execute(
             "/deliver-review safe-review-run",
