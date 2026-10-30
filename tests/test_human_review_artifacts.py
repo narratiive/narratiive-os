@@ -34,7 +34,7 @@ def state(workflow_id: str) -> WorkflowState:
         workspace_id="narratiive",
         client_id="safe-client",
         entity_id="safe-company",
-        input_payload={"company": "SAFE Review Company", "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}}},
+        input_payload={"company": "SAFE Review Company", "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}}},
     )
 
 
@@ -114,6 +114,28 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
         proposal_state.input_payload = {"company": "SAFE Review Company"}
         with self.assertRaisesRegex(HumanReviewArtifactError, "approved fee"):
             build_review_plan(proposal_state, proposal_output())
+
+    def test_fieldwork_review_requires_fee_approval_bound_to_exact_fee(self) -> None:
+        proposal_state = state("discovery_evidence_to_growth_sprint_proposal")
+        proposal_state.input_payload["commercial_context"]["approved_fieldwork_fee"]["approval_reference"]["fee_checksum"] = "0" * 64
+        with self.assertRaisesRegex(HumanReviewArtifactError, "does not bind"):
+            build_review_plan(proposal_state, proposal_output())
+
+    def test_fieldwork_review_rejects_monetary_estimate_outside_discovery_lineage(self) -> None:
+        proposal_state = state("discovery_evidence_to_growth_sprint_proposal")
+        proposal_state.input_payload["discovery_evidence"] = {
+            "notes": "Synthetic notes",
+            "sources": [{"source_id": "meeting:notes:1", "source_type": "notes", "location": "synthetic:meeting"}],
+        }
+        output = proposal_output()
+        output["commercial_opportunity"]["monetary_estimate"] = {
+            "amount": 120000,
+            "currency": "GBP",
+            "basis": "The supplied Discovery notes describe the opportunity in enough detail.",
+            "evidence_refs": ["forged:source"],
+        }
+        with self.assertRaisesRegex(HumanReviewArtifactError, "supplied Discovery evidence"):
+            build_review_plan(proposal_state, output)
 
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()

@@ -563,6 +563,17 @@ class WorkflowQualityTests(unittest.TestCase):
         self.assertFalse(result["passed"])
         self.assertIn("one defensible commercial opportunity leads", result["failed_checks"])
 
+    def test_proposal_quality_rejects_monetary_estimate_without_evidence_refs(self) -> None:
+        weak = proposal_output()
+        weak["commercial_opportunity"]["monetary_estimate"] = {
+            "amount": 120000,
+            "currency": "GBP",
+            "basis": "The supplied Discovery notes describe an explicit commercial opportunity.",
+        }
+        result = growth_sprint_proposal_quality_gate(weak)
+        self.assertFalse(result["passed"])
+        self.assertIn("one defensible commercial opportunity leads", result["failed_checks"])
+
     def test_discovery_evidence_ingestion_requires_source_provenance(self) -> None:
         valid = {
             "discovery_evidence": {
@@ -570,7 +581,7 @@ class WorkflowQualityTests(unittest.TestCase):
                 "sources": [{"source_id": "meeting-1", "source_type": "notes", "location": "meeting:synthetic"}],
             },
             "blueprint_lite": "Synthetic blueprint",
-            "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
+            "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}},
         }
         validate_operational_inputs("discovery_evidence_to_growth_sprint_proposal", valid)
         invalid = dict(valid)
@@ -593,7 +604,7 @@ class WorkflowQualityTests(unittest.TestCase):
                     }],
                 },
                 "blueprint_lite": "Synthetic Blueprint Lite",
-                "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}},
+                "commercial_context": {"approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}},
             },
         )
 

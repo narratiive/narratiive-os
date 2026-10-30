@@ -1029,6 +1029,36 @@ def _value_checksum(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def validate_approved_fieldwork_fee(value: Any) -> Mapping[str, Any]:
+    """Require a fee to carry an immutable human-decision binding.
+
+    The fee is trusted only as a workflow input, never as model output.  The
+    approval record supplies a stable decision identity and a checksum of the
+    exact amount/currency pair subsequently rendered for founder review.
+    """
+    if not isinstance(value, Mapping):
+        raise ValueError("FIELDWORK proposal requires an approved fee in commercial context")
+    amount = value.get("amount")
+    currency = str(value.get("currency") or "").strip().upper()
+    reference = value.get("approval_reference")
+    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3:
+        raise ValueError("FIELDWORK proposal requires an approved fee in commercial context")
+    if not isinstance(reference, Mapping):
+        raise ValueError("FIELDWORK proposal fee requires a verifiable approval reference")
+    if (
+        not _meaningful(reference.get("approval_id"))
+        or str(reference.get("decision") or "").casefold() != "approved"
+        or not _meaningful(reference.get("approved_by"))
+        or not _meaningful(reference.get("recorded_at"))
+        or not isinstance(reference.get("fee_checksum"), str)
+    ):
+        raise ValueError("FIELDWORK proposal fee requires a verifiable approval reference")
+    expected = _value_checksum({"amount": amount, "currency": currency})
+    if reference["fee_checksum"] != expected:
+        raise ValueError("FIELDWORK proposal fee approval does not bind the exact amount and currency")
+    return value
+
+
 def _validate_campaign_identity(value: Any) -> None:
     if not isinstance(value, Mapping):
         raise ValueError("campaign workflow requires a structured canonical campaign_identity")
@@ -1277,6 +1307,7 @@ def _commercial_opportunity(value: Any) -> bool:
         and isinstance(estimate.get("currency"), str)
         and len(estimate["currency"].strip()) == 3
         and _substantive_text(estimate.get("basis"), minimum_words=6)
+        and _meaningful_list(estimate.get("evidence_refs"), minimum=1)
     )
 
 

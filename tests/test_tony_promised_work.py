@@ -87,7 +87,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         state, replay = runtime.commission(
             "safe-promised-source",
             "discovery_evidence_to_growth_sprint_proposal",
-            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}}},
+            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}}},
             commitment_id="telegram-safe-commitment",
         )
         return state, replay, dispatchers
@@ -108,7 +108,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         repeated, repeated_replay = runtime.commission(
             "safe-promised-source",
             "discovery_evidence_to_growth_sprint_proposal",
-            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": "synthetic-founder-fee-approval"}}},
+            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}}},
             commitment_id="telegram-safe-commitment",
         )
 

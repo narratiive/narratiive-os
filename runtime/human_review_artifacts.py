@@ -38,6 +38,7 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.workflow_quality import validate_approved_fieldwork_fee
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
@@ -111,6 +112,7 @@ class HumanReviewArtifact:
     decision_prompt: str
     next_if_approved: str
     telegram_notification: str
+    input_lineage: Mapping[str, str]
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
@@ -182,6 +184,7 @@ class HumanReviewArtifactStore:
             decision_prompt=plan.decision_prompt,
             next_if_approved=plan.next_if_approved,
             telegram_notification=telegram_notification,
+            input_lineage=_review_input_lineage(state),
         )
         manifest_bytes = (json.dumps(record.to_dict(), sort_keys=True, indent=2) + "\n").encode("utf-8")
         directory.mkdir(parents=True, exist_ok=True)
@@ -282,7 +285,12 @@ def build_review_plan(state: WorkflowState, output: Mapping[str, Any]) -> Review
     if state.workflow_id == "growth_diagnostic_to_blueprint_lite":
         return _blueprint_lite_plan(company, output)
     if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-        return _growth_sprint_plan(company, output, _approved_fieldwork_fee(state.input_payload))
+        return _growth_sprint_plan(
+            company,
+            output,
+            _approved_fieldwork_fee(state.input_payload),
+            _discovery_source_ids(state.input_payload),
+        )
     if state.workflow_id in {
         "growth_sprint_to_research_engine",
         "blueprint_lite_to_discovery_preparation",
@@ -523,7 +531,12 @@ def _story(plan: ReviewDocumentPlan, styles: Mapping[str, ParagraphStyle]) -> li
     return story
 
 
-def _growth_sprint_plan(company: str, output: Mapping[str, Any], approved_fee: str) -> ReviewDocumentPlan:
+def _growth_sprint_plan(
+    company: str,
+    output: Mapping[str, Any],
+    approved_fee: str,
+    discovery_source_ids: frozenset[str],
+) -> ReviewDocumentPlan:
     synthesis = _required_text(output, "discovery_synthesis")
     challenge = _required_text(output, "growth_problem_or_opportunity")
     opportunity = output.get("commercial_opportunity") if isinstance(output.get("commercial_opportunity"), Mapping) else {}
@@ -560,7 +573,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any], approved_fee: s
                 item for item in (
                     _clean_text(opportunity.get("headline")),
                     _clean_text(opportunity.get("commercial_insight")),
-                    _monetary_estimate_text(opportunity.get("monetary_estimate")),
+                    _monetary_estimate_text(opportunity.get("monetary_estimate"), discovery_source_ids),
                 ) if item
             ),
         ),
@@ -599,28 +612,59 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any], approved_fee: s
 def _approved_fieldwork_fee(payload: Mapping[str, Any]) -> str:
     context = payload.get("commercial_context")
     fee = context.get("approved_fieldwork_fee") if isinstance(context, Mapping) else None
-    if not isinstance(fee, Mapping):
-        raise HumanReviewArtifactError("FIELDWORK proposal review requires an approved fee in commercial context")
-    amount = fee.get("amount")
-    currency = _clean_text(fee.get("currency")).upper()
-    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3:
-        raise HumanReviewArtifactError("FIELDWORK proposal review requires an approved fee in commercial context")
+    try:
+        validated = validate_approved_fieldwork_fee(fee)
+    except ValueError as exc:
+        raise HumanReviewArtifactError(str(exc)) from exc
+    amount = validated.get("amount")
+    currency = _clean_text(validated.get("currency")).upper()
     formatted = f"{amount:,.0f}" if float(amount).is_integer() else f"{amount:,.2f}"
     display = f"£{formatted}" if currency == "GBP" else f"{currency} {formatted}"
     return f"FIELDWORK fee: {display}"
 
 
-def _monetary_estimate_text(value: Any) -> str:
+def _monetary_estimate_text(value: Any, discovery_source_ids: frozenset[str]) -> str:
     if not isinstance(value, Mapping):
         return ""
     amount = value.get("amount")
     currency = _clean_text(value.get("currency")).upper()
     basis = _clean_text(value.get("basis"))
+    refs = value.get("evidence_refs")
     if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3 or not basis:
-        return ""
+        raise HumanReviewArtifactError("monetary opportunity is incomplete")
+    if not isinstance(refs, list) or not refs or not all(isinstance(ref, str) and ref in discovery_source_ids for ref in refs):
+        raise HumanReviewArtifactError("monetary opportunity must reference supplied Discovery evidence")
     formatted = f"{amount:,.0f}" if float(amount).is_integer() else f"{amount:,.2f}"
     display = f"£{formatted}" if currency == "GBP" else f"{currency} {formatted}"
     return f"Illustrative commercial opportunity: {display}. Basis: {basis}"
+
+
+def _discovery_source_ids(payload: Mapping[str, Any]) -> frozenset[str]:
+    evidence = payload.get("discovery_evidence")
+    sources = evidence.get("sources") if isinstance(evidence, Mapping) else None
+    if not isinstance(sources, list):
+        return frozenset()
+    return frozenset(
+        str(source.get("source_id") or "").strip()
+        for source in sources
+        if isinstance(source, Mapping) and str(source.get("source_id") or "").strip()
+    )
+
+
+def _review_input_lineage(state: WorkflowState) -> Mapping[str, str]:
+    if state.workflow_id != "discovery_evidence_to_growth_sprint_proposal":
+        return {}
+    context = state.input_payload.get("commercial_context")
+    fee = context.get("approved_fieldwork_fee") if isinstance(context, Mapping) else None
+    try:
+        validated = validate_approved_fieldwork_fee(fee)
+    except ValueError as exc:
+        raise HumanReviewArtifactError(str(exc)) from exc
+    reference = validated["approval_reference"]
+    return {
+        "fieldwork_fee_approval_id": str(reference["approval_id"]),
+        "fieldwork_fee_checksum": str(reference["fee_checksum"]),
+    }
 
 
 def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
