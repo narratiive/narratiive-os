@@ -59,6 +59,18 @@ const WORKFLOW_SCHEMA = {
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
   classification_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human instruction explicitly classifying this exact workflow entity as an internal synthetic test." },
   authorisation_reference: { type: "string", minLength: 1, maxLength: 500, description: "Durable reference for the explicit founder authorisation." },
+  classification_scope: {
+    type: "object",
+    properties: {
+      workspace_id: { type: "string", minLength: 1, maxLength: 200 },
+      client_id: { type: "string", minLength: 1, maxLength: 200 },
+      workflow_id: { type: "string", minLength: 1, maxLength: 200 },
+      run_id: { type: "string", minLength: 1, maxLength: 500 },
+    },
+    required: ["workspace_id", "client_id", "workflow_id", "run_id"],
+    additionalProperties: false,
+    description: "Exact canonical scope of an authorised synthetic-test classification. This scope is bound into the trusted-turn proof.",
+  },
   inputs: { type: "object", additionalProperties: true },
 };
 const ATTENTION_SCHEMA = {

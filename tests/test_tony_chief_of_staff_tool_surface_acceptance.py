@@ -171,6 +171,9 @@ class TonyChiefOfStaffToolSurfaceAcceptanceTests(unittest.TestCase):
         self.assertIn("DEFAULT_WORKFLOW_CONTROL_TIMEOUT_MS = 240000", source)
         self.assertIn("AbortSignal.timeout(timeoutMs)", source)
         self.assertIn("Narratiive control plane timed out after", source)
+        self.assertIn("classification_scope: {", source)
+        self.assertIn('required: ["workspace_id", "client_id", "workflow_id", "run_id"]', source)
+        self.assertIn("Exact canonical scope of an authorised synthetic-test classification", source)
         for legacy_tool in LEGACY_STATE_TOOLS:
             self.assertNotIn(f'"{legacy_tool}"', source)
 
