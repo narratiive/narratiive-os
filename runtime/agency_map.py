@@ -205,7 +205,16 @@ _ROSTER: tuple[_AgentSpec, ...] = (
             "strategy_thesis_to_growth_blueprint to Strategy Director -- no "
             "agents/*.md contract currently names an owner for the director "
             "pass, and the review stage matches Quality Reviewer's contract "
-            "instead."
+            "instead. Discovery Preparation (prepare_discovery) IS attributed "
+            "here as an explicit ownership-assignment decision, not a "
+            "reinterpretation of agents/strategy_director.md's own text: that "
+            "contract names only Growth Blueprint population, but the stage "
+            "runs through the identical strategic_reasoning capability and "
+            "turns evidence into forward strategic judgement, the same work "
+            "the contract already describes for the Blueprint itself. This is "
+            "the one accountability assignment made in this round; see "
+            "docs/engineering/campaign-engine-foundation.md and the project "
+            "conversation record dated 2026-10-30 for the decision basis."
         ),
         defined_in="agents/strategy_director.md",
         implemented_in=("runtime/worker_registry.py",),
@@ -225,6 +234,7 @@ _ROSTER: tuple[_AgentSpec, ...] = (
         ),
         worker_ids=("claude-anthropic",),
         canonical_stage_refs=(
+            ("blueprint_lite_to_discovery_preparation", "prepare_discovery"),
             ("research_to_strategic_synthesis", "prepare_strategic_synthesis"),
             ("strategic_synthesis_to_strategy_thesis", "prepare_strategy_thesis"),
             ("strategy_thesis_to_growth_blueprint", "prepare_growth_blueprint"),

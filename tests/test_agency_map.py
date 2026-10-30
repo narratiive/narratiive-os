@@ -268,6 +268,23 @@ class AgencyMapStageAttributionTests(unittest.TestCase):
                 f"{entry.agent_id} must not claim creative_bible_to_asset_production activity",
             )
 
+    def test_discovery_preparation_is_assigned_to_strategy_director(self) -> None:
+        # Explicit ownership-assignment decision (2026-10-30), not a
+        # reinterpretation of agents/strategy_director.md's own text -- see
+        # the responsibilities note on that spec.
+        stage = StageRecord("prepare_discovery", "claude-anthropic", status=StageStatus.COMPLETED)
+        state = _state("blueprint_lite_to_discovery_preparation", "run-4", [stage])
+        entries = {e.agent_id: e for e in build_agency_map([state])}
+
+        self.assertTrue(entries["strategy_director"].capability.live_verified.value)
+        for agent_id, entry in entries.items():
+            if agent_id == "strategy_director":
+                continue
+            self.assertFalse(
+                entry.capability.live_verified.value,
+                f"Discovery Preparation completing must not verify {agent_id}",
+            )
+
     def test_to_dict_contains_the_expected_shape_including_provenance(self) -> None:
         entry = build_agency_map()[0]
         payload = entry.to_dict()
