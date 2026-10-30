@@ -26,13 +26,25 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             config = _sandbox_config(root, 19001, "sandbox-token")
             self.assertEqual(config["auth"]["profiles"], {})
             self.assertTrue(all(agent["model"] == SANDBOX_MODEL for agent in config["agents"]["list"]))
-            with mock.patch.dict("os.environ", {"ANTHROPIC_API_KEY": "must-not-leak"}, clear=False):
+            inherited = {
+                "ANTHROPIC_API_KEY": "must-not-leak",
+                "TONY_DISPATCH_GMAIL_URL": "https://provider.invalid/gmail",
+                "TONY_DISPATCH_GMAIL_TOKEN": "must-not-leak",
+                "TONY_DISPATCH_CLAUDE_API_KEY": "must-not-leak",
+                "NARRATIIVE_RUNTIME_ROOT": "/production/runtime",
+            }
+            with mock.patch.dict("os.environ", inherited, clear=False):
                 env = _sandbox_env(root, 19002, 19001, "sandbox-token", "bridge-token")
             self.assertEqual(env["TONY_DISPATCH_CLAUDE_MODE"], "")
             self.assertEqual(env["TONY_DISPATCH_CLAUDE_MODEL"], "")
             self.assertNotIn("ANTHROPIC_API_KEY", env)
+            self.assertNotIn("TONY_DISPATCH_GMAIL_URL", env)
+            self.assertNotIn("TONY_DISPATCH_GMAIL_TOKEN", env)
+            self.assertNotIn("TONY_DISPATCH_CLAUDE_API_KEY", env)
             self.assertEqual(env["TONY_HOSTED_MODEL_REQUEST_RESERVE_USD"], "0")
             self.assertEqual(Path(env["TONY_HOSTED_MODEL_USAGE_LEDGER"]).parent, root / "state")
+            self.assertEqual(Path(env["NARRATIIVE_RUNTIME_ROOT"]), root / "state" / "runtime")
+            self.assertEqual(Path(env["TONY_BRIEFING_DECISION_REGISTER_PATH"]).parent, root / "state")
 
 
 if __name__ == "__main__":

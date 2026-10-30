@@ -204,13 +204,20 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         paths[name] = state / f"{name.casefold().removeprefix('tony_').removesuffix('_path').replace('_', '-')}.json"
     paths["TONY_CAMPAIGN_ENGINE_ROOT"] = state / "campaign-engine"
     paths["TONY_OBJECTS_ROOT"] = state / "objects"
-    for key, value in paths.items():
-        env[key] = str(value)
-    # Empty every known external dispatcher/provider credential in the child only.
-    prefixes = ("ANTHROPIC_", "GOOGLE_", "META_", "TIKTOK_", "NOTION_", "GITHUB_", "FIRELIES_", "FIREFLIES_", "N8N_", "GMAIL_")
+    paths["TONY_BRIEFING_DECISION_REGISTER_PATH"] = state / "briefing-decision-register.jsonl"
+    paths["TONY_BRIEFING_BASELINE_PATH"] = state / "briefing-last-delivered.json"
+    # Strip every Narratiive/Tony/OpenClaw setting from the parent before adding
+    # the explicitly enumerated sandbox configuration below. In particular,
+    # dispatch URLs and tokens must never inherit into an acceptance run.
+    prefixes = (
+        "ANTHROPIC_", "GOOGLE_", "META_", "TIKTOK_", "NOTION_", "GITHUB_",
+        "FIRELIES_", "FIREFLIES_", "N8N_", "GMAIL_", "TONY_", "NARRATIIVE_", "OPENCLAW_",
+    )
     for key in list(env):
         if key.startswith(prefixes):
             env.pop(key, None)
+    for key, value in paths.items():
+        env[key] = str(value)
     env.update({
         "HOME": str(root / "home"),
         "OPENCLAW_STATE_DIR": str(root / "openclaw-state"),
@@ -226,6 +233,7 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         "TONY_EXECUTIVE_WORKSPACE_ID": "narratiive", "TONY_TELEGRAM_CHAT_ID": "999000111",
         "TONY_INBOUND_LEAD_SOURCE": "local_projection",
         "NARRATIIVE_RUNTIME_ENV_FILE": str(root / "runtime.env"),
+        "NARRATIIVE_RUNTIME_ROOT": str(state / "runtime"),
         # No direct Claude dispatcher is configured in the acceptance sandbox.
         # A missing provider must remain a visible workflow blocker, never a paid fallback.
         "TONY_DISPATCH_CLAUDE_MODE": "",
