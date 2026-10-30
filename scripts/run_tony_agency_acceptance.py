@@ -133,6 +133,7 @@ def _write_json(path: Path, value: Any, *, mode: int | None = None) -> None:
 
 def _sandbox_config(root: Path, gateway_port: int, gateway_token: str) -> dict[str, Any]:
     config = json.loads((ROOT / "openclaw" / "openclaw.fleet.json").read_text(encoding="utf-8"))
+    config.setdefault("agents", {}).setdefault("defaults", {})["model"] = SANDBOX_MODEL
     for agent in config["agents"]["list"]:
         agent["workspace"] = str(root / "workspaces" / str(agent["id"]))
         agent.pop("heartbeat", None)

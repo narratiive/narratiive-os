@@ -25,6 +25,7 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             root = Path(directory)
             config = _sandbox_config(root, 19001, "sandbox-token")
             self.assertEqual(config["auth"]["profiles"], {})
+            self.assertEqual(config["agents"]["defaults"]["model"], SANDBOX_MODEL)
             self.assertTrue(all(agent["model"] == SANDBOX_MODEL for agent in config["agents"]["list"]))
             inherited = {
                 "ANTHROPIC_API_KEY": "must-not-leak",
