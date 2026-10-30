@@ -14,9 +14,11 @@ from runtime.models import WorkflowState
 from runtime.serialization import workflow_from_dict, workflow_to_dict
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_internal_review_delivery import (
+    FIELDWORK_PROPOSAL_WORKFLOW_ID,
     INTERNAL_REVIEW_ADDRESS,
     InternalReviewDeliveryService,
     approval_binding_evidence,
+    fieldwork_commercial_offer_preview,
     workflow_approval_token,
 )
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime, build_tony_workflow_runtime
@@ -35,7 +37,7 @@ from runtime.workflow_entity_classification import (
 
 class WorkflowCommandBackend(Protocol):
     def list_states(self) -> tuple[WorkflowState, ...]: ...
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None, fieldwork_commercial_offer: Mapping[str, Any] | None = None, commercial_offer_digest: str = "") -> WorkflowState: ...
     def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
@@ -98,6 +100,7 @@ class WorkflowCommandBackend(Protocol):
         target_workflow_id: str,
         inputs: Mapping[str, Any],
         commitment_id: str,
+        payment_authorised: bool = False,
     ) -> tuple[WorkflowState, bool]: ...
     def begin_promised_delivery(self, state: WorkflowState, *, delivery_key: str, kind: str) -> WorkflowState: ...
     def finish_promised_delivery(self, state: WorkflowState, *, delivery_key: str, evidence: Mapping[str, Any]) -> WorkflowState: ...
@@ -154,8 +157,13 @@ class FileWorkflowCommandBackend:
             states.append(state)
         return tuple(states)
 
-    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState:
-        binding = approval_binding_evidence(state, approval_token)
+    def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None, fieldwork_commercial_offer: Mapping[str, Any] | None = None, commercial_offer_digest: str = "") -> WorkflowState:
+        binding = approval_binding_evidence(
+            state,
+            approval_token,
+            fieldwork_commercial_offer=fieldwork_commercial_offer,
+            commercial_offer_digest=commercial_offer_digest,
+        )
         if decision_evidence:
             binding["human_decision"] = dict(decision_evidence)
         runtime = self._runtime(state)
@@ -218,6 +226,7 @@ class FileWorkflowCommandBackend:
         target_workflow_id: str,
         inputs: Mapping[str, Any],
         commitment_id: str,
+        payment_authorised: bool = False,
     ) -> tuple[WorkflowState, bool]:
         runtime = self._runtime(state)
         return runtime.commission(
@@ -225,6 +234,7 @@ class FileWorkflowCommandBackend:
             target_workflow_id,
             inputs,
             commitment_id=commitment_id,
+            payment_authorised=payment_authorised,
         )
 
     def classify_internal_synthetic_test(
@@ -619,7 +629,7 @@ class TonyWorkflowCommandService:
         "drive-preview", "persist-drive",
         "worlds", "select-world", "bible", "approve-bible", "assets", "approve-assets",
         "campaigns", "clients", "learning", "learning-queue", "sync-learning",
-        "classify-synthetic-test",
+        "classify-synthetic-test", "fieldwork-offer",
     }
 
     def __init__(
@@ -819,6 +829,14 @@ class TonyWorkflowCommandService:
             state = self._resolve(states, reference)
             if name in {"workflow", "work"}:
                 return self._status(state)
+            if name == "fieldwork-offer":
+                supplied = dict(inputs or {})
+                approval_token = str(supplied.get("approval_token") or "").strip()
+                offer = supplied.get("fieldwork_commercial_offer")
+                if not approval_token or not isinstance(offer, Mapping):
+                    return self._error(name, "fieldwork_offer_binding_required", "Read the current proposal gate and supply its exact approval token and commercial offer for founder review.")
+                preview = fieldwork_commercial_offer_preview(state, approval_token, offer)
+                return CommandResponse(name, "attention_required", "This is the exact FIELDWORK commercial offer for founder review. Approval requires the returned offer digest; no email, Checkout session or client action has been created.", preview)
             if name == "approvals":
                 return self._approval(state)
             if name == "blockers":
@@ -1057,6 +1075,12 @@ class TonyWorkflowCommandService:
                     )
                 return CommandResponse(name, "healthy", message, delivery)
             if name == "commission":
+                if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+                    return self._error(
+                        name,
+                        "fieldwork_payment_required",
+                        "FIELDWORK research can be commissioned only after verified payment authorisation.",
+                    )
                 supplied = dict(inputs or {})
                 target_workflow_id = str(supplied.pop("target_workflow_id", "")).strip()
                 commitment_id = str(supplied.pop("commitment_id", "")).strip()
@@ -1124,6 +1148,8 @@ class TonyWorkflowCommandService:
                     return self._error(name, "rationale_required", f"Use /{name} <run or company> because <reason>.")
                 approval_token = str((inputs or {}).get("approval_token") or "").strip()
                 decision_evidence = (inputs or {}).get("approval_decision_evidence")
+                commercial_offer = (inputs or {}).get("fieldwork_commercial_offer")
+                commercial_offer_digest = str((inputs or {}).get("commercial_offer_digest") or "").strip()
                 if decision_evidence is not None and not isinstance(decision_evidence, Mapping):
                     return self._error(name, "approval_evidence_invalid", "Verified human decision evidence must be an object.")
                 if state.approval_status == "pending" and not approval_token:
@@ -1132,6 +1158,9 @@ class TonyWorkflowCommandService:
                         "approval_token_required",
                         "Read the current workflow gate first and use its exact approval token; this prevents stale artefact approval.",
                     )
+                if name == "approve" and state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+                    if not isinstance(commercial_offer, Mapping) or not commercial_offer_digest:
+                        return self._error(name, "fieldwork_offer_approval_required", "Review the exact FIELDWORK commercial offer first and supply its returned offer digest with approval.")
                 if name == "approve":
                     changed = self.backend.approve(
                         state,
@@ -1139,6 +1168,8 @@ class TonyWorkflowCommandService:
                         rationale=rationale,
                         approval_token=approval_token,
                         decision_evidence=decision_evidence,
+                        fieldwork_commercial_offer=commercial_offer if isinstance(commercial_offer, Mapping) else None,
+                        commercial_offer_digest=commercial_offer_digest,
                     )
                     return CommandResponse(name, "healthy", f"Approved {changed.run_id} for its exact proposed action. No external action was performed.", self._summary(changed))
                 changed = self.backend.reject(

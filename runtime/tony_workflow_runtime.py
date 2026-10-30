@@ -397,6 +397,10 @@ class TonyWorkflowRuntime:
             raise ValueError("workflow must be complete before handoff")
         if state.approval_required and state.approval_status != "approved":
             raise ValueError("workflow handoff requires explicit approval")
+        if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+            raise ValueError(
+                "FIELDWORK research may be commissioned only from verified payment authorisation; generic proposal handoff is prohibited"
+            )
         if not definition.next_workflow_id:
             raise ValueError("workflow has no registered next workflow")
         artifacts = [artifact for stage in state.stages for artifact in stage.output_artifacts]
@@ -539,6 +543,7 @@ class TonyWorkflowRuntime:
         additional_inputs: Mapping[str, Any],
         *,
         commitment_id: str,
+        payment_authorised: bool = False,
     ) -> tuple[WorkflowState, bool]:
         """Persist authorised future work before Tony says it is underway.
 
@@ -552,6 +557,8 @@ class TonyWorkflowRuntime:
             raise ValueError("source workflow must be complete before commissioning downstream work")
         if source.approval_required and source.approval_status != "approved":
             raise ValueError("source workflow requires explicit approval before commissioning downstream work")
+        if source.workflow_id == "discovery_evidence_to_growth_sprint_proposal" and not payment_authorised:
+            raise ValueError("FIELDWORK research may be commissioned only from verified payment authorisation")
         target_id = target_workflow_id.strip()
         definition = self.coordinator.registry.resolve(source.workflow_id)
         reachable: set[str] = set()

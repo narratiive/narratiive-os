@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 import re
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
@@ -519,12 +521,42 @@ class WorkflowRunService:
             raise ValueError("workflow run is not awaiting approval")
         if not identity or not reason:
             raise ValueError("approval requires approver identity and rationale")
+        from runtime.tony_internal_review_delivery import FIELDWORK_PROPOSAL_WORKFLOW_ID
+
+        if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+            supplied_binding = dict(approval_binding or {})
+            if (
+                not isinstance(supplied_binding.get("fieldwork_commercial_offer"), Mapping)
+                or not str(supplied_binding.get("approval_binding_digest") or "").strip()
+                or not str(supplied_binding.get("fieldwork_commercial_offer_digest") or "").strip()
+            ):
+                raise ValueError("FIELDWORK proposal approval requires a current exact commercial offer binding")
         if approval_binding and "approval_binding_digest" in approval_binding:
             # Revalidate under the coordinator's run lock, against persisted
             # state rather than the earlier conversational lookup snapshot.
-            from runtime.tony_internal_review_delivery import assert_current_approval_token
+            from runtime.tony_internal_review_delivery import (
+                approval_binding_evidence,
+            )
 
-            assert_current_approval_token(state, str(approval_binding.get("approval_binding_digest") or ""))
+            supplied_binding = dict(approval_binding)
+            if (
+                state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID
+                and not isinstance(supplied_binding.get("fieldwork_commercial_offer"), Mapping)
+            ):
+                raise ValueError("FIELDWORK proposal approval requires an exact commercial offer binding")
+            validated = approval_binding_evidence(
+                state,
+                str(supplied_binding.get("approval_binding_digest") or ""),
+                fieldwork_commercial_offer=(
+                    supplied_binding.get("fieldwork_commercial_offer")
+                    if isinstance(supplied_binding.get("fieldwork_commercial_offer"), Mapping)
+                    else None
+                ),
+                commercial_offer_digest=str(supplied_binding.get("fieldwork_commercial_offer_digest") or ""),
+            )
+            if isinstance(supplied_binding.get("human_decision"), Mapping):
+                validated["human_decision"] = dict(supplied_binding["human_decision"])
+            approval_binding = validated
         approval = {
             "approver": identity,
             "rationale": reason,
@@ -532,7 +564,24 @@ class WorkflowRunService:
             "proposed_next_action": state.proposed_next_action,
         }
         if approval_binding:
-            approval["approval_binding"] = dict(approval_binding)
+            binding = dict(approval_binding)
+            if binding.get("fieldwork_commercial_offer"):
+                material = json.dumps(
+                    {
+                        "approver": identity,
+                        "approved_at": approval["approved_at"],
+                        "approval_binding_digest": binding.get("approval_binding_digest"),
+                        "fieldwork_commercial_offer_digest": binding.get("fieldwork_commercial_offer_digest"),
+                    },
+                    sort_keys=True,
+                    separators=(",", ":"),
+                )
+                approval_record_id = "fieldwork-commercial-approval-" + hashlib.sha256(
+                    material.encode("utf-8")
+                ).hexdigest()[:24]
+                binding["approval_record_id"] = approval_record_id
+                approval["approval_record_id"] = approval_record_id
+            approval["approval_binding"] = binding
         state.approval_history.append(approval)
         state.approval_status = "approved"
         state.proposed_next_action = None

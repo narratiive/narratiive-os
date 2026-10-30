@@ -723,6 +723,111 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(proposal.data["status"], "awaiting_approval")
         self.assertFalse(proposal.data["external_action_taken"])
 
+    def test_fieldwork_commercial_approval_binds_exact_offer_and_rejects_stale_terms(self) -> None:
+        blueprint_token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
+        self.service.execute(
+            "/approve safe-executive-run because reviewed Blueprint Lite", [],
+            principal_id="telegram:123", inputs={"approval_token": blueprint_token},
+        )
+        discovery = self.service.execute("/continue safe-executive-run", [])
+        discovery_token = self.service.execute(f"/workflow {discovery.data['run_id']}", []).data["approval_token"]
+        self.service.execute(
+            f"/approve {discovery.data['run_id']} because reviewed discovery preparation", [],
+            principal_id="telegram:123", inputs={"approval_token": discovery_token},
+        )
+        proposal = self.service.execute(
+            f"/continue {discovery.data['run_id']}", [],
+            inputs={"discovery_evidence": {"notes": "SAFE synthetic discovery notes retain unresolved questions.", "sources": [{"source_id": "meeting-safe", "source_type": "notes", "location": "meeting:safe"}]}},
+        )
+        run_id = proposal.data["run_id"]
+        state = next(item for item in self.service.backend.list_states() if item.run_id == run_id)
+        artifact = state.stages[-1].output_artifacts[-1]
+        token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        offer = {
+            "proposal_id": "safe-fieldwork-proposal-v1", "recipient_email": "client@example.invalid",
+            "proposal_url": "https://drive.example.invalid/safe-fieldwork-proposal-v1",
+            "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+            "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+            "deposit_amount_minor": 300000, "currency": "GBP",
+            "scope_summary": "Synthetic FIELDWORK scope for approval-binding regression coverage.",
+            "balance_terms": "Synthetic balance due on delivery.",
+            "service_terms_url": "https://narratiive.example.invalid/terms",
+        }
+        preview = self.service.execute(
+            f"/fieldwork-offer {run_id}", [], inputs={"approval_token": token, "fieldwork_commercial_offer": offer},
+        )
+        self.assertEqual(preview.status, "attention_required")
+        self.assertFalse(preview.data["external_action_taken"])
+        for required_field in ("scope_summary", "balance_terms", "service_terms_url"):
+            missing = {key: value for key, value in offer.items() if key != required_field}
+            missing_preview = self.service.execute(
+                f"/fieldwork-offer {run_id}", [],
+                inputs={"approval_token": token, "fieldwork_commercial_offer": missing},
+            )
+            self.assertEqual(missing_preview.status, "error")
+            self.assertIn("commercial offer", missing_preview.message)
+        with self.assertRaisesRegex(ValueError, "current exact commercial offer binding"):
+            self.runtime.approve(
+                run_id,
+                approver="telegram:123",
+                rationale="forged direct runtime approval",
+                approval_binding={"fieldwork_commercial_offer": offer},
+            )
+        rejected = self.service.execute(
+            f"/approve {run_id} because reviewed FIELDWORK terms", [], principal_id="telegram:123",
+            inputs={"approval_token": token, "fieldwork_commercial_offer": {**offer, "recipient_email": "substituted@example.invalid"}, "commercial_offer_digest": preview.data["commercial_offer_digest"]},
+        )
+        self.assertEqual(rejected.status, "error")
+        self.assertIn("stale", rejected.message)
+        approved = self.service.execute(
+            f"/approve {run_id} because reviewed FIELDWORK terms", [], principal_id="telegram:123",
+            inputs={"approval_token": token, "fieldwork_commercial_offer": offer, "commercial_offer_digest": preview.data["commercial_offer_digest"]},
+        )
+        self.assertEqual(approved.status, "healthy")
+        persisted = next(item for item in self.service.backend.list_states() if item.run_id == run_id)
+        binding = persisted.approval_history[-1]["approval_binding"]
+        self.assertEqual(binding["fieldwork_commercial_offer"]["recipient_email"], "client@example.invalid")
+        self.assertEqual(binding["fieldwork_commercial_offer"]["proposal_url"], offer["proposal_url"])
+        self.assertTrue(persisted.approval_history[-1]["approval_record_id"].startswith("fieldwork-commercial-approval-"))
+        bypass = self.service.execute(
+            f"/commission {run_id}", [],
+            inputs={
+                "target_workflow_id": "growth_sprint_to_research_engine",
+                "commitment_id": "forged-fieldwork-commission",
+                "approved_growth_sprint_scope": ["forged"],
+                "research_requirements": ["forged"],
+                "research_sources": [{"source_id": "forged", "source_type": "document", "uri": "synthetic:forged"}],
+                "client_context": {"company": "SAFE Executive Workflow Test"},
+            },
+        )
+        self.assertEqual(bypass.status, "error")
+        self.assertEqual(bypass.data["error_code"], "fieldwork_payment_required")
+
+    def test_fieldwork_proposal_can_be_rejected_without_an_offer_binding(self) -> None:
+        blueprint_token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
+        self.service.execute(
+            "/approve safe-executive-run because reviewed GROUNDWORK", [], principal_id="telegram:123",
+            inputs={"approval_token": blueprint_token},
+        )
+        discovery = self.service.execute("/continue safe-executive-run", [])
+        discovery_token = self.service.execute(f"/workflow {discovery.data['run_id']}", []).data["approval_token"]
+        self.service.execute(
+            f"/approve {discovery.data['run_id']} because reviewed Discovery preparation", [], principal_id="telegram:123",
+            inputs={"approval_token": discovery_token},
+        )
+        proposal = self.service.execute(
+            f"/continue {discovery.data['run_id']}", [],
+            inputs={"discovery_evidence": {"notes": "Synthetic notes requiring a proposal revision.", "sources": [{"source_id": "meeting-safe", "source_type": "notes", "location": "meeting:safe"}]}},
+        )
+        run_id = proposal.data["run_id"]
+        token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        rejected = self.service.execute(
+            f"/reject {run_id} because the commercial offer needs revision", [], principal_id="telegram:123",
+            inputs={"approval_token": token},
+        )
+        self.assertEqual(rejected.status, "healthy")
+        self.assertEqual(rejected.data["status"], "active")
+
     def test_additional_research_is_durable_idempotent_and_can_feed_a_new_blueprint(self) -> None:
         scope = hashlib.sha256(b"narratiive:safe-client").hexdigest()[:24]
         workspace = self.root / scope / "research" / "workspaces" / "narratiive"

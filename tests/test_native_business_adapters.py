@@ -246,6 +246,23 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
 
+    def test_gmail_send_supports_accessible_branded_html_with_plain_text_fallback(self):
+        router = Router([{"messages": []}, {"id": "sent-html", "threadId": "thread-html"}])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+        result = adapter(approved_contract({
+            "recipient_email": "safe@example.invalid",
+            "subject": "SAFE FIELDWORK",
+            "body": "Plain-text fallback with https://checkout.example.invalid",
+            "html_body": '<html><body><a href="https://checkout.example.invalid">Let’s get started</a></body></html>',
+        }))
+        request_body = json.loads(router.requests[1].data)
+        padded = request_body["raw"] + "=" * (-len(request_body["raw"]) % 4)
+        message = base64.urlsafe_b64decode(padded).decode("utf-8")
+        self.assertTrue(result["verified"])
+        self.assertIn("multipart/alternative", message)
+        self.assertIn("text/plain", message)
+        self.assertIn("text/html", message)
+
     def test_gmail_internal_review_exception_is_exact_and_supports_attachment(self):
         contract = {
             "execution_mode": "authorised_internal_review_write",
@@ -634,6 +651,38 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertIn("persisted_internal_drive_not_delivered", summary)
         self.assertIn("https://drive.invalid/file-1", summary)
         self.assertEqual(result["projection_key"], "safe-key")
+
+    def test_notion_fieldwork_payment_projection_is_exact_and_duplicate_safe(self):
+        router = Router([
+            {"id": "page-1", "properties": {"AI Summary": {"rich_text": []}}},
+            {"id": "page-1"},
+        ])
+        adapter = NotionWorkflowProjectionDispatcher("synthetic", "source-1", opener=router)
+        payload = {
+            "kind": "fieldwork_verified_acceptance_payment",
+            "projection_key": "safe-fieldwork-payment-key",
+            "proposal_id": "proposal-safe-1",
+            "payment_intent": "pi_test_safe_1",
+            "recommended_next_action": "Begin the authorised FIELDWORK workflow.",
+        }
+        result = adapter(approved_contract(payload, record_id="page-1"))
+        body = json.loads(router.requests[1].data)
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["record_id"], "page-1")
+        self.assertEqual(body["properties"]["Status"]["status"]["name"], "Active")
+        self.assertEqual(body["properties"]["Pipeline Stage"]["select"]["name"], "Growth Sprint")
+        self.assertIn("[fieldwork-payment:safe-fieldwork-payment-key]", body["properties"]["AI Summary"]["rich_text"][0]["text"]["content"])
+
+        duplicate_router = Router([{
+            "id": "page-1",
+            "properties": {"AI Summary": {"rich_text": [{"plain_text": "[fieldwork-payment:safe-fieldwork-payment-key]"}]}},
+        }])
+        duplicate = NotionWorkflowProjectionDispatcher("synthetic", "source-1", opener=duplicate_router)(
+            approved_contract(payload, record_id="page-1")
+        )
+        self.assertTrue(duplicate["duplicate_suppressed"])
+        self.assertEqual(duplicate["mutation_count"], 0)
+        self.assertEqual(len(duplicate_router.requests), 1)
 
     def test_fireflies_returns_provenanced_transcript_without_mutation(self):
         router = Router([{"data": {"transcript": {
