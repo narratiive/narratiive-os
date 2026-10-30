@@ -216,6 +216,7 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
         "strategic_hypothesis_is_distinctive": _proposal_hypothesis(output.get("strategic_hypothesis"), output.get("growth_problem_or_opportunity")),
         "evidence_is_sufficient_for_client_facing_proposal": _proposal_evidence_ready(output.get("proposal_evidence_readiness")),
         "fieldwork_offer_is_client_ready_and_terms_remain_pending": _fieldwork_offer(output.get("fieldwork_offer")),
+        "model_output_does_not_claim_fee_approval": _proposal_has_no_model_fee_approval_claim(output),
         "editorial_argument_and_exhibits_are_specific": _proposal_editorial_plan(output.get("editorial_plan")),
         "further_work_is_justified": _substantive_text(output.get("why_further_strategic_work_is_justified"), minimum_words=20),
         "scope_has_bounded_workstreams": _meaningful_list(output.get("proposed_scope"), minimum=3),
@@ -1350,6 +1351,30 @@ def _fieldwork_offer(value: Any) -> bool:
         and str(value.get("investment_status") or "").casefold() == "pending human commercial approval"
         and value.get("fee_source") == "commercial_context.approved_fieldwork_fee"
     )
+
+
+def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool:
+    """Only the checksum-validated renderer may state an approved FIELDWORK fee."""
+    fields = (
+        output.get("fieldwork_offer"),
+        output.get("commercial_proposal_inputs"),
+        output.get("draft_client_communication"),
+    )
+    text = " ".join(_model_text(field) for field in fields)
+    return not re.search(
+        r"(?:\b(?:fee|price|pricing|investment|commercial terms)\b.{0,100}\b(?:approved|agreed|confirmed)\b|"
+        r"\b(?:approved|agreed|confirmed)\b.{0,100}\b(?:fee|price|pricing|investment|commercial terms)\b)",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
+def _model_text(value: Any) -> str:
+    if isinstance(value, Mapping):
+        return " ".join(_model_text(item) for item in value.values())
+    if isinstance(value, list):
+        return " ".join(_model_text(item) for item in value)
+    return str(value or "")
 
 
 def _proposal_editorial_plan(value: Any) -> bool:
