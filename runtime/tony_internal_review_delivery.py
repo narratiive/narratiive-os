@@ -120,7 +120,7 @@ def fieldwork_commercial_offer_preview(
     if state.workflow_id != FIELDWORK_PROPOSAL_WORKFLOW_ID:
         raise InternalReviewDeliveryError("commercial offer binding is only valid for the FIELDWORK proposal workflow")
     normalised = _normalise_fieldwork_commercial_offer(state, binding, offer)
-    digest = _commercial_offer_digest(binding["approval_binding_digest"], normalised)
+    digest = fieldwork_commercial_offer_digest(binding["approval_binding_digest"], normalised)
     return {
         "workflow_id": state.workflow_id,
         "run_id": state.run_id,
@@ -173,7 +173,7 @@ def approval_binding_evidence(
         if state.workflow_id != FIELDWORK_PROPOSAL_WORKFLOW_ID:
             raise InternalReviewDeliveryError("commercial offer binding is only valid for the FIELDWORK proposal workflow")
         offer = _normalise_fieldwork_commercial_offer(state, binding, fieldwork_commercial_offer)
-        expected = _commercial_offer_digest(binding["approval_binding_digest"], offer)
+        expected = fieldwork_commercial_offer_digest(binding["approval_binding_digest"], offer)
         if not commercial_offer_digest.strip() or not hmac.compare_digest(expected, commercial_offer_digest.strip()):
             raise InternalReviewDeliveryError("commercial offer digest is stale or does not match the reviewed proposal terms")
         binding["fieldwork_commercial_offer"] = offer
@@ -248,7 +248,7 @@ def _normalise_fieldwork_commercial_offer(
     }
 
 
-def _commercial_offer_digest(approval_token: str, offer: Mapping[str, Any]) -> str:
+def fieldwork_commercial_offer_digest(approval_token: str, offer: Mapping[str, Any]) -> str:
     material = json.dumps(
         {"approval_token": approval_token, "commercial_offer": dict(offer)},
         sort_keys=True,

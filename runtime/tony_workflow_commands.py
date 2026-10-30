@@ -1149,7 +1149,7 @@ class TonyWorkflowCommandService:
                         "approval_token_required",
                         "Read the current workflow gate first and use its exact approval token; this prevents stale artefact approval.",
                     )
-                if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+                if name == "approve" and state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
                     if not isinstance(commercial_offer, Mapping) or not commercial_offer_digest:
                         return self._error(name, "fieldwork_offer_approval_required", "Review the exact FIELDWORK commercial offer first and supply its returned offer digest with approval.")
                 if name == "approve":

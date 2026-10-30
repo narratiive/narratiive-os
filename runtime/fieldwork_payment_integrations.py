@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
 from runtime.fieldwork_payments import FieldworkPaymentError
+from runtime.tony_internal_review_delivery import fieldwork_commercial_offer_digest
 
 
 def notion_payment_recorder(notion_dispatcher: Callable[[dict[str, Any]], Mapping[str, Any]]):
@@ -136,6 +138,12 @@ def _approved_parent_workflow(backend: Any, proposal: Mapping[str, Any], workspa
     approval_record_id = _text(approval.get("approval_record_id"))
     if not isinstance(offer, Mapping) or not approval_record_id or _text(binding.get("approval_record_id")) != approval_record_id:
         raise FieldworkPaymentError("parent proposal workflow lacks a complete canonical commercial approval")
+    approval_token = _text(binding.get("approval_binding_digest"))
+    expected_offer_digest = fieldwork_commercial_offer_digest(approval_token, offer)
+    if not approval_token or not hmac.compare_digest(
+        _text(binding.get("fieldwork_commercial_offer_digest")), expected_offer_digest
+    ):
+        raise FieldworkPaymentError("canonical commercial offer digest is missing or has been tampered with")
     if _text(proposal.get("founder_approval_id")) != approval_record_id:
         raise FieldworkPaymentError("founder approval does not match the exact approved commercial offer")
     if _text(proposal.get("founder_approved_at")) != _text(approval.get("approved_at")):

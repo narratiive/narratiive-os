@@ -790,6 +790,31 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         self.assertEqual(binding["fieldwork_commercial_offer"]["proposal_url"], offer["proposal_url"])
         self.assertTrue(persisted.approval_history[-1]["approval_record_id"].startswith("fieldwork-commercial-approval-"))
 
+    def test_fieldwork_proposal_can_be_rejected_without_an_offer_binding(self) -> None:
+        blueprint_token = self.service.execute("/workflow safe-executive-run", []).data["approval_token"]
+        self.service.execute(
+            "/approve safe-executive-run because reviewed GROUNDWORK", [], principal_id="telegram:123",
+            inputs={"approval_token": blueprint_token},
+        )
+        discovery = self.service.execute("/continue safe-executive-run", [])
+        discovery_token = self.service.execute(f"/workflow {discovery.data['run_id']}", []).data["approval_token"]
+        self.service.execute(
+            f"/approve {discovery.data['run_id']} because reviewed Discovery preparation", [], principal_id="telegram:123",
+            inputs={"approval_token": discovery_token},
+        )
+        proposal = self.service.execute(
+            f"/continue {discovery.data['run_id']}", [],
+            inputs={"discovery_evidence": {"notes": "Synthetic notes requiring a proposal revision.", "sources": [{"source_id": "meeting-safe", "source_type": "notes", "location": "meeting:safe"}]}},
+        )
+        run_id = proposal.data["run_id"]
+        token = self.service.execute(f"/workflow {run_id}", []).data["approval_token"]
+        rejected = self.service.execute(
+            f"/reject {run_id} because the commercial offer needs revision", [], principal_id="telegram:123",
+            inputs={"approval_token": token},
+        )
+        self.assertEqual(rejected.status, "healthy")
+        self.assertEqual(rejected.data["status"], "active")
+
     def test_additional_research_is_durable_idempotent_and_can_feed_a_new_blueprint(self) -> None:
         scope = hashlib.sha256(b"narratiive:safe-client").hexdigest()[:24]
         workspace = self.root / scope / "research" / "workspaces" / "narratiive"

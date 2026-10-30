@@ -304,11 +304,16 @@ class FieldworkPaymentService:
             immutable_existing = {key: existing.get(key) for key in proposal_record}
             if immutable_existing != proposal_record:
                 raise FieldworkPaymentError("proposal identity or commercial terms changed after registration")
+        verification = self._verify_proposal(proposal)
+        if existing:
             checkout = existing.get("checkout") if isinstance(existing.get("checkout"), dict) else {}
             if checkout.get("session_id") and checkout.get("url"):
+                existing["approval_verification"] = verification
+                self.store.save(
+                    state,
+                    {"kind": "checkout_approval_reverified", "proposal_id": proposal.proposal_id, "session_id": checkout["session_id"]},
+                )
                 return {"proposal": proposal_record, "checkout": dict(checkout), "replay": True, "email": self._proposal_email(proposal, str(checkout["url"]))}
-
-        verification = self._verify_proposal(proposal)
 
         payload = self._checkout_payload(proposal)
         stripe_session = self.stripe.create_checkout(
@@ -423,6 +428,10 @@ class FieldworkPaymentService:
             return self._reject_event(state, event_id, event_type, "proposal_not_found", raw_body)
         if not isinstance(proposal.get("approval_verification"), Mapping) or proposal["approval_verification"].get("verified") is not True:
             return self._reject_event(state, event_id, event_type, "proposal_approval_not_verified", raw_body, proposal_id=proposal_id)
+        try:
+            proposal["approval_verification"] = self._verify_proposal(self._proposal_from_record(proposal))
+        except (FieldworkPaymentError, TypeError, ValueError, KeyError):
+            return self._reject_event(state, event_id, event_type, "proposal_approval_not_current", raw_body, proposal_id=proposal_id)
         checks = self._payment_checks(proposal, session, metadata)
         failures = [name for name, passed in checks.items() if not passed]
         if failures:
@@ -548,6 +557,17 @@ class FieldworkPaymentService:
         ):
             raise FieldworkPaymentError("approved proposal verification does not bind the exact proposal")
         return result
+
+    @staticmethod
+    def _proposal_from_record(record: Mapping[str, Any]) -> ApprovedFieldworkProposal:
+        fields = (
+            "proposal_id", "workspace_id", "client_id", "client_name", "client_contact_name", "client_email",
+            "proposal_url", "proposal_checksum", "scope_summary", "total_amount_minor", "deposit_amount_minor",
+            "currency", "balance_terms", "service_terms_url", "founder_approval_id", "founder_approved_at",
+            "parent_workflow_run_id", "commercial_record_id", "required_inputs", "received_inputs", "workflow_inputs",
+            "target_workflow_id", "delivery_commitment_days",
+        )
+        return ApprovedFieldworkProposal(**{name: record[name] for name in fields if name in record})
 
     @classmethod
     def _action_once(cls, previous: Any, action: Action | None, context: Mapping[str, Any], *, required: bool) -> dict[str, Any]:

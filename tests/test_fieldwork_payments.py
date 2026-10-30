@@ -15,6 +15,7 @@ from runtime.fieldwork_payment_integrations import (
     notion_payment_recorder,
     tony_workflow_authoriser,
 )
+from runtime.tony_internal_review_delivery import fieldwork_commercial_offer_digest
 from runtime.fieldwork_payments import (
     ApprovedFieldworkProposal,
     FieldworkPaymentService,
@@ -292,6 +293,32 @@ class FieldworkPaymentTests(unittest.TestCase):
         self.assertTrue(second["replay"])
         self.assertEqual(len(self.stripe.created), 1)
 
+    def test_checkout_replay_and_payment_fail_closed_when_approval_is_no_longer_current(self):
+        approval_is_current = {"value": True}
+
+        def verify(context):
+            item = context["proposal"]
+            return {
+                "verified": approval_is_current["value"],
+                "proposal_id": item["proposal_id"],
+                "proposal_checksum": item["proposal_checksum"],
+                "founder_approval_id": item["founder_approval_id"],
+            }
+
+        service = FieldworkPaymentService(
+            FieldworkPaymentStore(Path(self.temp.name) / "current-approval"), self.stripe,
+            webhook_secret=WEBHOOK_SECRET, success_url="https://example.invalid/success", cancel_url="https://example.invalid/cancel",
+            proposal_verifier=verify, clock=lambda: NOW,
+        )
+        service.create_checkout(proposal())
+        approval_is_current["value"] = False
+        with self.assertRaisesRegex(RuntimeError, "approved proposal verification failed"):
+            service.create_checkout(proposal())
+        raw = event("evt_revoked_approval", "checkout.session.completed", session_object())
+        rejected = service.handle_webhook(raw, stripe_signature(raw, WEBHOOK_SECRET, NOW))
+        self.assertEqual(rejected["status"], "rejected")
+        self.assertEqual(rejected["reason"], "proposal_approval_not_current")
+
     def test_checkout_fails_closed_without_exact_proposal_verification(self):
         service = FieldworkPaymentService(
             FieldworkPaymentStore(Path(self.temp.name) / "unverified"), self.stripe,
@@ -376,7 +403,8 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
                 "workflow_id": "discovery_evidence_to_growth_sprint_proposal", "run_id": "proposal-run-synthetic-001",
                 "artifact_id": "proposal-artifact-1", "artifact_checksum": "synthetic-proposal-v1", "artifact_version": "v1",
                 "approval_binding_digest": "binding-safe-1", "approval_record_id": approval_record_id,
-                "fieldwork_commercial_offer": offer, "fieldwork_commercial_offer_digest": "offer-digest-safe-1",
+                "fieldwork_commercial_offer": offer,
+                "fieldwork_commercial_offer_digest": fieldwork_commercial_offer_digest("binding-safe-1", offer),
             }}],
             stages=[SimpleNamespace(revision_count=0, output_artifacts=[SimpleNamespace(artifact_id="proposal-artifact-1", checksum="synthetic-proposal-v1", metadata={})])],
         )
@@ -429,10 +457,18 @@ class FieldworkIntegrationAdapterTests(unittest.TestCase):
             context["proposal"] = proposal_record
 
         offer["proposal_artifact_version"] = "v2"
+        parent.approval_history[-1]["approval_binding"]["fieldwork_commercial_offer_digest"] = fieldwork_commercial_offer_digest("binding-safe-1", offer)
         with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
             with self.assertRaisesRegex(RuntimeError, "commercial approval"):
                 tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
         offer["proposal_artifact_version"] = "v1"
+        parent.approval_history[-1]["approval_binding"]["fieldwork_commercial_offer_digest"] = fieldwork_commercial_offer_digest("binding-safe-1", offer)
+
+        parent.approval_history[-1]["approval_binding"]["fieldwork_commercial_offer_digest"] = "tampered"
+        with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
+            with self.assertRaisesRegex(RuntimeError, "digest"):
+                tony_workflow_authoriser(Path("/synthetic"), workspace_id="narratiive")(context)
+        parent.approval_history[-1]["approval_binding"]["fieldwork_commercial_offer_digest"] = fieldwork_commercial_offer_digest("binding-safe-1", offer)
 
         parent.approval_history[-1]["approval_binding"].pop("fieldwork_commercial_offer")
         with mock.patch("runtime.tony_workflow_commands.FileWorkflowCommandBackend", return_value=backend):
