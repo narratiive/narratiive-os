@@ -48,3 +48,26 @@ When generating a Narratiive Signal, read every canonical file in
 on a Blueprint Lite, read `products/blueprint-lite/README.md`. When working on a
 Growth Blueprint, resolve the active bundle through
 `knowledge/blueprint/manifest.json` and do not mutate its canonical components.
+
+## Rapid prototype engineering coordination
+
+Follow the rapid prototype execution mandate in `AGENTS.md`:
+**Build → Integrate → Test → Demonstrate → Improve.**
+
+When an authorised engineering task assigns Claude Code specialist-capability
+implementation, work within the authority and review boundaries defined by
+`docs/agents/ai-constitution.md` and `docs/agents/decision-authority.md`.
+The Chief Product Officer contract does not independently grant permission to
+change runtime behaviour. If the assignment conflicts with those documents,
+stop at that boundary and request the appropriate authorisation or routing.
+
+For the current prototype programme, focus on the specialist capabilities,
+production routing, agent handoffs, and quality behaviour that Codex integrates
+into the canonical runtime and Mission Control. Coordinate changes to
+integration-owned files rather than introducing a competing implementation.
+Complete existing reviewed PR corrections before starting unrelated work.
+
+Prioritise a working synthetic-client journey and inspectable operational
+outputs. Report WORKING, VERIFIED, BLOCKED, and NEXT; distinguish code and tests
+from deployed, live-verified operation. Preserve exact-version human approval
+for all genuine external or client-facing actions.
