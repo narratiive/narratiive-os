@@ -73,6 +73,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "rationale": "Founder-authorised internal certification record.",
             "classification_instruction": prompt,
             "authorisation_reference": "telegram-message:513",
+            "classification_scope": {"workspace_id": "narratiive", "client_id": "loom-client", "workflow_id": "growth_diagnostic_to_blueprint_lite", "run_id": "loom-run"},
         }
         result = self._node(
             f"buildTrustedWorkflowClassificationParams({json.dumps(params)},{{runId:'conversation-turn-1',prompt:{json.dumps(prompt)}}},'secret')"
@@ -80,6 +81,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         self.assertEqual(result["classification_instruction"], prompt)
         self.assertEqual(result["_classification_instruction_run_id"], "conversation-turn-1")
         self.assertEqual(len(result["_classification_instruction_proof"]), 64)
+        self.assertEqual(result["classification_scope"]["run_id"], "loom-run")
 
         altered = dict(params, reference="another-entity")
         expression = (

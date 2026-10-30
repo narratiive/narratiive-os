@@ -38,7 +38,7 @@ class SyntheticRehearsalTests(unittest.TestCase):
                 },
             },
         })
-        event = WorkflowEntityClassification.create(workspace_id="narratiive", client_id="loom", entity_id="inbound-d1b96a67", workflow_id=self.proposal.workflow_id, classification=INTERNAL_SYNTHETIC_TEST, classifier_id=self.classifier_id, authorisation_reference="telegram:1", authorisation_turn_id="turn-1", authorisation_proof="proof", reason="test")
+        event = WorkflowEntityClassification.create(workspace_id="narratiive", client_id="loom", run_id=self.proposal.run_id, entity_id="inbound-d1b96a67", workflow_id=self.proposal.workflow_id, classification=INTERNAL_SYNTHETIC_TEST, classifier_id=self.classifier_id, authorisation_reference="telegram:1", authorisation_turn_id="turn-1", authorisation_proof="proof", reason="test")
         self.events = JsonlEventLog(Path(self.tmp.name), workspace_id="narratiive")
         self.classifications = FileWorkflowEntityClassificationJournal(
             Path(self.tmp.name), authorised_classifier_id=self.classifier_id,

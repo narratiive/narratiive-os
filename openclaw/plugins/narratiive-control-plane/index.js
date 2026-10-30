@@ -148,6 +148,7 @@ async function executeWorkflowControl(params) {
           ...(authorisationReference ? { authorisation_reference: authorisationReference } : {}),
           ...(params?._classification_instruction_run_id ? { classification_instruction_run_id: String(params._classification_instruction_run_id) } : {}),
           ...(params?._classification_instruction_proof ? { classification_instruction_proof: String(params._classification_instruction_proof) } : {}),
+          ...(params?.classification_scope && typeof params.classification_scope === "object" && !Array.isArray(params.classification_scope) ? { classification_scope: params.classification_scope } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),

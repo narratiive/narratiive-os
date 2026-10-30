@@ -252,6 +252,7 @@ class FileWorkflowCommandBackend:
             WorkflowEntityClassification.create(
                 workspace_id=state.workspace_id,
                 client_id=state.client_id,
+                run_id=state.run_id,
                 entity_id=state.entity_id,
                 workflow_id=state.workflow_id,
                 classification=INTERNAL_SYNTHETIC_TEST,
@@ -789,15 +790,22 @@ class TonyWorkflowCommandService:
                         "exact_workflow_entity_not_found",
                         "Classification requires an exact persisted workflow entity ID.",
                     )
+                supplied_scope = supplied.get("classification_scope")
+                if not isinstance(supplied_scope, Mapping):
+                    return self._error(
+                        name,
+                        "exact_classification_authorisation_required",
+                        "Classification requires the exact signed workspace, client, workflow and run identity.",
+                    )
                 requested_scope = {
-                    field: str(supplied.get(field) or "").strip()
+                    field: str(supplied_scope.get(field) or "").strip()
                     for field in ("workspace_id", "client_id", "workflow_id", "run_id")
                 }
-                if len(matching_entity_states) > 1 and not all(requested_scope.values()):
+                if not all(requested_scope.values()):
                     return self._error(
                         name,
                         "ambiguous_workflow_entity_scope",
-                        "This entity appears in multiple workflow scopes. Supply the exact workspace, client, workflow and run identity.",
+                        "Classification requires the exact workspace, client, workflow and run identity.",
                     )
                 scoped_states = tuple(
                     state for state in matching_entity_states

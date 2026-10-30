@@ -32,7 +32,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
 
     def _event(self, classification: str, *, supersedes: str = "") -> WorkflowEntityClassification:
         return WorkflowEntityClassification.create(
-            workspace_id="narratiive", client_id=self.state.client_id, entity_id="inbound-d1b96a67", workflow_id="growth_diagnostic_to_blueprint_lite",
+            workspace_id="narratiive", client_id=self.state.client_id, run_id=self.state.run_id, entity_id="inbound-d1b96a67", workflow_id="growth_diagnostic_to_blueprint_lite",
             classification=classification, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123",
             authorisation_proof="proof-123", reason="Authorised synthetic test classification.",
@@ -56,7 +56,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
 
     def test_cross_workspace_or_unknown_entity_is_rejected(self) -> None:
         foreign = WorkflowEntityClassification.create(
-            workspace_id="other", client_id=self.state.client_id, entity_id=self.state.entity_id, workflow_id=self.state.workflow_id,
+            workspace_id="other", client_id=self.state.client_id, run_id=self.state.run_id, entity_id=self.state.entity_id, workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No cross-workspace classification.",
         )
@@ -64,7 +64,7 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
             self.journal.append(foreign, states=[self.state], principal_id="telegram:founder")
 
         unknown = WorkflowEntityClassification.create(
-            workspace_id="narratiive", client_id=self.state.client_id, entity_id="other-entity", workflow_id=self.state.workflow_id,
+            workspace_id="narratiive", client_id=self.state.client_id, run_id=self.state.run_id, entity_id="other-entity", workflow_id=self.state.workflow_id,
             classification=INTERNAL_SYNTHETIC_TEST, classifier_id="telegram:founder",
             authorisation_reference="telegram-message:123", authorisation_turn_id="turn-123", authorisation_proof="proof-123", reason="No implicit classification.",
         )
@@ -107,6 +107,17 @@ class WorkflowEntityClassificationTests(unittest.TestCase):
         )
         self.assertEqual(self.journal.classification_for(self.state, states=[self.state]), legacy)
         self.assertIsNone(self.journal.classification_for(self.state, states=[self.state, sibling]))
+
+    def test_classification_does_not_cross_run_scope_for_same_client_and_entity(self) -> None:
+        event = self.journal.append(
+            self._event(INTERNAL_SYNTHETIC_TEST), states=[self.state], principal_id="telegram:founder"
+        )
+        sibling = WorkflowState(
+            self.state.workflow_id, "sibling-run", [], workspace_id="narratiive",
+            client_id=self.state.client_id, entity_id=self.state.entity_id,
+        )
+        self.assertEqual(self.journal.classification_for(self.state, states=[self.state, sibling]), event)
+        self.assertIsNone(self.journal.classification_for(sibling, states=[self.state, sibling]))
 
     def test_only_the_configured_principal_can_append_a_classification(self) -> None:
         service = WorkflowEntityClassificationService(

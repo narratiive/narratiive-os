@@ -146,6 +146,7 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
 def workflow_decision_proof_material(
     *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
     authorisation_reference: str = "",
+    classification_scope: Mapping[str, str] | None = None,
 ) -> bytes:
     normalized_operation = operation.strip().casefold().replace("-", "_")
     values = (
@@ -157,7 +158,8 @@ def workflow_decision_proof_material(
         instruction,
     )
     if normalized_operation == "classify_synthetic_test":
-        values = (*values, authorisation_reference)
+        scope = classification_scope or {}
+        values = (*values, authorisation_reference, *(str(scope.get(field) or "") for field in ("workspace_id", "client_id", "workflow_id", "run_id")))
     return "\0".join(values).encode("utf-8")
 
 
@@ -171,6 +173,7 @@ def verify_workflow_decision_proof(
     instruction: str,
     proof: str,
     authorisation_reference: str = "",
+    classification_scope: Mapping[str, str] | None = None,
 ) -> bool:
     if not secret or not run_id or not proof:
         return False
@@ -183,6 +186,7 @@ def verify_workflow_decision_proof(
             approval_token=approval_token,
             instruction=instruction,
             authorisation_reference=authorisation_reference,
+            classification_scope=classification_scope,
         ),
         hashlib.sha256,
     ).hexdigest()
@@ -525,9 +529,16 @@ class LeadAwareTonyApplication:
                     instruction_run_id = str((inputs or {}).get("classification_instruction_run_id") or "").strip()
                     instruction_proof = str((inputs or {}).get("classification_instruction_proof") or "").strip()
                     authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
+                    classification_scope = (inputs or {}).get("classification_scope")
+                    if not isinstance(classification_scope, Mapping):
+                        raise ValueError("workflow classification requires an exact signed workspace, client, workflow and run scope")
+                    classification_scope = {
+                        field: str(classification_scope.get(field) or "").strip()
+                        for field in ("workspace_id", "client_id", "workflow_id", "run_id")
+                    }
                     if not instruction or "classif" not in instruction.casefold() or "synthetic" not in instruction.casefold():
                         raise ValueError("workflow classification requires an explicit current-human classification instruction")
-                    if not instruction_run_id or not authorisation_reference:
+                    if not instruction_run_id or not authorisation_reference or not all(classification_scope.values()):
                         raise ValueError("workflow classification requires trusted-turn provenance and an authorisation reference")
                     if not verify_workflow_decision_proof(
                         str(self.base.bridge_token or ""),
@@ -538,6 +549,7 @@ class LeadAwareTonyApplication:
                         instruction=instruction,
                         proof=instruction_proof,
                         authorisation_reference=authorisation_reference,
+                        classification_scope=classification_scope,
                     ):
                         raise ValueError("workflow classification lacks verified verbatim current-human instruction provenance")
                 principal = (

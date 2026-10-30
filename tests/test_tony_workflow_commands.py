@@ -187,7 +187,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             principal_id="telegram:founder",
             inputs={"authorisation_reference": "telegram-message:123", "classification_instruction_run_id": "turn-123", "classification_instruction_proof": "proof-123"},
         )
-        self.assertEqual(ambiguous.data["error_code"], "ambiguous_workflow_entity_scope")
+        self.assertEqual(ambiguous.data["error_code"], "exact_classification_authorisation_required")
 
         result = service.execute(
             "/classify-synthetic-test safe-lead because authorised internal test",
@@ -197,10 +197,12 @@ class TonyWorkflowCommandTests(unittest.TestCase):
                 "authorisation_reference": "telegram-message:123",
                 "classification_instruction_run_id": "turn-123",
                 "classification_instruction_proof": "proof-123",
-                "workspace_id": "narratiive",
-                "client_id": "safe-client",
-                "workflow_id": "growth_diagnostic_to_blueprint_lite",
-                "run_id": "safe-executive-run",
+                "classification_scope": {
+                    "workspace_id": "narratiive",
+                    "client_id": "safe-client",
+                    "workflow_id": "growth_diagnostic_to_blueprint_lite",
+                    "run_id": "safe-executive-run",
+                },
             },
         )
 
