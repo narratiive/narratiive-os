@@ -755,6 +755,13 @@ class TonyWorkflowCommandTests(unittest.TestCase):
         )
         self.assertEqual(preview.status, "attention_required")
         self.assertFalse(preview.data["external_action_taken"])
+        with self.assertRaisesRegex(ValueError, "current exact commercial offer binding"):
+            self.runtime.approve(
+                run_id,
+                approver="telegram:123",
+                rationale="forged direct runtime approval",
+                approval_binding={"fieldwork_commercial_offer": offer},
+            )
         rejected = self.service.execute(
             f"/approve {run_id} because reviewed FIELDWORK terms", [], principal_id="telegram:123",
             inputs={"approval_token": token, "fieldwork_commercial_offer": {**offer, "recipient_email": "substituted@example.invalid"}, "commercial_offer_digest": preview.data["commercial_offer_digest"]},

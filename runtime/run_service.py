@@ -523,8 +523,14 @@ class WorkflowRunService:
             raise ValueError("approval requires approver identity and rationale")
         from runtime.tony_internal_review_delivery import FIELDWORK_PROPOSAL_WORKFLOW_ID
 
-        if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID and not approval_binding:
-            raise ValueError("FIELDWORK proposal approval requires an exact commercial offer binding")
+        if state.workflow_id == FIELDWORK_PROPOSAL_WORKFLOW_ID:
+            supplied_binding = dict(approval_binding or {})
+            if (
+                not isinstance(supplied_binding.get("fieldwork_commercial_offer"), Mapping)
+                or not str(supplied_binding.get("approval_binding_digest") or "").strip()
+                or not str(supplied_binding.get("fieldwork_commercial_offer_digest") or "").strip()
+            ):
+                raise ValueError("FIELDWORK proposal approval requires a current exact commercial offer binding")
         if approval_binding and "approval_binding_digest" in approval_binding:
             # Revalidate under the coordinator's run lock, against persisted
             # state rather than the earlier conversational lookup snapshot.
