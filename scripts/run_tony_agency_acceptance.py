@@ -34,6 +34,7 @@ from urllib.request import Request, urlopen
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ID = "safe-cinder-grove-agency-acceptance"
 COMPANY = "Cinder & Grove Mobility"
+SANDBOX_MODEL = "ollama/qwen3.5:latest"
 FOUNDER_PROMPTS = (
     "We've received this enquiry. Assess the opportunity and tell me what we should do.",
     "We've won it. Get us ready to start.",
@@ -135,8 +136,10 @@ def _sandbox_config(root: Path, gateway_port: int, gateway_token: str) -> dict[s
     for agent in config["agents"]["list"]:
         agent["workspace"] = str(root / "workspaces" / str(agent["id"]))
         agent.pop("heartbeat", None)
+        # The acceptance environment must never inherit a hosted model profile.
+        agent["model"] = SANDBOX_MODEL
     config.update({
-        "auth": {"profiles": {"anthropic:acceptance": {"provider": "anthropic", "mode": "api_key"}}},
+        "auth": {"profiles": {}},
         "gateway": {
             "mode": "local", "bind": "loopback", "port": gateway_port,
             "auth": {"mode": "token", "token": gateway_token},
@@ -204,7 +207,7 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
     for key, value in paths.items():
         env[key] = str(value)
     # Empty every known external dispatcher/provider credential in the child only.
-    prefixes = ("GOOGLE_", "META_", "TIKTOK_", "NOTION_", "GITHUB_", "FIRELIES_", "FIREFLIES_", "N8N_", "GMAIL_")
+    prefixes = ("ANTHROPIC_", "GOOGLE_", "META_", "TIKTOK_", "NOTION_", "GITHUB_", "FIRELIES_", "FIREFLIES_", "N8N_", "GMAIL_")
     for key in list(env):
         if key.startswith(prefixes):
             env.pop(key, None)
@@ -223,8 +226,17 @@ def _sandbox_env(root: Path, bridge_port: int, gateway_port: int, gateway_token:
         "TONY_EXECUTIVE_WORKSPACE_ID": "narratiive", "TONY_TELEGRAM_CHAT_ID": "999000111",
         "TONY_INBOUND_LEAD_SOURCE": "local_projection",
         "NARRATIIVE_RUNTIME_ENV_FILE": str(root / "runtime.env"),
-        "TONY_DISPATCH_CLAUDE_MODE": "anthropic_api",
-        "TONY_DISPATCH_CLAUDE_MODEL": "claude-sonnet-4-6",
+        # No direct Claude dispatcher is configured in the acceptance sandbox.
+        # A missing provider must remain a visible workflow blocker, never a paid fallback.
+        "TONY_DISPATCH_CLAUDE_MODE": "",
+        "TONY_DISPATCH_CLAUDE_MODEL": "",
+        # The bridge requires a budget guard even when no hosted dispatcher is
+        # configured. Keep its ledger and zero-reservation policy inside this
+        # disposable sandbox; it cannot authorise a provider request.
+        "TONY_HOSTED_MODEL_MONTHLY_LIMIT_USD": "1",
+        "TONY_HOSTED_MODEL_WARNING_USD": "0.50",
+        "TONY_HOSTED_MODEL_REQUEST_RESERVE_USD": "0",
+        "TONY_HOSTED_MODEL_USAGE_LEDGER": str(state / "sandbox-model-usage.jsonl"),
     })
     return env
 
@@ -291,7 +303,7 @@ def _approval_prompt(state: Mapping[str, Any]) -> str:
 
 def _send_turn(url: str, token: str, session: str, prompt: str, previous_response_id: str = "") -> Turn:
     started = datetime.now(timezone.utc).isoformat()
-    body: dict[str, Any] = {"model": "openclaw/tony", "input": prompt}
+    body: dict[str, Any] = {"model": SANDBOX_MODEL, "input": prompt}
     if previous_response_id:
         body["previous_response_id"] = previous_response_id
     headers = {
@@ -406,7 +418,7 @@ def run(output_dir: Path, *, max_gate_turns: int = 14) -> dict[str, Any]:
     processes: list[tuple[subprocess.Popen[str], Any]] = []
     try:
         bridge_log = (logs / "bridge.log").open("w", encoding="utf-8")
-        bridge = subprocess.Popen([str(ROOT / ".venv" / "bin" / "python"), "-m", "openclaw.tony_live_bridge"], cwd=ROOT, env=env, stdout=bridge_log, stderr=subprocess.STDOUT, text=True)
+        bridge = subprocess.Popen([sys.executable, "-m", "openclaw.tony_live_bridge"], cwd=ROOT, env=env, stdout=bridge_log, stderr=subprocess.STDOUT, text=True)
         processes.append((bridge, bridge_log))
         _wait_url(f"http://127.0.0.1:{bridge_port}/health", bridge)
         gateway_log = (logs / "gateway.log").open("w", encoding="utf-8")
