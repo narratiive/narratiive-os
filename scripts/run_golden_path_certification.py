@@ -52,20 +52,38 @@ def _lifecycle() -> ClientLifecycleRecord:
 
 def _approval(service, run_id: str, token: str, label: str) -> None:
     instruction = f"TEST APPROVAL — I explicitly approve the current {label} artefact for run {run_id} for internal continuation only."
+    inputs = {
+        "approval_token": token,
+        "approval_decision_evidence": {
+            "explicit_decision_intent": "approve",
+            "human_instruction": instruction,
+            "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+            "turn_run_id": f"certification:{run_id}:{label}",
+            "verbatim_current_human_instruction_verified": True,
+        },
+    }
+    state = next(item for item in service.backend.list_states() if item.run_id == run_id)
+    if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+        artifact = state.stages[-1].output_artifacts[-1]
+        offer = {
+            "proposal_id": f"certification-{run_id}", "recipient_email": "synthetic-client@example.invalid",
+            "proposal_url": f"https://example.invalid/proposals/{run_id}",
+            "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+            "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+            "deposit_amount_minor": 300000, "currency": "GBP",
+        }
+        preview = service.execute(
+            f"/fieldwork-offer {run_id}", [],
+            inputs={"approval_token": token, "fieldwork_commercial_offer": offer},
+        )
+        if preview.status == "error":
+            raise RuntimeError(preview.message)
+        inputs.update({"fieldwork_commercial_offer": offer, "commercial_offer_digest": preview.data["commercial_offer_digest"]})
     response = service.execute(
         f"/approve {run_id} because {instruction}",
         [],
         principal_id="matt:synthetic-certification",
-        inputs={
-            "approval_token": token,
-            "approval_decision_evidence": {
-                "explicit_decision_intent": "approve",
-                "human_instruction": instruction,
-                "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
-                "turn_run_id": f"certification:{run_id}:{label}",
-                "verbatim_current_human_instruction_verified": True,
-            },
-        },
+        inputs=inputs,
     )
     if response.status == "error":
         raise RuntimeError(response.message)

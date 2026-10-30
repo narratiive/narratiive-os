@@ -19,6 +19,11 @@ from runtime.inbound_lifecycle import project_inbound_lead
 from runtime.models import WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.run_service import WorkflowRunService
+from runtime.tony_internal_review_delivery import (
+    approval_binding_evidence,
+    fieldwork_commercial_offer_preview,
+    workflow_approval_token,
+)
 from runtime.senior_strategist_review_worker import SeniorStrategistReviewWorker
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
 from runtime.tony_workflow_runtime import TonyWorkflowRuntime
@@ -693,11 +698,28 @@ def execute_all_gate_conformance(root: Path) -> tuple[TonyWorkflowRuntime, list[
             if state.status is WorkflowStatus.COMPLETE:
                 break
             if state.status is WorkflowStatus.AWAITING_APPROVAL:
+                binding = {"test_fixture": CLIENT_ID}
+                if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                    token = workflow_approval_token(state)
+                    assert token is not None
+                    artifact = state.stages[-1].output_artifacts[-1]
+                    offer = {
+                        "proposal_id": f"synthetic-{run_id}", "recipient_email": "synthetic-client@example.invalid",
+                        "proposal_url": f"https://example.invalid/proposals/{run_id}",
+                        "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+                        "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+                        "deposit_amount_minor": 300000, "currency": "GBP",
+                    }
+                    preview = fieldwork_commercial_offer_preview(state, token, offer)
+                    binding = approval_binding_evidence(
+                        state, token, fieldwork_commercial_offer=offer,
+                        commercial_offer_digest=preview["commercial_offer_digest"],
+                    )
                 runtime.approve(
                     run_id,
                     approver="matt-authorised-synthetic-e2e",
                     rationale=f"Approve isolated {CLIENT_NAME} gate for lifecycle testing only.",
-                    approval_binding={"test_fixture": CLIENT_ID},
+                    approval_binding=binding,
                 )
             outcome = runtime.advance(run_id, _lifecycle())
             if outcome.status == "blocked":
@@ -815,10 +837,28 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
             if state.status is WorkflowStatus.COMPLETE:
                 break
             if state.status is WorkflowStatus.AWAITING_APPROVAL:
+                kwargs = {}
+                if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                    token = workflow_approval_token(state)
+                    assert token is not None
+                    artifact = state.stages[-1].output_artifacts[-1]
+                    offer = {
+                        "proposal_id": f"synthetic-{run_id}", "recipient_email": "synthetic-client@example.invalid",
+                        "proposal_url": f"https://example.invalid/proposals/{run_id}",
+                        "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+                        "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+                        "deposit_amount_minor": 300000, "currency": "GBP",
+                    }
+                    preview = fieldwork_commercial_offer_preview(state, token, offer)
+                    kwargs["approval_binding"] = approval_binding_evidence(
+                        state, token, fieldwork_commercial_offer=offer,
+                        commercial_offer_digest=preview["commercial_offer_digest"],
+                    )
                 runtime.approve(
                     run_id,
                     approver="matt-authorised-synthetic-e2e",
                     rationale="Approve isolated native-chain test gate.",
+                    **kwargs,
                 )
             outcome = runtime.advance(run_id, _lifecycle())
             if outcome.status == "blocked":
