@@ -99,11 +99,21 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
 
     def test_blocked_workflow_allows_explicitly_refused_bypass(self) -> None:
         states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
-        response = "I will not use the OpenClaw specialist agents as a workaround."
-        self.assertEqual(
-            _blocked_bypass_offers(states, [Turn("Start it", response, "now")]),
-            [],
-        )
+        for response in (
+            "I will not use the OpenClaw specialist agents as a workaround.",
+            "I don't recommend using specialist agents while the workflow is blocked.",
+            "I won’t spawn a Strategy agent subagent.",
+        ):
+            with self.subTest(response=response):
+                self.assertEqual(
+                    _blocked_bypass_offers(states, [Turn("Start it", response, "now")]),
+                    [],
+                )
+
+    def test_blocker_negation_does_not_hide_later_bypass_offer(self) -> None:
+        states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        response = "The workflow cannot proceed, so I recommend using specialist agents instead."
+        self.assertTrue(_blocked_bypass_offers(states, [Turn("Start it", response, "now")]))
 
     def test_tony_contract_forbids_out_of_workflow_blocker_workaround(self) -> None:
         contract = Path("openclaw/workspace-templates/tony/AGENTS.md").read_text(encoding="utf-8")
