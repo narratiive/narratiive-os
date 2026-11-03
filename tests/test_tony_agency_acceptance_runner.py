@@ -107,6 +107,9 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "Commissioning a research agent manually will keep it moving.",
             "I will not spawn a specialist agent but I can delegate this to another available agent.",
             "I will not assign this to a strategy agent but I can route this to another available agent.",
+            "I'm manually commissioning the research.",
+            "I'm commissioning the research manually.",
+            "Commissioning research manually will keep this moving.",
         )
         for response in responses:
             with self.subTest(response=response):
@@ -132,6 +135,13 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I recommend not routing this to a specialist agent.",
             "I recommend fixing the specialist agent rather than bypassing the canonical workflow.",
             "I recommend avoiding routing this to a specialist agent.",
+            "I am not spawning a specialist agent.",
+            "I am not assigning this to a strategy agent.",
+            "I am not routing this to a specialist agent.",
+            "I am not delegating this to a specialist agent.",
+            "I am not commissioning a research agent.",
+            "I am avoiding spawning a specialist agent.",
+            "Avoid spawning a specialist agent.",
         ):
             with self.subTest(response=response):
                 self.assertEqual(

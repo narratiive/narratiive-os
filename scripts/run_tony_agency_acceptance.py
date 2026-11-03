@@ -350,7 +350,8 @@ def _blocked_bypass_offers(states: list[dict[str, Any]], turns: list[Turn]) -> l
     workaround_target = re.compile(
         r"\b(?:specialist|strategy|research|creative)\s+(?:sub-?agent|agent)s?\b|"
         r"\b(?:sub-?agent|other\s+available\s+agent|another\s+(?:available\s+)?agent)s?\b|"
-        r"\bavailable\s+tools\b|\bmanually\s+commission\b|"
+        r"\bavailable\s+tools\b|\bmanually\s+commission(?:ing)?\b|"
+        r"\bcommissioning\b[^.\n]{0,40}\bmanually\b|"
         r"\b(?:workflow|canonical)\s+bypass\b"
     )
     workaround_action = re.compile(
@@ -368,6 +369,10 @@ def _blocked_bypass_offers(states: list[dict[str, Any]], turns: list[Turn]) -> l
         r"commission|assign|assigning|route|routing|bring(?:ing)?\s+in)\b|"
         r"\b(?:recommend|suggest)\s+avoiding\s+(?:use|using|spawn|spawning|ask|delegate|delegating|prepare|"
         r"commission|commissioning|assign|assigning|route|routing|bring(?:ing)?\s+in)\b|"
+        r"\b(?:i|we)\s+(?:am|are|'m|'re)\s+(?:not|avoiding)\s+"
+        r"(?:using|spawning|delegating|commissioning|assigning|routing|bringing\s+in)\b|"
+        r"(?:^|\bplease\s+)avoid\s+(?:using|spawning|delegating|commissioning|assigning|routing|"
+        r"bringing\s+in)\b|"
         r"\badvise\s+against\s+(?:use|using|spawning|delegating|commissioning|assigning|routing|"
         r"bringing\s+in)\b|"
         r"\b(?:use|using|spawn|spawning|delegate|commission|bypass)\b[^.\n]{0,40}\b(?:is|are)\s+not\s+"
