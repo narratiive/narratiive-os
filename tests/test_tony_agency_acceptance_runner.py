@@ -11,12 +11,14 @@ from scripts.run_tony_agency_acceptance import (
     STAGE_WORKFLOWS,
     TONY_RESPONSE_MODEL,
     Turn,
+    _blocked_bypass_offers,
     _blocked_progress_claims,
     _has_external_effect,
     _sandbox_config,
     _sandbox_env,
     _send_turn,
     _spawned_specialist_sessions,
+    evaluate,
 )
 
 
@@ -79,6 +81,105 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             [Turn("Start it", "It is not ready because commissioning failed.", "now")],
         )
         self.assertEqual(claims, [])
+
+    def test_blocked_workflow_rejects_offered_specialist_bypass(self) -> None:
+        states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        responses = (
+            "I recommend using the OpenClaw specialist agents to continue the work in parallel.",
+            "I can prepare preliminary materials using other available agents in parallel.",
+            "I can spawn a Strategy agent subagent to handle it.",
+            "I can use available tools for preliminary research.",
+            "I can manually commission research while the worker recovers.",
+            "I can ask a specialist agent to continue the work.",
+            "We could delegate this to a specialist agent while the workflow recovers.",
+            "I can have the strategy agent prepare the research.",
+            "Let me hand this to a specialist agent instead.",
+            "I can get another available agent to handle it.",
+            "I can assign this to the strategy agent instead.",
+            "I can route this to a specialist agent instead.",
+            "I can bring in another available agent.",
+            "I will not spawn a specialist agent, but I can delegate this to another available agent.",
+            "I can’t recommend using specialist agents, but I can ask another available agent to take over.",
+            "Assigning this to a strategy agent will keep things moving.",
+            "Routing this to a specialist agent is the best workaround.",
+            "Spawning a specialist agent is the practical next step.",
+            "Delegating this to a specialist agent is the practical next step.",
+            "Commissioning a research agent manually will keep it moving.",
+            "I will not spawn a specialist agent but I can delegate this to another available agent.",
+            "I will not assign this to a strategy agent but I can route this to another available agent.",
+            "I'm manually commissioning the research.",
+            "I'm commissioning the research manually.",
+            "Commissioning research manually will keep this moving.",
+            "I am preparing this with a specialist agent.",
+            "I will not spawn a specialist agent, and I can delegate this to another available agent.",
+            "I will not spawn a specialist agent and will instead delegate this to another available agent.",
+            "Do not spawn a specialist agent—delegate this to another available agent instead.",
+        )
+        for response in responses:
+            with self.subTest(response=response):
+                claims = _blocked_bypass_offers(states, [Turn("Start it", response, "now")])
+                self.assertEqual(len(claims), 1)
+                self.assertIn("out-of-workflow", claims[0])
+
+    def test_blocked_workflow_allows_explicitly_refused_bypass(self) -> None:
+        states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        for response in (
+            "I will not use the OpenClaw specialist agents as a workaround.",
+            "I don't recommend using specialist agents while the workflow is blocked.",
+            "I won’t spawn a Strategy agent subagent.",
+            "I can't in good conscience recommend using specialist agents.",
+            "I won’t attempt to spawn a specialist agent.",
+            "I recommend not using specialist agents.",
+            "I advise against using specialist agents while blocked.",
+            "Using specialist agents is not permitted while blocked.",
+            "I recommend fixing the worker; specialist agents remain unavailable.",
+            "I will not assign this to the strategy agent.",
+            "I will not route this to a specialist agent.",
+            "I will not bring in another available agent.",
+            "I recommend not routing this to a specialist agent.",
+            "I recommend fixing the specialist agent rather than bypassing the canonical workflow.",
+            "I recommend avoiding routing this to a specialist agent.",
+            "I am not spawning a specialist agent.",
+            "I am not assigning this to a strategy agent.",
+            "I am not routing this to a specialist agent.",
+            "I am not delegating this to a specialist agent.",
+            "I am not commissioning a research agent.",
+            "I am avoiding spawning a specialist agent.",
+            "Avoid spawning a specialist agent.",
+            "Do not spawn a specialist agent.",
+            "Don't spawn a specialist agent.",
+            "Never commission a research agent manually.",
+            "Do not manually commission research.",
+            "Never manually commission research.",
+        ):
+            with self.subTest(response=response):
+                self.assertEqual(
+                    _blocked_bypass_offers(states, [Turn("Start it", response, "now")]),
+                    [],
+                )
+
+    def test_blocker_negation_does_not_hide_later_bypass_offer(self) -> None:
+        states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        response = "The workflow cannot proceed, so I recommend using specialist agents instead."
+        self.assertTrue(_blocked_bypass_offers(states, [Turn("Start it", response, "now")]))
+
+    def test_tony_contract_forbids_out_of_workflow_blocker_workaround(self) -> None:
+        contract = Path("openclaw/workspace-templates/tony/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Do not offer a specialist spawn, manual commission", contract)
+
+    def test_blocked_workflow_without_artifact_is_durable_pass_with_issue(self) -> None:
+        states = [
+            {
+                "workflow_id": "growth_diagnostic_to_blueprint_lite",
+                "run_id": "lead-1",
+                "status": "blocked",
+                "stages": [{"output_artifacts": []}],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            report = evaluate(states, [], [], Path(directory), states)
+        self.assertEqual(report["stages"]["Durable state/memory"]["status"], "PASS WITH ISSUE")
+        self.assertNotIn("Durable state/memory", report["product_gaps_discovered"])
 
     def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
         response = mock.MagicMock()
