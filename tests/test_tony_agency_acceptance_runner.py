@@ -119,6 +119,11 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I advise against using specialist agents while blocked.",
             "Using specialist agents is not permitted while blocked.",
             "I recommend fixing the worker; specialist agents remain unavailable.",
+            "I will not assign this to the strategy agent.",
+            "I will not route this to a specialist agent.",
+            "I will not bring in another available agent.",
+            "I recommend not routing this to a specialist agent.",
+            "I recommend fixing the specialist agent rather than bypassing the canonical workflow.",
         ):
             with self.subTest(response=response):
                 self.assertEqual(
