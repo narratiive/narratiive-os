@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from runtime.groundwork import groundwork_instruction, validate_prospect_intelligence
+
 import hashlib
 import json
 import threading
@@ -856,7 +858,7 @@ class TonyInboundBlueprintLiteService:
             "but provisional opportunity, and 3–4 meaningful questions to answer next. Produce only the internal human-review-ready Blueprint Lite "
             "defined by the canonical product contract. Do not create the paid Growth Blueprint, share a file, update Notion, create a Calendar event, "
             "book Discovery, or change any external state."
-        )
+        ) + groundwork_instruction()
 
     @classmethod
     def _quality_gate(cls, evidence: Any) -> dict[str, Any]:
@@ -886,6 +888,10 @@ class TonyInboundBlueprintLiteService:
             "recommendation_is_advance": recommendation == "advance",
             "no_false_external_execution_claim": no_asserted_external_action(evidence, _FALSE_EXECUTION_MARKERS),
         }
+        # Legacy stored artefacts remain readable; new workflow commissions require the
+        # field in the registry. Validate the extension whenever it is supplied.
+        if "prospect_intelligence" in evidence:
+            checks["prospect_intelligence_valid"] = not validate_prospect_intelligence(evidence["prospect_intelligence"])
         failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
         return {"passed": not failed, "failed_checks": failed, "checks": checks}
 

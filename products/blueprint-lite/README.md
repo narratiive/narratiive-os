@@ -143,3 +143,45 @@ Tony orchestrates, stores, validates and routes. Claude researches, reasons and 
 ## Relationship to outbound
 
 Blueprint Lite is an inbound product. It must not replace or rename Narratiive Signal, which remains the canonical unsolicited outbound strategic gift.
+
+## Internal Groundwork qualification brief (2026-11-03)
+
+Decision: Matt's Groundwork Quality Upgrade instruction, 3 November 2026.
+This adds the internal **Prospect Intelligence Brief** to the existing Blueprint
+Lite generation pathway. It does not replace the recipient-facing seven-part
+structure above, rename Blueprint Lite or create a FIELDWORK deliverable.
+
+The reusable specialist commission and validation are in `runtime/groundwork.py`.
+Both `runtime/workflow_instructions.py` (durable workflow) and
+`TonyInboundBlueprintLiteService._instruction` (diagnostic ingress) include that
+same commission. New workflow output includes `prospect_intelligence` alongside,
+not in place of, the existing diagnostic, growth-tension and lineage fields.
+
+The internal brief answers whether to pursue, commercial/marketing attractiveness,
+brand/people character and visible marketing. It carries a 100-point scorecard:
+commercial 30, marketing 30, brand/creative 20, Narratiive fit 20. Each score has an
+evidence-based justification. The renderer calculates the total and applies
+80–100 Priority prospect / pursue; 70–79 Qualify further / qualify; below 70
+Do not prioritise / deprioritise. This advisory judgement never approves contact,
+workflow progression or client release.
+
+Aim for one excellent A4 page, hard maximum two, no separate cover or decision
+page. Use 450–650 words, short observations, two or three cited marketing examples,
+two or three commercial hypotheses and exactly three Discovery questions. Keep
+verified facts, interpretations, assumptions and unknowns explicit. Reference
+checkable URLs with assessment dates. Unknown budget, mandate or performance
+constrains scores and confidence. Do not infer missing diagnostic answers.
+Include imagery only with documented reuse permission; typography is the default.
+
+`HumanReviewPresentationService` selects the compact layout for this structured
+brief, retains Blueprint Lite's product identity and immutable source lineage,
+and rejects overflow beyond two pages. Existing stored outputs without the
+extension remain readable through the legacy layout; no history is rewritten.
+
+n8n remains the lead-event transport; Tony's existing workflow control commissions
+`growth_diagnostic_to_blueprint_lite`, step `prepare_blueprint_lite`, and Claude
+provides specialist preparation. No n8n node, Tony workspace configuration,
+external communications or live prospect test needs changing. Deploy source
+changes through the normal reviewed PR and canonical runtime deployment process.
+A renderer test is document-generation evidence, not proof of a live Claude run,
+workflow completion, deployment or release approval.

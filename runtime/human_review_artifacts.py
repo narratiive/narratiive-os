@@ -38,10 +38,11 @@ from reportlab.platypus import (
 from pypdf import PdfReader
 
 from runtime.models import ArtifactRef, WorkflowState
+from runtime.groundwork import WEIGHTS, qualification, validate_prospect_intelligence
 
 
 RENDERER_ID = "narratiive-human-review-pdf"
-RENDERER_VERSION = "2"
+RENDERER_VERSION = "3"
 BLUEPRINT_PRESENTATION_RENDERER_ID = "narratiive-growth-blueprint-presentation"
 BLUEPRINT_PRESENTATION_RENDERER_VERSION = "1"
 PDF_MIME_TYPE = "application/pdf"
@@ -92,6 +93,7 @@ class ReviewDocumentPlan:
     focus_points: tuple[str, ...]
     decision_prompt: str
     next_if_approved: str
+    prospect_intelligence: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -312,6 +314,8 @@ class NarratiiveReviewPDFRenderer:
             data = temporary_path.read_bytes()
             if not data.startswith(b"%PDF-"):
                 raise HumanReviewArtifactError("review renderer did not produce a PDF")
+            if plan.prospect_intelligence is not None and document.page_count > 2:
+                raise HumanReviewArtifactError("Groundwork exceeds two pages; shorten the specialist copy")
             return data, document.page_count
         finally:
             temporary_path.unlink(missing_ok=True)
@@ -455,6 +459,8 @@ def _styles() -> dict[str, ParagraphStyle]:
 
 
 def _story(plan: ReviewDocumentPlan, styles: Mapping[str, ParagraphStyle]) -> list[Flowable]:
+    if plan.prospect_intelligence is not None:
+        return _groundwork_story(plan)
     usable_width = A4[0] - 46 * mm
     decision_box = Table(
         [[Paragraph(_p(plan.decision_prompt), styles["decision"])]],
@@ -590,6 +596,27 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
 
 
 def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
+    if "prospect_intelligence" in output:
+        brief = output["prospect_intelligence"]
+        errors = validate_prospect_intelligence(brief)
+        if errors:
+            raise HumanReviewArtifactError("; ".join(errors))
+        total, label, action = qualification(brief)
+        sections = (
+            ReviewSection("Company and people", body=(brief["company_and_people"],)),
+            ReviewSection("Brand character", body=(brief["brand_character"],)),
+            ReviewSection("Visible marketing", items=tuple(brief["marketing_examples"])),
+            ReviewSection("Growth hypotheses", items=tuple(brief["growth_hypotheses"])),
+            ReviewSection("Priority Discovery questions", items=tuple(brief["discovery_questions"])),
+        )
+        return ReviewDocumentPlan(
+            product="Blueprint Lite", gate_label="GROUNDWORK / GATE 1", company=company,
+            subtitle="Prospect Intelligence Brief", sections=sections,
+            focus_points=(brief["verdict"], f"{total}/100 - {label}", brief["confidence"]),
+            decision_prompt=f"{action}: {brief['verdict']}",
+            next_if_approved="Matt decides whether to pursue or qualify. No contact, booking or client release is authorised by this score.",
+            prospect_intelligence=brief,
+        )
     diagnosis = _clean_text(output.get("central_diagnosis")) or _clean_text(output.get("blueprint_lite"))
     tension = _required_text(output, "growth_tension")
     opportunity = _required_text(output, "provisional_opportunity")
@@ -924,3 +951,53 @@ def _persist_immutable(target: Path, content: bytes) -> None:
     finally:
         if os.path.exists(temporary):
             os.unlink(temporary)
+
+
+def _groundwork_story(plan: ReviewDocumentPlan) -> list[Flowable]:
+    """A compact editorial brief; never a cover sheet or a strategy-report export."""
+    brief = plan.prospect_intelligence
+    assert brief is not None
+    width = A4[0] - 46 * mm
+    body = ParagraphStyle("GroundworkBody", fontName="Helvetica", fontSize=9.1, leading=12.1, textColor=INK, spaceAfter=3.5)
+    small = ParagraphStyle("GroundworkSource", parent=body, fontSize=7.2, leading=9.1, textColor=STONE)
+    heading = ParagraphStyle("GroundworkHeading", fontName="Helvetica-Bold", fontSize=9, leading=12, textColor=AMBER, spaceBefore=8, spaceAfter=4, keepWithNext=True)
+    title = ParagraphStyle("GroundworkTitle", fontName="Times-Bold", fontSize=30, leading=33, textColor=INK, spaceAfter=5)
+    total, label, action = qualification(brief)
+    story = [
+        Paragraph("NARRATIIVE / GROUNDWORK", heading),
+        Paragraph(_p(plan.company), title),
+        Paragraph(_p(f"Prospect Intelligence Brief | {brief['assessed_on']} | Internal review"), small),
+        Spacer(1, 9),
+        Paragraph(_p(f"{total}/100 - {label.upper()} / {action}"), heading),
+        Paragraph(_p(brief["verdict"]), body),
+        Paragraph(_p("Confidence: " + brief["confidence"]), small),
+        Spacer(1, 7),
+    ]
+    rows = [[Paragraph("CRITERION", small), Paragraph("SCORE", small), Paragraph("EVIDENCE & JUDGEMENT", small)]]
+    for row in brief["scorecard"]:
+        rows.append([Paragraph(_p(row["criterion"]), body), Paragraph(f"<b>{row['score']}/{WEIGHTS[row['criterion']]}</b>", body), Paragraph(_p(row["rationale"]), body)])
+    story.append(Table(rows, colWidths=(width * .27, width * .12, width * .61), repeatRows=1, style=TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"), ("BACKGROUND", (0, 0), (-1, 0), PALE),
+        ("LINEBELOW", (0, 1), (-1, -1), .4, PALE), ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5), ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ])))
+    for section in plan.sections:
+        if section.heading == "Visible marketing":
+            story.extend([PageBreak(), Paragraph("THE OPPORTUNITY TO QUALIFY", heading)])
+        story.append(Paragraph(_p(section.heading.upper()), heading))
+        for text in section.body:
+            story.append(Paragraph(_p(text), body))
+        for index, text in enumerate(section.items, 1):
+            story.append(Paragraph(_p(f"{index}. {text}"), body))
+        if section.heading == "Visible marketing":
+            story.append(Paragraph(_p(brief["channel_limits"]), small))
+    story.extend([
+        Paragraph("ASSUMPTIONS & UNKNOWNS", heading), Paragraph(_p(brief["unknowns"]), small),
+        Paragraph("SOURCES / CHECKABLE REFERENCES", heading),
+    ])
+    for index, source in enumerate(brief["sources"], 1):
+        url = escape(source["url"], quote=True)
+        story.append(Paragraph(f'[{index}] <link href="{url}" color="#20201D">{_p(source["label"])}</link> - {_p(source["url"])} (checked {_p(source["checked_on"])}).', small))
+    story.extend([Spacer(1, 5), Paragraph("Advisory qualification only. Matt retains the pursue decision; no external action or client release is authorised.", small)])
+    return story

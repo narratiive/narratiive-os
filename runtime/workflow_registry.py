@@ -106,6 +106,7 @@ GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE = _workflow(
         inputs=("diagnostic_input_package",),
         outputs=(
             "blueprint_lite",
+            "prospect_intelligence",
             "diagnostic_signals_used",
             "diagnostic_input_coverage",
             "source_backed_evidence",

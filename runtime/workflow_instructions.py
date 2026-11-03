@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from runtime.groundwork import groundwork_instruction
+
 
 _INSTRUCTIONS = {
     "growth_diagnostic_to_blueprint_lite": """
@@ -55,6 +57,8 @@ Act as the independent senior strategist reviewer. Review the finished client-fa
 """
     else:
         specific = _INSTRUCTIONS.get(workflow_id, "")
+    if workflow_id == "growth_diagnostic_to_blueprint_lite":
+        specific += groundwork_instruction()
     if workflow_id == "strategy_thesis_to_growth_blueprint" and stage_id == "prepare_growth_blueprint":
         specific += """
 Return contradiction_resolution with the exact list-valued keys unresolved_material_contradictions and resolution_notes; resolution_notes must contain at least one substantive item, and do not advance with any unresolved material contradiction. Return quantitative_evidence_treatment with known_facts, illustrative_or_directional and unsourced_numbers_present=false; never present illustrative numbers as client facts. Return assumption_control with silent_guesses=false, suppositions_labelled=true and every missing_evidence item. Return completeness with materially_complete=true and truncated=false only when the full requested artefact is present.
