@@ -11,12 +11,14 @@ from scripts.run_tony_agency_acceptance import (
     STAGE_WORKFLOWS,
     TONY_RESPONSE_MODEL,
     Turn,
+    _blocked_bypass_offers,
     _blocked_progress_claims,
     _has_external_effect,
     _sandbox_config,
     _sandbox_env,
     _send_turn,
     _spawned_specialist_sessions,
+    evaluate,
 )
 
 
@@ -79,6 +81,34 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             [Turn("Start it", "It is not ready because commissioning failed.", "now")],
         )
         self.assertEqual(claims, [])
+
+    def test_blocked_workflow_rejects_offered_specialist_bypass(self) -> None:
+        states = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        response = (
+            "I recommend using the OpenClaw specialist agents to continue the work in parallel, "
+            "or I can manually commission research."
+        )
+        claims = _blocked_bypass_offers(states, [Turn("Start it", response, "now")])
+        self.assertEqual(len(claims), 1)
+        self.assertIn("out-of-workflow", claims[0])
+
+    def test_tony_contract_forbids_out_of_workflow_blocker_workaround(self) -> None:
+        contract = Path("openclaw/workspace-templates/tony/AGENTS.md").read_text(encoding="utf-8")
+        self.assertIn("Do not offer a specialist spawn, manual commission", contract)
+
+    def test_blocked_workflow_without_artifact_is_durable_pass_with_issue(self) -> None:
+        states = [
+            {
+                "workflow_id": "growth_diagnostic_to_blueprint_lite",
+                "run_id": "lead-1",
+                "status": "blocked",
+                "stages": [{"output_artifacts": []}],
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            report = evaluate(states, [], [], Path(directory), states)
+        self.assertEqual(report["stages"]["Durable state/memory"]["status"], "PASS WITH ISSUE")
+        self.assertNotIn("Durable state/memory", report["product_gaps_discovered"])
 
     def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
         response = mock.MagicMock()
