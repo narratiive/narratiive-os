@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from runtime.inbound_leads import InboundLead
 from runtime.tony_blueprint_lite_inbound import (
@@ -10,7 +11,9 @@ from runtime.tony_blueprint_lite_inbound import (
     TonyInboundBlueprintLiteService,
 )
 from runtime.serialization import workflow_from_dict
+from runtime.repositories import JsonlEventLog
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
+from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 
 
 class TonyInboundBlueprintLiteTests(unittest.TestCase):
@@ -87,8 +90,13 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
 
     def test_missing_claude_dispatcher_fails_closed_and_persists_one_job(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
-            service = TonyInboundBlueprintLiteService(store, dispatchers={})
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
             result = service.enqueue(self._lead(), self._payload())
             self.assertEqual(result["state"], "dispatcher_unavailable")
             self.assertEqual(result["blocker"], "claude_dispatcher_not_configured")
@@ -101,14 +109,34 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
                 "worker_unavailable:strategic_reasoning",
             )
             self.assertEqual(workflow_from_dict(persisted["workflow_run"]).status.value, "blocked")
+            generic_states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(len(generic_states), 1)
+            self.assertEqual(generic_states[0].run_id, "lead-1")
+            self.assertEqual(generic_states[0].status.value, "blocked")
+            self.assertEqual(
+                generic_states[0].blocker,
+                "worker_unavailable:strategic_reasoning",
+            )
             replay = service.enqueue(self._lead(), self._payload())
             self.assertTrue(replay["replay"])
             self.assertEqual(len(store.read_all()), 1)
 
-            available = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: self._good_evidence()})
+            available = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
             resumed = available.enqueue(self._lead(), self._payload())
             self.assertEqual(resumed["state"], "preparation_queued")
             self.assertEqual(workflow_from_dict(store.get("lead-1")["workflow_run"]).stage("prepare_blueprint_lite").status.value, "ready")
+            completed = available.process("lead-1")
+            self.assertEqual(completed["state"], "awaiting_review")
+            generic_states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(generic_states[0].status.value, "awaiting_approval")
 
     def test_verified_blueprint_lite_is_versioned_and_stops_at_human_review(self) -> None:
         calls: list[dict] = []
@@ -219,6 +247,204 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertTrue(states[0].stage("prepare_blueprint_lite").quality_result["passed"])
             self.assertEqual(len(states[0].stage("prepare_blueprint_lite").output_artifacts), 1)
             self.assertFalse(states[0].external_action_taken)
+            events = build_tony_workflow_runtime(
+                root / "workflow-runtime",
+                workspace_id="narratiive",
+                client_id="lead-1",
+                dispatchers={},
+            ).runs.event_log.read("lead-1")
+            self.assertEqual(
+                [event.event_type for event in events].count("approval.requested"),
+                1,
+            )
+
+    def test_quality_failure_blocks_the_same_canonical_runtime(self) -> None:
+        evidence = self._good_evidence()
+        evidence["quality_gate"] = {"human_review_ready": False}
+        evidence["recommendation"] = "revise"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: evidence},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+
+            result = service.process("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(result["blocker"], "blueprint_lite_quality_gate")
+            self.assertEqual(len(states), 1)
+            self.assertEqual(states[0].status.value, "blocked")
+            self.assertEqual(states[0].blocker, "blueprint_lite_quality_gate")
+
+    def test_revised_diagnostic_uses_new_canonical_run_without_partial_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            first = store.get("lead-1")
+
+            revised = self._payload()
+            revised["diagnostic"]["challenge"] = "Revised positioning challenge"
+            result = service.enqueue(self._lead(), revised)
+            current = store.get("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+
+            self.assertEqual(result["state"], "preparation_queued")
+            self.assertEqual(first["canonical_run_id"], "lead-1")
+            self.assertTrue(current["canonical_run_id"].startswith("lead-1--revision-"))
+            self.assertNotEqual(current["canonical_run_id"], first["canonical_run_id"])
+            self.assertEqual(
+                current["diagnostic_input_package"]["diagnostic"]["challenge"],
+                "Revised positioning challenge",
+            )
+            self.assertEqual(len(states), 2)
+            by_id = {state.run_id: state for state in states}
+            self.assertEqual(
+                by_id["lead-1"].input_payload["diagnostic_input_package"],
+                first["diagnostic_input_package"],
+            )
+            self.assertEqual(
+                by_id[current["canonical_run_id"]].input_payload["diagnostic_input_package"],
+                current["diagnostic_input_package"],
+            )
+
+    def test_completed_event_failure_rolls_canonical_runtime_back_to_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            original_append = JsonlEventLog.append
+
+            def fail_completed_event(event_log, event):
+                if event.event_type == "stage.completed":
+                    raise OSError("simulated completed-event persistence failure")
+                return original_append(event_log, event)
+
+            with patch.object(JsonlEventLog, "append", new=fail_completed_event):
+                result = service.process("lead-1")
+
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(result["blocker"], "workflow_runtime_persistence_failed")
+            self.assertEqual(len(states), 1)
+            self.assertEqual(states[0].status.value, "blocked")
+            self.assertEqual(states[0].stage("prepare_blueprint_lite").status.value, "blocked")
+            self.assertEqual(states[0].blocker, "workflow_runtime_persistence_failed")
+            self.assertNotEqual(states[0].approval_status, "pending")
+
+    def test_approval_event_failure_rolls_back_snapshot_and_uncommitted_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            original_append = JsonlEventLog.append
+
+            def fail_approval_event(event_log, event):
+                if event.event_type == "approval.requested":
+                    raise OSError("simulated approval-event persistence failure")
+                return original_append(event_log, event)
+
+            with patch.object(JsonlEventLog, "append", new=fail_approval_event):
+                result = service.process("lead-1")
+
+            runtime = build_tony_workflow_runtime(
+                root / "workflow-runtime",
+                workspace_id="narratiive",
+                client_id="lead-1",
+                dispatchers={},
+            )
+            state = runtime.runs.load_run("lead-1")
+            event_types = [event.event_type for event in runtime.runs.event_log.read("lead-1")]
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(state.status.value, "blocked")
+            self.assertEqual(state.blocker, "workflow_runtime_persistence_failed")
+            self.assertNotIn("stage.completed", event_types)
+            self.assertNotIn("approval.requested", event_types)
+            self.assertEqual(event_types[-1], "stage.blocked")
+
+    def test_non_consecutive_content_replay_reuses_prior_canonical_artifact(self) -> None:
+        calls = 0
+
+        def claude(_dispatch):
+            nonlocal calls
+            calls += 1
+            evidence = self._good_evidence()
+            evidence["work_product"] = f"draft-call-{calls}"
+            evidence["blueprint_lite"] = f"Blueprint draft-call-{calls}"
+            return evidence
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": claude},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            payload_a = self._payload()
+            payload_b = self._payload()
+            payload_b["diagnostic"]["challenge"] = "A second immutable challenge"
+
+            service.enqueue(self._lead(), payload_a)
+            service.process("lead-1")
+            service.enqueue(self._lead(), payload_b)
+            service.process("lead-1")
+            replay_a = service.enqueue(self._lead(), payload_a)
+            state_after_replay_a = store.get("lead-1")
+            replay_b = service.enqueue(self._lead(), payload_b)
+
+            persisted = store.get("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(calls, 2)
+            self.assertTrue(replay_a["replay"])
+            self.assertTrue(replay_b["replay"])
+            self.assertEqual(state_after_replay_a["canonical_run_id"], "lead-1")
+            self.assertEqual(
+                state_after_replay_a["workflow_run"]["run_id"],
+                state_after_replay_a["canonical_run_id"],
+            )
+            self.assertEqual(len(persisted["versions"]), 2)
+            self.assertEqual(persisted["current_version"], 2)
+            self.assertEqual(persisted["workflow_run"]["run_id"], persisted["canonical_run_id"])
+            for version in persisted["versions"]:
+                self.assertEqual(version["workflow_run"]["run_id"], version["canonical_run_id"])
+            self.assertEqual(len(states), 2)
+            self.assertTrue(all(len(state.stage("prepare_blueprint_lite").output_artifacts) == 1 for state in states))
+            current = next(state for state in states if state.run_id == persisted["canonical_run_id"])
+            self.assertIn(
+                "draft-call-2",
+                current.stage("prepare_blueprint_lite").output_artifacts[0].location
+                + str(current.input_payload),
+            )
 
     def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
         payload = self._payload()

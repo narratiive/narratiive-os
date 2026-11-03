@@ -1,14 +1,99 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.run_tony_agency_acceptance import SANDBOX_MODEL, STAGE_WORKFLOWS, _has_external_effect, _sandbox_config, _sandbox_env
+from scripts.run_tony_agency_acceptance import (
+    SANDBOX_MODEL,
+    STAGE_WORKFLOWS,
+    TONY_RESPONSE_MODEL,
+    Turn,
+    _blocked_progress_claims,
+    _has_external_effect,
+    _sandbox_config,
+    _sandbox_env,
+    _send_turn,
+    _spawned_specialist_sessions,
+)
 
 
 class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
+    def test_specialist_session_bypass_is_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sessions = root / "openclaw-state" / "agents" / "strategy" / "sessions" / "sessions.json"
+            sessions.parent.mkdir(parents=True)
+            sessions.write_text(json.dumps({"agent:strategy:subagent:1": {"status": "running"}}), encoding="utf-8")
+            self.assertEqual(_spawned_specialist_sessions(root), ["agent:strategy:subagent:1"])
+
+    def test_tony_conversation_sessions_are_not_specialist_bypasses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sessions = root / "openclaw-state" / "agents" / "tony" / "sessions" / "sessions.json"
+            sessions.parent.mkdir(parents=True)
+            sessions.write_text(json.dumps({"agent:tony:acceptance": {"status": "running"}}), encoding="utf-8")
+            self.assertEqual(_spawned_specialist_sessions(root), [])
+
+    def test_blocked_workflow_rejects_positive_commissioning_language(self) -> None:
+        claims = _blocked_progress_claims(
+            [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}],
+            [Turn("Start it", "Approved & Ready — opportunity commissioned and preparation initiated.", "now")],
+        )
+        self.assertEqual(len(claims), 1)
+        self.assertIn("authoritative workflow remained blocked", claims[0])
+
+    def test_honest_blocker_response_is_not_false_success(self) -> None:
+        claims = _blocked_progress_claims(
+            [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}],
+            [Turn("Start it", "Commissioning failed: the strategic worker is unavailable.", "now")],
+        )
+        self.assertEqual(claims, [])
+
+    def test_blocked_workflow_detects_underway_started_and_begun_variants(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        for response in (
+            "The work is underway.",
+            "Ready — I have started the preparation.",
+            "The preparation has begun.",
+        ):
+            with self.subTest(response=response):
+                self.assertTrue(_blocked_progress_claims(state, [Turn("Start it", response, "now")]))
+
+    def test_blocked_workflow_detects_ready_specialist_and_next_phase_claims(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        for response in (
+            "It's ready.",
+            "I've commissioned Strategy to handle it.",
+            "The next phase is underway.",
+        ):
+            with self.subTest(response=response):
+                self.assertTrue(_blocked_progress_claims(state, [Turn("Start it", response, "now")]))
+
+    def test_blocked_workflow_allows_explicit_not_ready_statement(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        claims = _blocked_progress_claims(
+            state,
+            [Turn("Start it", "It is not ready because commissioning failed.", "now")],
+        )
+        self.assertEqual(claims, [])
+
+    def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
+        response = mock.MagicMock()
+        response.read.return_value = b'{"id":"response-1","output_text":"Ready"}'
+        response.__enter__.return_value = response
+
+        with mock.patch("scripts.run_tony_agency_acceptance.urlopen", return_value=response) as opener:
+            turn = _send_turn("http://127.0.0.1:19001/v1/responses", "token", "session", "Assess it")
+
+        request = opener.call_args.args[0]
+        body = json.loads(request.data)
+        self.assertEqual(body["model"], TONY_RESPONSE_MODEL)
+        self.assertEqual(body["model"], "openclaw/tony")
+        self.assertEqual(turn.response, "Ready")
+
     def test_negative_external_action_attestation_is_not_a_false_positive(self) -> None:
         self.assertFalse(_has_external_effect({"quality_gate": {"no_external_action_taken": True}, "external_action_taken": False}))
 
@@ -25,6 +110,7 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             root = Path(directory)
             config = _sandbox_config(root, 19001, "sandbox-token")
             self.assertEqual(config["auth"]["profiles"], {})
+            self.assertEqual(config["agents"]["defaults"]["model"], SANDBOX_MODEL)
             self.assertTrue(all(agent["model"] == SANDBOX_MODEL for agent in config["agents"]["list"]))
             inherited = {
                 "ANTHROPIC_API_KEY": "must-not-leak",
@@ -47,8 +133,8 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             self.assertNotIn("TONY_DISPATCH_CLAUDE_API_KEY", env)
             self.assertNotIn("OPENAI_API_KEY", env)
             self.assertNotIn("OPENAI_BASE_URL", env)
-            self.assertNotIn("OLLAMA_API_KEY", env)
-            self.assertNotIn("OLLAMA_HOST", env)
+            self.assertEqual(env["OLLAMA_API_KEY"], "narratiive-synthetic-local-only")
+            self.assertEqual(env["OLLAMA_HOST"], "http://127.0.0.1:11434")
             self.assertEqual(env["TONY_HOSTED_MODEL_REQUEST_RESERVE_USD"], "0")
             self.assertEqual(Path(env["TONY_HOSTED_MODEL_USAGE_LEDGER"]).parent, root / "state")
             self.assertEqual(Path(env["NARRATIIVE_RUNTIME_ROOT"]), root / "state" / "runtime")
