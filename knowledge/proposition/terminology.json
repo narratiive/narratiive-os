@@ -1,7 +1,7 @@
 {
   "policy_id": "narratiive_terminology",
-  "version": "1.1.0",
-  "version_note": "Retired Narratiive terms are rewritten into approved descriptive language rather than blocking Tony outputs.",
+  "version": "1.2.0",
+  "version_note": "FIELDWORK is the founder-confirmed canonical name for Narratiive's paid strategic engagement; legacy technical identifiers remain compatible.",
   "status": "active",
   "owner": "Narratiive",
   "governance": {
@@ -13,15 +13,15 @@
     {"term": "Narratiive OS", "use": "The operating system and repository-backed business infrastructure."},
     {"term": "Tony", "use": "The Chief-of-Staff interface and orchestration layer."},
     {"term": "Growth Blueprint", "use": "The canonical strategic output defined by the Blueprint registry."},
+    {"term": "FIELDWORK", "use": "The canonical paid strategic engagement commissioned after Discovery."},
     {"term": "Campaign World", "use": "The approved post-Blueprint creative platform output."},
     {"term": "Creative Bible", "use": "The executional creative system derived from an approved Campaign World."}
   ],
   "unsettled_terms": [
-    {"concept": "Personalised prospecting asset", "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."},
-    {"concept": "Paid commercial engagement", "rule": "Do not invent or revive an engagement label; use descriptive language until an approved name is versioned here."}
+    {"concept": "Personalised prospecting asset", "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."}
   ],
   "retired_terms": [
     {"term": "Opportunity Card", "replacement": "personalised prospecting asset", "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."},
-    {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "The phrase has been superseded and is not an approved commercial engagement name."}
+    {"term": "Growth Sprint", "replacement": "FIELDWORK", "rationale": "FIELDWORK is the founder-confirmed canonical paid strategic engagement name; legacy technical identifiers remain unchanged."}
   ]
 }

@@ -42,6 +42,12 @@ class WorkflowInstructionTests(unittest.TestCase):
         self.assertIn("list of 1–6 distinct, substantive questions", instruction)
         self.assertIn("classification value must be exactly fact, interpretation or hypothesis", instruction)
         self.assertIn("single plain JSON string of 60–500 words, not an object", instruction)
+        self.assertIn('engagement_name exactly "FIELDWORK"', instruction)
+        self.assertIn("not a restatement of the growth problem", instruction)
+        self.assertIn("Do not turn unresolved identity, scale, source-association or commercial-evidence conflicts", instruction)
+        self.assertIn("Lead with one commercial_opportunity object", instruction)
+        self.assertIn("never calculate, alter or compare it", instruction)
+        self.assertIn("Questions must not repeat across workstreams", instruction)
 
     def test_growth_blueprint_contract_matches_validator(self) -> None:
         instruction = workflow_instruction(

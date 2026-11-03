@@ -87,7 +87,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         state, replay = runtime.commission(
             "safe-promised-source",
             "discovery_evidence_to_growth_sprint_proposal",
-            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test"}},
+            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}}},
             commitment_id="telegram-safe-commitment",
         )
         return state, replay, dispatchers
@@ -108,7 +108,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         repeated, repeated_replay = runtime.commission(
             "safe-promised-source",
             "discovery_evidence_to_growth_sprint_proposal",
-            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test"}},
+            {"discovery_evidence": discovery_evidence(), "commercial_context": {"source": "synthetic:test", "approved_fieldwork_fee": {"amount": 12000, "currency": "GBP", "approval_reference": {"approval_id": "synthetic-founder-fee-approval", "decision": "approved", "approved_by": "synthetic-founder", "recorded_at": "2026-10-30T00:00:00Z", "fee_checksum": "9a4cde75e37d0063f9b84b520b7ee72145129683e8d53c1854d73ca8bf6beeb4"}}}},
             commitment_id="telegram-safe-commitment",
         )
 
@@ -138,7 +138,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(delivered.promised_work_delivery["status"], "delivered")
         self.assertEqual(len(self.gmail_calls), 1)
         self.assertEqual(len(self.telegram_messages), 1)
-        self.assertIn("Gate 2 is ready", self.telegram_messages[0])
+        self.assertIn("Narratiive FIELDWORK Proposal", self.telegram_messages[0])
         self.assertLess(len(self.telegram_messages[0]), 900)
         attachment = self.gmail_calls[0]["payload"]["attachments"][0]
         self.assertEqual(attachment["mime_type"], "application/pdf")
@@ -150,9 +150,9 @@ class TonyPromisedWorkTests(unittest.TestCase):
             page.extract_text() or ""
             for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
         )
-        self.assertIn("Growth Sprint Proposal", visible)
-        self.assertIn("The growth challenge", visible)
-        self.assertIn("Proposed workstreams", visible)
+        self.assertIn("Narratiive FIELDWORK Proposal", visible)
+        self.assertIn("The opportunity", visible)
+        self.assertIn("Introducing FIELDWORK", visible)
         for internal in (
             "provider_message_id", "worker_execution", "selection_reason",
             "source_refs", "artifact-", "safe-promised-source",

@@ -78,9 +78,9 @@ class WorkflowActionPreviewService:
                 "simulation delivery override must be the authorised Narratiive internal address"
             )
         if state.workflow_id != "discovery_evidence_to_growth_sprint_proposal":
-            raise WorkflowActionPreviewError("client email preview is only supported for a Growth Sprint proposal")
+            raise WorkflowActionPreviewError("client email preview is only supported for a FIELDWORK proposal")
         if state.approval_status != "approved":
-            raise WorkflowActionPreviewError("Growth Sprint proposal must be approved before a client action is prepared")
+            raise WorkflowActionPreviewError("FIELDWORK proposal must be approved before a client action is prepared")
         artifact, output = self._artifact_output(state)
         source_body = str(output.get("draft_client_communication") or "").strip()
         if not source_body:
@@ -92,7 +92,7 @@ class WorkflowActionPreviewService:
         recipient_name = _intended_recipient_name(state, company)
         body = _resolve_simulation_body(source_body, recipient_name)
         action = {
-            "kind": "simulated_growth_sprint_proposal_email",
+            "kind": "simulated_fieldwork_proposal_email",
             "simulation_mode": True,
             "intended_client": company,
             "intended_recipient_name": recipient_name,
@@ -101,7 +101,7 @@ class WorkflowActionPreviewService:
             "recipient_email": INTERNAL_REVIEW_ADDRESS,
             "cc": [],
             "bcc": [],
-            "subject": f"{company} — Growth Sprint Proposal",
+            "subject": f"{company} — Narratiive FIELDWORK Proposal",
             "body_description": _body_description(body),
             "full_body": body,
             "body_source_field": "draft_client_communication",

@@ -211,13 +211,20 @@ def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[st
     checks = {
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
+        "one_defensible_commercial_opportunity_leads": _commercial_opportunity(output.get("commercial_opportunity")),
+        "commercial_read_is_evidence_linked": _commercial_read(output.get("commercial_read")),
+        "strategic_hypothesis_is_distinctive": _proposal_hypothesis(output.get("strategic_hypothesis"), output.get("growth_problem_or_opportunity")),
+        "evidence_is_sufficient_for_client_facing_proposal": _proposal_evidence_ready(output.get("proposal_evidence_readiness")),
+        "fieldwork_offer_is_client_ready_and_terms_remain_pending": _fieldwork_offer(output.get("fieldwork_offer")),
+        "model_output_does_not_claim_fee_approval": _proposal_has_no_model_fee_approval_claim(output),
+        "editorial_argument_and_exhibits_are_specific": _proposal_editorial_plan(output.get("editorial_plan")),
         "further_work_is_justified": _substantive_text(output.get("why_further_strategic_work_is_justified"), minimum_words=20),
         "scope_has_bounded_workstreams": _meaningful_list(output.get("proposed_scope"), minimum=3),
         "workstreams_have_strategic_questions": _workstreams(output.get("workstreams_and_questions")),
         "growth_blueprint_outputs_are_explicit": _meaningful_list(output.get("expected_growth_blueprint_outputs"), minimum=5),
         "commercial_inputs_are_pending_human_approval": _commercial_inputs(commercial),
         "assumptions_and_dependencies_are_explicit": _meaningful_list(output.get("assumptions_and_dependencies"), minimum=2),
-        "draft_client_communication_is_reviewable": _bounded_text(output.get("draft_client_communication"), 60, 500),
+        "draft_client_communication_uses_fieldwork_name": _fieldwork_client_copy(output.get("draft_client_communication")),
         "evidence_lineage_is_complete": _lineage(output.get("evidence_lineage"), minimum=3),
         "no_false_external_execution_claim": _no_false_action(output),
     }
@@ -1023,6 +1030,36 @@ def _value_checksum(value: Any) -> str:
     return hashlib.sha256(encoded).hexdigest()
 
 
+def validate_approved_fieldwork_fee(value: Any) -> Mapping[str, Any]:
+    """Require a fee to carry an immutable human-decision binding.
+
+    The fee is trusted only as a workflow input, never as model output.  The
+    approval record supplies a stable decision identity and a checksum of the
+    exact amount/currency pair subsequently rendered for founder review.
+    """
+    if not isinstance(value, Mapping):
+        raise ValueError("FIELDWORK proposal requires an approved fee in commercial context")
+    amount = value.get("amount")
+    currency = str(value.get("currency") or "").strip().upper()
+    reference = value.get("approval_reference")
+    if not isinstance(amount, (int, float)) or isinstance(amount, bool) or amount <= 0 or len(currency) != 3:
+        raise ValueError("FIELDWORK proposal requires an approved fee in commercial context")
+    if not isinstance(reference, Mapping):
+        raise ValueError("FIELDWORK proposal fee requires a verifiable approval reference")
+    if (
+        not _meaningful(reference.get("approval_id"))
+        or str(reference.get("decision") or "").casefold() != "approved"
+        or not _meaningful(reference.get("approved_by"))
+        or not _meaningful(reference.get("recorded_at"))
+        or not isinstance(reference.get("fee_checksum"), str)
+    ):
+        raise ValueError("FIELDWORK proposal fee requires a verifiable approval reference")
+    expected = _value_checksum({"amount": amount, "currency": currency})
+    if reference["fee_checksum"] != expected:
+        raise ValueError("FIELDWORK proposal fee approval does not bind the exact amount and currency")
+    return value
+
+
 def _validate_campaign_identity(value: Any) -> None:
     if not isinstance(value, Mapping):
         raise ValueError("campaign workflow requires a structured canonical campaign_identity")
@@ -1216,7 +1253,7 @@ def _lineage(value: Any, *, minimum: int) -> bool:
 
 
 def _workstreams(value: Any) -> bool:
-    return (
+    if not (
         isinstance(value, list)
         and len(value) >= 3
         and all(
@@ -1225,7 +1262,186 @@ def _workstreams(value: Any) -> bool:
             and _questions(item.get("questions"), minimum=1, maximum=6)
             for item in value
         )
+    ):
+        return False
+    questions = [
+        _normalise_text(question)
+        for item in value
+        for question in item["questions"]
+    ]
+    return len(questions) == len(set(questions))
+
+
+def _commercial_read(value: Any) -> bool:
+    allowed = {"fact", "interpretation", "hypothesis"}
+    return (
+        isinstance(value, list)
+        and 2 <= len(value) <= 4
+        and all(
+            isinstance(item, Mapping)
+            and _substantive_text(item.get("observation"), minimum_words=6)
+            and str(item.get("classification") or "").casefold() in allowed
+            and _meaningful_list(item.get("evidence_refs"), minimum=1)
+            and _substantive_text(item.get("commercial_implication"), minimum_words=6)
+            for item in value
+        )
     )
+
+
+def _commercial_opportunity(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    if not (
+        _substantive_text(value.get("headline"), minimum_words=6)
+        and str(value.get("classification") or "").casefold() in {"fact", "interpretation", "hypothesis"}
+        and _meaningful_list(value.get("evidence_refs"), minimum=1)
+        and _substantive_text(value.get("commercial_insight"), minimum_words=10)
+        and _substantive_text(value.get("basis"), minimum_words=6)
+    ):
+        return False
+    estimate = value.get("monetary_estimate")
+    return estimate is None or (
+        isinstance(estimate, Mapping)
+        and isinstance(estimate.get("amount"), (int, float))
+        and not isinstance(estimate.get("amount"), bool)
+        and estimate["amount"] > 0
+        and isinstance(estimate.get("currency"), str)
+        and len(estimate["currency"].strip()) == 3
+        and _substantive_text(estimate.get("basis"), minimum_words=6)
+        and _meaningful_list(estimate.get("evidence_refs"), minimum=1)
+    )
+
+
+def _proposal_hypothesis(value: Any, growth_problem: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    fields = (
+        "commercial_tension",
+        "what_may_be_overlooked",
+        "why_conventional_approach_is_insufficient",
+        "decision_fieldwork_will_unlock",
+    )
+    statements = [str(value.get(field) or "").strip() for field in fields]
+    return (
+        all(_substantive_text(statement, minimum_words=8) for statement in statements)
+        and len({_normalise_text(statement) for statement in statements}) == len(statements)
+        and _normalise_text(statements[0]) != _normalise_text(growth_problem)
+    )
+
+
+def _proposal_evidence_ready(value: Any) -> bool:
+    return (
+        isinstance(value, Mapping)
+        and value.get("client_facing_ready") is True
+        and value.get("material_contradictions") == []
+        and isinstance(value.get("missing_evidence"), list)
+        and value.get("required_clarification") == []
+    )
+
+
+def _fieldwork_offer(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    return (
+        value.get("engagement_name") == "FIELDWORK"
+        and value.get("client_facing_title") == "Narratiive FIELDWORK Proposal"
+        and _substantive_text(value.get("recommendation"), minimum_words=10)
+        and _meaningful_list(value.get("deliverables"), minimum=3)
+        and _substantive_text(value.get("duration"), minimum_words=1)
+        and str(value.get("investment_status") or "").casefold() == "pending human commercial approval"
+        and value.get("fee_source") == "commercial_context.approved_fieldwork_fee"
+    )
+
+
+_WRITTEN_AMOUNT = (
+    r"(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|"
+    r"thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|"
+    r"thirty|forty|fifty|sixty|seventy|eighty|ninety)"
+    r"(?:[ -]+(?:hundred|thousand|million|billion|and|one|two|three|four|five|"
+    r"six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|"
+    r"seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|"
+    r"eighty|ninety))*"
+)
+_CURRENCY_NAME = (
+    r"(?:pounds?|dollars?|euros?|yen|yuan|renminbi|rupees?|francs?|krona|"
+    r"kronor|koruna|zloty|pesos?|reais|rands?|dirhams?|dinars?|riyals?|ringgit|"
+    r"baht|won|lira|shekels?|forint|hryvnia|lei|lev|lari|taka|dong|naira|shillings?)"
+)
+_ISO_CURRENCY_CODE = (
+    r"(?:AED|ARS|AUD|BDT|BGN|BHD|BRL|CAD|CHF|CLP|CNY|COP|CZK|DKK|EGP|EUR|GBP|"
+    r"HKD|HUF|IDR|ILS|INR|ISK|JPY|KES|KRW|KWD|LKR|MAD|MXN|MYR|NGN|NOK|NZD|OMR|PHP|"
+    r"PKR|PLN|QAR|RON|RSD|RUB|SAR|SEK|SGD|THB|TRY|TWD|UAH|USD|VND|ZAR)"
+)
+
+
+def _proposal_has_no_model_fee_approval_claim(output: Mapping[str, Any]) -> bool:
+    """Only the checksum-validated renderer may state an approved FIELDWORK fee."""
+    proposal = dict(output)
+    opportunity = proposal.get("commercial_opportunity")
+    if isinstance(opportunity, Mapping):
+        safe_opportunity = dict(opportunity)
+        estimate = safe_opportunity.get("monetary_estimate")
+        if isinstance(estimate, Mapping):
+            # The structured amount/currency is validated separately against
+            # Discovery provenance. Its free-text basis remains model output
+            # and must be screened like every other rendered field.
+            safe_opportunity["monetary_estimate"] = {
+                key: value for key, value in estimate.items() if key not in {"amount", "currency"}
+            }
+        proposal["commercial_opportunity"] = safe_opportunity
+    text = _model_text(proposal)
+    return not re.search(
+        # The validated renderer supports any ISO-style three-letter currency,
+        # not only GBP/USD/EUR.  Model-authored copy must therefore reject a
+        # currency amount regardless of its code or whether it is expressed in
+        # words; otherwise an unbound FIELDWORK fee can reach a review copy.
+        rf"(?:\b(?:fee|price|pricing|costs?)\b|[\$£€¥₹₩₽₺₫₱₦₴₪]\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:(?-i:[A-Z]{{3}})|{_ISO_CURRENCY_CODE})\s*(?:\d|{_WRITTEN_AMOUNT})|\b(?:\d[\d,.]*|{_WRITTEN_AMOUNT})(?:[ -]+[A-Za-z]{{2,20}}){{0,5}}[ -]+{_CURRENCY_NAME}\b)",
+        text,
+        flags=re.IGNORECASE,
+    )
+
+
+def _model_text(value: Any) -> str:
+    if isinstance(value, Mapping):
+        return " ".join(_model_text(item) for item in value.values())
+    if isinstance(value, list):
+        return " ".join(_model_text(item) for item in value)
+    return str(value or "")
+
+
+def _proposal_editorial_plan(value: Any) -> bool:
+    if not isinstance(value, Mapping):
+        return False
+    argument = value.get("argument")
+    exhibits = value.get("visual_exhibits")
+    return (
+        isinstance(argument, list)
+        and len(argument) == 6
+        and all(_substantive_text(item, minimum_words=6) for item in argument)
+        and len({_normalise_text(item) for item in argument}) == len(argument)
+        and isinstance(exhibits, list)
+        and 1 <= len(exhibits) <= 3
+        and all(
+            isinstance(item, Mapping)
+            and _meaningful(item.get("type"))
+            and _substantive_text(item.get("purpose"), minimum_words=5)
+            and _meaningful_list(item.get("evidence_refs"), minimum=1)
+            for item in exhibits
+        )
+    )
+
+
+def _fieldwork_client_copy(value: Any) -> bool:
+    if not _bounded_text(value, 60, 500):
+        return False
+    text = _normalise_text(value)
+    return "fieldwork" in text and "growth sprint" not in text and "growth blueprint" not in text
+
+
+def _normalise_text(value: Any) -> str:
+    return " ".join(str(value or "").casefold().split())
+
+
 
 
 def _commercial_inputs(value: Any) -> bool:
