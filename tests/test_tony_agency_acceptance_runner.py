@@ -114,6 +114,10 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I will not spawn a specialist agent, and I can delegate this to another available agent.",
             "I will not spawn a specialist agent and will instead delegate this to another available agent.",
             "Do not spawn a specialist agent—delegate this to another available agent instead.",
+            "I can manually prepare some initial groundwork while waiting.",
+            "Would you like me to draft an email while we wait?",
+            "I can prepare outreach while things come back online.",
+            "Is there a way to proceed with a simpler initial phase?",
         )
         for response in responses:
             with self.subTest(response=response):
@@ -151,6 +155,8 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "Never commission a research agent manually.",
             "Do not manually commission research.",
             "Never manually commission research.",
+            "Do not manually prepare groundwork.",
+            "I will not draft an email while the workflow is blocked.",
         ):
             with self.subTest(response=response):
                 self.assertEqual(
