@@ -98,7 +98,11 @@ from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkf
 from runtime.workflow_entity_classification import FileWorkflowEntityClassificationJournal
 from runtime.tony_claude_api_dispatcher import DEFAULT_TIMEOUT_SECONDS as CLAUDE_DEFAULT_TIMEOUT_SECONDS
 from runtime.tony_conversation_work import FileConversationWorkStore, TonyConversationIngress
-from runtime.model_usage_budget import HostedModelBudgetGuard, ModelBudgetExceeded
+from runtime.model_usage_budget import (
+    HostedModelBudgetGuard,
+    ModelBudgetConfigurationError,
+    ModelBudgetExceeded,
+)
 from openclaw.telegram_output_policy import protect_telegram_output
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -351,21 +355,60 @@ class LeadAwareTonyApplication:
                     return self._respond(start_response, status, payload)
                 reservation = None
                 if self.model_budget_guard is not None:
-                    reservation = self.model_budget_guard.reserve_capacity(
-                        reserve_usd=self.model_budget_reserve_usd,
-                        ttl_seconds=int(self.agent_gateway.config.work_timeout_seconds) + 60,
-                    )
+                    try:
+                        reservation = self.model_budget_guard.reserve_capacity(
+                            reserve_usd=self.model_budget_reserve_usd,
+                            ttl_seconds=int(self.agent_gateway.config.work_timeout_seconds) + 60,
+                        )
+                    except ModelBudgetConfigurationError:
+                        return self._respond(
+                            start_response,
+                            HTTPStatus.SERVICE_UNAVAILABLE,
+                            {
+                                "ok": False,
+                                "error": {
+                                    "code": "hosted_model_budget_unavailable",
+                                    "message": "Tony’s conversation accounting is temporarily unavailable; no action was taken.",
+                                },
+                            },
+                        )
                 try:
                     reply = self.agent_gateway.converse(text)
                 except Exception:
                     # The Gateway may have accepted and billed a request before a
                     # timeout/disconnect. Charge it conservatively through month-end.
                     if self.model_budget_guard is not None and reservation is not None:
-                        self.model_budget_guard.retain_ambiguous_reservation(reservation)
+                        try:
+                            self.model_budget_guard.retain_ambiguous_reservation(reservation)
+                        except ModelBudgetConfigurationError:
+                            return self._respond(
+                                start_response,
+                                HTTPStatus.SERVICE_UNAVAILABLE,
+                                {
+                                    "ok": False,
+                                    "error": {
+                                        "code": "hosted_model_outcome_unconfirmed",
+                                        "message": "Tony could not safely confirm the outcome after contacting the model; any resulting action is unconfirmed.",
+                                    },
+                                },
+                            )
                     raise
                 else:
                     if self.model_budget_guard is not None and reservation is not None:
-                        self.model_budget_guard.release_reservation(reservation)
+                        try:
+                            self.model_budget_guard.release_reservation(reservation)
+                        except ModelBudgetConfigurationError:
+                            return self._respond(
+                                start_response,
+                                HTTPStatus.SERVICE_UNAVAILABLE,
+                                {
+                                    "ok": False,
+                                    "error": {
+                                        "code": "hosted_model_outcome_unconfirmed",
+                                        "message": "Tony produced a response but could not safely confirm the accounting outcome; any resulting action is unconfirmed.",
+                                    },
+                                },
+                            )
                 if not reply.strip() or reply.strip().upper() == "NO_REPLY":
                     reply = (
                         "I’m here, but I don’t have a verified update I can stand behind yet. "

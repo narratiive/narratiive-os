@@ -1045,10 +1045,15 @@ class TonyWorkflowCommandService:
                 summary = " ".join(f"• {item}" for item in conclusions)
                 message = str(delivery.get("telegram_notification") or "").strip()
                 if not message:
+                    already_approved = str(delivery.get("approval_status") or "") == "approved"
                     message = (
                         f"{_artifact_label(state)} is ready. I sent the full review copy to {INTERNAL_REVIEW_ADDRESS}."
                         + (f" {summary}" if summary else "")
-                        + " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
+                        + (
+                            " Its exact version is already approved; I have not started the next workflow stage."
+                            if already_approved
+                            else " I need your judgement at the current gate: approve it, request a revision, or tell me what should change."
+                        )
                     )
                 return CommandResponse(name, "healthy", message, delivery)
             if name == "commission":

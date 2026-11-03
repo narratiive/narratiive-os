@@ -164,8 +164,18 @@ class InternalReviewDeliveryService:
             raise InternalReviewDeliveryError(
                 "internal review delivery is restricted to the exact Narratiive-owned review address"
             )
-        if state.status is not WorkflowStatus.AWAITING_APPROVAL or state.approval_status != "pending":
-            raise InternalReviewDeliveryError("internal review delivery requires a current human approval gate")
+        at_current_review_gate = (
+            state.status is WorkflowStatus.AWAITING_APPROVAL
+            and state.approval_status == "pending"
+        )
+        approved_exact_artifact = (
+            state.status is WorkflowStatus.COMPLETE
+            and state.approval_status == "approved"
+        )
+        if not (at_current_review_gate or approved_exact_artifact):
+            raise InternalReviewDeliveryError(
+                "internal review delivery requires a current human approval gate or an approved exact artefact"
+            )
         artifact = reviewable_artifact(state)
         if artifact is None:
             raise InternalReviewDeliveryError("workflow has no persisted artefact to deliver")
@@ -223,7 +233,7 @@ class InternalReviewDeliveryService:
                 "kind": "internal_artifact_review_delivery",
                 "recipient_email": INTERNAL_REVIEW_ADDRESS,
                 "subject": f"{company} — {title} review",
-                "body": _email_body(company, review),
+                "body": _email_body(company, review, approval_status=state.approval_status),
                 "attachments": [
                     {
                         "filename": review.filename,
@@ -274,7 +284,7 @@ class InternalReviewDeliveryService:
             "conclusions": conclusions,
             "decision_prompt": review.decision_prompt,
             "next_if_approved": review.next_if_approved,
-            "telegram_notification": review.telegram_notification,
+            "telegram_notification": review.telegram_notification if at_current_review_gate else "",
         }
         runtime.runs.record_external_action(state.run_id, idempotency_key=key, receipt=receipt)
         current = runtime.runs.load_run(state.run_id)
@@ -367,9 +377,13 @@ class InternalReviewDeliveryService:
             "conclusions": list(receipt.get("conclusions") or []),
             "decision_prompt": str(receipt.get("decision_prompt") or ""),
             "next_if_approved": str(receipt.get("next_if_approved") or ""),
-            "telegram_notification": str(receipt.get("telegram_notification") or ""),
+            "telegram_notification": (
+                "" if state.approval_status == "approved"
+                else str(receipt.get("telegram_notification") or "")
+            ),
             "review_link": "https://mail.google.com/mail/u/0/#all/" + quote(str(receipt.get("thread_id") or receipt.get("message_id") or ""), safe=""),
             "approval_token": workflow_approval_token(state),
+            "approval_status": state.approval_status,
             "external_action_taken": not duplicate,
         }
 
@@ -394,10 +408,15 @@ def _company_name(state: WorkflowState) -> str:
     return state.entity_id or state.client_id
 
 
-def _email_body(company: str, review: HumanReviewArtifact) -> str:
+def _email_body(company: str, review: HumanReviewArtifact, *, approval_status: str) -> str:
     compact = lambda value: " ".join(str(value).split())[:240]
+    next_step = (
+        "This exact artefact is already approved. No next workflow stage has been started by this review delivery."
+        if approval_status == "approved"
+        else "Approval is pending. Please approve or request changes through Tony in Telegram."
+    )
     return "\n".join((
         f"{compact(company)} — {compact(review.product)} is attached for review.",
-        "Approval is pending. Please approve or request changes through Tony in Telegram.",
+        next_step,
         f"Next, if approved: {compact(review.next_if_approved)}",
     ))

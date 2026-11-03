@@ -88,6 +88,21 @@ class MissionControlOperatorTests(unittest.TestCase):
             self.assertIn(f"{lifecycle}:'{commercial_phase}'", HTML)
         self.assertIn("||'unmapped'", HTML)
 
+    def test_fieldwork_journey_is_evidence_bound_and_marks_unconnected_steps(self):
+        state = self._state(workflow="discovery_evidence_to_growth_sprint_proposal")
+        item = self.projector.project(states=[state], leads=[])["opportunities"][0]
+
+        self.assertEqual(item["workflow_ids"], ["discovery_evidence_to_growth_sprint_proposal"])
+        self.assertIn("FIELDWORK Journey", HTML)
+        self.assertIn("Not connected", HTML)
+        self.assertIn("Sandbox — Not Deployed", HTML)
+        self.assertIn("Needs Your Attention", HTML)
+        self.assertIn("fieldworkStages", HTML)
+
+    def test_rejected_proposal_is_not_presented_as_complete(self):
+        self.assertIn("proposalApproval==='rejected'?'blocked'", HTML)
+        self.assertIn("Tony’s current workflow ownership", HTML)
+
     def test_synthetic_is_labelled_and_excluded_from_executive_counts(self):
         live = self._state()
         test = self._state(client="fixture", synthetic=True)

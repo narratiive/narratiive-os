@@ -516,21 +516,24 @@ def _usage_records(path: Path, period: str, *, openclaw: bool) -> Iterable[tuple
             usage = message.get("usage")
             if not isinstance(usage, Mapping):
                 raise ModelBudgetConfigurationError("Anthropic usage metadata is missing or invalid")
+            token_usage = TokenUsage(
+                input_tokens=_strict_non_negative_int(usage.get("input"), "input"),
+                output_tokens=_strict_non_negative_int(usage.get("output"), "output"),
+                cache_read_tokens=_strict_non_negative_int(usage.get("cacheRead"), "cacheRead"),
+                cache_write_tokens=_strict_non_negative_int(usage.get("cacheWrite"), "cacheWrite"),
+            )
             raw_response_id = message.get("responseId")
             if raw_response_id is None:
                 raw_response_id = message.get("response_id")
+            if openclaw and raw_response_id is None and _is_aborted_openclaw_turn(event, message, token_usage):
+                # OpenClaw writes this documented terminal shape when a turn is
+                # aborted before a provider response exists. It is fully
+                # validated and carries no billable usage, so it cannot
+                # participate in accounting or deduplication. Every other
+                # identity-less record remains fail-closed below.
+                continue
             response_id = _strict_response_id(raw_response_id)
-            records.append(
-                (
-                    response_id,
-                    TokenUsage(
-                        input_tokens=_strict_non_negative_int(usage.get("input"), "input"),
-                        output_tokens=_strict_non_negative_int(usage.get("output"), "output"),
-                        cache_read_tokens=_strict_non_negative_int(usage.get("cacheRead"), "cacheRead"),
-                        cache_write_tokens=_strict_non_negative_int(usage.get("cacheWrite"), "cacheWrite"),
-                    ),
-                )
-            )
+            records.append((response_id, token_usage))
     return records
 
 
@@ -555,6 +558,29 @@ def _strict_response_id(value: Any) -> str:
             "Anthropic usage response id is missing or invalid"
         )
     return value.strip()
+
+
+def _is_aborted_openclaw_turn(
+    event: Mapping[str, Any], message: Mapping[str, Any], usage: TokenUsage
+) -> bool:
+    """Recognise only OpenClaw's explicit zero-usage terminal abort record."""
+
+    content = message.get("content")
+    return (
+        usage == TokenUsage()
+        and event.get("type") == "message"
+        and isinstance(message.get("role"), str)
+        and message.get("role").casefold() == "assistant"
+        and message.get("api") == "anthropic-messages"
+        and message.get("stopReason") == "aborted"
+        and isinstance(message.get("errorMessage"), str)
+        and bool(message.get("errorMessage").strip())
+        and isinstance(content, list)
+        and len(content) == 1
+        and isinstance(content[0], Mapping)
+        and content[0].get("type") == "text"
+        and content[0].get("text") == ""
+    )
 
 
 def _strict_non_negative_int(value: Any, label: str) -> int:

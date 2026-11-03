@@ -316,6 +316,83 @@ class HostedModelBudgetGuardTests(unittest.TestCase):
                 with self.assertRaises(ModelBudgetConfigurationError):
                     self._guard(root).reserve_capacity()
 
+    def test_cancelled_zero_usage_openclaw_turn_without_response_identity_is_not_billable(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "cancelled.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text(
+                json.dumps(
+                    {
+                        "type": "message",
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "role": "assistant",
+                            "api": "anthropic-messages",
+                            "content": [{"type": "text", "text": ""}],
+                            "provider": "anthropic",
+                            "stopReason": "aborted",
+                            "errorMessage": "This operation was aborted",
+                            "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            snapshot = self._guard(root).snapshot()
+
+        self.assertEqual(snapshot.usage, TokenUsage())
+
+    def test_zero_usage_record_without_openclaw_abort_shape_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            session = root / "openclaw" / "agents" / "tony" / "sessions" / "incomplete.jsonl"
+            session.parent.mkdir(parents=True)
+            session.write_text(
+                json.dumps(
+                    {
+                        "timestamp": "2026-10-22T10:00:00Z",
+                        "message": {
+                            "provider": "anthropic",
+                            "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "response id"):
+                self._guard(root).snapshot()
+
+    def test_direct_ledger_never_accepts_an_openclaw_abort_shape_without_identity(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            guard = self._guard(root)
+            guard.direct_usage_ledger.parent.mkdir(parents=True)
+            guard.direct_usage_ledger.write_text(
+                json.dumps(
+                    {
+                        "type": "message",
+                        "recorded_at": "2026-10-22T10:00:00+00:00",
+                        "role": "assistant",
+                        "api": "anthropic-messages",
+                        "content": [{"type": "text", "text": ""}],
+                        "provider": "anthropic",
+                        "stopReason": "aborted",
+                        "errorMessage": "This operation was aborted",
+                        "usage": {"input": 0, "output": 0, "cacheRead": 0, "cacheWrite": 0},
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            with self.assertRaisesRegex(ModelBudgetConfigurationError, "response id"):
+                guard.snapshot()
+
     def test_invalid_openclaw_usage_identity_fails_closed_without_event_id_fallback(self) -> None:
         for response_id in (123, True, "   ", None):
             with self.subTest(response_id=response_id), tempfile.TemporaryDirectory() as directory:
