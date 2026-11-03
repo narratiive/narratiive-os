@@ -64,7 +64,7 @@ def validate_prospect_intelligence(value, *, verified_sources=None):
         errors.append("four scorecard rows required")
     else:
         for row, (criterion, weight) in zip(rows, WEIGHTS.items()):
-            if not isinstance(row, Mapping) or row.get("criterion") != criterion or type(row.get("score")) is not int or not 0 <= row["score"] <= weight or not str(row.get("rationale") or "").strip():
+            if not isinstance(row, Mapping) or row.get("criterion") != criterion or type(row.get("score")) is not int or not 0 <= row["score"] <= weight or not isinstance(row.get("rationale"), str) or not row["rationale"].strip():
                 errors.append(f"invalid {criterion} score")
     for key, low, high in (("marketing_examples", 2, 3), ("growth_hypotheses", 2, 3), ("discovery_questions", 3, 3)):
         items = value.get(key)

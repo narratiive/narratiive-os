@@ -42,6 +42,9 @@ class GroundworkBriefTest(unittest.TestCase):
         bad["scorecard"][0]["score"] = 31
         self.assertTrue(validate_prospect_intelligence(bad))
         bad = copy.deepcopy(brief)
+        bad["scorecard"][0]["rationale"] = {"unexpected": "uncited claim"}
+        self.assertTrue(validate_prospect_intelligence(bad))
+        bad = copy.deepcopy(brief)
         bad["sources"][0]["url"] = "javascript:alert(1)"
         self.assertTrue(validate_prospect_intelligence(bad))
         self.assertNotIn("prospect_intelligence", GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE.stages[0].output_contract.required_fields)
