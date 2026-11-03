@@ -347,17 +347,28 @@ def _blocked_progress_claims(states: list[dict[str, Any]], turns: list[Turn]) ->
 def _blocked_bypass_offers(states: list[dict[str, Any]], turns: list[Turn]) -> list[str]:
     if not any(state.get("status") == "blocked" for state in states):
         return []
-    patterns = (
-        r"\buse\s+(?:the\s+)?(?:openclaw\s+)?specialist\s+(?:sub-?agents|agents)\b",
+    offer_patterns = (
+        r"\b(?:use|using|recommend|offer)\b[^.\n]{0,100}\b(?:specialist|sub-?agent|other available agent)",
+        r"\bspawn\b[^.\n]{0,80}\b(?:strategy|research|creative|specialist)?\s*(?:agent|sub-?agent)\b",
         r"\bmanually\s+commission\b",
-        r"\bcontinue\s+(?:the\s+)?work\s+in\s+parallel\b",
+        r"\bprepare\s+(?:preliminary\s+)?(?:material|research|work)\b[^.\n]{0,100}\b(?:agent|tool|parallel)\b",
+        r"\buse\s+(?:the\s+)?available\s+tools\b[^.\n]{0,100}\b(?:research|preparation|work)\b",
+        r"\bcontinue\b[^.\n]{0,80}\bin\s+parallel\b",
         r"\bbypass\s+(?:the\s+)?(?:workflow|blocker|canonical)\b",
     )
-    if not any(
-        re.search(pattern, turn.response.casefold())
-        for pattern in patterns
-        for turn in turns
-    ):
+    negation = re.compile(r"\b(?:not|never|cannot|can't|won't|do\s+not|will\s+not)\b")
+    offered = False
+    for turn in turns:
+        clauses = re.split(r"(?<=[.!?])\s+|\n+", turn.response.casefold())
+        for clause in clauses:
+            if negation.search(clause):
+                continue
+            if any(re.search(pattern, clause) for pattern in offer_patterns):
+                offered = True
+                break
+        if offered:
+            break
+    if not offered:
         return []
     return [
         "Tony offered out-of-workflow specialist or manual preparation while the canonical workflow remained blocked."
