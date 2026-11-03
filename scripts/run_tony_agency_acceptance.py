@@ -373,6 +373,8 @@ def _blocked_bypass_offers(states: list[dict[str, Any]], turns: list[Turn]) -> l
         r"(?:using|spawning|delegating|commissioning|assigning|routing|bringing\s+in)\b|"
         r"(?:^|\bplease\s+)avoid\s+(?:using|spawning|delegating|commissioning|assigning|routing|"
         r"bringing\s+in)\b|"
+        r"(?:^|\bplease\s+)(?:do\s+not|don't|never)\s+(?:use|spawn|prepare|continue|commission|ask|"
+        r"delegate|assign|route|bring\s+in|bypass|hand)\b|"
         r"\badvise\s+against\s+(?:use|using|spawning|delegating|commissioning|assigning|routing|"
         r"bringing\s+in)\b|"
         r"\b(?:use|using|spawn|spawning|delegate|commission|bypass)\b[^.\n]{0,40}\b(?:is|are)\s+not\s+"

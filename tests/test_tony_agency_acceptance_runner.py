@@ -142,6 +142,9 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I am not commissioning a research agent.",
             "I am avoiding spawning a specialist agent.",
             "Avoid spawning a specialist agent.",
+            "Do not spawn a specialist agent.",
+            "Don't spawn a specialist agent.",
+            "Never commission a research agent manually.",
         ):
             with self.subTest(response=response):
                 self.assertEqual(
