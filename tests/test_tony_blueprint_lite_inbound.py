@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from runtime.inbound_leads import InboundLead
 from runtime.tony_blueprint_lite_inbound import (
@@ -10,6 +11,7 @@ from runtime.tony_blueprint_lite_inbound import (
     TonyInboundBlueprintLiteService,
 )
 from runtime.serialization import workflow_from_dict
+from runtime.repositories import JsonlEventLog
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 
 
@@ -309,6 +311,37 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
                 by_id[current["canonical_run_id"]].input_payload["diagnostic_input_package"],
                 current["diagnostic_input_package"],
             )
+
+    def test_completed_event_failure_rolls_canonical_runtime_back_to_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            original_append = JsonlEventLog.append
+
+            def fail_completed_event(event_log, event):
+                if event.event_type == "stage.completed":
+                    raise OSError("simulated completed-event persistence failure")
+                return original_append(event_log, event)
+
+            with patch.object(JsonlEventLog, "append", new=fail_completed_event):
+                result = service.process("lead-1")
+
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(result["blocker"], "workflow_runtime_persistence_failed")
+            self.assertEqual(len(states), 1)
+            self.assertEqual(states[0].status.value, "blocked")
+            self.assertEqual(states[0].stage("prepare_blueprint_lite").status.value, "blocked")
+            self.assertEqual(states[0].blocker, "workflow_runtime_persistence_failed")
+            self.assertNotEqual(states[0].approval_status, "pending")
 
     def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
         payload = self._payload()

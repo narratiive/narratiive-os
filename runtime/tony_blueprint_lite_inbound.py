@@ -657,11 +657,20 @@ class TonyInboundBlueprintLiteService:
         required = current.stage(stage_id).expected_outputs
         durable_outputs = {field: evidence[field] for field in required}
         runtime.runs.merge_inputs(run_id, durable_outputs)
-        runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
-        runtime.runs.pause_for_approval(
-            run_id,
-            "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
-        )
+        rollback_state = runtime.runs.load_run(run_id)
+        try:
+            runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
+            runtime.runs.pause_for_approval(
+                run_id,
+                "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
+            )
+        except Exception:
+            # WorkflowRunService saves its snapshot before appending the audit
+            # event. Restore the last non-consequential running snapshot so the
+            # caller can durably block it instead of exposing approval-ready
+            # work whose persistence transaction did not finish.
+            runtime.runs.repository.save(rollback_state)
+            raise
 
     def _persist_generic_initial_workflow(self, record: Mapping[str, Any]) -> None:
         """Expose queued and blocked inbound work through the canonical runtime.
