@@ -10,6 +10,8 @@ from scripts.run_tony_agency_acceptance import (
     SANDBOX_MODEL,
     STAGE_WORKFLOWS,
     TONY_RESPONSE_MODEL,
+    Turn,
+    _blocked_progress_claims,
     _has_external_effect,
     _sandbox_config,
     _sandbox_env,
@@ -18,6 +20,21 @@ from scripts.run_tony_agency_acceptance import (
 
 
 class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
+    def test_blocked_workflow_rejects_positive_commissioning_language(self) -> None:
+        claims = _blocked_progress_claims(
+            [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}],
+            [Turn("Start it", "Approved & Ready — opportunity commissioned and preparation initiated.", "now")],
+        )
+        self.assertEqual(len(claims), 1)
+        self.assertIn("authoritative workflow remained blocked", claims[0])
+
+    def test_honest_blocker_response_is_not_false_success(self) -> None:
+        claims = _blocked_progress_claims(
+            [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}],
+            [Turn("Start it", "Commissioning failed: the strategic worker is unavailable.", "now")],
+        )
+        self.assertEqual(claims, [])
+
     def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
         response = mock.MagicMock()
         response.read.return_value = b'{"id":"response-1","output_text":"Ready"}'

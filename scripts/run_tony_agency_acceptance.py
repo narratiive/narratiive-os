@@ -316,6 +316,29 @@ def _approval_prompt(state: Mapping[str, Any]) -> str:
     )
 
 
+def _blocked_progress_claims(states: list[dict[str, Any]], turns: list[Turn]) -> list[str]:
+    if not any(state.get("status") == "blocked" for state in states):
+        return []
+    markers = (
+        "approved & ready",
+        "opportunity commissioned",
+        "preparation initiated",
+        "work commissioned",
+    )
+    claims = [
+        marker
+        for marker in markers
+        if any(marker in turn.response.casefold() for turn in turns)
+    ]
+    if not claims:
+        return []
+    return [
+        "Tony used positive commissioning language while the authoritative workflow remained blocked: "
+        + ", ".join(claims)
+        + "."
+    ]
+
+
 def _send_turn(url: str, token: str, session: str, prompt: str, previous_response_id: str = "") -> Turn:
     started = datetime.now(timezone.utc).isoformat()
     # The Responses endpoint selects an OpenClaw agent. The agent's sandbox
@@ -352,6 +375,7 @@ def evaluate(
     completion_words = ("completed", "finished", "ready to deliver", "all done")
     if any(any(word in turn.response.casefold() for word in completion_words) for turn in turns) and not artifact_ids:
         false_success.append("Tony used completion language without any durable output artefact.")
+    false_success.extend(_blocked_progress_claims(states, turns))
     external_effect = _has_external_effect(states)
     implicit_artefact_approval = any(
         state.get("workflow_id") == "growth_diagnostic_to_blueprint_lite"
