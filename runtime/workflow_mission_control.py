@@ -52,7 +52,19 @@ def workflow_state_summary(state: WorkflowState) -> dict[str, Any]:
         if latest_stage and latest_stage.quality_result
         else None
     )
+    # A commissioned run can be active while its worker has never started.
+    # Expose execution truth separately so Tony cannot mistake ready for running.
+    if state.status.value == "active" and current is not None:
+        if current.status.value == "ready" and not current.attempts and not current.started_at:
+            execution_state = "waiting_to_start"
+        elif current.status.value in {"running", "executing", "in_progress"}:
+            execution_state = "working"
+        else:
+            execution_state = current.status.value
+    else:
+        execution_state = state.status.value
     return {
+        "execution_state": execution_state,
         "run_id": state.run_id,
         "workflow_id": state.workflow_id,
         "entity_id": state.entity_id,
