@@ -311,6 +311,10 @@ class NarratiiveReviewPDFRenderer:
             document = _ReviewDocTemplate(temporary_path, plan)
             story = _story(plan, document.styles)
             document.build(story, canvasmaker=_InvariantCanvas)
+            if plan.prospect_intelligence is not None and document.page_count == 2:
+                # Try one page first; when two are needed, balance the editorial split.
+                document = _ReviewDocTemplate(temporary_path, plan)
+                document.build(_groundwork_story(plan, balanced=True), canvasmaker=_InvariantCanvas)
             data = temporary_path.read_bytes()
             if not data.startswith(b"%PDF-"):
                 raise HumanReviewArtifactError("review renderer did not produce a PDF")
@@ -953,7 +957,7 @@ def _persist_immutable(target: Path, content: bytes) -> None:
             os.unlink(temporary)
 
 
-def _groundwork_story(plan: ReviewDocumentPlan) -> list[Flowable]:
+def _groundwork_story(plan: ReviewDocumentPlan, *, balanced: bool = False) -> list[Flowable]:
     """A compact editorial brief; never a cover sheet or a strategy-report export."""
     brief = plan.prospect_intelligence
     assert brief is not None
@@ -983,7 +987,7 @@ def _groundwork_story(plan: ReviewDocumentPlan) -> list[Flowable]:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ])))
     for section in plan.sections:
-        if section.heading == "Visible marketing":
+        if balanced and section.heading == "Visible marketing":
             story.extend([PageBreak(), Paragraph("THE OPPORTUNITY TO QUALIFY", heading)])
         story.append(Paragraph(_p(section.heading.upper()), heading))
         for text in section.body:
