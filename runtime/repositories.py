@@ -189,6 +189,27 @@ class JsonlEventLog:
         for event in events:
             self.append(event)
 
+    def checkpoint(self, run_id: str) -> int:
+        """Return the durable byte boundary before a multi-event transaction."""
+        path = self._path(run_id)
+        return path.stat().st_size if path.exists() else 0
+
+    def restore_checkpoint(self, run_id: str, byte_offset: int) -> None:
+        """Discard only events appended by an incomplete local transaction."""
+        if byte_offset < 0:
+            raise ValueError("event-log checkpoint must not be negative")
+        path = self._path(run_id)
+        if not path.exists():
+            if byte_offset:
+                raise ValueError("event-log checkpoint exceeds missing log")
+            return
+        if byte_offset > path.stat().st_size:
+            raise ValueError("event-log checkpoint exceeds current log")
+        with path.open("r+b") as handle:
+            handle.truncate(byte_offset)
+            handle.flush()
+            os.fsync(handle.fileno())
+
     def _path(self, run_id: str) -> Path:
         _validate_identifier(run_id, "run_id")
         return self.root / f"{run_id}.jsonl"

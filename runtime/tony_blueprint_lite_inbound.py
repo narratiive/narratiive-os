@@ -200,6 +200,29 @@ class TonyInboundBlueprintLiteService:
                 self.store.put(lead.lead_id, existing)
             return self._public_state(existing, replay=True)
 
+        if existing is not None:
+            completed = _completed_version(existing, fingerprint)
+            if completed is not None:
+                replay_state = dict(existing)
+                replay_state.update(
+                    {
+                        "canonical_run_id": str(completed["canonical_run_id"]),
+                        "input_fingerprint": fingerprint,
+                        "diagnostic_input_package": payload,
+                        "state": "awaiting_review",
+                        "blocker": "human_review_required",
+                        "current_version": completed.get("version"),
+                        "approval_required": True,
+                        "updated_at": _now(),
+                    }
+                )
+                if isinstance(completed.get("workflow_run"), Mapping):
+                    replay_state["workflow_run"] = dict(completed["workflow_run"])
+                replay_state.pop("failure", None)
+                replay_state.pop("failed_checks", None)
+                self.store.put(lead.lead_id, replay_state)
+                return self._public_state(replay_state, replay=True)
+
         versions = []
         attempts = []
         if existing is not None and isinstance(existing.get("versions"), list):
@@ -535,6 +558,8 @@ class TonyInboundBlueprintLiteService:
             "version": version_number,
             "created_at": _now(),
             "input_fingerprint": state.get("input_fingerprint"),
+            "canonical_run_id": state.get("canonical_run_id") or lead_id,
+            "diagnostic_input_package": dict(state.get("diagnostic_input_package") or {}),
             "dispatch": dict(dispatch),
             "evidence": dict(evidence),
             "quality_gate": quality,
@@ -598,6 +623,7 @@ class TonyInboundBlueprintLiteService:
                 "workflow_run": workflow_to_dict(workflow),
             }
         )
+        version["workflow_run"] = workflow_to_dict(workflow)
         state.pop("failure", None)
         state.pop("failed_checks", None)
         self.store.put(lead_id, state)
@@ -658,17 +684,18 @@ class TonyInboundBlueprintLiteService:
         durable_outputs = {field: evidence[field] for field in required}
         runtime.runs.merge_inputs(run_id, durable_outputs)
         rollback_state = runtime.runs.load_run(run_id)
+        event_checkpoint = None
+        if hasattr(runtime.runs.event_log, "checkpoint"):
+            event_checkpoint = runtime.runs.event_log.checkpoint(run_id)
         try:
             runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
-            runtime.runs.pause_for_approval(
-                run_id,
-                "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
-            )
         except Exception:
             # WorkflowRunService saves its snapshot before appending the audit
             # event. Restore the last non-consequential running snapshot so the
             # caller can durably block it instead of exposing approval-ready
             # work whose persistence transaction did not finish.
+            if event_checkpoint is not None and hasattr(runtime.runs.event_log, "restore_checkpoint"):
+                runtime.runs.event_log.restore_checkpoint(run_id, event_checkpoint)
             runtime.runs.repository.save(rollback_state)
             raise
 
@@ -839,6 +866,29 @@ def _canonical_run_id(lead_id: str, fingerprint: str, *, revised: bool) -> str:
     if not revised:
         return lead_id
     return f"{lead_id}--revision-{fingerprint[:12]}"
+
+
+def _completed_version(record: Mapping[str, Any], fingerprint: str) -> dict[str, Any] | None:
+    """Find previously completed content so non-consecutive replays stay idempotent."""
+    versions = record.get("versions")
+    if not isinstance(versions, list):
+        return None
+    lead_id = str(record.get("lead_id") or "").strip()
+    for candidate in reversed(versions):
+        if not isinstance(candidate, Mapping) or candidate.get("input_fingerprint") != fingerprint:
+            continue
+        quality = candidate.get("quality_gate")
+        if not isinstance(quality, Mapping) or quality.get("passed") is not True:
+            continue
+        completed = dict(candidate)
+        if not str(completed.get("canonical_run_id") or "").strip():
+            completed["canonical_run_id"] = _canonical_run_id(
+                lead_id,
+                fingerprint,
+                revised=int(completed.get("version") or 0) != 1,
+            )
+        return completed
+    return None
 
 
 def _workflow_from_record(record: Mapping[str, Any]):

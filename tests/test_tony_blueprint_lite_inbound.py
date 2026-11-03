@@ -13,6 +13,7 @@ from runtime.tony_blueprint_lite_inbound import (
 from runtime.serialization import workflow_from_dict
 from runtime.repositories import JsonlEventLog
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
+from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 
 
 class TonyInboundBlueprintLiteTests(unittest.TestCase):
@@ -246,6 +247,16 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertTrue(states[0].stage("prepare_blueprint_lite").quality_result["passed"])
             self.assertEqual(len(states[0].stage("prepare_blueprint_lite").output_artifacts), 1)
             self.assertFalse(states[0].external_action_taken)
+            events = build_tony_workflow_runtime(
+                root / "workflow-runtime",
+                workspace_id="narratiive",
+                client_id="lead-1",
+                dispatchers={},
+            ).runs.event_log.read("lead-1")
+            self.assertEqual(
+                [event.event_type for event in events].count("approval.requested"),
+                1,
+            )
 
     def test_quality_failure_blocks_the_same_canonical_runtime(self) -> None:
         evidence = self._good_evidence()
@@ -342,6 +353,89 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(states[0].stage("prepare_blueprint_lite").status.value, "blocked")
             self.assertEqual(states[0].blocker, "workflow_runtime_persistence_failed")
             self.assertNotEqual(states[0].approval_status, "pending")
+
+    def test_approval_event_failure_rolls_back_snapshot_and_uncommitted_events(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            original_append = JsonlEventLog.append
+
+            def fail_approval_event(event_log, event):
+                if event.event_type == "approval.requested":
+                    raise OSError("simulated approval-event persistence failure")
+                return original_append(event_log, event)
+
+            with patch.object(JsonlEventLog, "append", new=fail_approval_event):
+                result = service.process("lead-1")
+
+            runtime = build_tony_workflow_runtime(
+                root / "workflow-runtime",
+                workspace_id="narratiive",
+                client_id="lead-1",
+                dispatchers={},
+            )
+            state = runtime.runs.load_run("lead-1")
+            event_types = [event.event_type for event in runtime.runs.event_log.read("lead-1")]
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(state.status.value, "blocked")
+            self.assertEqual(state.blocker, "workflow_runtime_persistence_failed")
+            self.assertNotIn("stage.completed", event_types)
+            self.assertNotIn("approval.requested", event_types)
+            self.assertEqual(event_types[-1], "stage.blocked")
+
+    def test_non_consecutive_content_replay_reuses_prior_canonical_artifact(self) -> None:
+        calls = 0
+
+        def claude(_dispatch):
+            nonlocal calls
+            calls += 1
+            evidence = self._good_evidence()
+            evidence["work_product"] = f"draft-call-{calls}"
+            evidence["blueprint_lite"] = f"Blueprint draft-call-{calls}"
+            return evidence
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": claude},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            payload_a = self._payload()
+            payload_b = self._payload()
+            payload_b["diagnostic"]["challenge"] = "A second immutable challenge"
+
+            service.enqueue(self._lead(), payload_a)
+            service.process("lead-1")
+            service.enqueue(self._lead(), payload_b)
+            service.process("lead-1")
+            replay_a = service.enqueue(self._lead(), payload_a)
+            replay_b = service.enqueue(self._lead(), payload_b)
+
+            persisted = store.get("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(calls, 2)
+            self.assertTrue(replay_a["replay"])
+            self.assertTrue(replay_b["replay"])
+            self.assertEqual(len(persisted["versions"]), 2)
+            self.assertEqual(persisted["current_version"], 2)
+            self.assertEqual(len(states), 2)
+            self.assertTrue(all(len(state.stage("prepare_blueprint_lite").output_artifacts) == 1 for state in states))
+            current = next(state for state in states if state.run_id == persisted["canonical_run_id"])
+            self.assertIn(
+                "draft-call-2",
+                current.stage("prepare_blueprint_lite").output_artifacts[0].location
+                + str(current.input_payload),
+            )
 
     def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
         payload = self._payload()
