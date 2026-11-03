@@ -598,7 +598,7 @@ def _growth_sprint_plan(company: str, output: Mapping[str, Any]) -> ReviewDocume
 def _blueprint_lite_plan(company: str, output: Mapping[str, Any]) -> ReviewDocumentPlan:
     if "prospect_intelligence" in output:
         brief = output["prospect_intelligence"]
-        errors = validate_prospect_intelligence(brief)
+        errors = validate_prospect_intelligence(brief, verified_sources=output.get("source_backed_evidence", ()))
         if errors:
             raise HumanReviewArtifactError("; ".join(errors))
         total, label, action = qualification(brief)

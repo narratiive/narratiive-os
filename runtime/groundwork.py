@@ -1,6 +1,7 @@
 """Groundwork's compact internal qualification contract, shared by both commissions."""
 from collections.abc import Mapping
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
+import re
 from urllib.parse import urlparse
 
 WEIGHTS = {
@@ -37,7 +38,7 @@ Return exactly these keys:
   revenue/retention/acquisition mechanism, evidence basis and what needs validation.
 - discovery_questions: exactly 3 substantive priority questions ending in ?.
 - unknowns: 20-40 words, explicitly distinguishing assumptions from unknowns.
-- sources: 3-8 objects with label (short title), url (verified public HTTP(S) URL),
+- sources: 1-8 objects (aim for at least 3 independent pages when supplied) with label (short title), url (verified public HTTP(S) URL),
   checked_on (supplied assessment date). Cite these in order as [1], [2], etc throughout.
 Use only supplied verified evidence. If evidence is missing say unknown, reduce confidence,
 and recommend further qualification or deprioritisation. Never invent financials, ad spend,
@@ -50,7 +51,7 @@ Keep the existing Blueprint Lite fields and diagnostic evidence separate and int
 """
 
 
-def validate_prospect_intelligence(value):
+def validate_prospect_intelligence(value, *, verified_sources=None):
     """Reject malformed briefs rather than fabricate scores or silently truncate copy."""
     errors = []
     if not isinstance(value, Mapping):
@@ -71,17 +72,56 @@ def validate_prospect_intelligence(value):
             errors.append(f"invalid {key}")
         elif key == "discovery_questions" and not all(x.rstrip().endswith("?") for x in items):
             errors.append("discovery questions must be questions")
+    if not str(value.get("confidence") or "").startswith(("High", "Medium", "Low")):
+        errors.append("confidence must begin High, Medium or Low")
     sources = value.get("sources")
-    if not isinstance(sources, list) or not 3 <= len(sources) <= 8:
-        errors.append("three to eight sources required")
+    if not isinstance(sources, list) or not 1 <= len(sources) <= 8:
+        errors.append("one to eight sources required")
     else:
         for item in sources:
-            if not isinstance(item, Mapping) or not item.get("label") or not item.get("checked_on"):
-                errors.append("source metadata missing")
+            if not isinstance(item, Mapping) or not all(isinstance(item.get(k), str) and item[k].strip() for k in ("label", "url", "checked_on")):
+                errors.append("source metadata must be non-empty strings")
                 continue
-            url = urlparse(str(item.get("url") or ""))
-            if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password:
-                errors.append("invalid source URL")
+            try:
+                date.fromisoformat(item["checked_on"])
+                url = urlparse(item["url"])
+                if url.scheme not in {"http", "https"} or not url.hostname or url.username or url.password:
+                    errors.append("invalid source URL")
+            except ValueError:
+                errors.append("invalid source date or URL")
+        if verified_sources is not None:
+            allowed = set()
+            def collect(node):
+                if isinstance(node, Mapping):
+                    for k, v in node.items():
+                        if k in {"url", "uri", "source"} and isinstance(v, str):
+                            allowed.add(v.rstrip("/"))
+                        elif isinstance(v, (Mapping, list, tuple)):
+                            collect(v)
+                elif isinstance(node, (list, tuple)):
+                    for v in node:
+                        collect(v)
+            collect(verified_sources)
+            if any(not isinstance(item, Mapping) or str(item.get("url") or "").rstrip("/") not in allowed for item in sources):
+                errors.append("brief sources must match supplied evidence URLs")
+        citation_texts = []
+        for key in ("company_and_people", "brand_character"):
+            citation_texts.append(value.get(key))
+        if isinstance(rows, list):
+            citation_texts.extend(row.get("rationale") for row in rows if isinstance(row, Mapping))
+        for key in ("marketing_examples", "growth_hypotheses"):
+            if isinstance(value.get(key), list):
+                citation_texts.extend(value[key])
+        for text in citation_texts:
+            if not isinstance(text, str):
+                continue
+            citations = re.findall(r"\[(\d+(?:[-,]\d+)*)\]", text)
+            if not citations:
+                errors.append("material observations require citations")
+            for citation in citations:
+                numbers = [int(n) for n in re.split(r"[-,]", citation)]
+                if any(n < 1 or n > len(sources) for n in numbers):
+                    errors.append("citation references a missing source")
     return errors
 
 

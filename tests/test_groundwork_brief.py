@@ -44,15 +44,26 @@ class GroundworkBriefTest(unittest.TestCase):
         bad = copy.deepcopy(brief)
         bad["sources"][0]["url"] = "javascript:alert(1)"
         self.assertTrue(validate_prospect_intelligence(bad))
-        self.assertIn("prospect_intelligence", GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE.stages[0].output_contract.required_fields)
+        self.assertNotIn("prospect_intelligence", GROWTH_DIAGNOSTIC_TO_BLUEPRINT_LITE.stages[0].output_contract.required_fields)
         self.assertIn("prospect_intelligence", workflow_instruction("growth_diagnostic_to_blueprint_lite", "prepare_blueprint_lite", ()))
         from runtime.inbound_leads import InboundLead
         # Both commission paths share the same compact contract.
         self.assertIn("prospect_intelligence", TonyInboundBlueprintLiteService._instruction(InboundLead.from_mapping({"lead_id": "safe", "company": "Synthetic", "contact": "Synthetic", "email": "safe@example.com"})))
+        for url in ("https://[invalid", "javascript:alert(1)"):
+            bad = copy.deepcopy(brief)
+            bad["sources"][0]["url"] = url
+            self.assertTrue(validate_prospect_intelligence(bad))
+        bad = copy.deepcopy(brief)
+        bad["sources"][0]["label"] = {"unexpected": "object"}
+        self.assertTrue(validate_prospect_intelligence(bad))
+        bad = copy.deepcopy(brief)
+        bad["marketing_examples"][0] += " Unbacked claim [9]."
+        self.assertTrue(validate_prospect_intelligence(bad))
+        self.assertTrue(validate_prospect_intelligence(brief, verified_sources=[]))
         with tempfile.TemporaryDirectory() as directory:
             state = WorkflowState(workflow_id="growth_diagnostic_to_blueprint_lite", run_id="groundwork-review-test", stages=[], workspace_id="qualification-test", client_id="synthetic-review", entity_id="synthetic-review", input_payload={"company": "Synthetic Review Company"})
             service = HumanReviewPresentationService(HumanReviewArtifactStore(directory))
-            output = {"prospect_intelligence": brief}
+            output = {"prospect_intelligence": brief, "source_backed_evidence": [{"uri": x["url"]} for x in brief["sources"]]}
             source = ArtifactRef(artifact_id="synthetic-groundwork", artifact_type="blueprint_lite", location="synthetic.json", checksum=hashlib.sha256(json.dumps(output).encode()).hexdigest())
             result = service.produce(state=state, source=source, output=output)
             reader = PdfReader(result.location)

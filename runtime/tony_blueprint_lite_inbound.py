@@ -561,7 +561,7 @@ class TonyInboundBlueprintLiteService:
             self.store.put(lead_id, state)
             return self._public_state(state)
 
-        quality = self._quality_gate(evidence)
+        quality = self._quality_gate(evidence, verified_sources=research.get("source_backed_evidence", []) if isinstance(research, dict) else None)
         state["quality_gate"] = quality
         attempts = list(state.get("attempts") or [])
         attempts.append(
@@ -861,7 +861,7 @@ class TonyInboundBlueprintLiteService:
         ) + groundwork_instruction()
 
     @classmethod
-    def _quality_gate(cls, evidence: Any) -> dict[str, Any]:
+    def _quality_gate(cls, evidence: Any, *, verified_sources=None) -> dict[str, Any]:
         if not isinstance(evidence, dict):
             return {"passed": False, "failed_checks": ["structured evidence missing"], "checks": {}}
 
@@ -889,9 +889,9 @@ class TonyInboundBlueprintLiteService:
             "no_false_external_execution_claim": no_asserted_external_action(evidence, _FALSE_EXECUTION_MARKERS),
         }
         # Legacy stored artefacts remain readable; new workflow commissions require the
-        # field in the registry. Validate the extension whenever it is supplied.
+        # existing top-level fields. Validate the extension whenever it is supplied.
         if "prospect_intelligence" in evidence:
-            checks["prospect_intelligence_valid"] = not validate_prospect_intelligence(evidence["prospect_intelligence"])
+            checks["prospect_intelligence_valid"] = not validate_prospect_intelligence(evidence["prospect_intelligence"], verified_sources=verified_sources if verified_sources is not None else sources)
         failed = [name.replace("_", " ") for name, passed in checks.items() if not passed]
         return {"passed": not failed, "failed_checks": failed, "checks": checks}
 

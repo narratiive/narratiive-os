@@ -154,7 +154,7 @@ structure above, rename Blueprint Lite or create a FIELDWORK deliverable.
 The reusable specialist commission and validation are in `runtime/groundwork.py`.
 Both `runtime/workflow_instructions.py` (durable workflow) and
 `TonyInboundBlueprintLiteService._instruction` (diagnostic ingress) include that
-same commission. New workflow output includes `prospect_intelligence` alongside,
+same commission. The shared commission requests additive `prospect_intelligence` alongside,
 not in place of, the existing diagnostic, growth-tension and lineage fields.
 
 The internal brief answers whether to pursue, commercial/marketing attractiveness,
@@ -183,5 +183,9 @@ n8n remains the lead-event transport; Tony's existing workflow control commissio
 provides specialist preparation. No n8n node, Tony workspace configuration,
 external communications or live prospect test needs changing. Deploy source
 changes through the normal reviewed PR and canonical runtime deployment process.
+Legacy workers may still return the original contract; those outputs remain
+readable but do not meet the new brief standard. The additive extension is
+validated whenever returned, including citation bounds and source-URL consistency
+with supplied evidence. These checks do not establish a source's factual truth.
 A renderer test is document-generation evidence, not proof of a live Claude run,
 workflow completion, deployment or release approval.
