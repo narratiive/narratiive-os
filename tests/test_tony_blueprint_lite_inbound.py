@@ -3,10 +3,12 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from runtime.inbound_leads import InboundLead
 from runtime.tony_blueprint_lite_inbound import (
+    BlueprintLiteWebsiteResearch,
     FileBlueprintLitePreparationStore,
     TonyInboundBlueprintLiteService,
 )
@@ -224,6 +226,197 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             handed_off = calls[0]["target"]["verified_research_evidence"]
             self.assertEqual(handed_off["source_backed_evidence"][0]["evidence_id"], "ev-1")
             self.assertFalse(handed_off["external_action_taken"])
+
+    def test_website_research_uses_explicit_submitted_public_sources(self) -> None:
+        captured = []
+
+        class EvidencePack:
+            @staticmethod
+            def as_dict():
+                return {
+                    "status": "partial",
+                    "pack_id": "pack-origin",
+                    "records": [
+                        {
+                            "evidence_id": "ev-subscription",
+                            "source_id": "submitted-public-source-2:www.origincoffee.co.uk",
+                            "title": "Origin subscriptions",
+                            "uri": "https://www.origincoffee.co.uk/pages/coffee-subscriptions",
+                            "excerpt": "Origin describes its subscription offer.",
+                            "content_hash": "abc123",
+                            "retrieved_at": "2026-11-03T00:00:00Z",
+                            "provenance": {},
+                        }
+                    ],
+                }
+
+        class Engine:
+            @staticmethod
+            def run(job):
+                captured.append(job)
+                return SimpleNamespace(
+                    evidence_pack=EvidencePack(),
+                    blockers=("The submitted homepage exceeded the size limit.",),
+                )
+
+        researcher = BlueprintLiteWebsiteResearch.__new__(BlueprintLiteWebsiteResearch)
+        researcher.engine = Engine()
+        payload = self._payload()
+        payload["diagnostic"]["website"] = "https://www.origincoffee.co.uk/"
+        payload["diagnostic"]["raw_answers"] = {
+            "source_urls": [
+                "https://www.origincoffee.co.uk/",
+                "https://www.origincoffee.co.uk/pages/coffee-subscriptions",
+                "https://careers.origincoffee.co.uk/jobs/test-role",
+                "https://alice:super-secret@example.com/private-report",
+            ]
+        }
+
+        result = researcher(self._lead(), payload)
+
+        self.assertEqual(len(captured), 1)
+        self.assertEqual(len(captured[0].sources), 3)
+        self.assertEqual(
+            captured[0].sources[1].uri,
+            "https://www.origincoffee.co.uk/pages/coffee-subscriptions",
+        )
+        self.assertEqual(result["source_backed_evidence"][0]["evidence_id"], "ev-subscription")
+        self.assertIn("exceeded the size limit", result["research_gaps"][0])
+        self.assertIn("position 4", result["research_gaps"][1])
+        self.assertNotIn("super-secret", repr(captured[0]))
+        self.assertNotIn("super-secret", repr(result))
+
+    def test_credential_bearing_source_url_is_removed_before_any_persistence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            payload = self._payload()
+            payload["diagnostic"]["website"] = "https://alice:website-secret@example.com/private"
+            payload["diagnostic"]["raw_answers"] = {
+                "source_urls": [
+                    "https://example.com/about#team",
+                    "https://alice:list-secret@example.com/private",
+                    "https://example.com/report?access_token=query-secret",
+                    "https://example.com/camel?clientSecret=camel-secret&id=456",
+                    "https://example.com/article?id=123&q=growth#section",
+                ]
+            }
+
+            service.enqueue(self._lead(), payload)
+
+            persisted = store.get("lead-1")["diagnostic_input_package"]["diagnostic"]
+            self.assertEqual(persisted["website"], "")
+            self.assertEqual(
+                persisted["raw_answers"]["source_urls"],
+                [
+                    "https://example.com/about",
+                    "https://example.com/report",
+                    "https://example.com/camel?id=456",
+                    "https://example.com/article?id=123&q=growth",
+                ],
+            )
+            self.assertEqual(
+                [item["position"] for item in persisted["raw_answers"]["source_url_rejections"]],
+                [2],
+            )
+            durable_text = "\n".join(
+                path.read_text(encoding="utf-8")
+                for path in (root / "workflow-runtime").rglob("*.json")
+            )
+            durable_text += (root / "blueprint-lite.json").read_text(encoding="utf-8")
+            self.assertNotIn("website-secret", durable_text)
+            self.assertNotIn("list-secret", durable_text)
+            self.assertNotIn("query-secret", durable_text)
+            self.assertNotIn("camel-secret", durable_text)
+
+    def test_non_list_source_urls_are_removed_before_persistence(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+                researcher=lambda lead, payload: {
+                    "status": "complete",
+                    "pack_id": "pack-safe",
+                    "source_backed_evidence": [{"evidence_id": "ev-1", "uri": "https://example.com"}],
+                    "research_gaps": [],
+                    "external_action_taken": False,
+                },
+            )
+            payload = self._payload()
+            payload["diagnostic"]["raw_answers"] = {
+                "source_urls": "https://example.com/?access_token=durable-secret"
+            }
+
+            service.enqueue(self._lead(), payload)
+
+            persisted = store.get("lead-1")["diagnostic_input_package"]["diagnostic"]["raw_answers"]
+            self.assertEqual(persisted["source_urls"], [])
+            self.assertEqual(persisted["source_url_rejection_count"], 1)
+            durable_text = "\n".join(path.read_text(encoding="utf-8") for path in root.rglob("*.json"))
+            self.assertNotIn("durable-secret", durable_text)
+
+    def test_eight_source_limit_is_enforced_before_persistence_and_dispatch(self) -> None:
+        dispatches = []
+        research_payloads = []
+
+        def researcher(_lead, payload):
+            research_payloads.append(payload)
+            return {
+                "status": "complete",
+                "pack_id": "pack-bounded",
+                "source_backed_evidence": [{"evidence_id": "ev-1", "uri": "https://example.com/root"}],
+                "research_gaps": [],
+                "external_action_taken": False,
+            }
+
+        def claude(dispatch):
+            dispatches.append(dispatch)
+            return self._good_evidence()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": claude},
+                workflow_runtime_root=root / "workflow-runtime",
+                researcher=researcher,
+            )
+            payload = self._payload()
+            payload["diagnostic"]["website"] = "https://example.com/root"
+            payload["diagnostic"]["raw_answers"] = {
+                "source_urls": [f"https://example.com/source/{index}" for index in range(25)]
+            }
+
+            service.enqueue(self._lead(), payload)
+            service.process("lead-1")
+
+            persisted = store.get("lead-1")["diagnostic_input_package"]
+            persisted_urls = persisted["diagnostic"]["raw_answers"]["source_urls"]
+            self.assertEqual(len(persisted_urls), 7)
+            self.assertEqual(
+                persisted["diagnostic"]["raw_answers"]["source_url_rejection_count"],
+                18,
+            )
+            self.assertEqual(research_payloads[0], persisted)
+            self.assertEqual(
+                dispatches[0]["target"]["diagnostic_input_package"],
+                persisted,
+            )
+            durable_text = "\n".join(
+                path.read_text(encoding="utf-8")
+                for path in (root / "workflow-runtime").rglob("*.json")
+            )
+            durable_text += (root / "blueprint-lite.json").read_text(encoding="utf-8")
+            self.assertNotIn("source/24", durable_text)
 
     def test_live_inbound_persists_the_same_completed_work_in_generic_runtime(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

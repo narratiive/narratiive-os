@@ -6,7 +6,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Mapping
-from urllib.parse import urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 from runtime.external_action_truth import no_asserted_external_action
 from runtime.inbound_leads import InboundLead
@@ -29,6 +29,29 @@ DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
 BlueprintLiteResearcher = Callable[[InboundLead, Mapping[str, Any]], dict[str, Any]]
 
 _BLUEPRINT_LITE_SOURCES = {"growth diagnostic", "tally", "website"}
+_MAX_BLUEPRINT_LITE_SUBMITTED_SOURCES = 8
+_SENSITIVE_QUERY_KEYS = {
+    "access_token",
+    "api_key",
+    "apikey",
+    "auth",
+    "authorization",
+    "client_secret",
+    "code",
+    "credential",
+    "key",
+    "passwd",
+    "password",
+    "secret",
+    "sig",
+    "signature",
+    "token",
+    "x_amz_credential",
+    "x_amz_signature",
+    "x_goog_credential",
+    "x_goog_signature",
+}
+_NORMALISED_SENSITIVE_QUERY_KEYS = {item.replace("_", "") for item in _SENSITIVE_QUERY_KEYS}
 _REQUIRED_LINEAGE_KEYS = ("fact", "interpretation", "hypothesis")
 _FALSE_EXECUTION_MARKERS = (
     "email sent",
@@ -44,48 +67,66 @@ _FALSE_EXECUTION_MARKERS = (
 class BlueprintLiteWebsiteResearch:
     """Collect bounded, source-backed website evidence before strategic drafting."""
 
+    MAX_SUBMITTED_SOURCES = _MAX_BLUEPRINT_LITE_SUBMITTED_SOURCES
+
     def __init__(self, root: str | Path) -> None:
         self.engine = ResearchEngine(Path(root))
 
     def __call__(self, lead: InboundLead, payload: Mapping[str, Any]) -> dict[str, Any]:
         diagnostic = payload.get("diagnostic")
         website = str(diagnostic.get("website") or "").strip() if isinstance(diagnostic, Mapping) else ""
-        if not website:
+        raw_answers = diagnostic.get("raw_answers") if isinstance(diagnostic, Mapping) else None
+        submitted_urls = raw_answers.get("source_urls") if isinstance(raw_answers, Mapping) else None
+        candidates = [website]
+        if isinstance(submitted_urls, list):
+            candidates.extend(str(item or "").strip() for item in submitted_urls)
+        candidates = list(dict.fromkeys(item for item in candidates if item))[: self.MAX_SUBMITTED_SOURCES]
+        if not candidates:
             return {
                 "status": "blocked",
                 "source_backed_evidence": [],
-                "research_gaps": ["The submitted diagnostic does not include a company website."],
+                "research_gaps": ["The submitted diagnostic does not include an approved public source URL."],
                 "external_action_taken": False,
             }
-        parsed = urlparse(website)
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+
+        sources: list[EvidenceSource] = []
+        invalid_source_positions: list[int] = []
+        for index, uri in enumerate(candidates, start=1):
+            safe_uri = _safe_submitted_public_url(uri)
+            if safe_uri is None:
+                invalid_source_positions.append(index)
+                continue
+            parsed = urlparse(safe_uri)
+            sources.append(
+                EvidenceSource(
+                    source_id=f"submitted-public-source-{index}:{parsed.hostname}",
+                    workspace_id=lead.lead_id,
+                    source_type="web",
+                    uri=safe_uri,
+                    title=f"Submitted public source for {lead.company or lead.contact}",
+                    policy=EvidenceSourcePolicy(
+                        approved=True,
+                        allowed_domains=(parsed.hostname,),
+                        allowed_schemes=(parsed.scheme,),
+                        max_bytes=250_000,
+                        timeout_seconds=15,
+                    ),
+                    metadata={"approval_basis": "prospect_submitted_public_source_url"},
+                )
+            )
+        if not sources:
             return {
                 "status": "blocked",
                 "source_backed_evidence": [],
-                "research_gaps": ["The submitted company website is not a valid public HTTP(S) URL."],
+                "research_gaps": ["The submitted public source URLs are not valid HTTP(S) URLs."],
                 "external_action_taken": False,
             }
-        source = EvidenceSource(
-            source_id=f"submitted-website:{parsed.hostname}",
-            workspace_id=lead.lead_id,
-            source_type="web",
-            uri=website,
-            title=f"Submitted website for {lead.company or lead.contact}",
-            policy=EvidenceSourcePolicy(
-                approved=True,
-                allowed_domains=(parsed.hostname,),
-                allowed_schemes=(parsed.scheme,),
-                max_bytes=250_000,
-                timeout_seconds=15,
-            ),
-            metadata={"approval_basis": "prospect_submitted_company_website"},
-        )
         run = self.engine.run(
             ResearchJob(
                 job_id=f"{lead.lead_id}-blueprint-lite-website",
                 workspace_id=lead.lead_id,
                 query=f"Collect verifiable outside-in evidence for the Blueprint Lite for {lead.company or lead.contact}.",
-                sources=(source,),
+                sources=tuple(sources),
                 lineage=(lead.lead_id,),
             )
         )
@@ -108,7 +149,13 @@ class BlueprintLiteWebsiteResearch:
             "status": pack.get("status"),
             "pack_id": pack.get("pack_id"),
             "source_backed_evidence": evidence,
-            "research_gaps": list(run.blockers),
+            "research_gaps": [
+                *list(run.blockers),
+                *(
+                    f"Invalid submitted public source URL at position {index}."
+                    for index in invalid_source_positions
+                ),
+            ],
             "external_action_taken": False,
         }
 
@@ -971,6 +1018,50 @@ def _normalise_diagnostic_input_contract(payload: dict[str, Any]) -> dict[str, A
         if not _meaningful(normalised.get(canonical)) and _meaningful(normalised.get(alias)):
             normalised[canonical] = normalised[alias]
 
+    website = str(normalised.get("website") or "").strip()
+    if website:
+        safe_website = _safe_submitted_public_url(website)
+        normalised["website"] = safe_website or ""
+
+    raw_answers = normalised.get("raw_answers")
+    if isinstance(raw_answers, Mapping):
+        safe_answers = dict(raw_answers)
+        source_urls = safe_answers.get("source_urls")
+        if isinstance(source_urls, list):
+            safe_urls: list[str] = []
+            seen_urls = {normalised["website"]} if normalised.get("website") else set()
+            rejected: list[dict[str, Any]] = []
+            rejected_count = 0
+            for index, value in enumerate(source_urls, start=1):
+                safe_url = _safe_submitted_public_url(value)
+                if safe_url is None:
+                    rejected_count += 1
+                    if len(rejected) < _MAX_BLUEPRINT_LITE_SUBMITTED_SOURCES:
+                        rejected.append({"position": index, "reason": "non_public_or_credential_bearing_url"})
+                    continue
+                if safe_url in seen_urls:
+                    continue
+                if len(seen_urls) >= _MAX_BLUEPRINT_LITE_SUBMITTED_SOURCES:
+                    rejected_count += 1
+                    if len(rejected) < _MAX_BLUEPRINT_LITE_SUBMITTED_SOURCES:
+                        rejected.append({"position": index, "reason": "maximum_source_count_exceeded"})
+                    continue
+                seen_urls.add(safe_url)
+                safe_urls.append(safe_url)
+            safe_answers["source_urls"] = safe_urls
+            if rejected:
+                safe_answers["source_url_rejections"] = rejected
+                safe_answers["source_url_rejection_count"] = rejected_count
+        elif source_urls is not None:
+            safe_answers["source_urls"] = []
+            safe_answers["source_url_rejections"] = [
+                {"position": 1, "reason": "source_urls_must_be_a_list"}
+            ]
+            safe_answers["source_url_rejection_count"] = 1
+        normalised["raw_answers"] = safe_answers
+        if isinstance(normalised.get("answers"), Mapping):
+            normalised["answers"] = dict(safe_answers)
+
     category_scores = normalised.get("category_scores")
     if isinstance(category_scores, dict) and "demandGen" in category_scores and "demand_gen" not in category_scores:
         category_scores = dict(category_scores)
@@ -983,6 +1074,29 @@ def _normalise_diagnostic_input_contract(payload: dict[str, Any]) -> dict[str, A
     # from the fingerprint and persisted input contract. This makes an exact
     # submission replay a true replay rather than a second model job.
     return {"diagnostic": normalised}
+
+
+def _safe_submitted_public_url(value: Any) -> str | None:
+    """Return a credential-free public-source URL without persisting rejected input."""
+    uri = str(value or "").strip()
+    parsed = urlparse(uri)
+    if (
+        parsed.scheme not in {"http", "https"}
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        return None
+    safe_query = urlencode(
+        [
+            (key, query_value)
+            for key, query_value in parse_qsl(parsed.query, keep_blank_values=True)
+            if key.casefold().replace("-", "").replace("_", "")
+            not in _NORMALISED_SENSITIVE_QUERY_KEYS
+        ],
+        doseq=True,
+    )
+    return parsed._replace(query=safe_query, fragment="").geturl()
 
 
 def _diagnostic_input_coverage(payload: Mapping[str, Any]) -> dict[str, Any]:
