@@ -1,3 +1,4 @@
+import multiprocessing
 import tempfile
 import threading
 import unittest
@@ -5,6 +6,34 @@ from pathlib import Path
 
 from runtime.models import ArtifactRef, StageRecord, StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog, RunNotFound, WorkflowEvent
+
+
+def _failing_event_transaction(root: str, started, release) -> None:
+    event_log = JsonlEventLog(root)
+    try:
+        with event_log.transaction("run-001"):
+            event_log.append(
+                WorkflowEvent.create(
+                    event_id="evt-uncommitted",
+                    run_id="run-001",
+                    event_type="stage.completed",
+                )
+            )
+            started.set()
+            release.wait(timeout=5)
+            raise OSError("simulated transaction failure")
+    except OSError:
+        pass
+
+
+def _append_committed_event(root: str) -> None:
+    JsonlEventLog(root).append(
+        WorkflowEvent.create(
+            event_id="evt-committed",
+            run_id="run-001",
+            event_type="stage.blocked",
+        )
+    )
 
 
 class FileWorkflowRunRepositoryTests(unittest.TestCase):
@@ -148,6 +177,30 @@ class JsonlEventLogTests(unittest.TestCase):
             self.assertFalse(second.is_alive())
             self.assertEqual(
                 [event.event_id for event in event_log.read("run-001")],
+                ["evt-committed"],
+            )
+
+    def test_failed_transaction_does_not_truncate_other_process_append(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            context = multiprocessing.get_context("spawn")
+            started = context.Event()
+            release = context.Event()
+            first = context.Process(
+                target=_failing_event_transaction,
+                args=(temporary, started, release),
+            )
+            first.start()
+            self.assertTrue(started.wait(timeout=5))
+            second = context.Process(target=_append_committed_event, args=(temporary,))
+            second.start()
+            release.set()
+            first.join(timeout=5)
+            second.join(timeout=5)
+
+            self.assertEqual(first.exitcode, 0)
+            self.assertEqual(second.exitcode, 0)
+            self.assertEqual(
+                [event.event_id for event in JsonlEventLog(temporary).read("run-001")],
                 ["evt-committed"],
             )
 

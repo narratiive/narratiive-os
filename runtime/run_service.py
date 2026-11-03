@@ -924,16 +924,25 @@ class WorkflowRunService:
 
     def _commit(self, state: WorkflowState, event_type: str, payload: dict[str, object]) -> None:
         with self.transaction(state.run_id):
-            self.repository.save(state)
-            self.event_log.append(
-                WorkflowEvent.create(
-                    event_id=f"evt-{uuid4().hex}",
-                    run_id=state.run_id,
-                    event_type=event_type,
-                    payload=payload,
-                    workspace_id=state.workspace_id,
+            event_transaction = getattr(self.event_log, "transaction", None)
+
+            def persist() -> None:
+                self.repository.save(state)
+                self.event_log.append(
+                    WorkflowEvent.create(
+                        event_id=f"evt-{uuid4().hex}",
+                        run_id=state.run_id,
+                        event_type=event_type,
+                        payload=payload,
+                        workspace_id=state.workspace_id,
+                    )
                 )
-            )
+
+            if event_transaction is None:
+                persist()
+            else:
+                with event_transaction(state.run_id):
+                    persist()
 
     @contextmanager
     def transaction(self, run_id: str):
