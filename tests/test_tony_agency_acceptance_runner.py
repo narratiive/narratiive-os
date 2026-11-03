@@ -16,10 +16,27 @@ from scripts.run_tony_agency_acceptance import (
     _sandbox_config,
     _sandbox_env,
     _send_turn,
+    _spawned_specialist_sessions,
 )
 
 
 class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
+    def test_specialist_session_bypass_is_detected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sessions = root / "openclaw-state" / "agents" / "strategy" / "sessions" / "sessions.json"
+            sessions.parent.mkdir(parents=True)
+            sessions.write_text(json.dumps({"agent:strategy:subagent:1": {"status": "running"}}), encoding="utf-8")
+            self.assertEqual(_spawned_specialist_sessions(root), ["agent:strategy:subagent:1"])
+
+    def test_tony_conversation_sessions_are_not_specialist_bypasses(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sessions = root / "openclaw-state" / "agents" / "tony" / "sessions" / "sessions.json"
+            sessions.parent.mkdir(parents=True)
+            sessions.write_text(json.dumps({"agent:tony:acceptance": {"status": "running"}}), encoding="utf-8")
+            self.assertEqual(_spawned_specialist_sessions(root), [])
+
     def test_blocked_workflow_rejects_positive_commissioning_language(self) -> None:
         claims = _blocked_progress_claims(
             [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}],

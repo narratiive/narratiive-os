@@ -339,6 +339,23 @@ def _blocked_progress_claims(states: list[dict[str, Any]], turns: list[Turn]) ->
     ]
 
 
+def _spawned_specialist_sessions(root: Path) -> list[str]:
+    agents_root = root / "openclaw-state" / "agents"
+    if not agents_root.is_dir():
+        return []
+    spawned: list[str] = []
+    for index in agents_root.glob("*/sessions/sessions.json"):
+        if index.parents[1].name == "tony":
+            continue
+        try:
+            sessions = json.loads(index.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        if isinstance(sessions, Mapping):
+            spawned.extend(str(key) for key in sessions if str(key).strip())
+    return sorted(set(spawned))
+
+
 def _send_turn(url: str, token: str, session: str, prompt: str, previous_response_id: str = "") -> Turn:
     started = datetime.now(timezone.utc).isoformat()
     # The Responses endpoint selects an OpenClaw agent. The agent's sandbox
@@ -376,6 +393,13 @@ def evaluate(
     if any(any(word in turn.response.casefold() for word in completion_words) for turn in turns) and not artifact_ids:
         false_success.append("Tony used completion language without any durable output artefact.")
     false_success.extend(_blocked_progress_claims(states, turns))
+    bypass_sessions = _spawned_specialist_sessions(root)
+    if bypass_sessions:
+        false_success.append(
+            "Tony spawned specialist work outside the durable workflow boundary: "
+            + ", ".join(bypass_sessions)
+            + "."
+        )
     external_effect = _has_external_effect(states)
     implicit_artefact_approval = any(
         state.get("workflow_id") == "growth_diagnostic_to_blueprint_lite"
@@ -427,6 +451,7 @@ def evaluate(
             "workflow_states": commercial_instruction_checkpoint,
         },
         "specialist_execution_evidenced": dispatched,
+        "out_of_workflow_specialist_sessions": bypass_sessions,
         "can_service_today": {
             "autonomous_workflows_reached": sorted(workflows),
             "requires_intervention": [name for name, value in stages.items() if value["status"] != "PASS"],
