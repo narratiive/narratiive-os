@@ -248,7 +248,7 @@ class TonyInboundBlueprintLiteService:
             "updated_at": _now(),
         }
         workflow = BLUEPRINT_LITE_WORKFLOW.new_state(
-            lead.lead_id,
+            str(state["canonical_run_id"]),
             workspace_id="narratiive",
             client_id=lead.lead_id,
         )
@@ -684,20 +684,21 @@ class TonyInboundBlueprintLiteService:
         durable_outputs = {field: evidence[field] for field in required}
         runtime.runs.merge_inputs(run_id, durable_outputs)
         rollback_state = runtime.runs.load_run(run_id)
-        event_checkpoint = None
-        if hasattr(runtime.runs.event_log, "checkpoint"):
-            event_checkpoint = runtime.runs.event_log.checkpoint(run_id)
-        try:
-            runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
-        except Exception:
-            # WorkflowRunService saves its snapshot before appending the audit
-            # event. Restore the last non-consequential running snapshot so the
-            # caller can durably block it instead of exposing approval-ready
-            # work whose persistence transaction did not finish.
-            if event_checkpoint is not None and hasattr(runtime.runs.event_log, "restore_checkpoint"):
-                runtime.runs.event_log.restore_checkpoint(run_id, event_checkpoint)
-            runtime.runs.repository.save(rollback_state)
-            raise
+        with runtime.runs.transaction(run_id):
+            try:
+                event_transaction = getattr(runtime.runs.event_log, "transaction", None)
+                if event_transaction is None:
+                    runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
+                else:
+                    with event_transaction(run_id):
+                        runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
+            except Exception:
+                # WorkflowRunService saves its snapshot before appending the
+                # audit event. Restore the last non-consequential running
+                # snapshot while retaining transaction ownership so the caller
+                # can durably block it without erasing a concurrent commit.
+                runtime.runs.repository.save(rollback_state)
+                raise
 
     def _persist_generic_initial_workflow(self, record: Mapping[str, Any]) -> None:
         """Expose queued and blocked inbound work through the canonical runtime.

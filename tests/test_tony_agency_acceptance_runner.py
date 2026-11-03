@@ -62,6 +62,24 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             with self.subTest(response=response):
                 self.assertTrue(_blocked_progress_claims(state, [Turn("Start it", response, "now")]))
 
+    def test_blocked_workflow_detects_ready_specialist_and_next_phase_claims(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        for response in (
+            "It's ready.",
+            "I've commissioned Strategy to handle it.",
+            "The next phase is underway.",
+        ):
+            with self.subTest(response=response):
+                self.assertTrue(_blocked_progress_claims(state, [Turn("Start it", response, "now")]))
+
+    def test_blocked_workflow_allows_explicit_not_ready_statement(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        claims = _blocked_progress_claims(
+            state,
+            [Turn("Start it", "It is not ready because commissioning failed.", "now")],
+        )
+        self.assertEqual(claims, [])
+
     def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
         response = mock.MagicMock()
         response.read.return_value = b'{"id":"response-1","output_text":"Ready"}'

@@ -321,12 +321,14 @@ def _blocked_progress_claims(states: list[dict[str, Any]], turns: list[Turn]) ->
     if not any(state.get("status") == "blocked" for state in states):
         return []
     patterns = (
+        ("ready", r"(?:^|[.!?]\s+)(?:it|this|that)(?:\s+is|'s)\s+ready\b|^ready(?:[.!]|$)"),
         ("approved and ready", r"\bapproved\s*(?:&|and)\s*ready\b"),
         ("commissioned", r"\b(?:opportunity|work|workflow|project|preparation)\s+(?:is\s+|has\s+been\s+)?commissioned\b"),
+        ("specialist commissioned", r"\bi(?:\s+have|'ve)\s+commissioned\s+(?:the\s+)?[a-z][a-z0-9_-]*\b"),
         ("initiated", r"\b(?:preparation|work|workflow|project)\s+(?:is\s+|has\s+been\s+)?initiated\b"),
-        ("underway", r"\b(?:the\s+)?(?:work|preparation|workflow|project)\s+is\s+underway\b"),
-        ("started", r"\b(?:i\s+(?:have|'ve)\s+started\s+(?:the\s+)?(?:work|preparation|workflow|project)|(?:the\s+)?(?:work|preparation|workflow|project)\s+has\s+(?:started|begun))\b"),
-        ("ready and started", r"\bready\b[^.\n]{0,80}\bi\s+(?:have|'ve)\s+started\b"),
+        ("underway", r"\b(?:the\s+)?(?:(?:next|current)\s+)?(?:phase|work|preparation|workflow|project)\s+is\s+underway\b"),
+        ("started", r"\b(?:i(?:\s+have|'ve)\s+started\s+(?:the\s+)?(?:work|preparation|workflow|project)|(?:the\s+)?(?:work|preparation|workflow|project)\s+has\s+(?:started|begun))\b"),
+        ("ready and started", r"\bready\b[^.\n]{0,80}\bi(?:\s+have|'ve)\s+started\b"),
     )
     claims = [
         label

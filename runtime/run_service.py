@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import re
+import threading
+from contextlib import contextmanager
 from collections.abc import Callable, Iterable, Mapping
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -13,6 +15,9 @@ from .state_machine import WorkflowEngine
 
 class WorkflowRunService:
     """Application service joining definitions, transitions, snapshots and events."""
+
+    _locks_guard = threading.Lock()
+    _run_locks: dict[str, threading.RLock] = {}
 
     def __init__(
         self,
@@ -918,13 +923,25 @@ class WorkflowRunService:
         return state
 
     def _commit(self, state: WorkflowState, event_type: str, payload: dict[str, object]) -> None:
-        self.repository.save(state)
-        self.event_log.append(
-            WorkflowEvent.create(
-                event_id=f"evt-{uuid4().hex}",
-                run_id=state.run_id,
-                event_type=event_type,
-                payload=payload,
-                workspace_id=state.workspace_id,
+        with self.transaction(state.run_id):
+            self.repository.save(state)
+            self.event_log.append(
+                WorkflowEvent.create(
+                    event_id=f"evt-{uuid4().hex}",
+                    run_id=state.run_id,
+                    event_type=event_type,
+                    payload=payload,
+                    workspace_id=state.workspace_id,
+                )
             )
-        )
+
+    @contextmanager
+    def transaction(self, run_id: str):
+        """Serialise snapshot/event mutations for one run across service instances."""
+        root = getattr(self.repository, "root", None)
+        scope = str(root.resolve()) if root is not None else f"repository:{id(self.repository)}"
+        key = f"{scope}:{run_id}"
+        with self._locks_guard:
+            lock = self._run_locks.setdefault(key, threading.RLock())
+        with lock:
+            yield

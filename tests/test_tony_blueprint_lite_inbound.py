@@ -417,6 +417,7 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             service.enqueue(self._lead(), payload_b)
             service.process("lead-1")
             replay_a = service.enqueue(self._lead(), payload_a)
+            state_after_replay_a = store.get("lead-1")
             replay_b = service.enqueue(self._lead(), payload_b)
 
             persisted = store.get("lead-1")
@@ -426,8 +427,16 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(calls, 2)
             self.assertTrue(replay_a["replay"])
             self.assertTrue(replay_b["replay"])
+            self.assertEqual(state_after_replay_a["canonical_run_id"], "lead-1")
+            self.assertEqual(
+                state_after_replay_a["workflow_run"]["run_id"],
+                state_after_replay_a["canonical_run_id"],
+            )
             self.assertEqual(len(persisted["versions"]), 2)
             self.assertEqual(persisted["current_version"], 2)
+            self.assertEqual(persisted["workflow_run"]["run_id"], persisted["canonical_run_id"])
+            for version in persisted["versions"]:
+                self.assertEqual(version["workflow_run"]["run_id"], version["canonical_run_id"])
             self.assertEqual(len(states), 2)
             self.assertTrue(all(len(state.stage("prepare_blueprint_lite").output_artifacts) == 1 for state in states))
             current = next(state for state in states if state.run_id == persisted["canonical_run_id"])

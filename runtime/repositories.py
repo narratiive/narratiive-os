@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import tempfile
+import threading
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -147,6 +149,9 @@ class FileWorkflowRunRepository:
 class JsonlEventLog:
     """Append-only JSONL event history, partitioned by workflow run."""
 
+    _locks_guard = threading.Lock()
+    _run_locks: dict[str, threading.RLock] = {}
+
     def __init__(self, root: str | Path, *, workspace_id: str = "legacy") -> None:
         self.root = Path(root)
         _validate_identifier(workspace_id, "workspace_id")
@@ -158,29 +163,31 @@ class JsonlEventLog:
             raise ValueError("event belongs to a different workspace")
         path = self._path(event.run_id)
         line = json.dumps(event.to_dict(), separators=(",", ":"), sort_keys=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(line)
-            handle.write("\n")
-            handle.flush()
-            os.fsync(handle.fileno())
+        with self._run_lock(event.run_id):
+            with path.open("a", encoding="utf-8") as handle:
+                handle.write(line)
+                handle.write("\n")
+                handle.flush()
+                os.fsync(handle.fileno())
 
     def read(self, run_id: str) -> list[WorkflowEvent]:
         path = self._path(run_id)
-        if not path.exists():
-            return []
-        events: list[WorkflowEvent] = []
-        with path.open("r", encoding="utf-8") as handle:
-            for line_number, line in enumerate(handle, start=1):
-                if not line.strip():
-                    continue
-                try:
-                    event = WorkflowEvent.from_dict(json.loads(line))
-                    if event.workspace_id != self.workspace_id:
-                        raise ValueError("event belongs to a different workspace")
-                    events.append(event)
-                except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-                    raise ValueError(f"invalid event at {path}:{line_number}") from exc
-        return events
+        with self._run_lock(run_id):
+            if not path.exists():
+                return []
+            events: list[WorkflowEvent] = []
+            with path.open("r", encoding="utf-8") as handle:
+                for line_number, line in enumerate(handle, start=1):
+                    if not line.strip():
+                        continue
+                    try:
+                        event = WorkflowEvent.from_dict(json.loads(line))
+                        if event.workspace_id != self.workspace_id:
+                            raise ValueError("event belongs to a different workspace")
+                        events.append(event)
+                    except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
+                        raise ValueError(f"invalid event at {path}:{line_number}") from exc
+            return events
 
     def contains(self, run_id: str, event_id: str) -> bool:
         return any(event.event_id == event_id for event in self.read(run_id))
@@ -189,26 +196,26 @@ class JsonlEventLog:
         for event in events:
             self.append(event)
 
-    def checkpoint(self, run_id: str) -> int:
-        """Return the durable byte boundary before a multi-event transaction."""
-        path = self._path(run_id)
-        return path.stat().st_size if path.exists() else 0
+    @contextmanager
+    def transaction(self, run_id: str):
+        """Own one run's event stream and roll back only this failed transaction."""
+        with self._run_lock(run_id):
+            path = self._path(run_id)
+            checkpoint = path.stat().st_size if path.exists() else 0
+            try:
+                yield
+            except Exception:
+                if path.exists():
+                    with path.open("r+b") as handle:
+                        handle.truncate(checkpoint)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                raise
 
-    def restore_checkpoint(self, run_id: str, byte_offset: int) -> None:
-        """Discard only events appended by an incomplete local transaction."""
-        if byte_offset < 0:
-            raise ValueError("event-log checkpoint must not be negative")
-        path = self._path(run_id)
-        if not path.exists():
-            if byte_offset:
-                raise ValueError("event-log checkpoint exceeds missing log")
-            return
-        if byte_offset > path.stat().st_size:
-            raise ValueError("event-log checkpoint exceeds current log")
-        with path.open("r+b") as handle:
-            handle.truncate(byte_offset)
-            handle.flush()
-            os.fsync(handle.fileno())
+    def _run_lock(self, run_id: str) -> threading.RLock:
+        key = str(self._path(run_id).resolve())
+        with self._locks_guard:
+            return self._run_locks.setdefault(key, threading.RLock())
 
     def _path(self, run_id: str) -> Path:
         _validate_identifier(run_id, "run_id")
