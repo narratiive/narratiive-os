@@ -1,14 +1,37 @@
 from __future__ import annotations
 
+import json
 import tempfile
 import unittest
 from pathlib import Path
 from unittest import mock
 
-from scripts.run_tony_agency_acceptance import SANDBOX_MODEL, STAGE_WORKFLOWS, _has_external_effect, _sandbox_config, _sandbox_env
+from scripts.run_tony_agency_acceptance import (
+    SANDBOX_MODEL,
+    STAGE_WORKFLOWS,
+    TONY_RESPONSE_MODEL,
+    _has_external_effect,
+    _sandbox_config,
+    _sandbox_env,
+    _send_turn,
+)
 
 
 class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
+    def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
+        response = mock.MagicMock()
+        response.read.return_value = b'{"id":"response-1","output_text":"Ready"}'
+        response.__enter__.return_value = response
+
+        with mock.patch("scripts.run_tony_agency_acceptance.urlopen", return_value=response) as opener:
+            turn = _send_turn("http://127.0.0.1:19001/v1/responses", "token", "session", "Assess it")
+
+        request = opener.call_args.args[0]
+        body = json.loads(request.data)
+        self.assertEqual(body["model"], TONY_RESPONSE_MODEL)
+        self.assertEqual(body["model"], "openclaw/tony")
+        self.assertEqual(turn.response, "Ready")
+
     def test_negative_external_action_attestation_is_not_a_false_positive(self) -> None:
         self.assertFalse(_has_external_effect({"quality_gate": {"no_external_action_taken": True}, "external_action_taken": False}))
 

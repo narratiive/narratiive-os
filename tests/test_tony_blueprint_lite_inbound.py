@@ -87,8 +87,13 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
 
     def test_missing_claude_dispatcher_fails_closed_and_persists_one_job(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
-            store = FileBlueprintLitePreparationStore(Path(tmp) / "blueprint-lite.json")
-            service = TonyInboundBlueprintLiteService(store, dispatchers={})
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
             result = service.enqueue(self._lead(), self._payload())
             self.assertEqual(result["state"], "dispatcher_unavailable")
             self.assertEqual(result["blocker"], "claude_dispatcher_not_configured")
@@ -101,14 +106,34 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
                 "worker_unavailable:strategic_reasoning",
             )
             self.assertEqual(workflow_from_dict(persisted["workflow_run"]).status.value, "blocked")
+            generic_states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(len(generic_states), 1)
+            self.assertEqual(generic_states[0].run_id, "lead-1")
+            self.assertEqual(generic_states[0].status.value, "blocked")
+            self.assertEqual(
+                generic_states[0].blocker,
+                "worker_unavailable:strategic_reasoning",
+            )
             replay = service.enqueue(self._lead(), self._payload())
             self.assertTrue(replay["replay"])
             self.assertEqual(len(store.read_all()), 1)
 
-            available = TonyInboundBlueprintLiteService(store, dispatchers={"Claude": lambda dispatch: self._good_evidence()})
+            available = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
             resumed = available.enqueue(self._lead(), self._payload())
             self.assertEqual(resumed["state"], "preparation_queued")
             self.assertEqual(workflow_from_dict(store.get("lead-1")["workflow_run"]).stage("prepare_blueprint_lite").status.value, "ready")
+            completed = available.process("lead-1")
+            self.assertEqual(completed["state"], "awaiting_review")
+            generic_states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+            self.assertEqual(generic_states[0].status.value, "awaiting_approval")
 
     def test_verified_blueprint_lite_is_versioned_and_stops_at_human_review(self) -> None:
         calls: list[dict] = []

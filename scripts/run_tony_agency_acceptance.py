@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_ID = "safe-cinder-grove-agency-acceptance"
 COMPANY = "Cinder & Grove Mobility"
 SANDBOX_MODEL = "ollama/qwen3.5:latest"
+TONY_RESPONSE_MODEL = "openclaw/tony"
 FOUNDER_PROMPTS = (
     "We've received this enquiry. Assess the opportunity and tell me what we should do.",
     "We've won it. Get us ready to start.",
@@ -317,7 +318,9 @@ def _approval_prompt(state: Mapping[str, Any]) -> str:
 
 def _send_turn(url: str, token: str, session: str, prompt: str, previous_response_id: str = "") -> Turn:
     started = datetime.now(timezone.utc).isoformat()
-    body: dict[str, Any] = {"model": SANDBOX_MODEL, "input": prompt}
+    # The Responses endpoint selects an OpenClaw agent. The agent's sandbox
+    # configuration above selects the local Ollama model that performs the turn.
+    body: dict[str, Any] = {"model": TONY_RESPONSE_MODEL, "input": prompt}
     if previous_response_id:
         body["previous_response_id"] = previous_response_id
     headers = {

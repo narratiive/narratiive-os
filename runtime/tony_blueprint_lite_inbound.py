@@ -244,6 +244,7 @@ class TonyInboundBlueprintLiteService:
             state["blocker"] = "claude_dispatcher_not_configured"
             state["workflow_run"] = workflow_to_dict(workflow)
         self.store.put(lead.lead_id, state)
+        self._persist_generic_initial_workflow(state)
         return self._public_state(state)
 
     def enqueue_and_start(self, lead: InboundLead, raw_payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -592,6 +593,14 @@ class TonyInboundBlueprintLiteService:
         )
         if state.status.value in {"awaiting_approval", "complete"}:
             return
+        if state.status.value == "blocked" and str(state.blocker or "").startswith(
+            "worker_unavailable:"
+        ):
+            state = runtime.runs.resume_stage(
+                lead_id,
+                state.current_stage_id or "prepare_blueprint_lite",
+                state.input_payload.keys(),
+            )
         stage_id = state.current_stage_id or "prepare_blueprint_lite"
         runtime.runs.start_stage(lead_id, stage_id)
         runtime.runs.record_attempt(
@@ -610,6 +619,48 @@ class TonyInboundBlueprintLiteService:
             lead_id,
             "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
         )
+
+    def _persist_generic_initial_workflow(self, record: Mapping[str, Any]) -> None:
+        """Expose queued and blocked inbound work through the canonical runtime.
+
+        The preparation store owns the model-dispatch attempt, while the generic
+        runtime is the source Tony and Mission Control query. Persisting the run
+        immediately prevents an unavailable worker from making a real lead look
+        as though no workflow exists.
+        """
+        if self.workflow_runtime_root is None:
+            return
+        from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+
+        lead_id = str(record.get("lead_id") or "").strip()
+        runtime = build_tony_workflow_runtime(
+            self.workflow_runtime_root,
+            workspace_id="narratiive",
+            client_id=lead_id,
+            dispatchers=self.dispatchers,
+        )
+        state = runtime.coordinator.enqueue(
+            BLUEPRINT_LITE_WORKFLOW.workflow_id,
+            lead_id,
+            {
+                "diagnostic_input_package": dict(record.get("diagnostic_input_package") or {}),
+                "company": str(record.get("company") or ""),
+                "contact": str(record.get("contact") or ""),
+                "email": str(record.get("email") or ""),
+            },
+            entity_id=lead_id,
+            correlation_id=lead_id,
+        )
+        if (
+            record.get("state") == "dispatcher_unavailable"
+            and state.status.value != "blocked"
+        ):
+            runtime.runs.block_for_reason(
+                lead_id,
+                state.current_stage_id or "prepare_blueprint_lite",
+                "worker_unavailable:strategic_reasoning",
+                "Configure an eligible strategic-reasoning worker before dispatch.",
+            )
 
     def status(self, lead_id: str) -> dict[str, Any] | None:
         state = self.store.get(lead_id)
