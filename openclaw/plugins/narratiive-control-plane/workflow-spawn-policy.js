@@ -1,5 +1,3 @@
-const FAILURE_TTL_MS = 10 * 60 * 1000;
-
 function payloadFromResult(result) {
   if (result?.details && typeof result.details === "object") return result.details;
   const content = Array.isArray(result?.content) ? result.content : [];
@@ -22,12 +20,10 @@ export function failedCommissionEvidence(result, now = Date.now()) {
   };
 }
 
-export function blocksSpecialistSpawn(record, now = Date.now()) {
-  return Boolean(
-    record
-    && Number.isFinite(record.failedAt)
-    && now - record.failedAt >= 0
-    && now - record.failedAt <= FAILURE_TTL_MS
-  );
+export function retainFailedCommission(existing, result, now = Date.now()) {
+  return failedCommissionEvidence(result, now) || existing || null;
 }
 
+export function blocksSpecialistSpawn(record) {
+  return Boolean(record && Number.isFinite(record.failedAt));
+}

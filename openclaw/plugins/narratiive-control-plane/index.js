@@ -5,7 +5,7 @@ import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 import { resolveBridgeToken } from "./bridge-auth.js";
 import { buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
-import { blocksSpecialistSpawn, failedCommissionEvidence } from "./workflow-spawn-policy.js";
+import { blocksSpecialistSpawn, retainFailedCommission } from "./workflow-spawn-policy.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
@@ -308,9 +308,8 @@ export default definePluginEntry({
       ) return;
       const runId = String(ctx?.runId || event.runId || "").trim();
       if (!runId) return;
-      const failure = failedCommissionEvidence(event.result);
+      const failure = retainFailedCommission(failedCommissionRuns.get(runId), event.result);
       if (failure) failedCommissionRuns.set(runId, failure);
-      else failedCommissionRuns.delete(runId);
       while (failedCommissionRuns.size > 256) failedCommissionRuns.delete(failedCommissionRuns.keys().next().value);
     });
     api.on("before_tool_call", async (event, ctx) => {

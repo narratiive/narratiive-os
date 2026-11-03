@@ -17,7 +17,7 @@ class OpenClawWorkflowSpawnPolicyTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         script = (
-            f'import {{ blocksSpecialistSpawn, failedCommissionEvidence }} from {json.dumps(POLICY.as_uri())}; '
+            f'import {{ blocksSpecialistSpawn, failedCommissionEvidence, retainFailedCommission }} from {json.dumps(POLICY.as_uri())}; '
             f"console.log(JSON.stringify({expression}));"
         )
         completed = subprocess.run([node, "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
@@ -35,13 +35,20 @@ class OpenClawWorkflowSpawnPolicyTests(unittest.TestCase):
         )
         self.assertIsNone(result)
 
-    def test_stale_failure_does_not_block_future_turn(self) -> None:
+    def test_long_running_same_run_remains_blocked(self) -> None:
         result = self._node_json(
             "blocksSpecialistSpawn({failedAt:1000,reason:'blocked'}, 1000 + 11*60*1000)"
         )
-        self.assertFalse(result)
+        self.assertTrue(result)
+
+    def test_unrelated_success_does_not_clear_prior_failure_in_same_run(self) -> None:
+        result = self._node_json(
+            "blocksSpecialistSpawn(retainFailedCommission("
+            "failedCommissionEvidence({details:{ok:false,message:'workflow A failed'}}, 1000),"
+            "{details:{ok:true,data:{commissioned:true}}}, 2000))"
+        )
+        self.assertTrue(result)
 
 
 if __name__ == "__main__":
     unittest.main()
-
