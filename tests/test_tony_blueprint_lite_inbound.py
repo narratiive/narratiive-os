@@ -245,6 +245,71 @@ class TonyInboundBlueprintLiteTests(unittest.TestCase):
             self.assertEqual(len(states[0].stage("prepare_blueprint_lite").output_artifacts), 1)
             self.assertFalse(states[0].external_action_taken)
 
+    def test_quality_failure_blocks_the_same_canonical_runtime(self) -> None:
+        evidence = self._good_evidence()
+        evidence["quality_gate"] = {"human_review_ready": False}
+        evidence["recommendation"] = "revise"
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: evidence},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+
+            result = service.process("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+
+            self.assertEqual(result["state"], "blocked")
+            self.assertEqual(result["blocker"], "blueprint_lite_quality_gate")
+            self.assertEqual(len(states), 1)
+            self.assertEqual(states[0].status.value, "blocked")
+            self.assertEqual(states[0].blocker, "blueprint_lite_quality_gate")
+
+    def test_revised_diagnostic_uses_new_canonical_run_without_partial_mutation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            store = FileBlueprintLitePreparationStore(root / "blueprint-lite.json")
+            service = TonyInboundBlueprintLiteService(
+                store,
+                dispatchers={"Claude": lambda dispatch: self._good_evidence()},
+                workflow_runtime_root=root / "workflow-runtime",
+            )
+            service.enqueue(self._lead(), self._payload())
+            first = store.get("lead-1")
+
+            revised = self._payload()
+            revised["diagnostic"]["challenge"] = "Revised positioning challenge"
+            result = service.enqueue(self._lead(), revised)
+            current = store.get("lead-1")
+            states = FileWorkflowCommandBackend(
+                root / "workflow-runtime", dispatchers={}, environ={}
+            ).list_states()
+
+            self.assertEqual(result["state"], "preparation_queued")
+            self.assertEqual(first["canonical_run_id"], "lead-1")
+            self.assertTrue(current["canonical_run_id"].startswith("lead-1--revision-"))
+            self.assertNotEqual(current["canonical_run_id"], first["canonical_run_id"])
+            self.assertEqual(
+                current["diagnostic_input_package"]["diagnostic"]["challenge"],
+                "Revised positioning challenge",
+            )
+            self.assertEqual(len(states), 2)
+            by_id = {state.run_id: state for state in states}
+            self.assertEqual(
+                by_id["lead-1"].input_payload["diagnostic_input_package"],
+                first["diagnostic_input_package"],
+            )
+            self.assertEqual(
+                by_id[current["canonical_run_id"]].input_payload["diagnostic_input_package"],
+                current["diagnostic_input_package"],
+            )
+
     def test_camel_case_transport_fields_are_canonicalised_without_losing_computed_diagnostic_inputs(self) -> None:
         payload = self._payload()
         payload["diagnostic"] = {

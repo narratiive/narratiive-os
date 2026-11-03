@@ -209,6 +209,7 @@ class TonyInboundBlueprintLiteService:
 
         state: dict[str, Any] = {
             "lead_id": lead.lead_id,
+            "canonical_run_id": _canonical_run_id(lead.lead_id, fingerprint, revised=existing is not None),
             "contact": lead.contact,
             "company": lead.company,
             "email": lead.email,
@@ -243,8 +244,8 @@ class TonyInboundBlueprintLiteService:
             state["state"] = "dispatcher_unavailable"
             state["blocker"] = "claude_dispatcher_not_configured"
             state["workflow_run"] = workflow_to_dict(workflow)
-        self.store.put(lead.lead_id, state)
         self._persist_generic_initial_workflow(state)
+        self.store.put(lead.lead_id, state)
         return self._public_state(state)
 
     def enqueue_and_start(self, lead: InboundLead, raw_payload: Mapping[str, Any]) -> dict[str, Any]:
@@ -318,6 +319,11 @@ class TonyInboundBlueprintLiteService:
                 }
             )
             state["workflow_run"] = workflow_to_dict(workflow)
+            self._block_generic_workflow(
+                state,
+                "worker_unavailable:strategic_reasoning",
+                "Configure an eligible strategic-reasoning worker before dispatch.",
+            )
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -339,6 +345,11 @@ class TonyInboundBlueprintLiteService:
                     "blocker": "diagnostic_input_package_missing",
                     "updated_at": _now(),
                 }
+            )
+            self._block_generic_workflow(
+                state,
+                "diagnostic_input_package_missing",
+                "Restore the canonical diagnostic input package before retrying this workflow step.",
             )
             self.store.put(lead_id, state)
             return self._public_state(state)
@@ -403,6 +414,11 @@ class TonyInboundBlueprintLiteService:
                 }
             )
             state["workflow_run"] = workflow_to_dict(workflow)
+            self._block_generic_workflow(
+                state,
+                "unsafe_or_invalid_dispatch_contract",
+                "Resolve the worker routing contract before retrying this workflow step.",
+            )
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -436,6 +452,11 @@ class TonyInboundBlueprintLiteService:
                 }
             )
             state["workflow_run"] = workflow_to_dict(workflow)
+            self._block_generic_workflow(
+                state,
+                "claude_dispatch_failed",
+                "Inspect the persisted attempt evidence before retrying the worker.",
+            )
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -460,6 +481,11 @@ class TonyInboundBlueprintLiteService:
                 }
             )
             state["workflow_run"] = workflow_to_dict(workflow)
+            self._block_generic_workflow(
+                state,
+                "claude_evidence_unverified",
+                "Inspect the returned worker evidence and resolve the verification failure.",
+            )
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -495,6 +521,11 @@ class TonyInboundBlueprintLiteService:
                 }
             )
             state["workflow_run"] = workflow_to_dict(workflow)
+            self._block_generic_workflow(
+                state,
+                "blueprint_lite_quality_gate",
+                "Revise the worker output against the failed quality checks before progression.",
+            )
             self.store.put(lead_id, state)
             return self._public_state(state)
 
@@ -527,6 +558,17 @@ class TonyInboundBlueprintLiteService:
                     "workflow_run": workflow_to_dict(workflow),
                 }
             )
+            try:
+                self._block_generic_workflow(
+                    state,
+                    "workflow_runtime_persistence_failed",
+                    "Repair durable generic workflow persistence before human review.",
+                )
+            except Exception:
+                # The canonical runtime is the component that failed here. Keep
+                # the intake record truthfully blocked without replacing the
+                # original, non-secret failure class recorded above.
+                pass
             self.store.put(lead_id, state)
             return self._public_state(state)
         artifact_content = json.dumps(evidence, sort_keys=True, default=str)
@@ -572,6 +614,7 @@ class TonyInboundBlueprintLiteService:
         from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 
         lead_id = str(record.get("lead_id") or "").strip()
+        run_id = str(record.get("canonical_run_id") or lead_id).strip()
         runtime = build_tony_workflow_runtime(
             self.workflow_runtime_root,
             workspace_id="narratiive",
@@ -586,7 +629,7 @@ class TonyInboundBlueprintLiteService:
         }
         state = runtime.coordinator.enqueue(
             BLUEPRINT_LITE_WORKFLOW.workflow_id,
-            lead_id,
+            run_id,
             inputs,
             entity_id=lead_id,
             correlation_id=lead_id,
@@ -597,26 +640,26 @@ class TonyInboundBlueprintLiteService:
             "worker_unavailable:"
         ):
             state = runtime.runs.resume_stage(
-                lead_id,
+                run_id,
                 state.current_stage_id or "prepare_blueprint_lite",
                 state.input_payload.keys(),
             )
         stage_id = state.current_stage_id or "prepare_blueprint_lite"
-        runtime.runs.start_stage(lead_id, stage_id)
+        runtime.runs.start_stage(run_id, stage_id)
         runtime.runs.record_attempt(
-            lead_id,
+            run_id,
             stage_id,
             {"status": "returned", "source": "blueprint_lite_live_inbound"},
         )
-        runtime.runs.record_quality(lead_id, stage_id, quality)
-        current = runtime.runs.load_run(lead_id)
+        runtime.runs.record_quality(run_id, stage_id, quality)
+        current = runtime.runs.load_run(run_id)
         artifact = runtime.coordinator.artifacts.persist(current, stage_id, evidence)
         required = current.stage(stage_id).expected_outputs
         durable_outputs = {field: evidence[field] for field in required}
-        runtime.runs.merge_inputs(lead_id, durable_outputs)
-        runtime.runs.complete_stage(lead_id, stage_id, (artifact,), durable_outputs.keys())
+        runtime.runs.merge_inputs(run_id, durable_outputs)
+        runtime.runs.complete_stage(run_id, stage_id, (artifact,), durable_outputs.keys())
         runtime.runs.pause_for_approval(
-            lead_id,
+            run_id,
             "Authorised human reviews the Blueprint Lite before any client-facing use or Discovery handoff.",
         )
 
@@ -633,6 +676,7 @@ class TonyInboundBlueprintLiteService:
         from runtime.tony_workflow_runtime import build_tony_workflow_runtime
 
         lead_id = str(record.get("lead_id") or "").strip()
+        run_id = str(record.get("canonical_run_id") or lead_id).strip()
         runtime = build_tony_workflow_runtime(
             self.workflow_runtime_root,
             workspace_id="narratiive",
@@ -641,7 +685,7 @@ class TonyInboundBlueprintLiteService:
         )
         state = runtime.coordinator.enqueue(
             BLUEPRINT_LITE_WORKFLOW.workflow_id,
-            lead_id,
+            run_id,
             {
                 "diagnostic_input_package": dict(record.get("diagnostic_input_package") or {}),
                 "company": str(record.get("company") or ""),
@@ -656,11 +700,38 @@ class TonyInboundBlueprintLiteService:
             and state.status.value != "blocked"
         ):
             runtime.runs.block_for_reason(
-                lead_id,
+                run_id,
                 state.current_stage_id or "prepare_blueprint_lite",
                 "worker_unavailable:strategic_reasoning",
                 "Configure an eligible strategic-reasoning worker before dispatch.",
             )
+
+    def _block_generic_workflow(
+        self,
+        record: Mapping[str, Any],
+        blocker: str,
+        next_action: str,
+    ) -> None:
+        """Keep Tony and Mission Control aligned with a failed intake attempt."""
+        if self.workflow_runtime_root is None:
+            return
+        from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+
+        lead_id = str(record.get("lead_id") or "").strip()
+        run_id = str(record.get("canonical_run_id") or lead_id).strip()
+        runtime = build_tony_workflow_runtime(
+            self.workflow_runtime_root,
+            workspace_id="narratiive",
+            client_id=lead_id,
+            dispatchers=self.dispatchers,
+        )
+        state = runtime.runs.load_run(run_id)
+        stage_id = state.current_stage_id or "prepare_blueprint_lite"
+        if state.status.value == "blocked":
+            if state.blocker == blocker:
+                return
+            state = runtime.runs.resume_stage(run_id, stage_id, state.input_payload.keys())
+        runtime.runs.block_for_reason(run_id, stage_id, blocker, next_action)
 
     def status(self, lead_id: str) -> dict[str, Any] | None:
         state = self.store.get(lead_id)
@@ -752,6 +823,13 @@ class TonyInboundBlueprintLiteService:
 def _fingerprint(payload: Mapping[str, Any]) -> str:
     encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
     return hashlib.sha256(encoded).hexdigest()
+
+
+def _canonical_run_id(lead_id: str, fingerprint: str, *, revised: bool) -> str:
+    """Give changed submissions an immutable canonical workflow identity."""
+    if not revised:
+        return lead_id
+    return f"{lead_id}--revision-{fingerprint[:12]}"
 
 
 def _workflow_from_record(record: Mapping[str, Any]):
