@@ -17,7 +17,7 @@ class OpenClawWorkflowSpawnPolicyTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         script = (
-            f'import {{ blocksSpecialistSpawn, failedCommissionEvidence, retainFailedCommission }} from {json.dumps(POLICY.as_uri())}; '
+            f'import {{ blocksSpecialistSpawn, failedCommissionEvidence, hookRunKey, retainFailedCommission }} from {json.dumps(POLICY.as_uri())}; '
             f"console.log(JSON.stringify({expression}));"
         )
         completed = subprocess.run([node, "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
@@ -48,6 +48,16 @@ class OpenClawWorkflowSpawnPolicyTests(unittest.TestCase):
             "{details:{ok:true,data:{commissioned:true}}}, 2000))"
         )
         self.assertTrue(result)
+
+    def test_session_key_is_fail_closed_fallback_when_run_id_is_absent(self) -> None:
+        result = self._node_json("hookRunKey({}, {sessionKey:'agent:tony:fallback'})")
+        self.assertEqual(result, "agent:tony:fallback")
+
+    def test_plugin_cleans_guard_only_when_agent_run_ends(self) -> None:
+        source = (POLICY.parent / "index.js").read_text(encoding="utf-8")
+        self.assertIn('api.on("agent_end"', source)
+        self.assertIn("failedCommissionRuns.delete(runId)", source)
+        self.assertNotIn("while (failedCommissionRuns.size", source)
 
 
 if __name__ == "__main__":

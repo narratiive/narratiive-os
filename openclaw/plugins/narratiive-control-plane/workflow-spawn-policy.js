@@ -11,6 +11,10 @@ function payloadFromResult(result) {
   }
 }
 
+export function hookRunKey(event, context) {
+  return String(context?.runId || event?.runId || context?.sessionKey || "").trim();
+}
+
 export function failedCommissionEvidence(result, now = Date.now()) {
   const payload = payloadFromResult(result);
   if (payload.ok === true && payload?.data?.commissioned === true) return null;

@@ -5,7 +5,7 @@ import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 import { resolveBridgeToken } from "./bridge-auth.js";
 import { buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
-import { blocksSpecialistSpawn, retainFailedCommission } from "./workflow-spawn-policy.js";
+import { blocksSpecialistSpawn, hookRunKey, retainFailedCommission } from "./workflow-spawn-policy.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
 const DEFAULT_CONTROL_PLANE_TIMEOUT_MS = 8000;
@@ -295,26 +295,30 @@ export default definePluginEntry({
     const trustedTurns = new Map();
     const failedCommissionRuns = new Map();
     const rememberTrustedTurn = (event, ctx) => {
-      const runId = String(ctx?.runId || "").trim();
+      const runId = hookRunKey(event, ctx);
       if (!runId || typeof event?.prompt !== "string") return;
       trustedTurns.set(runId, { runId, prompt: event.prompt, recordedAt: Date.now() });
-      while (trustedTurns.size > 256) trustedTurns.delete(trustedTurns.keys().next().value);
     };
     api.on("before_agent_run", rememberTrustedTurn);
+    api.on("agent_end", async (event, ctx) => {
+      const runId = hookRunKey(event, ctx);
+      if (!runId) return;
+      trustedTurns.delete(runId);
+      failedCommissionRuns.delete(runId);
+    });
     api.on("after_tool_call", async (event, ctx) => {
       if (
         event.toolName !== "narratiive_workflow_control"
         || String(event.params?.operation || "").toLowerCase() !== "commission"
       ) return;
-      const runId = String(ctx?.runId || event.runId || "").trim();
+      const runId = hookRunKey(event, ctx);
       if (!runId) return;
       const failure = retainFailedCommission(failedCommissionRuns.get(runId), event.result);
       if (failure) failedCommissionRuns.set(runId, failure);
-      while (failedCommissionRuns.size > 256) failedCommissionRuns.delete(failedCommissionRuns.keys().next().value);
     });
     api.on("before_tool_call", async (event, ctx) => {
       if (event.toolName === "sessions_spawn") {
-        const runId = String(ctx?.runId || event.runId || "").trim();
+        const runId = hookRunKey(event, ctx);
         const failure = failedCommissionRuns.get(runId);
         if (blocksSpecialistSpawn(failure)) {
           return {
@@ -324,7 +328,7 @@ export default definePluginEntry({
         }
       }
       if (event.toolName === "narratiive_workflow_control" && (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase()) || String(event.params?.operation || "").toLowerCase() === "classify_synthetic_test")) {
-        const runId = String(ctx?.runId || event.runId || "").trim();
+        const runId = hookRunKey(event, ctx);
         const trustedTurn = trustedTurns.get(runId);
         if (!trustedTurn || Date.now() - trustedTurn.recordedAt > 10 * 60 * 1000) {
           return { block: true, blockReason: "Workflow artefact decision requires a current trusted human turn." };

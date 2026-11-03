@@ -52,6 +52,16 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
         )
         self.assertEqual(claims, [])
 
+    def test_blocked_workflow_detects_underway_started_and_begun_variants(self) -> None:
+        state = [{"status": "blocked", "blocker": "worker_unavailable:strategic_reasoning"}]
+        for response in (
+            "The work is underway.",
+            "Ready — I have started the preparation.",
+            "The preparation has begun.",
+        ):
+            with self.subTest(response=response):
+                self.assertTrue(_blocked_progress_claims(state, [Turn("Start it", response, "now")]))
+
     def test_turn_routes_through_tony_while_sandbox_config_selects_local_model(self) -> None:
         response = mock.MagicMock()
         response.read.return_value = b'{"id":"response-1","output_text":"Ready"}'
