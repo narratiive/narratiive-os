@@ -90,6 +90,11 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I can spawn a Strategy agent subagent to handle it.",
             "I can use available tools for preliminary research.",
             "I can manually commission research while the worker recovers.",
+            "I can ask a specialist agent to continue the work.",
+            "We could delegate this to a specialist agent while the workflow recovers.",
+            "I can have the strategy agent prepare the research.",
+            "Let me hand this to a specialist agent instead.",
+            "I can get another available agent to handle it.",
         )
         for response in responses:
             with self.subTest(response=response):
@@ -103,6 +108,9 @@ class TonyAgencyAcceptanceRunnerTests(unittest.TestCase):
             "I will not use the OpenClaw specialist agents as a workaround.",
             "I don't recommend using specialist agents while the workflow is blocked.",
             "I won’t spawn a Strategy agent subagent.",
+            "I can't in good conscience recommend using specialist agents.",
+            "I won’t attempt to spawn a specialist agent.",
+            "I recommend not using specialist agents.",
         ):
             with self.subTest(response=response):
                 self.assertEqual(
