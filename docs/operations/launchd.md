@@ -1,11 +1,21 @@
 # Narratiive OS launchd installation
 
-The repository can install three per-user macOS LaunchAgents:
+The repository installer defines eight per-user macOS LaunchAgents:
 
 - `com.narratiive.runtime` — authenticated Narratiive runtime gateway;
 - `com.narratiive.tony-http-bridge` — Tony HTTP bridge for n8n and Telegram;
 - `com.narratiive.tony-conversation-worker` — durable long-running Tony work and correlated Telegram follow-up;
 - `com.narratiive.service-supervisor` — health check and narrow recovery every 60 seconds.
+- `com.narratiive.proactive-watch` — escalation check every 900 seconds, without a send on load;
+- `com.narratiive.gmail-inbox-watch` — inbox check on load and every 900 seconds;
+- `com.narratiive.proactive-morning` — morning brief at 08:00 local machine time;
+- `com.narratiive.proactive-evening` — evening brief at 18:00 local machine time.
+
+The conversation worker uses `KeepAlive` and `RunAtLoad`; it polls continuously,
+not on a calendar schedule. It advances commissioned internal work through the
+existing coordinator and stops at the human gate. An in-flight commitment is
+left with that coordinator while later ready commitments remain eligible.
+This is queue fairness, not recovery of an abandoned running stage.
 
 ## Secure environment file
 
@@ -167,21 +177,16 @@ Run it directly for a manual or externally triggered send:
 ```
 
 `--mode both` (the default) runs the brief and the escalation check in one
-invocation, which is the intended shape for a scheduled trigger. To schedule
-it with launchd, add a fourth per-user LaunchAgent with a fixed
-`StartCalendarInterval` (for example `{"Hour": 8, "Minute": 0}` and
-`{"Hour": 18, "Minute": 0}` as two array entries for morning and evening)
-running:
+invocation. The installer already defines separate morning and evening
+`StartCalendarInterval` agents. Do not add a duplicate calendar agent. Their
+commands use the external environment loader, for example:
 
 ```text
 scripts/run_with_env.py <env-file> <python> scripts/run_proactive_brief.py --mode both --command morning
 ```
 
-This is deliberately not wired into `scripts/install_launch_agents.py` yet:
-the existing installer's three agents are covered by
-`tests/test_launchd_installer.py` and installing a fourth agent changes what
-runs unattended on Matt's machine, which should be a separate, explicit
-decision once the delivery cadence is confirmed. Use
+The eight definitions and their cadence are covered by
+`tests/test_launchd_installer.py`. Calendar briefs do not run at load. Use
 `--simulate-transport-failure` only for smoke validation; it forces a
 transient send failure so the bounded-retry and fail-closed path can be
 observed without waiting for a real outage.
@@ -209,6 +214,7 @@ Logs are written to:
 ```bash
 launchctl print "gui/$(id -u)/com.narratiive.runtime"
 launchctl print "gui/$(id -u)/com.narratiive.tony-http-bridge"
+launchctl print "gui/$(id -u)/com.narratiive.tony-conversation-worker"
 curl -fsS http://127.0.0.1:8787/health
 curl -fsS http://127.0.0.1:8790/health
 ```
@@ -216,6 +222,19 @@ curl -fsS http://127.0.0.1:8790/health
 The same Tony bridge serves the private read-only Mission Control interface at
 `http://127.0.0.1:8790/mission-control`; see
 [`MISSION_CONTROL.md`](MISSION_CONTROL.md) for operator and security guidance.
+
+A healthy HTTP bridge does not prove that the separate conversation worker is
+running. On the canonical Mac checkout, inspect the worker's launchctl state
+and its error log as well. Verify that `TONY_WORKFLOW_RUNTIME_ROOT` matches the
+bridge configuration and that the executive workspace resolves to the same
+registered client tenant. Never print the secure environment file or tokens.
+Then observe an already authorised commitment through the public workflow
+status command: ready, a recorded attempt, immutable output, and pending human
+review. Do not manufacture a new client commission as a scheduler probe.
+
+Repository tests prove definitions and behaviour with fixtures. Only a live
+Mac observation can establish that launchd loaded these definitions and that
+the worker sees the intended persisted run.
 
 ## Uninstall
 

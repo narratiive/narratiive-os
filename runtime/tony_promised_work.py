@@ -27,6 +27,7 @@ class TonyPromisedWorkWorker:
                 for state in self.backend.list_states()
                 if isinstance(state.input_payload.get("_promised_work"), Mapping)
                 and not state.promised_work_delivery
+                and not self._already_running(state)
             ),
             key=lambda state: (state.created_at, state.run_id),
         )
@@ -83,6 +84,16 @@ class TonyPromisedWorkWorker:
                 "work_complete" if link else "review_delivery_blocked",
             )
         return state
+
+    @staticmethod
+    def _already_running(state: WorkflowState) -> bool:
+        # Leave in-flight work with its coordinator, but do not let it hide
+        # later ready commitments or spin the polling loop without work.
+        return (
+            state.status.value == "active"
+            and state.current_stage_id is not None
+            and state.stage(state.current_stage_id).status.value == "running"
+        )
 
     def _deliver_once(self, state: WorkflowState, message: str, kind: str) -> WorkflowState:
         marker = state.input_payload.get("_promised_work", {})
