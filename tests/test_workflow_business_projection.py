@@ -78,7 +78,10 @@ class WorkflowBusinessProjectionTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             service = WorkflowBusinessProjectionService(tmp, lambda dispatch: calls.append(dispatch) or {})
             current = state()
-            current.input_payload = {}
+            current.input_payload = {
+                "lead_id": "11111111-1111-1111-1111-111111111111",
+            }
+            current.entity_id = "22222222-2222-2222-2222-222222222222"
             missing = service.sync(current, approver="telegram:123", rationale="SAFE missing identity")
             missing_key = missing["projection_key"]
             current.input_payload["notion_page_id"] = "40d0c9cf-a8f2-810f-b599-d478255f11e4"

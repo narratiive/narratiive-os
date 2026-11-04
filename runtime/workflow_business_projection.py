@@ -239,8 +239,6 @@ def _notion_record_id(state: WorkflowState) -> str:
     candidates = (
         state.input_payload.get("notion_page_id"),
         state.input_payload.get("notion_record_id"),
-        state.input_payload.get("lead_id"),
-        state.entity_id,
     )
     for value in candidates:
         identity = str(value or "").strip()
