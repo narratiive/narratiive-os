@@ -158,6 +158,7 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
                 {
                     "diagnostic_evidence": {"source": "approved manual recovery"},
                     "company_context": {"name": "TEST / FICTIONAL — Origin Coffee"},
+                    "notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
                 },
                 commitment_id="origin-discovery-after-recovery-v1",
             )
@@ -214,6 +215,7 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
                 {
                     "diagnostic_evidence": {"source": "approved manual recovery"},
                     "company_context": {"name": "TEST / FICTIONAL — Origin Coffee"},
+                    "notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
                 },
                 commitment_id="origin-discovery-after-recovery-v1",
             )
