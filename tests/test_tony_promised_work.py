@@ -247,6 +247,59 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(len(self.gmail_calls), 1)
         self.assertEqual(len(self.telegram_messages), 1)
 
+    def test_worker_retries_quality_passed_persistence_failure_and_recovers_without_reexecution(self) -> None:
+        specialist_calls = []
+
+        def claude(contract):
+            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                specialist_calls.append("proposal")
+                return proposal_output()
+            return blueprint_output()
+
+        dispatchers = self._dispatchers()
+        dispatchers["Claude"] = claude
+        state, _, _ = self._commission(dispatchers)
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        # Reproduce the persisted legacy commission shape that caused the live
+        # Origin proposal's accepted evidence_lineage output to collide.
+        interrupted_input = runtime.runs.load_run(state.run_id)
+        interrupted_input.input_payload["evidence_lineage"] = ["inherited-discovery-evidence"]
+        runtime.runs.repository.save(interrupted_input)
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+
+        failed = TonyPromisedWorkWorker(backend, self._sender).run_once()
+        recovered = TonyPromisedWorkWorker(backend, self._sender).run_once()
+        replay = TonyPromisedWorkWorker(backend, self._sender).run_once()
+
+        self.assertEqual(failed.status.value, "active")
+        self.assertEqual(failed.promised_work_delivery["kind"], "worker_failure")
+        self.assertEqual(recovered.status.value, "awaiting_approval")
+        self.assertEqual(recovered.promised_work_delivery["kind"], "gate_ready")
+        self.assertEqual(
+            recovered.promised_work_delivery["supersedes_kind"],
+            "worker_failure",
+        )
+        self.assertEqual(specialist_calls, ["proposal"])
+        self.assertEqual(
+            len(recovered.stage("prepare_growth_sprint_proposal").output_artifacts),
+            1,
+        )
+        self.assertEqual(len(self.gmail_calls), 1)
+        self.assertEqual(len(self.telegram_messages), 2)
+        self.assertIsNone(replay)
+
     def test_ambiguous_telegram_send_is_not_blindly_retried_after_restart(self) -> None:
         _, _, dispatchers = self._commission()
         backend = FileWorkflowCommandBackend(

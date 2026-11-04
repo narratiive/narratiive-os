@@ -39,7 +39,11 @@ class TonyPromisedWorkWorker:
                 # A RUNNING step is already owned by the canonical coordinator.
                 # Calling advance again would convert an interrupted/in-flight
                 # provider request into a false workflow_step_not_ready blocker.
-                if current is not None and current.status.value == "running":
+                if (
+                    current is not None
+                    and current.status.value == "running"
+                    and not self._quality_passed_recovery_pending(state)
+                ):
                     return state
                 state = self.backend.advance(state)
         except Exception as exc:
@@ -92,7 +96,23 @@ class TonyPromisedWorkWorker:
         return (
             delivery.get("status") == "delivered"
             and delivery.get("kind") in {"worker_failure", "work_failed"}
-            and state.status.value in {"awaiting_approval", "complete"}
+            and (
+                state.status.value in {"awaiting_approval", "complete"}
+                or TonyPromisedWorkWorker._quality_passed_recovery_pending(state)
+            )
+        )
+
+    @staticmethod
+    def _quality_passed_recovery_pending(state: WorkflowState) -> bool:
+        if state.status.value != "active" or not state.current_stage_id:
+            return False
+        stage = state.stage(state.current_stage_id)
+        return (
+            stage.status.value == "running"
+            and isinstance(stage.quality_result, Mapping)
+            and stage.quality_result.get("passed") is True
+            and bool(stage.attempts)
+            and stage.attempts[-1].get("quality_passed") is True
         )
 
     def _deliver_once(self, state: WorkflowState, message: str, kind: str) -> WorkflowState:
