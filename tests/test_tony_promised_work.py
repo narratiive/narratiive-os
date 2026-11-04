@@ -300,6 +300,56 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(len(self.telegram_messages), 2)
         self.assertIsNone(replay)
 
+    def test_restart_recovery_keeps_quality_passed_orphan_eligible_without_reexecution(self) -> None:
+        specialist_calls = []
+
+        def claude(contract):
+            workflow_id = contract.get("target", {}).get("workflow_context", {}).get("workflow_id")
+            if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+                specialist_calls.append("proposal")
+                return proposal_output()
+            return blueprint_output()
+
+        dispatchers = self._dispatchers()
+        dispatchers["Claude"] = claude
+        state, _, _ = self._commission(dispatchers)
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        interrupted_input = runtime.runs.load_run(state.run_id)
+        interrupted_input.input_payload["evidence_lineage"] = ["inherited-discovery-evidence"]
+        runtime.runs.repository.save(interrupted_input)
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+
+        failed = TonyPromisedWorkWorker(backend, self._sender).run_once()
+        recovered_count = runtime.coordinator.recover_pending()
+        after_restart = runtime.runs.load_run(state.run_id)
+        self.assertTrue(TonyPromisedWorkWorker._quality_passed_recovery_pending(after_restart))
+        recovered = TonyPromisedWorkWorker(backend, self._sender).run_once()
+
+        self.assertEqual(failed.promised_work_delivery["kind"], "worker_failure")
+        self.assertEqual(recovered_count, 1)
+        self.assertEqual(
+            after_restart.stage("prepare_growth_sprint_proposal").status.value,
+            "ready",
+        )
+        self.assertEqual(recovered.status.value, "awaiting_approval")
+        self.assertEqual(recovered.promised_work_delivery["kind"], "gate_ready")
+        self.assertEqual(specialist_calls, ["proposal"])
+        self.assertEqual(
+            len(recovered.stage("prepare_growth_sprint_proposal").output_artifacts),
+            1,
+        )
+
     def test_tampered_recovery_does_not_resend_delivered_worker_failure(self) -> None:
         state, _, dispatchers = self._commission()
         runtime = build_tony_workflow_runtime(

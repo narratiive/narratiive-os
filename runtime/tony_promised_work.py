@@ -108,7 +108,10 @@ class TonyPromisedWorkWorker:
             return False
         stage = state.stage(state.current_stage_id)
         return (
-            stage.status.value == "running"
+            (
+                stage.status.value == "running"
+                or (stage.status.value == "ready" and stage.retry_count > 0)
+            )
             and isinstance(stage.quality_result, Mapping)
             and stage.quality_result.get("passed") is True
             and bool(stage.attempts)
