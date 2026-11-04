@@ -26,7 +26,7 @@ class TonyPromisedWorkWorker:
                 state
                 for state in self.backend.list_states()
                 if isinstance(state.input_payload.get("_promised_work"), Mapping)
-                and not state.promised_work_delivery
+                and self._delivery_required(state)
             ),
             key=lambda state: (state.created_at, state.run_id),
         )
@@ -39,7 +39,11 @@ class TonyPromisedWorkWorker:
                 # A RUNNING step is already owned by the canonical coordinator.
                 # Calling advance again would convert an interrupted/in-flight
                 # provider request into a false workflow_step_not_ready blocker.
-                if current is not None and current.status.value == "running":
+                if (
+                    current is not None
+                    and current.status.value == "running"
+                    and not self._quality_passed_recovery_pending(state)
+                ):
                     return state
                 state = self.backend.advance(state)
         except Exception as exc:
@@ -84,6 +88,33 @@ class TonyPromisedWorkWorker:
             )
         return state
 
+    @staticmethod
+    def _delivery_required(state: WorkflowState) -> bool:
+        delivery = state.promised_work_delivery
+        if not delivery:
+            return True
+        return (
+            delivery.get("status") == "delivered"
+            and delivery.get("kind") in {"worker_failure", "work_failed"}
+            and (
+                state.status.value in {"awaiting_approval", "complete"}
+                or TonyPromisedWorkWorker._quality_passed_recovery_pending(state)
+            )
+        )
+
+    @staticmethod
+    def _quality_passed_recovery_pending(state: WorkflowState) -> bool:
+        if state.status.value != "active" or not state.current_stage_id:
+            return False
+        stage = state.stage(state.current_stage_id)
+        return (
+            stage.status.value == "running"
+            and isinstance(stage.quality_result, Mapping)
+            and stage.quality_result.get("passed") is True
+            and bool(stage.attempts)
+            and stage.attempts[-1].get("quality_passed") is True
+        )
+
     def _deliver_once(self, state: WorkflowState, message: str, kind: str) -> WorkflowState:
         marker = state.input_payload.get("_promised_work", {})
         commitment_id = str(marker.get("commitment_id") or "") if isinstance(marker, Mapping) else ""
@@ -91,6 +122,12 @@ class TonyPromisedWorkWorker:
             f"{state.workspace_id}\0{state.run_id}\0{commitment_id}\0{kind}".encode("utf-8")
         ).hexdigest()
         state = self.backend.begin_promised_delivery(state, delivery_key=delivery_key, kind=kind)
+        current_delivery = state.promised_work_delivery
+        if (
+            current_delivery.get("delivery_key") == delivery_key
+            and current_delivery.get("status") == "delivered"
+        ):
+            return state
         # An attempting record is written before the provider call. A crash in
         # the narrow send/receipt window therefore becomes an explicit ambiguous
         # delivery instead of a blind replay and duplicate Telegram message.

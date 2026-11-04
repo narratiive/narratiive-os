@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import threading
 from contextlib import contextmanager
@@ -548,6 +549,8 @@ class WorkflowRunService:
         revision_outputs = set(stage.expected_outputs) if stage.revision_count > 0 and stage.output_artifacts else set()
         if conflicts and not set(conflicts).issubset(declared_refinements.union(revision_outputs)):
             raise ValueError(f"workflow output cannot overwrite existing inputs: {','.join(conflicts)}")
+        if all(state.input_payload.get(key) == value for key, value in outputs.items()):
+            return state
         state.input_payload.update(dict(outputs))
         state.touch()
         self._commit(
@@ -557,6 +560,83 @@ class WorkflowRunService:
                 "stage_id": stage_id,
                 "output_fields": sorted(outputs),
                 "revision_count": stage.revision_count,
+            },
+        )
+        return state
+
+    def reconcile_inherited_output_conflicts(
+        self,
+        run_id: str,
+        stage_id: str,
+        outputs: Mapping[str, object],
+        *,
+        artifact: ArtifactRef,
+    ) -> WorkflowState:
+        """Remove only output-only context that blocked an accepted output commit."""
+        state = self.repository.load(run_id)
+        stage = state.stage(stage_id)
+        if state.current_stage_id != stage_id or stage.status is not StageStatus.RUNNING:
+            raise ValueError("accepted output recovery requires the current interrupted stage")
+        if not isinstance(stage.quality_result, Mapping) or stage.quality_result.get("passed") is not True:
+            raise ValueError("accepted output recovery requires a persisted passing quality result")
+        if not stage.attempts or stage.attempts[-1].get("quality_passed") is not True:
+            raise ValueError("accepted output recovery requires a quality-approved worker attempt")
+        if not set(outputs).issubset(set(stage.expected_outputs)):
+            raise ValueError("accepted output recovery contains undeclared fields")
+        conflicts = sorted(
+            key
+            for key, value in outputs.items()
+            if key in state.input_payload and state.input_payload[key] != value
+        )
+        forbidden = set(conflicts).intersection(stage.required_inputs)
+        if forbidden:
+            raise ValueError("accepted output recovery cannot replace required inputs")
+        prior_hashes = {
+            key: hashlib.sha256(
+                json.dumps(
+                    state.input_payload[key], sort_keys=True, separators=(",", ":")
+                ).encode("utf-8")
+            ).hexdigest()
+            for key in conflicts
+        }
+        for key in conflicts:
+            state.input_payload.pop(key, None)
+        if conflicts:
+            state.touch()
+            self._commit(
+                state,
+                "workflow.inherited_output_conflicts_reconciled",
+                {
+                    "stage_id": stage_id,
+                    "artifact_id": artifact.artifact_id,
+                    "artifact_checksum": artifact.checksum,
+                    "removed_output_fields": conflicts,
+                    "prior_value_checksums": prior_hashes,
+                },
+            )
+        return state
+
+    def record_accepted_output_recovery(
+        self,
+        run_id: str,
+        stage_id: str,
+        artifact: ArtifactRef,
+    ) -> WorkflowState:
+        state = self.repository.load(run_id)
+        if any(
+            event.event_type == "stage.accepted_output_recovered"
+            and event.payload.get("stage_id") == stage_id
+            and event.payload.get("artifact_id") == artifact.artifact_id
+            for event in self.event_log.read(run_id)
+        ):
+            return state
+        self._commit(
+            state,
+            "stage.accepted_output_recovered",
+            {
+                "stage_id": stage_id,
+                "artifact_id": artifact.artifact_id,
+                "artifact_checksum": artifact.checksum,
             },
         )
         return state
@@ -949,15 +1029,30 @@ class WorkflowRunService:
             raise ValueError("promised delivery requires key and kind")
         existing = state.promised_work_delivery
         if existing:
-            if existing.get("delivery_key") != key:
+            if existing.get("delivery_key") == key:
+                return state
+            follow_up_allowed = (
+                existing.get("status") == "delivered"
+                and existing.get("kind") in {"worker_failure", "work_failed"}
+                and kind in {"gate_ready", "work_complete", "review_delivery_blocked"}
+                and state.status in {WorkflowStatus.AWAITING_APPROVAL, WorkflowStatus.COMPLETE}
+            )
+            if not follow_up_allowed:
                 raise ValueError("a different promised-work delivery is already recorded")
-            return state
         state.promised_work_delivery = {
             "delivery_key": key,
             "kind": kind.strip(),
             "status": "attempting",
             "started_at": datetime.now(timezone.utc).isoformat(),
             "evidence": {},
+            **(
+                {
+                    "supersedes_delivery_key": str(existing.get("delivery_key") or ""),
+                    "supersedes_kind": str(existing.get("kind") or ""),
+                }
+                if existing
+                else {}
+            ),
         }
         state.touch()
         self._commit(state, "promised_work.delivery_started", dict(state.promised_work_delivery))

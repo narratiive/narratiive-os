@@ -723,7 +723,8 @@ class TonyWorkflowRuntime:
             raise ValueError("workflow commission source artefact must be structured")
 
         target = self.coordinator.registry.resolve(target_id)
-        required = target.stages[0].input_contract.required_fields
+        target_stage = target.stages[0]
+        required = target_stage.input_contract.required_fields
         supplied = {**dict(source_output), **dict(additional_inputs)}
         supplied["_lineage"] = {
             "parent_workflow_id": source.workflow_id,
@@ -756,6 +757,13 @@ class TonyWorkflowRuntime:
                 "company": str(source.input_payload.get("company") or source.input_payload.get("company_name") or "").strip(),
                 "source_ref": f"workflow_run:{source.run_id}",
             }
+        # A commissioned run receives the source artefact as context, but fields
+        # owned by the target stage are not target inputs. Retaining them makes
+        # the accepted target output look like an unsafe input overwrite. This
+        # mirrors the canonical synchronous handoff boundary.
+        for field in target_stage.output_contract.required_fields:
+            if field not in required:
+                supplied.pop(field, None)
         missing = [field for field in required if field not in supplied or supplied[field] in (None, "", [], {})]
         if missing:
             raise ValueError(f"commissioned workflow requires additional inputs: {','.join(missing)}")
