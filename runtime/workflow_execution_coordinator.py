@@ -538,7 +538,10 @@ class WorkflowExecutionCoordinator:
         if not state.current_stage_id:
             return False, None
         stage = state.stage(state.current_stage_id)
-        if stage.status is not StageStatus.RUNNING:
+        if not (
+            stage.status is StageStatus.RUNNING
+            or (stage.status is StageStatus.READY and stage.retry_count > 0)
+        ):
             return False, None
         if not isinstance(stage.quality_result, Mapping) or stage.quality_result.get("passed") is not True:
             return False, None
@@ -565,6 +568,8 @@ class WorkflowExecutionCoordinator:
             stage.capability,
             side_effect=stage.side_effect_classification,
         )
+        if stage.status is StageStatus.READY:
+            state = self.runs.start_stage(state.run_id, stage.stage_id)
         return True, self._finalise_accepted_output(
             state=state,
             stage_definition=stage_definition,
