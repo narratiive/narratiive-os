@@ -10,7 +10,11 @@ from http import HTTPStatus
 from pathlib import Path
 
 from openclaw.telegram_inbound import TelegramInboundConfig, TelegramInboundService
-from openclaw.tony_live_bridge import LeadAwareTonyApplication, workflow_decision_proof_material
+from openclaw.tony_live_bridge import (
+    LeadAwareTonyApplication,
+    has_explicit_manual_recovery_intent,
+    workflow_decision_proof_material,
+)
 
 
 class FakeSender:
@@ -364,6 +368,7 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertFalse(call("different-entity")["ok"])
 
     def test_manual_recovery_uses_trusted_turn_proof_and_authorised_principal(self):
+        self.assertFalse(has_explicit_manual_recovery_intent("Is the workflow recovery still blocked?"))
         workflows = FakeWorkflowCommands()
         app = LeadAwareTonyApplication(
             FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),

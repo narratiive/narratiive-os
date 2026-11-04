@@ -117,6 +117,10 @@ _NEGATED_WORKFLOW_DECISION = re.compile(
     re.IGNORECASE,
 )
 _QUESTION_WORKFLOW_DECISION = re.compile(r"^\s*(?:can|could|should|would|may)\s+(?:i|we)\b", re.IGNORECASE)
+_QUESTION_MANUAL_RECOVERY = re.compile(
+    r"^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b",
+    re.IGNORECASE,
+)
 
 
 def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> bool:
@@ -145,7 +149,11 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
 
 def has_explicit_manual_recovery_intent(instruction: str) -> bool:
     text = str(instruction or "")
-    if not text.strip() or _QUESTION_WORKFLOW_DECISION.search(text):
+    if (
+        not text.strip()
+        or _QUESTION_MANUAL_RECOVERY.search(text)
+        or text.rstrip().endswith("?")
+    ):
         return False
     if re.search(r"\b(?:do\s+not|don't|dont|never)\s+(?:recover|resume)\b", text, re.IGNORECASE):
         return False

@@ -132,6 +132,14 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         )
         self.assertIn("refuses", self._node(expression))
 
+        question = dict(params, recovery_instruction="Is the workflow recovery still blocked?")
+        expression = (
+            "(()=>{try{buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(question)},{{runId:'conversation-turn-3',prompt:{json.dumps(question['recovery_instruction'])}}},'secret');return 'allowed'"
+            "}catch(error){return error.message}})()"
+        )
+        self.assertIn("not recovery authorisation", self._node(expression))
+
 
 if __name__ == "__main__":
     unittest.main()

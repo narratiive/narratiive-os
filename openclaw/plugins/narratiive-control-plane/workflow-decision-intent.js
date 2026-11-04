@@ -6,6 +6,7 @@ const MANUAL_RECOVERY_OPERATION = "manual_recovery";
 const TARGET_PATTERN = /\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|creative(?:\s+director(?:'s|’s))?\s+bible|proposal|version|current\s+work)\b/i;
 const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b/i;
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
+const RECOVERY_QUESTION_PATTERN = /^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b/i;
 
 function normalizedOperation(operation) {
   return String(operation || "").trim().toLowerCase().replaceAll("-", "_");
@@ -142,6 +143,9 @@ export function buildTrustedWorkflowRecoveryParams(params, trustedTurn, bridgeTo
   const instruction = String(params?.recovery_instruction || "");
   if (!instruction || instruction !== trustedTurn.prompt) {
     throw new Error("recovery_instruction must exactly equal the verbatim current human instruction");
+  }
+  if (RECOVERY_QUESTION_PATTERN.test(instruction) || /\?\s*$/.test(instruction)) {
+    throw new Error("a recovery question or status enquiry is not recovery authorisation");
   }
   if (!/\b(?:recover|recovery|resume)\b/i.test(instruction) || !/\b(?:workflow|engagement|run|state)\b/i.test(instruction)) {
     throw new Error("the current human instruction must explicitly authorise workflow recovery");
