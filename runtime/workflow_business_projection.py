@@ -123,6 +123,28 @@ class WorkflowBusinessProjectionService:
     def _projection(self, state: WorkflowState) -> dict[str, Any]:
         latest = next((stage for stage in reversed(state.stages) if stage.output_artifacts), None)
         deliverable_state, drive_files = _deliverable_persistence(state)
+        manual_recovery = next(
+            (
+                item
+                for item in reversed(state.approval_history)
+                if item.get("decision") == "manual_recovery_approved"
+            ),
+            None,
+        )
+        lineage = state.input_payload.get("_lineage")
+        inherited_recovery = (
+            lineage.get("manual_recovery")
+            if isinstance(lineage, Mapping) and isinstance(lineage.get("manual_recovery"), Mapping)
+            else None
+        )
+        recovery_evidence = manual_recovery or inherited_recovery
+        execution_mode = (
+            "manual_recovery"
+            if manual_recovery
+            else "workflow_automation_after_manual_recovery"
+            if inherited_recovery
+            else "workflow_automation"
+        )
         payload = {
             "workflow_run_id": state.run_id,
             "workflow_id": state.workflow_id,
@@ -137,6 +159,19 @@ class WorkflowBusinessProjectionService:
             "external_action_taken": state.external_action_taken,
             "deliverable_state": deliverable_state,
             "drive_files": drive_files,
+            "execution_mode": execution_mode,
+            "automated_completion": False if recovery_evidence else None,
+            "manual_recovery": (
+                {
+                    "recovery_id": recovery_evidence.get("recovery_id"),
+                    "artifact_id": recovery_evidence.get("artifact_id"),
+                    "artifact_checksum": recovery_evidence.get("artifact_checksum"),
+                    "artifact_version": recovery_evidence.get("artifact_version"),
+                    "prior_blocker": recovery_evidence.get("prior_blocker"),
+                }
+                if recovery_evidence
+                else None
+            ),
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return {**payload, "projection_key": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}

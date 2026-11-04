@@ -37,6 +37,35 @@ def build_next_workflow_inputs(
                 "version": int(artifact.metadata.get("version") or 1),
                 "checksum": artifact.checksum,
             }
+    source_lineage = source.input_payload.get("_lineage")
+    inherited_manual_recovery = (
+        source_lineage.get("manual_recovery")
+        if isinstance(source_lineage, Mapping) and isinstance(source_lineage.get("manual_recovery"), Mapping)
+        else None
+    )
+    direct_manual_recovery = next(
+        (
+            item
+            for item in reversed(source.approval_history)
+            if item.get("decision") == "manual_recovery_approved"
+        ),
+        None,
+    )
+    recovery = direct_manual_recovery or inherited_manual_recovery
+    manual_recovery = (
+        {
+            "recovery_id": recovery.get("recovery_id"),
+            "artifact_id": recovery.get("artifact_id"),
+            "artifact_checksum": recovery.get("artifact_checksum"),
+            "artifact_title": recovery.get("artifact_title"),
+            "artifact_version": recovery.get("artifact_version"),
+            "source_uri": recovery.get("source_uri"),
+            "prior_blocker": recovery.get("prior_blocker"),
+            "automated_completion": False,
+        }
+        if recovery
+        else None
+    )
     combined["_lineage"] = {
         "parent_workflow_id": source.workflow_id,
         "parent_run_id": source.run_id,
@@ -45,5 +74,6 @@ def build_next_workflow_inputs(
             for stage in source.stages
             for artifact in stage.output_artifacts
         ],
+        "manual_recovery": manual_recovery,
     }
     return combined

@@ -2,9 +2,13 @@ import { createHmac } from "node:crypto";
 
 const DECISION_OPERATIONS = new Set(["approve", "reject", "request_revision"]);
 const CLASSIFICATION_OPERATION = "classify_synthetic_test";
+const MANUAL_RECOVERY_OPERATION = "manual_recovery";
 const TARGET_PATTERN = /\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+thesis|research\s+report|campaign\s+world|creative(?:\s+director(?:'s|’s))?\s+bible|proposal|version|current\s+work)\b/i;
 const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b/i;
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
+const RECOVERY_QUESTION_PATTERN = /^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b/i;
+const RECOVERY_NEGATION_PATTERN = /\b(?:do\s+not|don't|dont|never)\b[^.!?\n]{0,100}\b(?:recover|resume)\b/i;
+const RECOVERY_AUTHORISATION_PATTERN = /(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b|\bi\s+(?:approve|authorise|authorize|request)\s+(?:the\s+)?(?:manual\s+)?(?:recovery|resumption)\s+(?:of\s+)?(?:the\s+)?(?:workflow|engagement|run)\b|\bi\s+instruct\s+you\s+to\s+(?:recover|resume)\s+(?:the\s+)?(?:workflow|engagement|run)\b|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b/i;
 
 function normalizedOperation(operation) {
   return String(operation || "").trim().toLowerCase().replaceAll("-", "_");
@@ -24,7 +28,19 @@ export function hasExplicitWorkflowDecisionIntent(operation, instruction) {
   return /(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b/i.test(text);
 }
 
-export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "" }) {
+export function workflowDecisionProofMaterial({
+  runId,
+  operation,
+  reference,
+  approvalToken,
+  instruction,
+  authorisationReference = "",
+  recoveryId = "",
+  artifactTitle = "",
+  artifactVersion = "",
+  sourceUri = "",
+  artifactChecksum = "",
+}) {
   const normalized = normalizedOperation(operation);
   const fields = [
     "narratiive-workflow-decision-v1",
@@ -34,7 +50,16 @@ export function workflowDecisionProofMaterial({ runId, operation, reference, app
     String(approvalToken || ""),
     String(instruction || ""),
   ];
-  if (normalized === CLASSIFICATION_OPERATION) fields.push(String(authorisationReference || ""));
+  if (normalized === CLASSIFICATION_OPERATION || normalized === MANUAL_RECOVERY_OPERATION) fields.push(String(authorisationReference || ""));
+  if (normalized === MANUAL_RECOVERY_OPERATION) {
+    fields.push(
+      String(recoveryId || ""),
+      String(artifactTitle || ""),
+      String(artifactVersion || ""),
+      String(sourceUri || ""),
+      String(artifactChecksum || ""),
+    );
+  }
   return fields.join("\0");
 }
 
@@ -108,5 +133,64 @@ export function buildTrustedWorkflowClassificationParams(params, trustedTurn, br
     classification_instruction: instruction,
     _classification_instruction_run_id: trustedTurn.runId,
     _classification_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
+  };
+}
+
+export function buildTrustedWorkflowRecoveryParams(params, trustedTurn, bridgeToken) {
+  const operation = normalizedOperation(params?.operation);
+  if (operation !== MANUAL_RECOVERY_OPERATION) return params;
+  if (!trustedTurn?.runId || typeof trustedTurn.prompt !== "string") {
+    throw new Error("manual recovery requires the current trusted human turn");
+  }
+  const instruction = String(params?.recovery_instruction || "");
+  if (!instruction || instruction !== trustedTurn.prompt) {
+    throw new Error("recovery_instruction must exactly equal the verbatim current human instruction");
+  }
+  if (RECOVERY_QUESTION_PATTERN.test(instruction) || /\?\s*$/.test(instruction)) {
+    throw new Error("a recovery question or status enquiry is not recovery authorisation");
+  }
+  if (RECOVERY_NEGATION_PATTERN.test(instruction)) {
+    throw new Error("the current human instruction explicitly refuses workflow recovery");
+  }
+  if (!RECOVERY_AUTHORISATION_PATTERN.test(instruction) || !/\b(?:workflow|engagement|run|state)\b/i.test(instruction)) {
+    throw new Error("the current human instruction must explicitly authorise workflow recovery");
+  }
+  const reference = String(params?.reference || "").trim();
+  const authorisationReference = String(params?.authorisation_reference || "").trim();
+  const recovery = params?.manual_recovery;
+  if (!reference || !authorisationReference || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) {
+    throw new Error("manual recovery requires an exact run, artefact and authorisation reference");
+  }
+  const recoveryId = String(recovery.recovery_id || "").trim();
+  const artifactTitle = String(recovery.artifact_title || "").trim();
+  const artifactVersion = String(recovery.artifact_version || "").trim();
+  const sourceUri = String(recovery.source_uri || "").trim();
+  const artifactChecksum = String(recovery.artifact_checksum || "").trim();
+  if (!recoveryId || !artifactTitle || !artifactVersion || !sourceUri || !/^[0-9a-f]{64}$/.test(artifactChecksum)) {
+    throw new Error("manual recovery requires the exact immutable artefact identity");
+  }
+  const fields = {
+    runId: trustedTurn.runId,
+    operation,
+    reference,
+    approvalToken: "",
+    instruction,
+    authorisationReference,
+    recoveryId,
+    artifactTitle,
+    artifactVersion,
+    sourceUri,
+    artifactChecksum,
+  };
+  const proof = signWorkflowDecisionProof(bridgeToken, fields);
+  if (trustedTurn.manualRecoveryClaim && trustedTurn.manualRecoveryClaim !== proof) {
+    throw new Error("the current human turn is already bound to a different manual recovery");
+  }
+  trustedTurn.manualRecoveryClaim = proof;
+  return {
+    ...params,
+    recovery_instruction: instruction,
+    _recovery_instruction_run_id: trustedTurn.runId,
+    _recovery_instruction_proof: proof,
   };
 }

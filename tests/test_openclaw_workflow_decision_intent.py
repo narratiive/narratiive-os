@@ -17,7 +17,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         script = (
-            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
+            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, buildTrustedWorkflowRecoveryParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
             f"console.log(JSON.stringify({expression}));"
         )
         completed = subprocess.run([node, "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
@@ -88,6 +88,76 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "}catch(error){return error.message}})()"
         )
         self.assertIn("exact workflow entity", self._node(expression))
+
+    def test_manual_recovery_binds_the_current_human_instruction(self) -> None:
+        prompt = "Recover the existing fictional Origin engagement through the canonical workflow state."
+        params = {
+            "operation": "manual_recovery",
+            "reference": "origin-fictional-run",
+            "rationale": "Use the approved immutable recovery artefact.",
+            "recovery_instruction": prompt,
+            "authorisation_reference": "chat-message:origin-recovery",
+            "manual_recovery": {
+                "recovery_id": "origin-groundwork-v1",
+                "artifact_title": "Origin Coffee Groundwork Review",
+                "artifact_version": "v1",
+                "source_uri": "https://docs.example.invalid/origin/v1",
+                "artifact_checksum": "a" * 64,
+                "output": {"blueprint_lite": "approved"},
+            },
+        }
+        result = self._node(
+            f"buildTrustedWorkflowRecoveryParams({json.dumps(params)},{{runId:'conversation-turn-2',prompt:{json.dumps(prompt)}}},'secret')"
+        )
+        self.assertEqual(result["recovery_instruction"], prompt)
+        self.assertEqual(result["_recovery_instruction_run_id"], "conversation-turn-2")
+        self.assertEqual(len(result["_recovery_instruction_proof"]), 64)
+
+        changed = json.loads(json.dumps(params))
+        changed["manual_recovery"]["artifact_checksum"] = "b" * 64
+        expression = (
+            "(()=>{const turn={runId:'conversation-turn-2',prompt:"
+            f"{json.dumps(prompt)}"
+            "};buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(params)},turn,'secret');try{{buildTrustedWorkflowRecoveryParams({json.dumps(changed)},turn,'secret');return 'allowed'}}"
+            "catch(error){return error.message}})()"
+        )
+        self.assertIn("different manual recovery", self._node(expression))
+
+        refused = dict(params, recovery_instruction="Do not recover the existing fictional Origin engagement workflow.")
+        expression = (
+            "(()=>{try{buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(refused)},{{runId:'conversation-turn-2',prompt:{json.dumps(refused['recovery_instruction'])}}},'secret');return 'allowed'"
+            "}catch(error){return error.message}})()"
+        )
+        self.assertIn("refuses", self._node(expression))
+
+        question = dict(params, recovery_instruction="Is the workflow recovery still blocked?")
+        expression = (
+            "(()=>{try{buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(question)},{{runId:'conversation-turn-3',prompt:{json.dumps(question['recovery_instruction'])}}},'secret');return 'allowed'"
+            "}catch(error){return error.message}})()"
+        )
+        self.assertIn("not recovery authorisation", self._node(expression))
+
+        non_authorising = [
+            "Please tell me whether the workflow recovery is still blocked.",
+            "Give me the workflow recovery state.",
+            "The workflow recovery state is blocked.",
+            "I do not want you to recover the workflow.",
+            "Don't attempt to recover the workflow.",
+            "I request the workflow recovery state.",
+            "I request an update on workflow recovery.",
+            "I approve this summary of the workflow recovery state.",
+        ]
+        for index, statement in enumerate(non_authorising, start=4):
+            candidate = dict(params, recovery_instruction=statement)
+            expression = (
+                "(()=>{try{buildTrustedWorkflowRecoveryParams("
+                f"{json.dumps(candidate)},{{runId:'conversation-turn-{index}',prompt:{json.dumps(statement)}}},'secret');return 'allowed'"
+                "}catch(error){return error.message}})()"
+            )
+            self.assertNotEqual(self._node(expression), "allowed", statement)
 
 
 if __name__ == "__main__":

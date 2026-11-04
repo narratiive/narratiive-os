@@ -117,6 +117,21 @@ _NEGATED_WORKFLOW_DECISION = re.compile(
     re.IGNORECASE,
 )
 _QUESTION_WORKFLOW_DECISION = re.compile(r"^\s*(?:can|could|should|would|may)\s+(?:i|we)\b", re.IGNORECASE)
+_QUESTION_MANUAL_RECOVERY = re.compile(
+    r"^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b",
+    re.IGNORECASE,
+)
+_NEGATED_MANUAL_RECOVERY = re.compile(
+    r"\b(?:do\s+not|don't|dont|never)\b[^.!?\n]{0,100}\b(?:recover|resume)\b",
+    re.IGNORECASE,
+)
+_AFFIRMATIVE_MANUAL_RECOVERY = re.compile(
+    r"(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b"
+    r"|\bi\s+(?:approve|authorise|authorize|request)\s+(?:the\s+)?(?:manual\s+)?(?:recovery|resumption)\s+(?:of\s+)?(?:the\s+)?(?:workflow|engagement|run)\b"
+    r"|\bi\s+instruct\s+you\s+to\s+(?:recover|resume)\s+(?:the\s+)?(?:workflow|engagement|run)\b"
+    r"|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b",
+    re.IGNORECASE,
+)
 
 
 def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> bool:
@@ -143,9 +158,27 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
     )
 
 
+def has_explicit_manual_recovery_intent(instruction: str) -> bool:
+    text = str(instruction or "")
+    if (
+        not text.strip()
+        or _QUESTION_MANUAL_RECOVERY.search(text)
+        or text.rstrip().endswith("?")
+    ):
+        return False
+    if _NEGATED_MANUAL_RECOVERY.search(text):
+        return False
+    return bool(
+        _AFFIRMATIVE_MANUAL_RECOVERY.search(text)
+        and re.search(r"\b(?:workflow|engagement|run|state)\b", text, re.IGNORECASE)
+    )
+
+
 def workflow_decision_proof_material(
     *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
     authorisation_reference: str = "",
+    recovery_id: str = "", artifact_title: str = "", artifact_version: str = "",
+    source_uri: str = "", artifact_checksum: str = "",
 ) -> bytes:
     normalized_operation = operation.strip().casefold().replace("-", "_")
     values = (
@@ -156,8 +189,17 @@ def workflow_decision_proof_material(
         approval_token,
         instruction,
     )
-    if normalized_operation == "classify_synthetic_test":
+    if normalized_operation in {"classify_synthetic_test", "manual_recovery"}:
         values = (*values, authorisation_reference)
+    if normalized_operation == "manual_recovery":
+        values = (
+            *values,
+            recovery_id,
+            artifact_title,
+            artifact_version,
+            source_uri,
+            artifact_checksum,
+        )
     return "\0".join(values).encode("utf-8")
 
 
@@ -171,6 +213,8 @@ def verify_workflow_decision_proof(
     instruction: str,
     proof: str,
     authorisation_reference: str = "",
+    recovery_id: str = "", artifact_title: str = "", artifact_version: str = "",
+    source_uri: str = "", artifact_checksum: str = "",
 ) -> bool:
     if not secret or not run_id or not proof:
         return False
@@ -183,6 +227,11 @@ def verify_workflow_decision_proof(
             approval_token=approval_token,
             instruction=instruction,
             authorisation_reference=authorisation_reference,
+            recovery_id=recovery_id,
+            artifact_title=artifact_title,
+            artifact_version=artifact_version,
+            source_uri=source_uri,
+            artifact_checksum=artifact_checksum,
         ),
         hashlib.sha256,
     ).hexdigest()
@@ -461,6 +510,7 @@ class LeadAwareTonyApplication:
                 "continue": "continue",
                 "resume": "resume",
                 "recover": "recover",
+                "manual-recovery": "manual-recovery",
                 "projection": "projection",
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
@@ -483,7 +533,7 @@ class LeadAwareTonyApplication:
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
-                "sync-campaign-learning", "classify-synthetic-test",
+                "sync-campaign-learning", "classify-synthetic-test", "manual-recovery",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
@@ -491,7 +541,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 if operation in {"approve", "reject", "request-revision"}:
@@ -540,6 +590,42 @@ class LeadAwareTonyApplication:
                         authorisation_reference=authorisation_reference,
                     ):
                         raise ValueError("workflow classification lacks verified verbatim current-human instruction provenance")
+                if operation == "manual-recovery":
+                    instruction = str((inputs or {}).get("recovery_instruction") or "")
+                    instruction_run_id = str((inputs or {}).get("recovery_instruction_run_id") or "").strip()
+                    instruction_proof = str((inputs or {}).get("recovery_instruction_proof") or "").strip()
+                    authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
+                    recovery = (inputs or {}).get("manual_recovery")
+                    if not isinstance(recovery, Mapping):
+                        raise ValueError("manual recovery requires the exact immutable artefact identity")
+                    if not has_explicit_manual_recovery_intent(instruction):
+                        raise ValueError("manual recovery requires an explicit current-human recovery instruction")
+                    if not instruction_run_id or not authorisation_reference:
+                        raise ValueError("manual recovery requires trusted-turn provenance and an authorisation reference")
+                    if not verify_workflow_decision_proof(
+                        str(self.base.bridge_token or ""),
+                        run_id=instruction_run_id,
+                        operation=operation,
+                        reference=reference,
+                        approval_token="",
+                        instruction=instruction,
+                        proof=instruction_proof,
+                        authorisation_reference=authorisation_reference,
+                        recovery_id=str(recovery.get("recovery_id") or ""),
+                        artifact_title=str(recovery.get("artifact_title") or ""),
+                        artifact_version=str(recovery.get("artifact_version") or ""),
+                        source_uri=str(recovery.get("source_uri") or ""),
+                        artifact_checksum=str(recovery.get("artifact_checksum") or ""),
+                    ):
+                        raise ValueError("manual recovery lacks verified verbatim current-human instruction provenance")
+                    inputs["recovery_approval_evidence"] = {
+                        "human_instruction": instruction,
+                        "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+                        "turn_run_id": instruction_run_id,
+                        "authorisation_reference": authorisation_reference,
+                        "verbatim_current_human_instruction_verified": True,
+                        "explicit_decision_intent": "manual_recovery",
+                    }
                 principal = (
                     f"matt:{self.authorised_principal_id}"
                     if operation == "sync-campaign-learning"

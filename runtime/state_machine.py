@@ -89,6 +89,55 @@ class WorkflowEngine:
         self._refresh_workflow(state)
         return state
 
+    def complete_blocked_stage_with_manual_recovery(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+        output: ArtifactRef,
+    ) -> WorkflowState:
+        """Complete one blocked preparation step from an approved manual artefact.
+
+        This is a narrow recovery transition, not an automated retry.  The
+        application service validates the immutable artefact and human approval
+        evidence before calling it.  External-write steps cannot use this path.
+        """
+
+        stage = state.stage(stage_id)
+        self._require_current(state, stage)
+        if stage.status is not StageStatus.BLOCKED:
+            raise InvalidTransition("manual recovery requires the current blocked stage")
+        if stage.side_effect_classification != "preparation":
+            raise InvalidTransition("manual recovery cannot complete an external-action stage")
+        if state.stages.index(stage) != len(state.stages) - 1:
+            raise InvalidTransition("manual recovery cannot bypass later workflow stages")
+        quality = stage.quality_result or {}
+        if not (
+            quality.get("passed") is True
+            and quality.get("evaluation_mode") == "approved_manual_recovery"
+            and quality.get("automated") is False
+        ):
+            raise InvalidTransition("manual recovery requires explicit non-automated quality evidence")
+
+        # Preserve the normal transition graph while persisting only the final,
+        # explicitly labelled recovery event in the application service.
+        self._transition(stage, StageStatus.REVISION_REQUIRED)
+        self._transition(stage, StageStatus.READY)
+        self._transition(stage, StageStatus.RUNNING)
+        self._transition(stage, StageStatus.COMPLETED)
+        stage.output_artifacts.append(output)
+        stage.blocker = None
+        stage.failure_reason = None
+        stage.proposed_next_action = None
+        stage.mark_completed()
+        state.current_stage_id = None
+        state.blocker = None
+        state.proposed_next_action = None
+        # The verified manual-recovery decision is itself the exact artefact
+        # approval for this final stage. Later stages are rejected above.
+        state.status = WorkflowStatus.COMPLETE
+        self._refresh_workflow(state)
+        return state
+
     def block_stage(self, state: WorkflowState, stage_id: str, missing_inputs: Iterable[str]) -> WorkflowState:
         stage = state.stage(stage_id)
         missing = sorted({item.strip() for item in missing_inputs if item.strip()})
