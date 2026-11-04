@@ -282,6 +282,88 @@ class MissionControlOperatorTests(unittest.TestCase):
         self.assertEqual(item["operational_substate"], "blocked")
         self.assertIn("evidence_specificity", item["blocker"])
 
+    def test_recovered_historical_blocker_does_not_override_latest_human_gate(self):
+        historical = self._state(
+            workflow="growth_diagnostic_to_blueprint_lite",
+            status=WorkflowStatus.BLOCKED,
+            blocked="blueprint_lite_quality_gate",
+        )
+        historical.run_id = "origin-groundwork-blocked"
+        historical.updated_at = "2026-11-04T13:00:00+00:00"
+
+        latest = self._state(
+            workflow="blueprint_lite_to_discovery_preparation",
+            status=WorkflowStatus.AWAITING_APPROVAL,
+            approval="pending",
+        )
+        latest.run_id = "origin-discovery-awaiting-review"
+        latest.updated_at = "2026-11-04T14:00:00+00:00"
+        latest.current_stage_id = None
+        latest.stages[0].status = StageStatus.COMPLETED
+        latest.stages[0].blocker = None
+        latest.blocker = None
+        latest.proposed_next_action = "Approve Discovery Preparation before downstream work."
+
+        item = self.projector.project(states=[historical, latest], leads=[])["opportunities"][0]
+
+        self.assertEqual(item["operational_substate"], "awaiting_approval")
+        self.assertEqual(item["attention_state"], "matt_required")
+        self.assertFalse(item["blocked"])
+        self.assertIsNone(item["blocker"])
+        self.assertEqual(item["next_action"], latest.proposed_next_action)
+
+    def test_recovered_historical_stage_blocker_remains_in_activity_history(self):
+        historical = self._state(
+            workflow="growth_diagnostic_to_blueprint_lite",
+            status=WorkflowStatus.BLOCKED,
+            blocked="research_dependency_failed",
+        )
+        latest = self._state(
+            workflow="blueprint_lite_to_discovery_preparation",
+            status=WorkflowStatus.AWAITING_APPROVAL,
+            approval="pending",
+        )
+        latest.run_id = "origin-discovery-awaiting-review"
+        latest.updated_at = "2026-11-04T14:00:00+00:00"
+        latest.current_stage_id = None
+        latest.stages[0].status = StageStatus.COMPLETED
+        latest.blocker = None
+        scope = hashlib.sha256(b"narratiive:catkin").hexdigest()[:24]
+        event_path = self.root / scope / "events" / f"{historical.run_id}.jsonl"
+        event_path.write_text(
+            json.dumps({
+                "event_id": "evt-blocked",
+                "run_id": historical.run_id,
+                "event_type": "stage.blocked",
+                "payload": {"blocker": "research_dependency_failed"},
+                "occurred_at": "2026-11-04T13:00:00+00:00",
+                "workspace_id": "narratiive",
+            }) + "\n",
+            encoding="utf-8",
+        )
+
+        item = self.projector.project(states=[historical, latest], leads=[])["opportunities"][0]
+
+        self.assertFalse(item["blocked"])
+        self.assertIn("Workflow stage blocked", [event["label"] for event in item["activity"]])
+
+    def test_projection_order_is_stable_when_timestamps_and_names_tie(self):
+        first = self._state(client="fixture-a")
+        second = self._state(client="fixture-b")
+        first.input_payload["company"] = "Same Company"
+        second.input_payload["company"] = "Same Company"
+
+        generated_at = "2026-11-04T15:00:00+00:00"
+        forward = self.projector.project(
+            states=[first, second], leads=[], generated_at=generated_at
+        )
+        reverse = self.projector.project(
+            states=[second, first], leads=[], generated_at=generated_at
+        )
+
+        self.assertEqual(forward["opportunities"], reverse["opportunities"])
+        self.assertEqual(forward["activity"], reverse["activity"])
+
     def test_web_is_loopback_read_only_and_viewing_does_not_mutate_state(self):
         state = self._state()
         watched = next(self.root.glob("*/artifacts/*.json"))

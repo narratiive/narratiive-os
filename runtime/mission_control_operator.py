@@ -132,14 +132,20 @@ class OperatorMissionControlProjector:
             self._opportunity(key, runs, lead_by_workflow_key.get(key), now, classifications)
             for key, runs in grouped.items()
         ]
-        opportunities.sort(key=lambda item: (item["updated_at"], item["company"]), reverse=True)
+        opportunities.sort(
+            key=lambda item: (item["updated_at"], item["company"], item["id"]),
+            reverse=True,
+        )
         live = [item for item in opportunities if not item["synthetic"]]
         active = [item for item in live if item["lifecycle_stage"] != "complete"]
         needs_you = [self._queue_item(item) for item in live if item["requires_matt"]]
         attention = [item for item in live if item["attention_state"] in {"blocked", "waiting_externally", "failed", "stale"}]
         activity = sorted(
             (event for item in live for event in item["activity"]),
-            key=lambda item: item["occurred_at"], reverse=True,
+            key=lambda item: (
+                item["occurred_at"], item["company"], item["run_id"], item["event_id"]
+            ),
+            reverse=True,
         )[:30]
         running = sum(item["attention_state"] == "running" for item in active)
         connections = self._connections(system_snapshot or {})
@@ -185,24 +191,17 @@ class OperatorMissionControlProjector:
             for state in runs
         )
         lifecycle = self._lifecycle(runs, lead)
-        blocker = next(
-            (
-                state.blocker
-                or (
-                    state.stage(state.current_stage_id).blocker
-                    if state.current_stage_id
-                    else None
-                )
-                for state in reversed(runs)
-                if state.blocker
-                or (
-                    state.current_stage_id
-                    and state.stage(state.current_stage_id).blocker
-                )
-            ),
-            None,
+        blocker = (
+            latest.blocker
+            or (
+                latest.stage(latest.current_stage_id).blocker
+                if latest and latest.current_stage_id
+                else None
+            )
+            if latest
+            else None
         )
-        failed = any(state.status.value == "failed" for state in runs)
+        failed = bool(latest and latest.status.value == "failed")
         waiting = bool(latest and latest.status.value == "awaiting_approval")
         requires_matt = waiting or bool(latest and (latest.revision_owner or "").casefold() == "matt")
         waiting_externally = bool(blocker and str(blocker).casefold().startswith("waiting_external"))
@@ -227,7 +226,10 @@ class OperatorMissionControlProjector:
         artefacts = self._artefacts(runs)
         events = [self._event_item(state, event, name) for state in runs for event in self.evidence.events(state)]
         events = [event for event in events if event is not None]
-        events.sort(key=lambda item: item["occurred_at"], reverse=True)
+        events.sort(
+            key=lambda item: (item["occurred_at"], item["run_id"], item["event_id"]),
+            reverse=True,
+        )
         next_action = latest.current_proposed_next_action() if latest else (lead.recommended_next_action if lead else None)
         current_activity = self._activity(latest, attention) if latest else "Opportunity recorded"
         return {
@@ -389,6 +391,7 @@ class OperatorMissionControlProjector:
             "stage.completed": "Workflow stage completed", "stage.quality_recorded": "Quality review recorded",
             "workflow.outputs_promoted": "Governed output promoted", "workflow.handoff_created": "Next workflow commissioned",
             "workflow.approved": "Human approval recorded", "workflow.blocked": "Workflow blocked",
+            "stage.blocked": "Workflow stage blocked",
         }
         label = labels.get(event.event_type)
         if not label:
