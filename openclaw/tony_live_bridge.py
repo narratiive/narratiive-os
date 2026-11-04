@@ -127,7 +127,8 @@ _NEGATED_MANUAL_RECOVERY = re.compile(
 )
 _AFFIRMATIVE_MANUAL_RECOVERY = re.compile(
     r"(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b"
-    r"|\bi\s+(?:approve|authorise|authorize|instruct|request)\b[^.!?\n]{0,160}\b(?:recover|recovery|resume)\b"
+    r"|\bi\s+(?:approve|authorise|authorize|request)\s+(?:the\s+)?(?:manual\s+)?(?:recovery|resumption)\s+(?:of\s+)?(?:the\s+)?(?:workflow|engagement|run)\b"
+    r"|\bi\s+instruct\s+you\s+to\s+(?:recover|resume)\s+(?:the\s+)?(?:workflow|engagement|run)\b"
     r"|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b",
     re.IGNORECASE,
 )

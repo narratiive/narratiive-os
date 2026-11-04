@@ -8,7 +8,7 @@ const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explici
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
 const RECOVERY_QUESTION_PATTERN = /^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b/i;
 const RECOVERY_NEGATION_PATTERN = /\b(?:do\s+not|don't|dont|never)\b[^.!?\n]{0,100}\b(?:recover|resume)\b/i;
-const RECOVERY_AUTHORISATION_PATTERN = /(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b|\bi\s+(?:approve|authorise|authorize|instruct|request)\b[^.!?\n]{0,160}\b(?:recover|recovery|resume)\b|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b/i;
+const RECOVERY_AUTHORISATION_PATTERN = /(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b|\bi\s+(?:approve|authorise|authorize|request)\s+(?:the\s+)?(?:manual\s+)?(?:recovery|resumption)\s+(?:of\s+)?(?:the\s+)?(?:workflow|engagement|run)\b|\bi\s+instruct\s+you\s+to\s+(?:recover|resume)\s+(?:the\s+)?(?:workflow|engagement|run)\b|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b/i;
 
 function normalizedOperation(operation) {
   return String(operation || "").trim().toLowerCase().replaceAll("-", "_");

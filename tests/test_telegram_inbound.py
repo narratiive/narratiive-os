@@ -375,6 +375,9 @@ class TelegramInboundTests(unittest.TestCase):
             "The workflow recovery state is blocked.",
             "I do not want you to recover the workflow.",
             "Don't attempt to recover the workflow.",
+            "I request the workflow recovery state.",
+            "I request an update on workflow recovery.",
+            "I approve this summary of the workflow recovery state.",
         )
         for statement in non_authorising:
             self.assertFalse(has_explicit_manual_recovery_intent(statement), statement)

@@ -146,6 +146,9 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "The workflow recovery state is blocked.",
             "I do not want you to recover the workflow.",
             "Don't attempt to recover the workflow.",
+            "I request the workflow recovery state.",
+            "I request an update on workflow recovery.",
+            "I approve this summary of the workflow recovery state.",
         ]
         for index, statement in enumerate(non_authorising, start=4):
             candidate = dict(params, recovery_instruction=statement)
