@@ -7,6 +7,8 @@ const TARGET_PATTERN = /\b(?:artefact|artifact|blueprint(?:\s+lite)?|strategy\s+
 const NEGATED_INTENT_PATTERN = /\b(?:do\s+not|don't|dont|not|never)\s+(?:explicitly\s+)?(?:approve|reject|revise)\b/i;
 const QUESTION_PATTERN = /^\s*(?:can|could|should|would|may)\s+(?:i|we)\b/i;
 const RECOVERY_QUESTION_PATTERN = /^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b/i;
+const RECOVERY_NEGATION_PATTERN = /\b(?:do\s+not|don't|dont|never)\b[^.!?\n]{0,100}\b(?:recover|resume)\b/i;
+const RECOVERY_AUTHORISATION_PATTERN = /(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b|\bi\s+(?:approve|authorise|authorize|instruct|request)\b[^.!?\n]{0,160}\b(?:recover|recovery|resume)\b|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b/i;
 
 function normalizedOperation(operation) {
   return String(operation || "").trim().toLowerCase().replaceAll("-", "_");
@@ -147,11 +149,11 @@ export function buildTrustedWorkflowRecoveryParams(params, trustedTurn, bridgeTo
   if (RECOVERY_QUESTION_PATTERN.test(instruction) || /\?\s*$/.test(instruction)) {
     throw new Error("a recovery question or status enquiry is not recovery authorisation");
   }
-  if (!/\b(?:recover|recovery|resume)\b/i.test(instruction) || !/\b(?:workflow|engagement|run|state)\b/i.test(instruction)) {
-    throw new Error("the current human instruction must explicitly authorise workflow recovery");
-  }
-  if (/\b(?:do\s+not|don't|dont|never)\s+(?:recover|resume)\b/i.test(instruction)) {
+  if (RECOVERY_NEGATION_PATTERN.test(instruction)) {
     throw new Error("the current human instruction explicitly refuses workflow recovery");
+  }
+  if (!RECOVERY_AUTHORISATION_PATTERN.test(instruction) || !/\b(?:workflow|engagement|run|state)\b/i.test(instruction)) {
+    throw new Error("the current human instruction must explicitly authorise workflow recovery");
   }
   const reference = String(params?.reference || "").trim();
   const authorisationReference = String(params?.authorisation_reference || "").trim();

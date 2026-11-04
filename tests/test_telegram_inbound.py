@@ -368,7 +368,21 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertFalse(call("different-entity")["ok"])
 
     def test_manual_recovery_uses_trusted_turn_proof_and_authorised_principal(self):
-        self.assertFalse(has_explicit_manual_recovery_intent("Is the workflow recovery still blocked?"))
+        non_authorising = (
+            "Is the workflow recovery still blocked?",
+            "Please tell me whether the workflow recovery is still blocked.",
+            "Give me the workflow recovery state.",
+            "The workflow recovery state is blocked.",
+            "I do not want you to recover the workflow.",
+            "Don't attempt to recover the workflow.",
+        )
+        for statement in non_authorising:
+            self.assertFalse(has_explicit_manual_recovery_intent(statement), statement)
+        self.assertTrue(
+            has_explicit_manual_recovery_intent(
+                "Recover the existing fictional Origin engagement through the canonical workflow state."
+            )
+        )
         workflows = FakeWorkflowCommands()
         app = LeadAwareTonyApplication(
             FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),

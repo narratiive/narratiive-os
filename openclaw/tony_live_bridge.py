@@ -121,6 +121,16 @@ _QUESTION_MANUAL_RECOVERY = re.compile(
     r"^\s*(?:is|are|was|were|has|have|can|could|should|would|may|what|when|where|why|how)\b",
     re.IGNORECASE,
 )
+_NEGATED_MANUAL_RECOVERY = re.compile(
+    r"\b(?:do\s+not|don't|dont|never)\b[^.!?\n]{0,100}\b(?:recover|resume)\b",
+    re.IGNORECASE,
+)
+_AFFIRMATIVE_MANUAL_RECOVERY = re.compile(
+    r"(?:^|\n)\s*(?:(?:[-*]|\d+[.)])\s*)?(?:please\s+)?(?:recover|resume)\b"
+    r"|\bi\s+(?:approve|authorise|authorize|instruct|request)\b[^.!?\n]{0,160}\b(?:recover|recovery|resume)\b"
+    r"|\byou\s+(?:may|can|are\s+authorised\s+to|are\s+authorized\s+to)\s+(?:recover|resume)\b",
+    re.IGNORECASE,
+)
 
 
 def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> bool:
@@ -155,10 +165,10 @@ def has_explicit_manual_recovery_intent(instruction: str) -> bool:
         or text.rstrip().endswith("?")
     ):
         return False
-    if re.search(r"\b(?:do\s+not|don't|dont|never)\s+(?:recover|resume)\b", text, re.IGNORECASE):
+    if _NEGATED_MANUAL_RECOVERY.search(text):
         return False
     return bool(
-        re.search(r"\b(?:recover|recovery|resume)\b", text, re.IGNORECASE)
+        _AFFIRMATIVE_MANUAL_RECOVERY.search(text)
         and re.search(r"\b(?:workflow|engagement|run|state)\b", text, re.IGNORECASE)
     )
 
