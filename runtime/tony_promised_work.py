@@ -122,6 +122,12 @@ class TonyPromisedWorkWorker:
             f"{state.workspace_id}\0{state.run_id}\0{commitment_id}\0{kind}".encode("utf-8")
         ).hexdigest()
         state = self.backend.begin_promised_delivery(state, delivery_key=delivery_key, kind=kind)
+        current_delivery = state.promised_work_delivery
+        if (
+            current_delivery.get("delivery_key") == delivery_key
+            and current_delivery.get("status") == "delivered"
+        ):
+            return state
         # An attempting record is written before the provider call. A crash in
         # the narrow send/receipt window therefore becomes an explicit ambiguous
         # delivery instead of a blind replay and duplicate Telegram message.

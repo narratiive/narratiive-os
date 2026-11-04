@@ -300,6 +300,70 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(len(self.telegram_messages), 2)
         self.assertIsNone(replay)
 
+    def test_tampered_recovery_does_not_resend_delivered_worker_failure(self) -> None:
+        state, _, dispatchers = self._commission()
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        interrupted_input = runtime.runs.load_run(state.run_id)
+        interrupted_input.input_payload["evidence_lineage"] = ["inherited-discovery-evidence"]
+        runtime.runs.repository.save(interrupted_input)
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+        worker = TonyPromisedWorkWorker(backend, self._sender)
+
+        first = worker.run_once()
+        orphan = next(self.root.rglob("artifact-*.json"))
+        orphan.write_text("{}\n", encoding="utf-8")
+        second = worker.run_once()
+        third = worker.run_once()
+
+        self.assertEqual(first.promised_work_delivery["kind"], "worker_failure")
+        self.assertEqual(second.status.value, "active")
+        self.assertEqual(third.status.value, "active")
+        self.assertEqual(len(self.telegram_messages), 1)
+
+    def test_ambiguous_recovery_does_not_resend_delivered_worker_failure(self) -> None:
+        state, _, dispatchers = self._commission()
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        interrupted_input = runtime.runs.load_run(state.run_id)
+        interrupted_input.input_payload["evidence_lineage"] = ["inherited-discovery-evidence"]
+        runtime.runs.repository.save(interrupted_input)
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+        worker = TonyPromisedWorkWorker(backend, self._sender)
+
+        first = worker.run_once()
+        orphan = next(self.root.rglob("artifact-*.json"))
+        identity = orphan.stem.split("-")[1]
+        duplicate = orphan.with_name(f"artifact-{identity}-0000000000000000.json")
+        duplicate.write_bytes(orphan.read_bytes())
+        second = worker.run_once()
+        third = worker.run_once()
+
+        self.assertEqual(first.promised_work_delivery["kind"], "worker_failure")
+        self.assertEqual(second.status.value, "active")
+        self.assertEqual(third.status.value, "active")
+        self.assertEqual(len(self.telegram_messages), 1)
+
     def test_ambiguous_telegram_send_is_not_blindly_retried_after_restart(self) -> None:
         _, _, dispatchers = self._commission()
         backend = FileWorkflowCommandBackend(
