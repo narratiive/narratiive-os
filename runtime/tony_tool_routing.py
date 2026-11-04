@@ -64,12 +64,16 @@ class TonyExecutiveToolRouter:
             self._contains(action_text, ("prepare", "draft"))
             and self._contains(action_text, ("do not send", "don't send", "without sending", "not send"))
         )
+        explicit_gmail_draft = "gmail draft" in action_text
 
         # Prefer the execution surface that owns the primary action, not a system
         # merely mentioned as the downstream destination.
-        if draft_only:
+        if draft_only and not explicit_gmail_draft:
             worker = "Claude"
             rationale = "the next step is explicitly internal draft preparation and must not mutate an external system"
+        elif explicit_gmail_draft:
+            worker = "Gmail"
+            rationale = "the next step is explicitly to persist an unsent review draft in Gmail"
         elif self._contains(text, self._CALENDAR_MARKERS):
             worker = "Google Calendar"
             rationale = "the next step is primarily scheduling or meeting coordination"

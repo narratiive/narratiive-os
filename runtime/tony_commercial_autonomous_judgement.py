@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from typing import Any, Iterable, Mapping
 
+from runtime.discovery_invitation import DiscoveryInvitationError, render_discovery_invitation
 from runtime.tony_autonomous_dispatch import DispatchHandler
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_growth_blueprint_review import TonyGrowthBlueprintReviewer
@@ -25,9 +26,20 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
     _OUTREACH_CREATIVE_KEYS = ("creative_brief", "creative_treatment", "supporting_creative_brief")
     _REVIEWED_SEND_APPROVALS = {"send it", "send that", "send this", "go ahead and send it", "go ahead and send that"}
 
-    def __init__(self, command_service, dispatchers: Mapping[str, DispatchHandler] | None = None, **kwargs) -> None:
+    def __init__(
+        self,
+        command_service,
+        dispatchers: Mapping[str, DispatchHandler] | None = None,
+        *,
+        discovery_booking_url: str = "",
+        **kwargs,
+    ) -> None:
+        self.discovery_booking_url = discovery_booking_url.strip()
         super().__init__(command_service, dispatchers=dispatchers, **kwargs)
-        if self._last_verified_result is not None and self._enrich_context(self._last_verified_result):
+        if self._last_verified_result is not None and self._enrich_context(
+            self._last_verified_result,
+            discovery_booking_url=self.discovery_booking_url,
+        ):
             self._persist_context(self._last_verified_result)
 
     def execute(self, command: str, objects: Iterable[dict[str, Any]]) -> CommandResponse:
@@ -37,7 +49,7 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         context = self._last_verified_result
         if context is None:
             return response
-        changed = self._enrich_context(context)
+        changed = self._enrich_context(context, discovery_booking_url=self.discovery_booking_url)
         if changed:
             self._persist_context(context)
         judgement = context.get("commercial_judgement")
@@ -55,7 +67,11 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         elif disposition == "growth_blueprint_stop":
             suffix = f" I reviewed the returned Growth Blueprint and recommend stopping this opportunity. {recommendation}"
         elif disposition == "outreach_package_ready":
-            suffix = f" I reviewed Claude's returned outreach package. The email is specific, substantive and bounded enough to send. It is ready for your final approval. I recommend: {recommendation} Nothing has been sent externally."
+            evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
+            if evidence.get("reviewed_outreach_html"):
+                suffix = f" I reviewed Claude's returned discovery invitation. Its plain-text and HTML versions are evidence-bound and ready to save as an unsent Gmail draft for your review. I recommend: {recommendation} Nothing has been sent externally."
+            else:
+                suffix = f" I reviewed Claude's returned outreach package. The email is specific, substantive and bounded enough to send. It is ready for your final approval. I recommend: {recommendation} Nothing has been sent externally."
         elif disposition == "outreach_package_revision_required":
             failed = ", ".join(str(item) for item in judgement.get("failed_checks", ()))
             suffix = f" I reviewed Claude's returned outreach package and would not send it yet. It needs revision on: {failed or 'the outreach quality requirements'}. Nothing has been sent externally."
@@ -111,7 +127,12 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         )
 
     @classmethod
-    def _enrich_context(cls, context: dict[str, Any]) -> bool:
+    def _enrich_context(
+        cls,
+        context: dict[str, Any],
+        *,
+        discovery_booking_url: str = "",
+    ) -> bool:
         if isinstance(context.get("commercial_judgement"), dict):
             return False
         worker = str(context.get("worker") or "").strip().casefold()
@@ -119,7 +140,10 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             return cls._enrich_calendar_context(context)
         if worker == "claude":
             return (
-                cls._enrich_outreach_package_context(context)
+                cls._enrich_outreach_package_context(
+                    context,
+                    discovery_booking_url=discovery_booking_url,
+                )
                 or cls._enrich_growth_blueprint_context(context)
                 or cls._enrich_meeting_draft_context(context)
             )
@@ -160,7 +184,12 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
         return True
 
     @classmethod
-    def _enrich_outreach_package_context(cls, context: dict[str, Any]) -> bool:
+    def _enrich_outreach_package_context(
+        cls,
+        context: dict[str, Any],
+        *,
+        discovery_booking_url: str = "",
+    ) -> bool:
         dispatch = context.get("dispatch") if isinstance(context.get("dispatch"), dict) else {}
         evidence = context.get("evidence") if isinstance(context.get("evidence"), dict) else {}
         target = dispatch.get("target") if isinstance(dispatch.get("target"), dict) else {}
@@ -170,11 +199,44 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             return False
         if str(target.get("area") or "").strip().casefold() != "commercial":
             return False
-        if "tailored outreach package" not in lowered_instruction or "do not send" not in lowered_instruction:
+        if not any(
+            marker in lowered_instruction
+            for marker in ("tailored outreach package", "discovery invitation package")
+        ) or "do not send" not in lowered_instruction:
             return False
 
         subject = cls._first_rendered(evidence, cls._OUTREACH_SUBJECT_KEYS)
         body = cls._first_rendered(evidence, cls._OUTREACH_BODY_KEYS)
+        email_html = ""
+        invitation = evidence.get("discovery_invitation")
+        invitation_requested = isinstance(invitation, Mapping)
+        invitation_expected = invitation_requested or "discovery invitation package" in lowered_instruction
+        invitation_error = ""
+        template_version = ""
+        if invitation_expected and not invitation_requested:
+            invitation_error = "structured Groundwork discovery invitation fields are missing"
+        elif invitation_requested:
+            try:
+                rendered = render_discovery_invitation(
+                    invitation,
+                    booking_url=discovery_booking_url,
+                )
+            except (DiscoveryInvitationError, OSError) as exc:
+                invitation_error = str(exc)
+                email_html = ""
+            else:
+                subject = rendered.subject
+                body = rendered.body
+                email_html = rendered.email_html
+                template_version = rendered.template_version
+                evidence.update(
+                    {
+                        "email_subject": subject,
+                        "email_body": body,
+                        "email_html": email_html,
+                        "discovery_invitation_template_version": template_version,
+                    }
+                )
         creative = cls._first_rendered(evidence, cls._OUTREACH_CREATIVE_KEYS)
         contact = str(target.get("contact") or "").strip()
         first_name = contact.split()[0].casefold() if contact else ""
@@ -189,25 +251,43 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             "calendar event created",
             "meeting booked",
         )
+        body_length_ok = 80 <= body_words <= 320 if invitation_expected else 35 <= body_words <= 220
         checks = {
             "subject_present": bool(subject),
             "subject_concise": 3 <= subject_words <= 14,
             "body_present": bool(body),
             "contact_specific": bool(first_name and first_name in body.casefold()),
-            "body_substantive": 35 <= body_words <= 220,
+            "body_substantive": body_length_ok,
             "no_false_execution_claim": not any(marker in combined for marker in execution_claims),
         }
+        if invitation_expected:
+            checks.update(
+                {
+                    "groundwork_evidence_bound": not invitation_error,
+                    "html_rendered": bool(email_html),
+                    "booking_destination_configured": bool(discovery_booking_url),
+                }
+            )
         ready = all(checks.values())
         recommendation = ""
         execution_next_action = ""
         if ready:
             recipient = contact or "the lead"
-            recommendation = f"Send the reviewed outreach email to {recipient} via Gmail."
-            execution_next_action = (
-                f"Send the following reviewed outreach email to {recipient} via Gmail exactly as reviewed.\n"
-                f"Subject: {subject}\n\n{body}\n\n"
-                "Do not alter the reviewed subject or body before sending."
-            )
+            if email_html:
+                recommendation = f"Create an unsent Gmail draft for {recipient} so Matt can review the rendered discovery invitation."
+                execution_next_action = (
+                    f"Create an unsent Gmail draft for {recipient} using the following reviewed discovery invitation exactly. "
+                    "The draft must remain unsent pending Matt's separate approval.\n"
+                    f"Subject: {subject}\n\n{body}\n\n"
+                    "Preserve the reviewed plain-text and HTML alternatives without alteration."
+                )
+            else:
+                recommendation = f"Send the reviewed outreach email to {recipient} via Gmail."
+                execution_next_action = (
+                    f"Send the following reviewed outreach email to {recipient} via Gmail exactly as reviewed.\n"
+                    f"Subject: {subject}\n\n{body}\n\n"
+                    "Do not alter the reviewed subject or body before sending."
+                )
             evidence.update(
                 {
                     "recommended_next_action": recommendation,
@@ -216,6 +296,9 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
                     "reviewed_outreach_body": body,
                 }
             )
+            if email_html:
+                evidence["reviewed_outreach_html"] = email_html
+                evidence["reviewed_outreach_template_version"] = template_version
             if creative:
                 evidence["reviewed_outreach_creative_brief"] = creative
             disposition = "outreach_package_ready"
@@ -229,7 +312,11 @@ class TonyCommercialAutonomousJudgementCommandService(TonyPersistentAutonomousRe
             evidence["execution_next_action"] = execution_next_action
             evidence.pop("reviewed_outreach_subject", None)
             evidence.pop("reviewed_outreach_body", None)
+            evidence.pop("reviewed_outreach_html", None)
+            evidence.pop("reviewed_outreach_template_version", None)
             evidence.pop("reviewed_outreach_creative_brief", None)
+            if invitation_error:
+                evidence["discovery_invitation_review_blocker"] = invitation_error
         failed_checks = [name.replace("_", " ") for name, passed in checks.items() if not passed]
         evidence.update(
             {

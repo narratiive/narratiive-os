@@ -28,7 +28,13 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
         "happy to share the thinking if useful. Best, Matt"
     )
 
-    def service(self, *, body: str | None = None, subject: str | None = None):
+    def service(
+        self,
+        *,
+        body: str | None = None,
+        subject: str | None = None,
+        invitation: dict | None = None,
+    ):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         store = Path(tmp.name) / "result.json"
@@ -47,6 +53,7 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
                         "target": {
                             "lead_id": "lead-1",
                             "contact": "Alex Example",
+                            "recipient_email": "alex@example.com",
                             "area": "commercial",
                         },
                     },
@@ -54,6 +61,7 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
                         "email_subject": self.SUBJECT if subject is None else subject,
                         "email_body": self.BODY if body is None else body,
                         "creative_brief": "Create one restrained visual treatment that dramatises the gap between a complex offer and a clear commercial story without inventing product claims.",
+                        **({"discovery_invitation": invitation} if invitation is not None else {}),
                     },
                     "executive_result": "Claude returned the tailored outreach package.",
                     "verified_at": self.NOW.isoformat(),
@@ -65,6 +73,7 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
             StubCommandService(),
             store_path=store,
             clock=lambda: self.NOW,
+            discovery_booking_url="https://calendar.app.google/example",
         )
 
     def test_strong_outreach_is_reviewed_then_exact_email_is_approval_gated_for_gmail(self):
@@ -108,6 +117,49 @@ class TonyOutreachPackageReviewTests(unittest.TestCase):
         self.assertIn("subject concise", judgement["failed_checks"])
         self.assertIn("would not send it yet", review.message)
         self.assertNotIn("Send the following reviewed outreach email", judgement["execution_next_action"])
+
+    def test_groundwork_invitation_adds_html_and_routes_only_to_an_unsent_gmail_draft(self):
+        sources = [
+            {"label": "About", "url": "https://example.com/about"},
+            {"label": "Impact", "url": "https://example.com/impact"},
+            {"label": "Wholesale", "url": "https://example.com/wholesale"},
+        ]
+        invitation = {
+            "company_name": "Example Co",
+            "first_name": "Alex",
+            "email_subject": self.SUBJECT,
+            "headline_lines": ["Example Co —", "what could the", "next chapter hold?"],
+            "intro_paragraphs": [
+                "We have been looking at Example Co's public growth story and are intrigued by the next strategic choice.",
+                "The opportunity may be to turn existing substance into sharper reasons for different audiences to choose.",
+            ],
+            "brand_visual_url": "https://example.com/brand.jpg?v=1",
+            "brand_visual_alt": "Example Co public brand image",
+            "groundwork_sources": sources,
+            "conversation_starters": [
+                {"heading": "WHICH GROWTH MATTERS MOST?", "body": "Which audience is the priority now?", "source_urls": [sources[0]["url"]]},
+                {"heading": "WHAT SHOULD WORK HARDER?", "body": "How could verified proof become more commercially useful?", "source_urls": [sources[1]["url"]]},
+                {"heading": "WHAT MUST REMAIN DISTINCTIVE?", "body": "Could scale strengthen the brand rather than flatten it?", "source_urls": [sources[2]["url"]]},
+            ],
+        }
+        service = self.service(invitation=invitation)
+
+        review = service.execute("What do you recommend?", [])
+        judgement = review.data["commercial_judgement"]
+        self.assertEqual(judgement["disposition"], "outreach_package_ready")
+        self.assertTrue(judgement["review_checks"]["groundwork_evidence_bound"])
+        self.assertTrue(judgement["review_checks"]["html_rendered"])
+        self.assertIn("unsent Gmail draft", judgement["recommended_next_action"])
+
+        handoff = service.execute("OK, do that", []).data["execution_handoff"]
+        payload = handoff["dispatch"]["payload"]
+        self.assertEqual(handoff["worker"], "Gmail")
+        self.assertEqual(handoff["execution_mode"], "approval_gated_write")
+        self.assertEqual(payload["operation"], "create_draft")
+        self.assertEqual(payload["recipient_email"], "alex@example.com")
+        self.assertIn("background:#f3efe8", payload["email_html"])
+        self.assertIn("calendar.app.google/example", payload["email_html"])
+        self.assertFalse(handoff["dispatch"].get("sent", False))
 
 
 if __name__ == "__main__":

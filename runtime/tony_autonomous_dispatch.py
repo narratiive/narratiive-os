@@ -70,6 +70,7 @@ class TonyAutonomousDispatchCommandService:
     }
     _WRITE_PROOF_KEYS = {
         "sent",
+        "drafted",
         "created",
         "updated",
         "deleted",

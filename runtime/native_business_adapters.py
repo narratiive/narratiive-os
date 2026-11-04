@@ -199,7 +199,12 @@ class GmailDispatcher(GoogleAdapter):
 
     def __call__(self, contract: dict[str, Any]) -> dict[str, Any]:
         mode = _text(contract.get("execution_mode"))
-        return self._read(contract) if mode == "autonomous_read" else self._send(contract)
+        if mode == "autonomous_read":
+            return self._read(contract)
+        payload = _mapping(contract.get("payload"))
+        if _text(payload.get("operation")).casefold() == "create_draft":
+            return self._create_draft(contract)
+        return self._send(contract)
 
     def _read(self, contract: Mapping[str, Any]) -> dict[str, Any]:
         _require_read(contract)
@@ -372,6 +377,9 @@ class GmailDispatcher(GoogleAdapter):
         email["Subject"] = subject
         email["Message-ID"] = message_header
         email.set_content(body)
+        email_html = _text(payload.get("email_html"))
+        if email_html:
+            email.add_alternative(email_html, subtype="html")
         attachments = payload.get("attachments")
         if attachments is not None:
             if not isinstance(attachments, list) or len(attachments) > 3:
@@ -402,6 +410,69 @@ class GmailDispatcher(GoogleAdapter):
         if not message_id:
             raise BusinessAdapterError("gmail_send_unverified")
         return {"verified": True, "sent": True, "mutation_count": 1, "message_id": message_id, "thread_id": _text(sent.get("threadId"))}
+
+    def _create_draft(self, contract: Mapping[str, Any]) -> dict[str, Any]:
+        _require_write(contract)
+        payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
+        if _text(payload.get("kind")) != "reviewed_outreach_email":
+            raise BusinessAdapterError("gmail_draft_scope_rejected")
+        recipient = _text(payload.get("recipient_email") or target.get("recipient_email") or target.get("email"))
+        subject = _text(payload.get("subject") or payload.get("email_subject"))
+        body = _text(payload.get("body") or payload.get("email_body"))
+        email_html = _text(payload.get("email_html"))
+        if not recipient or "@" not in recipient or not subject or not body or not email_html:
+            raise BusinessAdapterError("gmail_draft_requires_exact_recipient_subject_text_and_html")
+
+        key = _text(contract.get("idempotency_key")) or hashlib.sha256(
+            f"draft\0{recipient}\0{subject}\0{body}\0{email_html}".encode("utf-8")
+        ).hexdigest()
+        message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
+        query = parse.urlencode({"q": f"rfc822msgid:{message_header}", "maxResults": "1"})
+        existing = self.client.call(f"{self.api_base}/users/me/drafts?{query}", headers=self._headers())
+        matches = existing.get("drafts", [])
+        if isinstance(matches, list) and matches:
+            prior = _mapping(matches[0])
+            message = _mapping(prior.get("message"))
+            return {
+                "verified": True,
+                "drafted": True,
+                "sent": False,
+                "mutation_count": 0,
+                "draft_id": _text(prior.get("id")),
+                "message_id": _text(message.get("id")),
+                "thread_id": _text(message.get("threadId")),
+                "duplicate_suppressed": True,
+                "summary": "The reviewed discovery invitation remains an unsent Gmail draft awaiting Matt's approval.",
+            }
+
+        email = EmailMessage()
+        email["To"] = recipient
+        email["Subject"] = subject
+        email["Message-ID"] = message_header
+        email.set_content(body)
+        email.add_alternative(email_html, subtype="html")
+        raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
+        created = self.client.call(
+            f"{self.api_base}/users/me/drafts",
+            method="POST",
+            headers=self._headers(),
+            body={"message": {"raw": raw}},
+        )
+        draft_id = _text(created.get("id"))
+        message = _mapping(created.get("message"))
+        message_id = _text(message.get("id"))
+        if not draft_id or not message_id:
+            raise BusinessAdapterError("gmail_draft_unverified")
+        return {
+            "verified": True,
+            "drafted": True,
+            "sent": False,
+            "mutation_count": 1,
+            "draft_id": draft_id,
+            "message_id": message_id,
+            "thread_id": _text(message.get("threadId")),
+            "summary": "The reviewed discovery invitation is stored as an unsent Gmail draft awaiting Matt's approval.",
+        }
 
 
 class GoogleCalendarDispatcher(GoogleAdapter):
