@@ -185,24 +185,17 @@ class OperatorMissionControlProjector:
             for state in runs
         )
         lifecycle = self._lifecycle(runs, lead)
-        blocker = next(
-            (
-                state.blocker
-                or (
-                    state.stage(state.current_stage_id).blocker
-                    if state.current_stage_id
-                    else None
-                )
-                for state in reversed(runs)
-                if state.blocker
-                or (
-                    state.current_stage_id
-                    and state.stage(state.current_stage_id).blocker
-                )
-            ),
-            None,
+        blocker = (
+            latest.blocker
+            or (
+                latest.stage(latest.current_stage_id).blocker
+                if latest and latest.current_stage_id
+                else None
+            )
+            if latest
+            else None
         )
-        failed = any(state.status.value == "failed" for state in runs)
+        failed = bool(latest and latest.status.value == "failed")
         waiting = bool(latest and latest.status.value == "awaiting_approval")
         requires_matt = waiting or bool(latest and (latest.revision_owner or "").casefold() == "matt")
         waiting_externally = bool(blocker and str(blocker).casefold().startswith("waiting_external"))
