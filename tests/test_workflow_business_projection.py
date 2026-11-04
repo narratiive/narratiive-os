@@ -92,6 +92,19 @@ class WorkflowBusinessProjectionTests(unittest.TestCase):
             self.assertFalse(calls)
             self.assertNotEqual(prepared["projection_key"], missing_key)
 
+            for malformed in (
+                "-40d0c9cfa8f2810fb599d478255f11e4",
+                "40d0c9cf--a8f2-810f-b599-d478255f11e4",
+            ):
+                current.input_payload = {"notion_page_id": malformed}
+                rejected = service.sync(
+                    current,
+                    approver="telegram:123",
+                    rationale="SAFE malformed identity",
+                )
+                self.assertEqual(rejected["projection_status"], "notion_record_identity_required")
+                self.assertFalse(calls)
+
     def test_ambiguous_dispatch_requires_reconciliation_not_blind_retry(self) -> None:
         calls = []
 

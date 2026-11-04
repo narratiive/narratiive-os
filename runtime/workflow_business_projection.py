@@ -242,8 +242,10 @@ def _notion_record_id(state: WorkflowState) -> str:
     )
     for value in candidates:
         identity = str(value or "").strip()
-        compact = identity.replace("-", "")
-        if re.fullmatch(r"[0-9a-fA-F]{32}", compact):
+        if re.fullmatch(
+            r"(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+            identity,
+        ):
             return identity
     return ""
 
