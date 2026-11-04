@@ -278,6 +278,8 @@ class TonyWorkflowRuntime:
         stage = state.stage(state.current_stage_id)
         if stage.side_effect_classification != "preparation":
             raise ValueError("manual recovery cannot complete an external-action stage")
+        if state.stages.index(stage) != len(state.stages) - 1:
+            raise ValueError("manual recovery cannot bypass later workflow stages")
         supplied = dict(output)
         missing = [
             field
@@ -725,6 +727,9 @@ class TonyWorkflowRuntime:
                     "recovery_id": manual_recovery.get("recovery_id"),
                     "artifact_id": manual_recovery.get("artifact_id"),
                     "artifact_checksum": manual_recovery.get("artifact_checksum"),
+                    "artifact_title": manual_recovery.get("artifact_title"),
+                    "artifact_version": manual_recovery.get("artifact_version"),
+                    "source_uri": manual_recovery.get("source_uri"),
                     "prior_blocker": manual_recovery.get("prior_blocker"),
                     "automated_completion": False,
                 }

@@ -108,6 +108,8 @@ class WorkflowEngine:
             raise InvalidTransition("manual recovery requires the current blocked stage")
         if stage.side_effect_classification != "preparation":
             raise InvalidTransition("manual recovery cannot complete an external-action stage")
+        if state.stages.index(stage) != len(state.stages) - 1:
+            raise InvalidTransition("manual recovery cannot bypass later workflow stages")
         quality = stage.quality_result or {}
         if not (
             quality.get("passed") is True
@@ -130,6 +132,8 @@ class WorkflowEngine:
         state.current_stage_id = None
         state.blocker = None
         state.proposed_next_action = None
+        # The verified manual-recovery decision is itself the exact artefact
+        # approval for this final stage. Later stages are rejected above.
         state.status = WorkflowStatus.COMPLETE
         self._refresh_workflow(state)
         return state

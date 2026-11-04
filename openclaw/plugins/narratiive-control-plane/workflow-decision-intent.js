@@ -25,7 +25,19 @@ export function hasExplicitWorkflowDecisionIntent(operation, instruction) {
   return /(?:^|[.!?]\s*)(?:please\s+)?revise\b|\b(?:i|we)\s+(?:explicitly\s+)?(?:request|require)\s+(?:a\s+)?revision\b/i.test(text);
 }
 
-export function workflowDecisionProofMaterial({ runId, operation, reference, approvalToken, instruction, authorisationReference = "" }) {
+export function workflowDecisionProofMaterial({
+  runId,
+  operation,
+  reference,
+  approvalToken,
+  instruction,
+  authorisationReference = "",
+  recoveryId = "",
+  artifactTitle = "",
+  artifactVersion = "",
+  sourceUri = "",
+  artifactChecksum = "",
+}) {
   const normalized = normalizedOperation(operation);
   const fields = [
     "narratiive-workflow-decision-v1",
@@ -36,6 +48,15 @@ export function workflowDecisionProofMaterial({ runId, operation, reference, app
     String(instruction || ""),
   ];
   if (normalized === CLASSIFICATION_OPERATION || normalized === MANUAL_RECOVERY_OPERATION) fields.push(String(authorisationReference || ""));
+  if (normalized === MANUAL_RECOVERY_OPERATION) {
+    fields.push(
+      String(recoveryId || ""),
+      String(artifactTitle || ""),
+      String(artifactVersion || ""),
+      String(sourceUri || ""),
+      String(artifactChecksum || ""),
+    );
+  }
   return fields.join("\0");
 }
 
@@ -130,8 +151,17 @@ export function buildTrustedWorkflowRecoveryParams(params, trustedTurn, bridgeTo
   }
   const reference = String(params?.reference || "").trim();
   const authorisationReference = String(params?.authorisation_reference || "").trim();
-  if (!reference || !authorisationReference) {
-    throw new Error("manual recovery requires an exact run reference and authorisation reference");
+  const recovery = params?.manual_recovery;
+  if (!reference || !authorisationReference || !recovery || typeof recovery !== "object" || Array.isArray(recovery)) {
+    throw new Error("manual recovery requires an exact run, artefact and authorisation reference");
+  }
+  const recoveryId = String(recovery.recovery_id || "").trim();
+  const artifactTitle = String(recovery.artifact_title || "").trim();
+  const artifactVersion = String(recovery.artifact_version || "").trim();
+  const sourceUri = String(recovery.source_uri || "").trim();
+  const artifactChecksum = String(recovery.artifact_checksum || "").trim();
+  if (!recoveryId || !artifactTitle || !artifactVersion || !sourceUri || !/^[0-9a-f]{64}$/.test(artifactChecksum)) {
+    throw new Error("manual recovery requires the exact immutable artefact identity");
   }
   const fields = {
     runId: trustedTurn.runId,
@@ -140,11 +170,21 @@ export function buildTrustedWorkflowRecoveryParams(params, trustedTurn, bridgeTo
     approvalToken: "",
     instruction,
     authorisationReference,
+    recoveryId,
+    artifactTitle,
+    artifactVersion,
+    sourceUri,
+    artifactChecksum,
   };
+  const proof = signWorkflowDecisionProof(bridgeToken, fields);
+  if (trustedTurn.manualRecoveryClaim && trustedTurn.manualRecoveryClaim !== proof) {
+    throw new Error("the current human turn is already bound to a different manual recovery");
+  }
+  trustedTurn.manualRecoveryClaim = proof;
   return {
     ...params,
     recovery_instruction: instruction,
     _recovery_instruction_run_id: trustedTurn.runId,
-    _recovery_instruction_proof: signWorkflowDecisionProof(bridgeToken, fields),
+    _recovery_instruction_proof: proof,
   };
 }

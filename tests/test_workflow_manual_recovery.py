@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
+from runtime.models import StageRecord
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
@@ -187,9 +188,14 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
             current = WorkflowMissionControlProjector(workspace_id="narratiive").project(states).runs[0]
             self.assertEqual(current["workflow_id"], "blueprint_lite_to_discovery_preparation")
             self.assertIsNone(current["blocker"])
+            self.assertEqual(current["execution_mode"], "workflow_automation_after_manual_recovery")
+            self.assertFalse(current["automated_completion"])
+            self.assertEqual(current["manual_recovery"]["artifact_version"], "v1")
             projection = runtime.business_projection.prepare(states[1])
             self.assertEqual(projection["lifecycle_stage"], "discovery")
             self.assertEqual(projection["blocker"], current["blocker"])
+            self.assertEqual(projection["execution_mode"], current["execution_mode"])
+            self.assertEqual(projection["manual_recovery"], current["manual_recovery"])
             synced = runtime.sync_business_projection(
                 states[1].run_id,
                 approver="telegram:matt",
@@ -214,6 +220,43 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
             durable = restarted.runs.load_run(recovered.run_id)
             self.assertEqual(durable.approval_history[-1]["recovery_id"], "origin-groundwork-v1-recovery")
             self.assertEqual(durable.stages[0].output_artifacts[-1].checksum, decision["artifact_checksum"])
+
+    def test_manual_recovery_cannot_skip_a_later_workflow_stage(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            runtime = build_tony_workflow_runtime(
+                tmp,
+                workspace_id="narratiive",
+                client_id="safe-client",
+                dispatchers={},
+                environ={},
+            )
+            blocked = self._blocked(
+                runtime,
+                "multi-stage-recovery-denied",
+                "multi-stage-entity",
+                "TEST / FICTIONAL — Multi Stage",
+            )
+            blocked.stages.append(
+                StageRecord(
+                    stage_id="later_human_gate",
+                    agent_ref="matt",
+                    step_approval_required=True,
+                    side_effect_classification="preparation",
+                )
+            )
+            runtime.runs.repository.save(blocked)
+
+            with self.assertRaisesRegex(ValueError, "cannot bypass later workflow stages"):
+                self._recover(
+                    runtime,
+                    blocked.run_id,
+                    "TEST / FICTIONAL — Multi Stage",
+                    "unsafe-multi-stage-recovery",
+                )
+            unchanged = runtime.runs.load_run(blocked.run_id)
+            self.assertEqual(unchanged.status.value, "blocked")
+            self.assertFalse(unchanged.approval_history)
+            self.assertFalse(unchanged.stages[0].output_artifacts)
 
     def test_second_fictional_prospect_fails_recovers_and_tony_suppresses_replays(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

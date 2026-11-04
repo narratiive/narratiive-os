@@ -158,6 +158,8 @@ def has_explicit_manual_recovery_intent(instruction: str) -> bool:
 def workflow_decision_proof_material(
     *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
     authorisation_reference: str = "",
+    recovery_id: str = "", artifact_title: str = "", artifact_version: str = "",
+    source_uri: str = "", artifact_checksum: str = "",
 ) -> bytes:
     normalized_operation = operation.strip().casefold().replace("-", "_")
     values = (
@@ -170,6 +172,15 @@ def workflow_decision_proof_material(
     )
     if normalized_operation in {"classify_synthetic_test", "manual_recovery"}:
         values = (*values, authorisation_reference)
+    if normalized_operation == "manual_recovery":
+        values = (
+            *values,
+            recovery_id,
+            artifact_title,
+            artifact_version,
+            source_uri,
+            artifact_checksum,
+        )
     return "\0".join(values).encode("utf-8")
 
 
@@ -183,6 +194,8 @@ def verify_workflow_decision_proof(
     instruction: str,
     proof: str,
     authorisation_reference: str = "",
+    recovery_id: str = "", artifact_title: str = "", artifact_version: str = "",
+    source_uri: str = "", artifact_checksum: str = "",
 ) -> bool:
     if not secret or not run_id or not proof:
         return False
@@ -195,6 +208,11 @@ def verify_workflow_decision_proof(
             approval_token=approval_token,
             instruction=instruction,
             authorisation_reference=authorisation_reference,
+            recovery_id=recovery_id,
+            artifact_title=artifact_title,
+            artifact_version=artifact_version,
+            source_uri=source_uri,
+            artifact_checksum=artifact_checksum,
         ),
         hashlib.sha256,
     ).hexdigest()
@@ -558,6 +576,9 @@ class LeadAwareTonyApplication:
                     instruction_run_id = str((inputs or {}).get("recovery_instruction_run_id") or "").strip()
                     instruction_proof = str((inputs or {}).get("recovery_instruction_proof") or "").strip()
                     authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
+                    recovery = (inputs or {}).get("manual_recovery")
+                    if not isinstance(recovery, Mapping):
+                        raise ValueError("manual recovery requires the exact immutable artefact identity")
                     if not has_explicit_manual_recovery_intent(instruction):
                         raise ValueError("manual recovery requires an explicit current-human recovery instruction")
                     if not instruction_run_id or not authorisation_reference:
@@ -571,6 +592,11 @@ class LeadAwareTonyApplication:
                         instruction=instruction,
                         proof=instruction_proof,
                         authorisation_reference=authorisation_reference,
+                        recovery_id=str(recovery.get("recovery_id") or ""),
+                        artifact_title=str(recovery.get("artifact_title") or ""),
+                        artifact_version=str(recovery.get("artifact_version") or ""),
+                        source_uri=str(recovery.get("source_uri") or ""),
+                        artifact_checksum=str(recovery.get("artifact_checksum") or ""),
                     ):
                         raise ValueError("manual recovery lacks verified verbatim current-human instruction provenance")
                     inputs["recovery_approval_evidence"] = {

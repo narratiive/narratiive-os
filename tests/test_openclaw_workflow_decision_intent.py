@@ -97,6 +97,14 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "rationale": "Use the approved immutable recovery artefact.",
             "recovery_instruction": prompt,
             "authorisation_reference": "chat-message:origin-recovery",
+            "manual_recovery": {
+                "recovery_id": "origin-groundwork-v1",
+                "artifact_title": "Origin Coffee Groundwork Review",
+                "artifact_version": "v1",
+                "source_uri": "https://docs.example.invalid/origin/v1",
+                "artifact_checksum": "a" * 64,
+                "output": {"blueprint_lite": "approved"},
+            },
         }
         result = self._node(
             f"buildTrustedWorkflowRecoveryParams({json.dumps(params)},{{runId:'conversation-turn-2',prompt:{json.dumps(prompt)}}},'secret')"
@@ -104,6 +112,17 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         self.assertEqual(result["recovery_instruction"], prompt)
         self.assertEqual(result["_recovery_instruction_run_id"], "conversation-turn-2")
         self.assertEqual(len(result["_recovery_instruction_proof"]), 64)
+
+        changed = json.loads(json.dumps(params))
+        changed["manual_recovery"]["artifact_checksum"] = "b" * 64
+        expression = (
+            "(()=>{const turn={runId:'conversation-turn-2',prompt:"
+            f"{json.dumps(prompt)}"
+            "};buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(params)},turn,'secret');try{{buildTrustedWorkflowRecoveryParams({json.dumps(changed)},turn,'secret');return 'allowed'}}"
+            "catch(error){return error.message}})()"
+        )
+        self.assertIn("different manual recovery", self._node(expression))
 
         refused = dict(params, recovery_instruction="Do not recover the existing fictional Origin engagement workflow.")
         expression = (

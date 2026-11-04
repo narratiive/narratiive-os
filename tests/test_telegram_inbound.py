@@ -372,6 +372,14 @@ class TelegramInboundTests(unittest.TestCase):
         reference = "origin-fictional-run"
         instruction = "Recover the existing fictional Origin engagement through the canonical workflow state."
         authorisation_reference = "chat-message:origin-recovery"
+        recovery = {
+            "recovery_id": "safe-recovery",
+            "artifact_title": "Origin Coffee Groundwork Review",
+            "artifact_version": "v1",
+            "source_uri": "https://docs.example.invalid/origin/v1",
+            "artifact_checksum": "a" * 64,
+            "output": {"blueprint_lite": "approved"},
+        }
         proof = hmac.new(
             b"secret",
             workflow_decision_proof_material(
@@ -381,17 +389,22 @@ class TelegramInboundTests(unittest.TestCase):
                 approval_token="",
                 instruction=instruction,
                 authorisation_reference=authorisation_reference,
+                recovery_id=recovery["recovery_id"],
+                artifact_title=recovery["artifact_title"],
+                artifact_version=recovery["artifact_version"],
+                source_uri=recovery["source_uri"],
+                artifact_checksum=recovery["artifact_checksum"],
             ),
             hashlib.sha256,
         ).hexdigest()
 
-        def call(*, recovery_proof: str = proof, source: str = "openclaw_telegram_workflow_tool"):
+        def call(*, recovery_proof: str = proof, source: str = "openclaw_telegram_workflow_tool", recovery_value=None):
             body = {
                 "operation": "manual-recovery",
                 "reference": reference,
                 "rationale": "Use the exact approved manual artefact.",
                 "inputs": {
-                    "manual_recovery": {"recovery_id": "safe-recovery"},
+                    "manual_recovery": recovery_value or recovery,
                     "authorisation_reference": authorisation_reference,
                     "recovery_instruction": instruction,
                     "recovery_instruction_run_id": "openclaw-conversation-turn-2",
@@ -413,6 +426,8 @@ class TelegramInboundTests(unittest.TestCase):
         evidence = workflows.calls[-1]["inputs"]["recovery_approval_evidence"]
         self.assertEqual(evidence["human_instruction"], instruction)
         self.assertEqual(evidence["explicit_decision_intent"], "manual_recovery")
+        changed = {**recovery, "artifact_checksum": "b" * 64}
+        self.assertFalse(call(recovery_value=changed)["ok"])
         self.assertFalse(call(recovery_proof="0" * 64)["ok"])
         self.assertFalse(call(source="untrusted")["ok"])
 

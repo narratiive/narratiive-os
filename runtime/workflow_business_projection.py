@@ -131,6 +131,20 @@ class WorkflowBusinessProjectionService:
             ),
             None,
         )
+        lineage = state.input_payload.get("_lineage")
+        inherited_recovery = (
+            lineage.get("manual_recovery")
+            if isinstance(lineage, Mapping) and isinstance(lineage.get("manual_recovery"), Mapping)
+            else None
+        )
+        recovery_evidence = manual_recovery or inherited_recovery
+        execution_mode = (
+            "manual_recovery"
+            if manual_recovery
+            else "workflow_automation_after_manual_recovery"
+            if inherited_recovery
+            else "workflow_automation"
+        )
         payload = {
             "workflow_run_id": state.run_id,
             "workflow_id": state.workflow_id,
@@ -145,17 +159,17 @@ class WorkflowBusinessProjectionService:
             "external_action_taken": state.external_action_taken,
             "deliverable_state": deliverable_state,
             "drive_files": drive_files,
-            "execution_mode": "manual_recovery" if manual_recovery else "workflow_automation",
-            "automated_completion": False if manual_recovery else None,
+            "execution_mode": execution_mode,
+            "automated_completion": False if recovery_evidence else None,
             "manual_recovery": (
                 {
-                    "recovery_id": manual_recovery.get("recovery_id"),
-                    "artifact_id": manual_recovery.get("artifact_id"),
-                    "artifact_checksum": manual_recovery.get("artifact_checksum"),
-                    "artifact_version": manual_recovery.get("artifact_version"),
-                    "prior_blocker": manual_recovery.get("prior_blocker"),
+                    "recovery_id": recovery_evidence.get("recovery_id"),
+                    "artifact_id": recovery_evidence.get("artifact_id"),
+                    "artifact_checksum": recovery_evidence.get("artifact_checksum"),
+                    "artifact_version": recovery_evidence.get("artifact_version"),
+                    "prior_blocker": recovery_evidence.get("prior_blocker"),
                 }
-                if manual_recovery
+                if recovery_evidence
                 else None
             ),
         }

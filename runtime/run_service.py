@@ -357,6 +357,8 @@ class WorkflowRunService:
             raise ValueError("manual recovery requires the current blocked stage")
         if stage.side_effect_classification != "preparation":
             raise ValueError("manual recovery cannot complete an external-action stage")
+        if state.stages.index(stage) != len(state.stages) - 1:
+            raise ValueError("manual recovery cannot bypass later workflow stages")
         blocker = str(stage.blocker or state.blocker or "").strip()
         if not blocker:
             raise ValueError("manual recovery requires a persisted blocker")
