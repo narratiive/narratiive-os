@@ -123,6 +123,14 @@ class WorkflowBusinessProjectionService:
     def _projection(self, state: WorkflowState) -> dict[str, Any]:
         latest = next((stage for stage in reversed(state.stages) if stage.output_artifacts), None)
         deliverable_state, drive_files = _deliverable_persistence(state)
+        manual_recovery = next(
+            (
+                item
+                for item in reversed(state.approval_history)
+                if item.get("decision") == "manual_recovery_approved"
+            ),
+            None,
+        )
         payload = {
             "workflow_run_id": state.run_id,
             "workflow_id": state.workflow_id,
@@ -137,6 +145,19 @@ class WorkflowBusinessProjectionService:
             "external_action_taken": state.external_action_taken,
             "deliverable_state": deliverable_state,
             "drive_files": drive_files,
+            "execution_mode": "manual_recovery" if manual_recovery else "workflow_automation",
+            "automated_completion": False if manual_recovery else None,
+            "manual_recovery": (
+                {
+                    "recovery_id": manual_recovery.get("recovery_id"),
+                    "artifact_id": manual_recovery.get("artifact_id"),
+                    "artifact_checksum": manual_recovery.get("artifact_checksum"),
+                    "artifact_version": manual_recovery.get("artifact_version"),
+                    "prior_blocker": manual_recovery.get("prior_blocker"),
+                }
+                if manual_recovery
+                else None
+            ),
         }
         canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return {**payload, "projection_key": hashlib.sha256(canonical.encode("utf-8")).hexdigest()}

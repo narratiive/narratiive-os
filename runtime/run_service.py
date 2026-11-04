@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 import threading
 from contextlib import contextmanager
@@ -277,6 +278,126 @@ class WorkflowRunService:
                 or value.startswith("worker_output_rejected:")
             ),
         )
+
+    def complete_blocked_stage_with_manual_recovery(
+        self,
+        run_id: str,
+        *,
+        artifact: ArtifactRef,
+        recovery_id: str,
+        approver: str,
+        rationale: str,
+        artifact_title: str,
+        artifact_version: str,
+        source_uri: str,
+        approval_evidence: Mapping[str, object],
+    ) -> tuple[WorkflowState, bool]:
+        """Record one exact approved manual artefact as a blocked-step recovery.
+
+        The prior blocker, attempts and artefacts remain untouched.  Replay of
+        the same recovery identity is suppressed; a conflicting recovery fails
+        closed.
+        """
+
+        state = self.repository.load(run_id)
+        identity = recovery_id.strip()
+        human = approver.strip()
+        reason = rationale.strip()
+        title = artifact_title.strip()
+        version = artifact_version.strip()
+        uri = source_uri.strip()
+        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,199}", identity):
+            raise ValueError("manual recovery requires a safe stable recovery identity")
+        if not all((human, reason, title, version, uri, artifact.checksum)):
+            raise ValueError("manual recovery requires approver, rationale and exact artefact identity")
+        if artifact.artifact_type != "manual_recovery_artifact":
+            raise ValueError("manual recovery requires an immutable manual recovery artefact")
+        if not re.fullmatch(r"[0-9a-f]{64}", str(artifact.checksum or "")):
+            raise ValueError("manual recovery artefact checksum is invalid")
+        evidence = dict(approval_evidence)
+        instruction = str(evidence.get("human_instruction") or "").strip()
+        instruction_checksum = str(evidence.get("human_instruction_sha256") or "")
+        if not (
+            evidence.get("verbatim_current_human_instruction_verified") is True
+            and evidence.get("explicit_decision_intent") == "manual_recovery"
+            and instruction
+            and re.fullmatch(r"[0-9a-f]{64}", instruction_checksum)
+            and hashlib.sha256(instruction.encode("utf-8")).hexdigest() == instruction_checksum
+        ):
+            raise ValueError("manual recovery requires verified current-human approval evidence")
+        expected_metadata = {
+            "recovery_id": identity,
+            "source_uri": uri,
+            "source_title": title,
+            "source_version": version,
+            "approved_by": human,
+            "execution_mode": "manual_recovery",
+            "automated_completion": False,
+        }
+        if any(artifact.metadata.get(key) != value for key, value in expected_metadata.items()):
+            raise ValueError("manual recovery artefact metadata does not match the approved transition")
+
+        prior = [
+            item
+            for item in state.approval_history
+            if item.get("decision") == "manual_recovery_approved"
+        ]
+        if prior:
+            recorded = prior[-1]
+            if (
+                recorded.get("recovery_id") == identity
+                and recorded.get("artifact_checksum") == artifact.checksum
+            ):
+                return state, True
+            raise ValueError("a different manual recovery is already recorded for this workflow")
+        if state.status is not WorkflowStatus.BLOCKED or not state.current_stage_id:
+            raise ValueError("manual recovery requires a currently blocked workflow")
+        stage = state.stage(state.current_stage_id)
+        if stage.status is not StageStatus.BLOCKED:
+            raise ValueError("manual recovery requires the current blocked stage")
+        if stage.side_effect_classification != "preparation":
+            raise ValueError("manual recovery cannot complete an external-action stage")
+        blocker = str(stage.blocker or state.blocker or "").strip()
+        if not blocker:
+            raise ValueError("manual recovery requires a persisted blocker")
+
+        prior_quality_result = dict(stage.quality_result or {})
+        decision = {
+            "decision": "manual_recovery_approved",
+            "recovery_id": identity,
+            "approver": human,
+            "rationale": reason,
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "stage_id": stage.stage_id,
+            "prior_blocker": blocker,
+            "artifact_id": artifact.artifact_id,
+            "artifact_checksum": artifact.checksum,
+            "artifact_title": title,
+            "artifact_version": version,
+            "source_uri": uri,
+            "execution_mode": "manual_recovery",
+            "automated_completion": False,
+            "approval_evidence": evidence,
+        }
+        stage.quality_result = {
+            "passed": True,
+            "evaluation_mode": "approved_manual_recovery",
+            "automated": False,
+            "prior_blocker": blocker,
+            "artifact_checksum": artifact.checksum,
+            "human_approval_verified": True,
+            "prior_quality_result": prior_quality_result,
+        }
+        state.approval_history.append(decision)
+        self.engine.complete_blocked_stage_with_manual_recovery(
+            state,
+            stage.stage_id,
+            artifact,
+        )
+        state.approval_status = "approved"
+        state.touch()
+        self._commit(state, "stage.manual_recovery_completed", decision)
+        return state, False
 
     def _request_blocked_revision(
         self,

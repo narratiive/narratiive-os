@@ -143,6 +143,18 @@ def has_explicit_workflow_decision_intent(operation: str, instruction: str) -> b
     )
 
 
+def has_explicit_manual_recovery_intent(instruction: str) -> bool:
+    text = str(instruction or "")
+    if not text.strip() or _QUESTION_WORKFLOW_DECISION.search(text):
+        return False
+    if re.search(r"\b(?:do\s+not|don't|dont|never)\s+(?:recover|resume)\b", text, re.IGNORECASE):
+        return False
+    return bool(
+        re.search(r"\b(?:recover|recovery|resume)\b", text, re.IGNORECASE)
+        and re.search(r"\b(?:workflow|engagement|run|state)\b", text, re.IGNORECASE)
+    )
+
+
 def workflow_decision_proof_material(
     *, run_id: str, operation: str, reference: str, approval_token: str, instruction: str,
     authorisation_reference: str = "",
@@ -156,7 +168,7 @@ def workflow_decision_proof_material(
         approval_token,
         instruction,
     )
-    if normalized_operation == "classify_synthetic_test":
+    if normalized_operation in {"classify_synthetic_test", "manual_recovery"}:
         values = (*values, authorisation_reference)
     return "\0".join(values).encode("utf-8")
 
@@ -461,6 +473,7 @@ class LeadAwareTonyApplication:
                 "continue": "continue",
                 "resume": "resume",
                 "recover": "recover",
+                "manual-recovery": "manual-recovery",
                 "projection": "projection",
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
@@ -483,7 +496,7 @@ class LeadAwareTonyApplication:
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
-                "sync-campaign-learning", "classify-synthetic-test",
+                "sync-campaign-learning", "classify-synthetic-test", "manual-recovery",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
@@ -491,7 +504,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 if operation in {"approve", "reject", "request-revision"}:
@@ -540,6 +553,34 @@ class LeadAwareTonyApplication:
                         authorisation_reference=authorisation_reference,
                     ):
                         raise ValueError("workflow classification lacks verified verbatim current-human instruction provenance")
+                if operation == "manual-recovery":
+                    instruction = str((inputs or {}).get("recovery_instruction") or "")
+                    instruction_run_id = str((inputs or {}).get("recovery_instruction_run_id") or "").strip()
+                    instruction_proof = str((inputs or {}).get("recovery_instruction_proof") or "").strip()
+                    authorisation_reference = str((inputs or {}).get("authorisation_reference") or "").strip()
+                    if not has_explicit_manual_recovery_intent(instruction):
+                        raise ValueError("manual recovery requires an explicit current-human recovery instruction")
+                    if not instruction_run_id or not authorisation_reference:
+                        raise ValueError("manual recovery requires trusted-turn provenance and an authorisation reference")
+                    if not verify_workflow_decision_proof(
+                        str(self.base.bridge_token or ""),
+                        run_id=instruction_run_id,
+                        operation=operation,
+                        reference=reference,
+                        approval_token="",
+                        instruction=instruction,
+                        proof=instruction_proof,
+                        authorisation_reference=authorisation_reference,
+                    ):
+                        raise ValueError("manual recovery lacks verified verbatim current-human instruction provenance")
+                    inputs["recovery_approval_evidence"] = {
+                        "human_instruction": instruction,
+                        "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+                        "turn_run_id": instruction_run_id,
+                        "authorisation_reference": authorisation_reference,
+                        "verbatim_current_human_instruction_verified": True,
+                        "explicit_decision_intent": "manual_recovery",
+                    }
                 principal = (
                     f"matt:{self.authorised_principal_id}"
                     if operation == "sync-campaign-learning"

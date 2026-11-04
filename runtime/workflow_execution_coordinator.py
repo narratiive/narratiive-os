@@ -91,6 +91,24 @@ class FileWorkflowArtifactStore:
             governance=governance,
         )
 
+    def persist_manual_recovery(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+        output: Mapping[str, Any],
+        *,
+        recovery_id: str,
+        governance: Mapping[str, Any],
+    ) -> ArtifactRef:
+        return self._persist(
+            state,
+            stage_id,
+            output,
+            artifact_type="manual_recovery_artifact",
+            discriminator=f"manual-recovery-{recovery_id}",
+            governance=governance,
+        )
+
     def _persist(
         self,
         state: WorkflowState,
@@ -182,6 +200,13 @@ class WorkflowExecutionCoordinator:
         )
         self.lock_root = self.artifacts.root / ".locks"
         self.lock_root.mkdir(parents=True, exist_ok=True)
+
+    @contextmanager
+    def run_lock(self, run_id: str):
+        """Serialise a public runtime transition against one durable run."""
+
+        with self._run_lock(run_id):
+            yield
 
     def enqueue(
         self,

@@ -38,6 +38,15 @@ class WorkflowCommandBackend(Protocol):
     def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
+    def recover_with_approved_artifact(
+        self,
+        state: WorkflowState,
+        *,
+        recovery: Mapping[str, Any],
+        approver: str,
+        rationale: str,
+        approval_evidence: Mapping[str, Any],
+    ) -> tuple[WorkflowState, bool]: ...
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def recover(self) -> int: ...
     def latest_output(self, state: WorkflowState) -> Mapping[str, Any] | None: ...
@@ -186,6 +195,31 @@ class FileWorkflowCommandBackend:
         runtime = self._runtime(state)
         runtime.resume(state.run_id)
         return runtime.runs.load_run(state.run_id)
+
+    def recover_with_approved_artifact(
+        self,
+        state: WorkflowState,
+        *,
+        recovery: Mapping[str, Any],
+        approver: str,
+        rationale: str,
+        approval_evidence: Mapping[str, Any],
+    ) -> tuple[WorkflowState, bool]:
+        output = recovery.get("output")
+        if not isinstance(output, Mapping):
+            raise ValueError("manual recovery requires a structured artefact output")
+        return self._runtime(state).recover_with_approved_artifact(
+            state.run_id,
+            recovery_id=str(recovery.get("recovery_id") or ""),
+            artifact_title=str(recovery.get("artifact_title") or ""),
+            artifact_version=str(recovery.get("artifact_version") or ""),
+            source_uri=str(recovery.get("source_uri") or ""),
+            artifact_checksum=str(recovery.get("artifact_checksum") or ""),
+            output=dict(output),
+            approver=approver,
+            rationale=rationale,
+            approval_evidence=approval_evidence,
+        )
 
     def advance(self, state: WorkflowState, additional_inputs: Mapping[str, Any] | None = None) -> WorkflowState:
         runtime = self._runtime(state)
@@ -611,7 +645,7 @@ class TonyWorkflowCommandService:
 
     _COMMANDS = {
         "workflow", "work", "approvals", "blockers", "artefact", "artifact",
-        "proposed", "approve", "reject", "revise", "resume", "recover",
+        "proposed", "approve", "reject", "revise", "resume", "recover", "manual-recovery",
         "projection", "sync-notion", "research",
         "deliver-review",
         "commission",
@@ -1149,6 +1183,35 @@ class TonyWorkflowCommandService:
                     decision_evidence=decision_evidence,
                 )
                 return CommandResponse("reject", "healthy", f"Revision requested for {changed.run_id}; progression remains stopped until revised work passes quality.", self._summary(changed))
+            if name == "manual-recovery":
+                if not principal_id.strip():
+                    return self._error(name, "authorised_principal_required", "Manual recovery requires Matt's authenticated identity.")
+                if not rationale:
+                    return self._error(name, "rationale_required", "Manual recovery requires an explicit reason.")
+                supplied = dict(inputs or {})
+                recovery = supplied.get("manual_recovery")
+                approval_evidence = supplied.get("recovery_approval_evidence")
+                if not isinstance(recovery, Mapping):
+                    return self._error(name, "manual_recovery_artifact_required", "Supply one exact immutable manual recovery artefact.")
+                if not isinstance(approval_evidence, Mapping):
+                    return self._error(name, "manual_recovery_approval_required", "Supply verified current-human manual recovery approval evidence.")
+                changed, replay = self.backend.recover_with_approved_artifact(
+                    state,
+                    recovery=recovery,
+                    approver=principal_id,
+                    rationale=rationale,
+                    approval_evidence=approval_evidence,
+                )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    (
+                        "That exact approved manual recovery is already recorded; no duplicate event or artefact was created."
+                        if replay
+                        else "Recorded the exact approved manual recovery artefact. Automation did not complete the recovered step."
+                    ),
+                    {**self._summary(changed), "manual_recovery": True, "automated_completion": False, "replay": replay},
+                )
             if name == "resume":
                 changed = self.backend.resume(state)
                 return CommandResponse(name, "healthy", f"Resumed {changed.run_id} from persisted state. No external action was performed.", self._summary(changed))

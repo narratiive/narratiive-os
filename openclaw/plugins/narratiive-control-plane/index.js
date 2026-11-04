@@ -4,7 +4,7 @@ import { buildNativeApprovalRequirement, buildWorkflowApprovalRequirement } from
 import { executeApprovedAction } from "./execution-client.js";
 import { executeSafeRead } from "./safe-read-client.js";
 import { resolveBridgeToken } from "./bridge-auth.js";
-import { buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
+import { buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, buildTrustedWorkflowRecoveryParams, hasExplicitWorkflowDecisionIntent } from "./workflow-decision-intent.js";
 import { blocksSpecialistSpawn, hookRunKey, retainFailedCommission } from "./workflow-spawn-policy.js";
 
 const DEFAULT_URL = "http://127.0.0.1:8790/control-plane";
@@ -39,7 +39,7 @@ const STATE_READ_SCHEMA = {
 const WORKFLOW_OPERATIONS = [
   "status", "current_work", "approvals", "blockers", "latest_artifact",
   "proposed_next_action", "approve", "reject", "request_revision", "continue",
-  "resume", "recover", "projection", "sync_notion",
+  "resume", "recover", "manual_recovery", "projection", "sync_notion",
   "additional_research", "deliver_internal_review",
   "commission", "artifact_detail", "action_preview", "execute_action",
   "classify_synthetic_test",
@@ -59,6 +59,7 @@ const WORKFLOW_SCHEMA = {
   workflow_id: { type: "string", minLength: 1, maxLength: 200 },
   commitment_id: { type: "string", minLength: 1, maxLength: 200 },
   classification_instruction: { type: "string", minLength: 1, maxLength: 2000, description: "Verbatim current human instruction explicitly classifying this exact workflow entity as an internal synthetic test." },
+  recovery_instruction: { type: "string", minLength: 1, maxLength: 4000, description: "Verbatim current human instruction explicitly authorising recovery of this exact blocked workflow." },
   authorisation_reference: { type: "string", minLength: 1, maxLength: 500, description: "Durable reference for the explicit founder authorisation." },
   inputs: { type: "object", additionalProperties: true },
 };
@@ -114,7 +115,7 @@ async function executeWorkflowControl(params) {
   const reference = String(params?.reference || "").trim();
   const rationale = String(params?.rationale || "").trim();
   if (!WORKFLOW_REFERENCE_OPTIONAL.has(operation) && !reference) throw new Error("workflow reference is required");
-  if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation) || operation === "commission" || operation === "classify_synthetic_test") && !rationale) throw new Error("workflow decisions require a rationale");
+  if ((WORKFLOW_DECISION_OPERATIONS.has(operation) || WORKFLOW_NATIVE_APPROVAL_OPERATIONS.has(operation) || operation === "commission" || operation === "classify_synthetic_test" || operation === "manual_recovery") && !rationale) throw new Error("workflow decisions require a rationale");
   if (operation === "commission" && (!params?.workflow_id || !params?.commitment_id)) throw new Error("commission requires workflow_id and commitment_id");
   const approvalToken = String(params?.approval_token || "").trim();
   if (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(operation) && !approvalToken) throw new Error("workflow decision requires the current approval token");
@@ -126,6 +127,8 @@ async function executeWorkflowControl(params) {
   const authorisationReference = String(params?.authorisation_reference || "").trim();
   const classificationInstruction = String(params?.classification_instruction || "");
   if (operation === "classify_synthetic_test" && (!authorisationReference || !classificationInstruction)) throw new Error("workflow classification requires the verbatim current instruction and authorisation reference");
+  const recoveryInstruction = String(params?.recovery_instruction || "");
+  if (operation === "manual_recovery" && (!authorisationReference || !recoveryInstruction)) throw new Error("manual recovery requires the verbatim current instruction and authorisation reference");
   const token = resolveBridgeToken();
   const headers = { "content-type": "application/json", accept: "application/json" };
   if (token) headers.authorization = `Bearer ${token}`;
@@ -149,6 +152,9 @@ async function executeWorkflowControl(params) {
           ...(authorisationReference ? { authorisation_reference: authorisationReference } : {}),
           ...(params?._classification_instruction_run_id ? { classification_instruction_run_id: String(params._classification_instruction_run_id) } : {}),
           ...(params?._classification_instruction_proof ? { classification_instruction_proof: String(params._classification_instruction_proof) } : {}),
+          ...(recoveryInstruction ? { recovery_instruction: recoveryInstruction } : {}),
+          ...(params?._recovery_instruction_run_id ? { recovery_instruction_run_id: String(params._recovery_instruction_run_id) } : {}),
+          ...(params?._recovery_instruction_proof ? { recovery_instruction_proof: String(params._recovery_instruction_proof) } : {}),
           ...(actionDigest ? { action_digest: actionDigest } : {}),
           ...(params?.recipient ? { recipient: String(params.recipient) } : {}),
           ...(params?.workflow_id ? { target_workflow_id: String(params.workflow_id) } : {}),
@@ -266,7 +272,7 @@ function approvalTool() {
 function workflowControlTool() {
   return {
     name: "narratiive_workflow_control",
-    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. A status enquiry such as 'is it ready?', 'what is happening?', 'where is it?' or 'is it still running?' must use status and must never use commission, continue, sessions_spawn or another production path. Use artifact_detail for authoritative business fields. Before proposing a client-facing send, use action_preview and show the complete resolved action; never ask for blind approval. For the KatKin acceptance simulation, pass inputs with simulation_mode=true and delivery_override=hello@narratiive.com; the preview must show that override. Real client delivery is not enabled by this simulation path. Call execute_action only after Matt unambiguously approves that preview in Telegram, using its exact action_digest; changed payloads fail closed and verified execution is idempotent. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Call approve, reject or request_revision only when the current human message explicitly names an artefact and uses matching decision intent. Copy that entire current message verbatim into approval_instruction; never compose, paraphrase, infer or reuse one. General language such as 'we won it', 'proceed', 'looks good' or 'continue' is not artefact approval. Include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
+    description: "Read or control durable Narratiive workflows by run, client, company or lead reference. A status enquiry such as 'is it ready?', 'what is happening?', 'where is it?' or 'is it still running?' must use status and must never use commission, continue, sessions_spawn or another production path. Use artifact_detail for authoritative business fields. Before proposing a client-facing send, use action_preview and show the complete resolved action; never ask for blind approval. For the KatKin acceptance simulation, pass inputs with simulation_mode=true and delivery_override=hello@narratiive.com; the preview must show that override. Real client delivery is not enabled by this simulation path. Call execute_action only after Matt unambiguously approves that preview in Telegram, using its exact action_digest; changed payloads fail closed and verified execution is idempotent. Before promising substantive future work, call commission with the downstream workflow_id, a stable commitment_id and the complete structured evidence inputs; only a successful commissioned=true response means the work is underway. Use manual_recovery only for a blocked preparation run when Matt's current instruction identifies an approved, immutable artefact; it records non-automated recovery and permits only the immediate downstream commission. For a substantial artefact at a human gate, call deliver_internal_review so the full immutable review copy goes only to hello@narratiive.com and Telegram receives a concise summary. Call approve, reject or request_revision only when the current human message explicitly names an artefact and uses matching decision intent. Copy that entire current message verbatim into approval_instruction; never compose, paraphrase, infer or reuse one. General language such as 'we won it', 'proceed', 'looks good' or 'continue' is not artefact approval. Include the exact approval_token returned for the current gate; stale tokens fail closed. Notion projection remains a separate native single-use approval. Continue may supply structured discovery evidence or approved research sources for the next registered workflow.",
     parameters: schema(WORKFLOW_SCHEMA, ["operation"]),
     async execute(_id, params) {
       try {
@@ -327,16 +333,19 @@ export default definePluginEntry({
           };
         }
       }
-      if (event.toolName === "narratiive_workflow_control" && (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase()) || String(event.params?.operation || "").toLowerCase() === "classify_synthetic_test")) {
+      if (event.toolName === "narratiive_workflow_control" && (WORKFLOW_ARTIFACT_DECISION_OPERATIONS.has(String(event.params?.operation || "").toLowerCase()) || ["classify_synthetic_test", "manual_recovery"].includes(String(event.params?.operation || "").toLowerCase()))) {
         const runId = hookRunKey(event, ctx);
         const trustedTurn = trustedTurns.get(runId);
         if (!trustedTurn || Date.now() - trustedTurn.recordedAt > 10 * 60 * 1000) {
           return { block: true, blockReason: "Workflow artefact decision requires a current trusted human turn." };
         }
         try {
-          const params = String(event.params?.operation || "").toLowerCase() === "classify_synthetic_test"
+          const operation = String(event.params?.operation || "").toLowerCase();
+          const params = operation === "classify_synthetic_test"
             ? buildTrustedWorkflowClassificationParams(event.params || {}, trustedTurn, resolveBridgeToken())
-            : buildTrustedWorkflowDecisionParams(event.params || {}, trustedTurn, resolveBridgeToken());
+            : operation === "manual_recovery"
+              ? buildTrustedWorkflowRecoveryParams(event.params || {}, trustedTurn, resolveBridgeToken())
+              : buildTrustedWorkflowDecisionParams(event.params || {}, trustedTurn, resolveBridgeToken());
           return { params };
         } catch (error) {
           return { block: true, blockReason: String(error?.message || error) };

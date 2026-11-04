@@ -209,6 +209,119 @@ class TonyWorkflowRuntime:
         self._project(state)
         return workflow_to_dict(state)
 
+    def recover_with_approved_artifact(
+        self,
+        run_id: str,
+        *,
+        recovery_id: str,
+        artifact_title: str,
+        artifact_version: str,
+        source_uri: str,
+        artifact_checksum: str,
+        output: Mapping[str, Any],
+        approver: str,
+        rationale: str,
+        approval_evidence: Mapping[str, Any],
+    ) -> tuple[WorkflowState, bool]:
+        """Close one blocked preparation step using exact approved manual work.
+
+        The immutable artefact and append-only recovery decision become runtime
+        truth.  The recorded quality result explicitly states that automation
+        did not complete the step.
+        """
+
+        with self.coordinator.run_lock(run_id):
+            return self._recover_with_approved_artifact_locked(
+                run_id,
+                recovery_id=recovery_id,
+                artifact_title=artifact_title,
+                artifact_version=artifact_version,
+                source_uri=source_uri,
+                artifact_checksum=artifact_checksum,
+                output=output,
+                approver=approver,
+                rationale=rationale,
+                approval_evidence=approval_evidence,
+            )
+
+    def _recover_with_approved_artifact_locked(
+        self,
+        run_id: str,
+        *,
+        recovery_id: str,
+        artifact_title: str,
+        artifact_version: str,
+        source_uri: str,
+        artifact_checksum: str,
+        output: Mapping[str, Any],
+        approver: str,
+        rationale: str,
+        approval_evidence: Mapping[str, Any],
+    ) -> tuple[WorkflowState, bool]:
+
+        state = self.runs.load_run(run_id)
+        prior = [
+            item
+            for item in state.approval_history
+            if item.get("decision") == "manual_recovery_approved"
+        ]
+        if prior:
+            recorded = prior[-1]
+            if (
+                recorded.get("recovery_id") == recovery_id.strip()
+                and recorded.get("artifact_checksum") == artifact_checksum.strip()
+            ):
+                return state, True
+            raise ValueError("a different manual recovery is already recorded for this workflow")
+        if state.status is not WorkflowStatus.BLOCKED or not state.current_stage_id:
+            raise ValueError("manual recovery requires a currently blocked workflow")
+        stage = state.stage(state.current_stage_id)
+        if stage.side_effect_classification != "preparation":
+            raise ValueError("manual recovery cannot complete an external-action stage")
+        supplied = dict(output)
+        missing = [
+            field
+            for field in stage.expected_outputs
+            if field not in supplied or supplied[field] in (None, "", [], {})
+        ]
+        if missing:
+            raise ValueError(
+                f"manual recovery artefact requires declared outputs: {','.join(missing)}"
+            )
+        checksum = _workflow_value_checksum(supplied)
+        if artifact_checksum.strip() != checksum:
+            raise ValueError("manual recovery artefact checksum does not match its exact content")
+        blocker = str(stage.blocker or state.blocker or "").strip()
+        artifact = self.coordinator.artifacts.persist_manual_recovery(
+            state,
+            stage.stage_id,
+            supplied,
+            recovery_id=recovery_id.strip(),
+            governance={
+                "execution_mode": "manual_recovery",
+                "automated_completion": False,
+                "prior_blocker": blocker,
+                "recovery_id": recovery_id.strip(),
+                "source_uri": source_uri.strip(),
+                "source_title": artifact_title.strip(),
+                "source_version": artifact_version.strip(),
+                "approved_by": approver.strip(),
+            },
+        )
+        recovered, replay = self.runs.complete_blocked_stage_with_manual_recovery(
+            run_id,
+            artifact=artifact,
+            recovery_id=recovery_id,
+            approver=approver,
+            rationale=rationale,
+            artifact_title=artifact_title,
+            artifact_version=artifact_version,
+            source_uri=source_uri,
+            approval_evidence=approval_evidence,
+        )
+        self._project(recovered)
+        return recovered, replay
+
     def status(self, run_id: str) -> dict[str, Any]:
         return workflow_to_dict(self.runs.load_run(run_id))
 
@@ -547,6 +660,23 @@ class TonyWorkflowRuntime:
         chain, so this cannot manufacture an unrelated work item.
         """
 
+        with self.coordinator.run_lock(source_run_id):
+            return self._commission_locked(
+                source_run_id,
+                target_workflow_id,
+                additional_inputs,
+                commitment_id=commitment_id,
+            )
+
+    def _commission_locked(
+        self,
+        source_run_id: str,
+        target_workflow_id: str,
+        additional_inputs: Mapping[str, Any],
+        *,
+        commitment_id: str,
+    ) -> tuple[WorkflowState, bool]:
+
         source = self.runs.load_run(source_run_id)
         if source.status is not WorkflowStatus.COMPLETE:
             raise ValueError("source workflow must be complete before commissioning downstream work")
@@ -561,6 +691,16 @@ class TonyWorkflowRuntime:
             cursor = self.coordinator.registry.resolve(cursor).next_workflow_id
         if target_id not in reachable:
             raise ValueError("commissioned workflow must be downstream of the source workflow")
+        manual_recovery = next(
+            (
+                item
+                for item in reversed(source.approval_history)
+                if item.get("decision") == "manual_recovery_approved"
+            ),
+            None,
+        )
+        if manual_recovery and target_id != definition.next_workflow_id:
+            raise ValueError("manual recovery can commission only the immediate downstream workflow")
 
         artifacts = [artifact for stage in source.stages for artifact in stage.output_artifacts]
         if not artifacts:
@@ -580,6 +720,17 @@ class TonyWorkflowRuntime:
             "parent_run_id": source.run_id,
             "parent_artifact_ids": [artifact.artifact_id for artifact in artifacts],
             "recovered_intermediate_evidence": target_id != definition.next_workflow_id,
+            "manual_recovery": (
+                {
+                    "recovery_id": manual_recovery.get("recovery_id"),
+                    "artifact_id": manual_recovery.get("artifact_id"),
+                    "artifact_checksum": manual_recovery.get("artifact_checksum"),
+                    "prior_blocker": manual_recovery.get("prior_blocker"),
+                    "automated_completion": False,
+                }
+                if manual_recovery
+                else None
+            ),
         }
         supplied["_promised_work"] = {
             "commitment_id": commitment_id.strip(),

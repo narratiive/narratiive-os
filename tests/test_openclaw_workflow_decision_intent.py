@@ -17,7 +17,7 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
         if not node:
             self.skipTest("node is unavailable")
         script = (
-            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
+            f'import {{ hasExplicitWorkflowDecisionIntent, buildTrustedWorkflowClassificationParams, buildTrustedWorkflowDecisionParams, buildTrustedWorkflowRecoveryParams }} from {json.dumps(MODULE.resolve().as_uri())}; '
             f"console.log(JSON.stringify({expression}));"
         )
         completed = subprocess.run([node, "--input-type=module", "-e", script], check=True, capture_output=True, text=True)
@@ -88,6 +88,30 @@ class OpenClawWorkflowDecisionIntentTests(unittest.TestCase):
             "}catch(error){return error.message}})()"
         )
         self.assertIn("exact workflow entity", self._node(expression))
+
+    def test_manual_recovery_binds_the_current_human_instruction(self) -> None:
+        prompt = "Recover the existing fictional Origin engagement through the canonical workflow state."
+        params = {
+            "operation": "manual_recovery",
+            "reference": "origin-fictional-run",
+            "rationale": "Use the approved immutable recovery artefact.",
+            "recovery_instruction": prompt,
+            "authorisation_reference": "chat-message:origin-recovery",
+        }
+        result = self._node(
+            f"buildTrustedWorkflowRecoveryParams({json.dumps(params)},{{runId:'conversation-turn-2',prompt:{json.dumps(prompt)}}},'secret')"
+        )
+        self.assertEqual(result["recovery_instruction"], prompt)
+        self.assertEqual(result["_recovery_instruction_run_id"], "conversation-turn-2")
+        self.assertEqual(len(result["_recovery_instruction_proof"]), 64)
+
+        refused = dict(params, recovery_instruction="Do not recover the existing fictional Origin engagement workflow.")
+        expression = (
+            "(()=>{try{buildTrustedWorkflowRecoveryParams("
+            f"{json.dumps(refused)},{{runId:'conversation-turn-2',prompt:{json.dumps(refused['recovery_instruction'])}}},'secret');return 'allowed'"
+            "}catch(error){return error.message}})()"
+        )
+        self.assertIn("refuses", self._node(expression))
 
 
 if __name__ == "__main__":

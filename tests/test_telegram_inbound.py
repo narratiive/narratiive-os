@@ -363,6 +363,59 @@ class TelegramInboundTests(unittest.TestCase):
         self.assertIn(entity_id, workflows.calls[-1]["text"])
         self.assertFalse(call("different-entity")["ok"])
 
+    def test_manual_recovery_uses_trusted_turn_proof_and_authorised_principal(self):
+        workflows = FakeWorkflowCommands()
+        app = LeadAwareTonyApplication(
+            FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),
+            workflow_command_service=workflows, authorised_principal_id="telegram:123",
+        )
+        reference = "origin-fictional-run"
+        instruction = "Recover the existing fictional Origin engagement through the canonical workflow state."
+        authorisation_reference = "chat-message:origin-recovery"
+        proof = hmac.new(
+            b"secret",
+            workflow_decision_proof_material(
+                run_id="openclaw-conversation-turn-2",
+                operation="manual-recovery",
+                reference=reference,
+                approval_token="",
+                instruction=instruction,
+                authorisation_reference=authorisation_reference,
+            ),
+            hashlib.sha256,
+        ).hexdigest()
+
+        def call(*, recovery_proof: str = proof, source: str = "openclaw_telegram_workflow_tool"):
+            body = {
+                "operation": "manual-recovery",
+                "reference": reference,
+                "rationale": "Use the exact approved manual artefact.",
+                "inputs": {
+                    "manual_recovery": {"recovery_id": "safe-recovery"},
+                    "authorisation_reference": authorisation_reference,
+                    "recovery_instruction": instruction,
+                    "recovery_instruction_run_id": "openclaw-conversation-turn-2",
+                    "recovery_instruction_proof": recovery_proof,
+                },
+                "source": source,
+            }
+            raw = json.dumps(body).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST", "PATH_INFO": "/workflow/control",
+                "CONTENT_LENGTH": str(len(raw)), "HTTP_AUTHORIZATION": "Bearer secret",
+                "wsgi.input": io.BytesIO(raw),
+            }
+            return json.loads(b"".join(app(environ, lambda status, headers: None)).decode("utf-8"))
+
+        accepted = call()
+        self.assertTrue(accepted["ok"])
+        self.assertEqual(workflows.calls[-1]["principal_id"], "telegram:123")
+        evidence = workflows.calls[-1]["inputs"]["recovery_approval_evidence"]
+        self.assertEqual(evidence["human_instruction"], instruction)
+        self.assertEqual(evidence["explicit_decision_intent"], "manual_recovery")
+        self.assertFalse(call(recovery_proof="0" * 64)["ok"])
+        self.assertFalse(call(source="untrusted")["ok"])
+
 
 if __name__ == "__main__":
     unittest.main()

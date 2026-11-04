@@ -52,6 +52,14 @@ def workflow_state_summary(state: WorkflowState) -> dict[str, Any]:
         if latest_stage and latest_stage.quality_result
         else None
     )
+    manual_recovery = next(
+        (
+            item
+            for item in reversed(state.approval_history)
+            if item.get("decision") == "manual_recovery_approved"
+        ),
+        None,
+    )
     return {
         "run_id": state.run_id,
         "workflow_id": state.workflow_id,
@@ -83,6 +91,19 @@ def workflow_state_summary(state: WorkflowState) -> dict[str, Any]:
             else None
         ),
         "external_action_taken": state.external_action_taken,
+        "execution_mode": "manual_recovery" if manual_recovery else "workflow_automation",
+        "automated_completion": False if manual_recovery else None,
+        "manual_recovery": (
+            {
+                "recovery_id": manual_recovery.get("recovery_id"),
+                "artifact_id": manual_recovery.get("artifact_id"),
+                "artifact_checksum": manual_recovery.get("artifact_checksum"),
+                "artifact_version": manual_recovery.get("artifact_version"),
+                "prior_blocker": manual_recovery.get("prior_blocker"),
+            }
+            if manual_recovery
+            else None
+        ),
         "updated_at": state.updated_at,
     }
 
