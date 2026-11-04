@@ -4,6 +4,7 @@ import fcntl
 import hashlib
 import json
 import os
+import re
 from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from datetime import datetime, timezone
@@ -53,6 +54,12 @@ class WorkflowBusinessProjectionService:
             raise ValueError("Notion projection requires an authenticated approver and rationale")
         projection = self.prepare(state)
         key = projection["projection_key"]
+        if not projection["notion_record_id"]:
+            return {
+                **projection,
+                "projection_status": "notion_record_identity_required",
+                "external_action_taken": False,
+            }
         if self.dispatcher is None:
             return {**projection, "projection_status": "notion_dispatcher_unavailable", "external_action_taken": False}
         with self._lock():
@@ -79,7 +86,8 @@ class WorkflowBusinessProjectionService:
             "execution_truth": "not_dispatched",
             "idempotency_key": key,
             "target": {
-                "lead_id": state.entity_id,
+                "record_id": projection["notion_record_id"],
+                "entity_id": state.entity_id,
                 "client_id": state.client_id,
                 "workspace_id": state.workspace_id,
                 "area": "commercial",
@@ -159,6 +167,7 @@ class WorkflowBusinessProjectionService:
             "external_action_taken": state.external_action_taken,
             "deliverable_state": deliverable_state,
             "drive_files": drive_files,
+            "notion_record_id": _notion_record_id(state),
             "execution_mode": execution_mode,
             "automated_completion": False if recovery_evidence else None,
             "manual_recovery": (
@@ -218,6 +227,27 @@ class WorkflowBusinessProjectionService:
                 yield
             finally:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+
+def _notion_record_id(state: WorkflowState) -> str:
+    """Return only an explicitly persisted Notion page identity.
+
+    Human-readable entity/client slugs are not provider page IDs and must not be
+    sent to the Notion page endpoint.
+    """
+
+    candidates = (
+        state.input_payload.get("notion_page_id"),
+        state.input_payload.get("notion_record_id"),
+        state.input_payload.get("lead_id"),
+        state.entity_id,
+    )
+    for value in candidates:
+        identity = str(value or "").strip()
+        compact = identity.replace("-", "")
+        if re.fullmatch(r"[0-9a-fA-F]{32}", compact):
+            return identity
+    return ""
 
 
 def _lifecycle_stage(workflow_id: str) -> str:

@@ -22,6 +22,7 @@ def state(*, status: WorkflowStatus = WorkflowStatus.AWAITING_APPROVAL) -> Workf
         correlation_id="safe-correlation",
         proposed_next_action="Approve internal discovery preparation.",
         approval_status="pending",
+        input_payload={"notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4"},
     )
 
 
@@ -66,6 +67,27 @@ class WorkflowBusinessProjectionTests(unittest.TestCase):
             self.assertEqual(len(calls), 1)
             self.assertEqual(calls[0]["payload"]["kind"], "workflow_business_state_projection")
             self.assertEqual(calls[0]["execution_mode"], "approval_gated_write")
+            self.assertEqual(
+                calls[0]["target"]["record_id"],
+                "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+            )
+
+    def test_missing_notion_page_identity_fails_before_dispatch_and_new_identity_changes_key(self) -> None:
+        calls = []
+
+        with tempfile.TemporaryDirectory() as tmp:
+            service = WorkflowBusinessProjectionService(tmp, lambda dispatch: calls.append(dispatch) or {})
+            current = state()
+            current.input_payload = {}
+            missing = service.sync(current, approver="telegram:123", rationale="SAFE missing identity")
+            missing_key = missing["projection_key"]
+            current.input_payload["notion_page_id"] = "40d0c9cf-a8f2-810f-b599-d478255f11e4"
+            prepared = service.prepare(current)
+
+            self.assertEqual(missing["projection_status"], "notion_record_identity_required")
+            self.assertFalse(missing["external_action_taken"])
+            self.assertFalse(calls)
+            self.assertNotEqual(prepared["projection_key"], missing_key)
 
     def test_ambiguous_dispatch_requires_reconciliation_not_blind_retry(self) -> None:
         calls = []
