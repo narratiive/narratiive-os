@@ -7,10 +7,11 @@ import unittest
 from pathlib import Path
 
 from runtime.client_lifecycle import ClientLifecycleRecord, ClientLifecycleStage
-from runtime.models import StageRecord
+from runtime.models import StageRecord, StageStatus, WorkflowStatus
 from runtime.tony_command_service import CommandResponse
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from runtime.workflow_handoffs import build_next_workflow_inputs
 from runtime.workflow_mission_control import WorkflowMissionControlProjector
 
 
@@ -164,6 +165,48 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
             self.assertEqual(commissioned.workflow_id, "blueprint_lite_to_discovery_preparation")
             self.assertFalse(commissioned.external_action_taken)
             self.assertFalse(commissioned.input_payload["_lineage"]["manual_recovery"]["automated_completion"])
+            continued_inputs = build_next_workflow_inputs(commissioned, {}, {})
+            self.assertEqual(
+                continued_inputs["_lineage"]["manual_recovery"]["recovery_id"],
+                "origin-groundwork-v1-recovery",
+            )
+
+            # A later explicit commission must retain the same recovery
+            # provenance rather than relabelling the chain as fully automated.
+            commissioned.status = WorkflowStatus.COMPLETE
+            commissioned.current_stage_id = None
+            commissioned.approval_status = "approved"
+            commissioned.stages[0].status = StageStatus.COMPLETED
+            commissioned.stages[0].output_artifacts = recovered.stages[0].output_artifacts.copy()
+            runtime.runs.repository.save(commissioned)
+            proposal, _ = runtime.commission(
+                commissioned.run_id,
+                "discovery_evidence_to_growth_sprint_proposal",
+                {
+                    "discovery_evidence": {
+                        "source": "synthetic completed Discovery",
+                        "notes": "Bounded fictional Discovery notes for lineage verification.",
+                        "sources": [
+                            {
+                                "source_id": "fictional-discovery-notes-v1",
+                                "source_type": "internal_test_notes",
+                                "location": "workflow-test:origin-discovery-v1",
+                            }
+                        ],
+                    },
+                    "commercial_context": {"company": "TEST / FICTIONAL — Origin Coffee"},
+                },
+                commitment_id="origin-proposal-after-recovery-v1",
+            )
+            self.assertEqual(
+                proposal.input_payload["_lineage"]["manual_recovery"]["recovery_id"],
+                "origin-groundwork-v1-recovery",
+            )
+            proposal_projection = runtime.business_projection.prepare(proposal)
+            self.assertEqual(
+                proposal_projection["execution_mode"],
+                "workflow_automation_after_manual_recovery",
+            )
 
             replayed, replay = runtime.commission(
                 recovered.run_id,
@@ -288,6 +331,15 @@ class WorkflowManualRecoveryTests(unittest.TestCase):
                 _Fallback(),
                 FileWorkflowCommandBackend(root, dispatchers={}, environ={}),
             )
+
+            alias_denied = service.execute(
+                "/manual-recovery TEST / FICTIONAL — Second Prospect because approved synthetic recovery",
+                [],
+                principal_id="telegram:matt",
+                inputs={"manual_recovery": recovery, "recovery_approval_evidence": _approval(instruction)},
+            )
+            self.assertEqual(alias_denied.status, "error")
+            self.assertEqual(alias_denied.data["error_code"], "exact_run_id_required")
 
             denied = service.execute(
                 f"/manual-recovery {blocked.run_id} because approved synthetic recovery",

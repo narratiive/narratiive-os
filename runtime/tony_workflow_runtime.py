@@ -693,7 +693,7 @@ class TonyWorkflowRuntime:
             cursor = self.coordinator.registry.resolve(cursor).next_workflow_id
         if target_id not in reachable:
             raise ValueError("commissioned workflow must be downstream of the source workflow")
-        manual_recovery = next(
+        direct_manual_recovery = next(
             (
                 item
                 for item in reversed(source.approval_history)
@@ -701,6 +701,14 @@ class TonyWorkflowRuntime:
             ),
             None,
         )
+        source_lineage = source.input_payload.get("_lineage")
+        inherited_manual_recovery = (
+            source_lineage.get("manual_recovery")
+            if isinstance(source_lineage, Mapping)
+            and isinstance(source_lineage.get("manual_recovery"), Mapping)
+            else None
+        )
+        manual_recovery = direct_manual_recovery or inherited_manual_recovery
         if manual_recovery and target_id != definition.next_workflow_id:
             raise ValueError("manual recovery can commission only the immediate downstream workflow")
 

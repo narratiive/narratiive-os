@@ -851,6 +851,12 @@ class TonyWorkflowCommandService:
                     {"event_id": event.event_id, "entity_id": event.entity_id, "workflow_id": event.workflow_id},
                 )
             state = self._resolve(states, reference)
+            if name == "manual-recovery" and reference != state.run_id:
+                return self._error(
+                    name,
+                    "exact_run_id_required",
+                    "Manual recovery requires the exact persisted workflow run ID; company, client, lead and entity aliases are not accepted.",
+                )
             if name in {"workflow", "work"}:
                 return self._status(state)
             if name == "approvals":
