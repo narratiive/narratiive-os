@@ -134,6 +134,7 @@ class TonyWorkflowCommandTests(unittest.TestCase):
             {
                 "diagnostic_input_package": {"overall_score": 40},
                 "company": "SAFE Executive Workflow Test",
+                "notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
             },
             entity_id="safe-lead",
             correlation_id="safe-correlation",
