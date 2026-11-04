@@ -26,7 +26,7 @@ class TonyPromisedWorkWorker:
                 state
                 for state in self.backend.list_states()
                 if isinstance(state.input_payload.get("_promised_work"), Mapping)
-                and not state.promised_work_delivery
+                and self._delivery_required(state)
             ),
             key=lambda state: (state.created_at, state.run_id),
         )
@@ -83,6 +83,17 @@ class TonyPromisedWorkWorker:
                 "work_complete" if link else "review_delivery_blocked",
             )
         return state
+
+    @staticmethod
+    def _delivery_required(state: WorkflowState) -> bool:
+        delivery = state.promised_work_delivery
+        if not delivery:
+            return True
+        return (
+            delivery.get("status") == "delivered"
+            and delivery.get("kind") in {"worker_failure", "work_failed"}
+            and state.status.value in {"awaiting_approval", "complete"}
+        )
 
     def _deliver_once(self, state: WorkflowState, message: str, kind: str) -> WorkflowState:
         marker = state.input_payload.get("_promised_work", {})

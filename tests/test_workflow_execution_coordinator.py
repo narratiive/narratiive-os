@@ -459,6 +459,76 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
         self.assertNotEqual(state.stage("draft").output_artifacts[1].artifact_id, first_artifact.artifact_id)
         self.assertEqual(first_payload["draft"], "initial reviewed draft")
 
+    def test_quality_passed_orphan_is_recovered_without_second_worker_execution(self) -> None:
+        calls = []
+        definition = WorkflowDefinition(
+            "proposal-persistence-recovery",
+            (
+                _stage(
+                    "prepare_proposal",
+                    inputs=("brief",),
+                    outputs=("draft", "evidence_lineage"),
+                ),
+            ),
+            approval_required=True,
+        )
+
+        def adapter(_contract):
+            calls.append("executed")
+            return {
+                "draft": "Quality-approved proposal candidate",
+                "evidence_lineage": ["proposal-evidence"],
+            }
+
+        coordinator = self._coordinator(definition, _worker(adapter))
+        coordinator.enqueue(
+            definition.workflow_id,
+            "run-proposal-recovery",
+            {
+                "brief": "safe",
+                "evidence_lineage": ["inherited-discovery-evidence"],
+                "_promised_work": {"commitment_id": "proposal-v1"},
+            },
+            entity_id="e",
+            correlation_id="c",
+        )
+
+        with self.assertRaisesRegex(
+            ValueError,
+            "workflow output cannot overwrite existing inputs: evidence_lineage",
+        ):
+            coordinator.advance("run-proposal-recovery", _lifecycle())
+        interrupted = self.runs.load_run("run-proposal-recovery")
+
+        self.assertEqual(interrupted.status, WorkflowStatus.ACTIVE)
+        self.assertEqual(interrupted.stage("prepare_proposal").status, StageStatus.RUNNING)
+        self.assertEqual(interrupted.stage("prepare_proposal").output_artifacts, [])
+        self.assertTrue(interrupted.stage("prepare_proposal").quality_result["passed"])
+        self.assertEqual(len(list(self.artifacts.root.glob("artifact-*.json"))), 1)
+
+        recovered = coordinator.advance("run-proposal-recovery", _lifecycle())
+        state = self.runs.load_run("run-proposal-recovery")
+
+        self.assertEqual(recovered.status, "awaiting_approval")
+        self.assertEqual(calls, ["executed"])
+        self.assertEqual(state.input_payload["evidence_lineage"], ["proposal-evidence"])
+        self.assertEqual(len(state.stage("prepare_proposal").output_artifacts), 1)
+        self.assertEqual(state.approval_status, "pending")
+        events = self.events.read(state.run_id)
+        self.assertEqual(
+            sum(event.event_type == "stage.accepted_output_recovered" for event in events),
+            1,
+        )
+        self.assertEqual(
+            sum(event.event_type == "stage.completed" for event in events),
+            1,
+        )
+
+        replay = coordinator.advance("run-proposal-recovery", _lifecycle())
+        self.assertEqual(replay.status, "awaiting_approval")
+        self.assertEqual(calls, ["executed"])
+        self.assertEqual(len(self.runs.load_run(state.run_id).stage("prepare_proposal").output_artifacts), 1)
+
     def test_restart_recovers_pending_work_without_duplicate_execution(self) -> None:
         calls = []
         definition = WorkflowDefinition("restart-safe", (_stage("draft"),))

@@ -15,6 +15,7 @@ from typing import Any
 from runtime.autonomy_planner import AutonomyAction, TonyAutonomyPlanner
 from runtime.blueprint_director import BlueprintDirectorCommissionBuilder
 from runtime.client_lifecycle import ClientLifecycleRecord
+from runtime.definitions import StageDefinition
 from runtime.models import ArtifactRef, StageStatus, WorkflowState, WorkflowStatus
 from runtime.run_service import WorkflowRunService
 from runtime.serialization import artifact_to_dict
@@ -108,6 +109,41 @@ class FileWorkflowArtifactStore:
             discriminator=f"manual-recovery-{recovery_id}",
             governance=governance,
         )
+
+    def recover_unreferenced_accepted_output(
+        self,
+        state: WorkflowState,
+        stage_id: str,
+    ) -> dict[str, Any] | None:
+        """Load one checksum-valid accepted output orphaned before state commit."""
+        identity = hashlib.sha256(f"{state.run_id}:{stage_id}".encode("utf-8")).hexdigest()
+        referenced = {
+            artifact.artifact_id
+            for stage in state.stages
+            for artifact in stage.output_artifacts
+        }
+        candidates = [
+            path
+            for path in sorted(self.root.glob(f"artifact-{identity[:16]}-*.json"))
+            if path.stem not in referenced
+        ]
+        if not candidates:
+            return None
+        if len(candidates) != 1:
+            raise ValueError("accepted workflow artifact recovery is ambiguous")
+        path = candidates[0]
+        raw = path.read_bytes()
+        try:
+            output = json.loads(raw.decode("utf-8"))
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise ValueError("accepted workflow artifact recovery is unreadable") from exc
+        if not isinstance(output, dict) or not output:
+            raise ValueError("accepted workflow artifact recovery must be a JSON object")
+        encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        checksum = hashlib.sha256(encoded).hexdigest()
+        if raw != encoded + b"\n" or not path.stem.endswith(f"-{checksum[:16]}"):
+            raise ValueError("accepted workflow artifact recovery checksum mismatch")
+        return output
 
     def _persist(
         self,
@@ -263,6 +299,11 @@ class WorkflowExecutionCoordinator:
             state = self.runs.load_run(run_id)
             if state.client_id != lifecycle.client_id:
                 raise ValueError("lifecycle record belongs to a different client")
+            recovered, recovery_outcome = self._recover_quality_passed_output(state)
+            if recovered:
+                if recovery_outcome is not None:
+                    return recovery_outcome
+                continue
             if state.status is WorkflowStatus.BLOCKED:
                 return self._outcome(state, AutonomyAction.ESCALATE.value)
             if state.status is WorkflowStatus.AWAITING_APPROVAL:
@@ -478,48 +519,124 @@ class WorkflowExecutionCoordinator:
                     receipt=receipt,
                 )
 
-            current = self.runs.load_run(run_id)
-            artifact = self.artifacts.persist(
-                current,
-                stage.stage_id,
-                output,
-                governance=self._artifact_governance(
-                    current,
-                    stage.stage_id,
-                    worker,
-                    quality,
-                    approval_status="pending" if current.approval_required else "not_required",
-                ),
+            outcome = self._finalise_accepted_output(
+                state=self.runs.load_run(run_id),
+                stage_definition=stage_definition,
+                worker=worker,
+                output=output,
+                quality=quality,
+                recovered=False,
             )
-            derived_inputs: dict[str, Any] = {}
-            if current.workflow_id == "strategy_thesis_to_growth_blueprint" and stage.stage_id == "direct_growth_blueprint":
-                self.runs.record_stage_artifact_identity(
-                    run_id,
-                    stage_id=stage.stage_id,
-                    input_key="blueprint_director_output_identity",
-                    artifact=artifact,
-                )
-                derived_inputs["blueprint_director_output_identity"] = True
-            durable_outputs = {
-                field: output[field]
-                for field in stage_definition.output_contract.required_fields
-            }
-            self.runs.promote_stage_outputs(run_id, stage.stage_id, durable_outputs)
-            available_inputs = self.runs.load_run(run_id).input_payload.keys()
-            state = self.runs.complete_stage(
-                run_id,
+            if outcome is not None:
+                return outcome
+            continue
+
+    def _recover_quality_passed_output(
+        self,
+        state: WorkflowState,
+    ) -> tuple[bool, ExecutionOutcome | None]:
+        if not state.current_stage_id:
+            return False, None
+        stage = state.stage(state.current_stage_id)
+        if stage.status is not StageStatus.RUNNING:
+            return False, None
+        if not isinstance(stage.quality_result, Mapping) or stage.quality_result.get("passed") is not True:
+            return False, None
+        if not stage.attempts or stage.attempts[-1].get("quality_passed") is not True:
+            return False, None
+        output = self.artifacts.recover_unreferenced_accepted_output(state, stage.stage_id)
+        if output is None:
+            return False, None
+        definition = self.registry.resolve(state.workflow_id)
+        stage_definition = next(item for item in definition.stages if item.stage_id == stage.stage_id)
+        missing = [
+            field
+            for field in stage_definition.output_contract.required_fields
+            if field not in output or output[field] in (None, "")
+        ]
+        if missing:
+            raise ValueError("recovered accepted output is missing declared fields")
+        validator = self.quality_validators.get(stage.quality_contract) if stage.quality_contract else None
+        quality = dict(validator(output)) if validator is not None else {"passed": True, "failed_checks": []}
+        quality["passed"] = quality.get("passed") is True
+        if quality["passed"] is not True:
+            raise ValueError("recovered accepted output no longer passes quality validation")
+        worker = self.workers.resolve(
+            stage.capability,
+            side_effect=stage.side_effect_classification,
+        )
+        return True, self._finalise_accepted_output(
+            state=state,
+            stage_definition=stage_definition,
+            worker=worker,
+            output=output,
+            quality=quality,
+            recovered=True,
+        )
+
+    def _finalise_accepted_output(
+        self,
+        *,
+        state: WorkflowState,
+        stage_definition: StageDefinition,
+        worker: Any,
+        output: Mapping[str, Any],
+        quality: Mapping[str, Any],
+        recovered: bool,
+    ) -> ExecutionOutcome | None:
+        stage = state.stage(stage_definition.stage_id)
+        artifact = self.artifacts.persist(
+            state,
+            stage.stage_id,
+            output,
+            governance=self._artifact_governance(
+                state,
                 stage.stage_id,
-                [artifact],
-                available_inputs,
+                worker,
+                quality,
+                approval_status="pending" if state.approval_required else "not_required",
+            ),
+        )
+        durable_outputs = {
+            field: output[field]
+            for field in stage_definition.output_contract.required_fields
+        }
+        if recovered:
+            self.runs.reconcile_inherited_output_conflicts(
+                state.run_id,
+                stage.stage_id,
+                durable_outputs,
+                artifact=artifact,
             )
-            if state.status is WorkflowStatus.AWAITING_APPROVAL or (
-                stage.step_approval_required and not external_action
-            ):
-                state = self.runs.pause_for_approval(
-                    run_id,
-                    f"Approve completed {state.workflow_id} work before consequential use or handoff.",
-                )
-                return self._outcome(state, AutonomyAction.APPROVAL.value)
+            self.runs.record_accepted_output_recovery(
+                state.run_id,
+                stage.stage_id,
+                artifact,
+            )
+        if state.workflow_id == "strategy_thesis_to_growth_blueprint" and stage.stage_id == "direct_growth_blueprint":
+            self.runs.record_stage_artifact_identity(
+                state.run_id,
+                stage_id=stage.stage_id,
+                input_key="blueprint_director_output_identity",
+                artifact=artifact,
+            )
+        self.runs.promote_stage_outputs(state.run_id, stage.stage_id, durable_outputs)
+        available_inputs = self.runs.load_run(state.run_id).input_payload.keys()
+        completed = self.runs.complete_stage(
+            state.run_id,
+            stage.stage_id,
+            [artifact],
+            available_inputs,
+        )
+        if completed.status is WorkflowStatus.AWAITING_APPROVAL or (
+            stage.step_approval_required and stage.side_effect_classification != "external_write"
+        ):
+            completed = self.runs.pause_for_approval(
+                state.run_id,
+                f"Approve completed {completed.workflow_id} work before consequential use or handoff.",
+            )
+            return self._outcome(completed, AutonomyAction.APPROVAL.value)
+        return None
 
     def _retry_or_block(
         self,

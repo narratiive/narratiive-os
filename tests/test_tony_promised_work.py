@@ -115,6 +115,7 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertFalse(replay)
         self.assertEqual(state.status.value, "active")
         self.assertEqual(state.input_payload["_promised_work"]["state"], "commissioned")
+        self.assertNotIn("evidence_lineage", state.input_payload)
         self.assertTrue(repeated_replay)
         self.assertEqual(repeated.run_id, state.run_id)
 
@@ -205,6 +206,45 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertIn("couldn’t complete", self.telegram_messages[0])
         self.assertEqual(delivered.promised_work_delivery["status"], "delivered")
         self.assertIsNone(replay)
+        self.assertEqual(len(self.telegram_messages), 1)
+
+    def test_recovered_gate_notification_supersedes_delivered_worker_failure_once(self) -> None:
+        state, _, dispatchers = self._commission()
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        failed_key = "safe-worker-failure-delivery"
+        runtime.runs.begin_promised_delivery(
+            state.run_id,
+            delivery_key=failed_key,
+            kind="worker_failure",
+        )
+        runtime.runs.finish_promised_delivery(
+            state.run_id,
+            delivery_key=failed_key,
+            evidence={"provider": "telegram", "message_id": "failure-1"},
+        )
+        runtime.advance(state.run_id, lifecycle())
+        backend = FileWorkflowCommandBackend(
+            self.root,
+            dispatchers=dispatchers,
+            environ={},
+            workspace_id="narratiive",
+        )
+
+        delivered = TonyPromisedWorkWorker(backend, self._sender).run_once()
+        replay = TonyPromisedWorkWorker(backend, self._sender).run_once()
+
+        self.assertEqual(delivered.status.value, "awaiting_approval")
+        self.assertEqual(delivered.promised_work_delivery["kind"], "gate_ready")
+        self.assertEqual(delivered.promised_work_delivery["supersedes_delivery_key"], failed_key)
+        self.assertEqual(delivered.promised_work_delivery["supersedes_kind"], "worker_failure")
+        self.assertIsNone(replay)
+        self.assertEqual(len(self.gmail_calls), 1)
         self.assertEqual(len(self.telegram_messages), 1)
 
     def test_ambiguous_telegram_send_is_not_blindly_retried_after_restart(self) -> None:
