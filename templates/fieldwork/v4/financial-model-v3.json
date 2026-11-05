@@ -1,0 +1,46 @@
+{
+  "version": 3,
+  "status": "TEST_FICTIONAL_ILLUSTRATIVE_ASSUMED_DATA_NOT_ORIGIN_FORECAST",
+  "actual_origin_data": {
+    "annual_revenue": null,
+    "margins": null,
+    "partner_count": null,
+    "conversion_rate": null,
+    "net_account_revenue": null
+  },
+  "mechanism": "incremental_won_trading_accounts * mature_net_annual_account_revenue * year_one_ramp",
+  "horizon": "first_12_months_from_hypothetical_acquisition_programme_launch",
+  "assumptions": {
+    "coffee_kg_per_week": 20,
+    "net_gbp_per_kg": 22,
+    "weeks_per_year": 50,
+    "net_annual_account_revenue_gbp": 22000,
+    "cannibalisation": "assumed_zero_by_incremental_eligibility_definition_unvalidated"
+  },
+  "scenarios": [
+    {
+      "name": "conservative",
+      "all_inputs_assumed": true,
+      "won_trading_accounts": 8,
+      "year_one_ramp": 0.35,
+      "incremental_revenue_gbp": 61600.0
+    },
+    {
+      "name": "central",
+      "all_inputs_assumed": true,
+      "won_trading_accounts": 12,
+      "year_one_ramp": 0.45,
+      "incremental_revenue_gbp": 118800.0
+    },
+    {
+      "name": "upside",
+      "all_inputs_assumed": true,
+      "won_trading_accounts": 16,
+      "year_one_ramp": 0.55,
+      "incremental_revenue_gbp": 193600.0
+    }
+  ],
+  "provisional_fee_ex_vat_gbp": 9800,
+  "commercial_approval": null,
+  "send_authorisation": null
+}
