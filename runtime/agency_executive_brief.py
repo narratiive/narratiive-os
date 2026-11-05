@@ -181,7 +181,8 @@ class AgencyExecutiveBriefService:
         action = founder_text(item.next_action, limit=180)
         deadline = founder_text(item.action_deadline, limit=60)
         suffix = f" By {deadline}." if deadline else ""
-        return f"{title}: {action}{suffix}"
+        reason = founder_text(item.why_matters, limit=150)
+        return f"{title}. {reason}. Recommended next step: {action}{suffix}"
 
     @staticmethod
     def _risk(item: AgencyItem) -> str:

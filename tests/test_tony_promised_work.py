@@ -220,7 +220,10 @@ class TonyPromisedWorkTests(unittest.TestCase):
         replay = TonyPromisedWorkWorker(backend, self._sender).run_once()
 
         self.assertEqual(delivered.status.value, "blocked")
-        self.assertIn("couldn’t complete", self.telegram_messages[0])
+        self.assertIn("FIELDWORK proposal is paused", self.telegram_messages[0])
+        self.assertIn("engineering check", self.telegram_messages[0])
+        self.assertNotIn("RuntimeError", self.telegram_messages[0])
+        self.assertNotIn("quality_failed", self.telegram_messages[0])
         self.assertEqual(delivered.promised_work_delivery["status"], "delivered")
         self.assertIsNone(replay)
         self.assertEqual(len(self.telegram_messages), 1)

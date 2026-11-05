@@ -4,7 +4,7 @@ import unittest
 from datetime import date, datetime
 from pathlib import Path
 
-from runtime.mission_control import MissionControlSnapshot
+from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 from runtime.proactive_executive_delivery import (
     DeliveryStatusRecord,
     DispatchOutcome,
@@ -386,7 +386,14 @@ def escalation_snapshot(*, blockers=(), approvals=()) -> MissionControlSnapshot:
         generated_at="2026-07-27T08:00:00Z",
         status="blocked" if blockers else "healthy",
         progress={"status": "healthy"},
-        workstreams=(),
+        workstreams=tuple(
+            WorkstreamStatus(
+                workstream_id=f"client-{index}", title=f"Client delivery decision {index + 1}",
+                state="blocked", owner="Matt", blocker="Client decision outstanding",
+                next_action="Choose the revised delivery date with the client.",
+                evidence=(f"synthetic:delivery:{index}",),
+            ) for index, value in enumerate(dict.fromkeys((*blockers, *approvals)))
+        ),
         connections=(),
         approvals_required=tuple(approvals),
         blockers=tuple(blockers),
@@ -427,7 +434,7 @@ class MaterialEscalationServiceTests(unittest.TestCase):
         self.assertEqual(result.status, "escalated")
         self.assertEqual(result.material_count, 2)
         self.assertEqual(len(self.sent), 1)
-        self.assertIn("workstream:x:blocked", self.sent[0][1])
+        self.assertIn("Choose the revised delivery date", self.sent[0][1])
         self.assertEqual(self.events[-1]["event_type"], "executive_escalation.sent")
 
     def test_delegates_send_and_dedup_mechanics_to_a_shared_dispatcher(self):

@@ -10,7 +10,7 @@ from runtime.interruption_policy import (
     InterruptionContext,
     InterruptionDecision,
 )
-from runtime.mission_control import MissionControlSnapshot
+from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 from runtime.policy_governed_escalation import PolicyGovernedMaterialEscalationService
 from runtime.proactive_executive_delivery import (
     FileLastEscalationStore,
@@ -33,7 +33,14 @@ def snapshot(*, blockers=(), approvals=()) -> MissionControlSnapshot:
         generated_at="2026-07-28T00:00:00Z",
         status="blocked" if blockers else "healthy",
         progress={"status": "healthy"},
-        workstreams=(),
+        workstreams=tuple(
+            WorkstreamStatus(
+                workstream_id=f"client-{index}", title=f"Client delivery decision {index + 1}",
+                state="blocked", owner="Matt", blocker="Client decision outstanding",
+                next_action="Choose the revised delivery date with the client.",
+                evidence=(f"synthetic:delivery:{index}",),
+            ) for index, value in enumerate(dict.fromkeys((*blockers, *approvals)))
+        ),
         connections=(),
         approvals_required=tuple(approvals),
         blockers=tuple(blockers),
@@ -81,7 +88,8 @@ class PolicyGovernedMaterialEscalationTests(TestCase):
         context = policy.contexts[0]
         self.assertEqual(context.workspace_id, "narratiive")
         self.assertEqual(context.recipient_id, "12345")
-        self.assertEqual(context.material_ids, ("pr:12", "workstream:x:blocked"))
+        self.assertEqual(len(context.material_ids), 2)
+        self.assertTrue(all("Recommended next step" in item for item in context.material_ids))
         self.assertEqual(context.last_sent_at, prior)
         self.assertEqual(self.sent, [])
         self.assertEqual(self.events[-1]["interruption_policy_reason"], "cooldown_active")

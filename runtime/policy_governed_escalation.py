@@ -4,6 +4,7 @@ import hashlib
 from datetime import datetime
 from typing import Any, Callable, Iterable
 
+from runtime.founder_brief import decision_ready_materials, render_material_update
 from runtime.executive_delivery import (
     CallableTextChannelAdapter,
     ChannelAdapter,
@@ -41,6 +42,7 @@ class PolicyGovernedMaterialEscalationService:
         self,
         *,
         mission_control_loader: MissionControlLoader,
+        material_selector: Callable[[MissionControlSnapshot], Iterable[str]] | None = None,
         key_store: DeliveryKeyStore,
         last_sent_store: FileLastEscalationStore,
         interruption_policy: InterruptionPolicy,
@@ -61,6 +63,7 @@ class PolicyGovernedMaterialEscalationService:
         canonical_channel = channel.strip().lower()
         if not canonical_channel:
             raise ValueError("channel is required")
+        self.material_selector = material_selector or decision_ready_materials
         self.mission_control_loader = mission_control_loader
         self.channel = canonical_channel
         self.channel_adapter = channel_adapter or CallableTextChannelAdapter(
@@ -85,6 +88,7 @@ class PolicyGovernedMaterialEscalationService:
 
         try:
             snapshot = self.mission_control_loader()
+            materials = list(self.material_selector(snapshot))
         except Exception as exc:
             result = EscalationResult(
                 canonical_workspace_id,
@@ -98,7 +102,6 @@ class PolicyGovernedMaterialEscalationService:
             self._record("executive_escalation.generation_failed", result)
             return result
 
-        materials = sorted(set(snapshot.blockers) | set(snapshot.approvals_required))
         digest_key = (
             self.build_digest_key(
                 workspace_id=canonical_workspace_id,
@@ -162,8 +165,7 @@ class PolicyGovernedMaterialEscalationService:
 
         content = ExecutiveMessageContent(
             kind="material_escalation",
-            title="Material escalation — Matt review needed:",
-            items=tuple(materials),
+            title=render_material_update(materials),
             metadata={"workspace_id": canonical_workspace_id},
         )
         target = DeliveryTarget(channel=self.channel, address=canonical_chat_id)

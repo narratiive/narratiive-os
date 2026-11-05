@@ -10,6 +10,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
 
+from runtime.founder_brief import decision_ready_materials, render_material_update
 from runtime.mission_control import MissionControlSnapshot
 from runtime.tony_command_service import CommandResponse
 
@@ -570,6 +571,7 @@ class MaterialEscalationService:
         self,
         *,
         mission_control_loader: MissionControlLoader,
+        material_selector: Callable[[MissionControlSnapshot], Iterable[str]] | None = None,
         send_message: MessageSender,
         key_store: DeliveryKeyStore,
         last_sent_store: FileLastEscalationStore,
@@ -582,6 +584,7 @@ class MaterialEscalationService:
             raise ValueError("max_attempts must be at least 1")
         if min_interval_seconds < 0:
             raise ValueError("min_interval_seconds must not be negative")
+        self.material_selector = material_selector or decision_ready_materials
         self.mission_control_loader = mission_control_loader
         self.send_message = send_message
         self.key_store = key_store
@@ -600,6 +603,7 @@ class MaterialEscalationService:
 
         try:
             snapshot = self.mission_control_loader()
+            materials = list(self.material_selector(snapshot))
         except Exception as exc:
             result = EscalationResult(
                 workspace_id, chat_id, "generation_failed", 0, 0, "", error=str(exc)
@@ -607,7 +611,6 @@ class MaterialEscalationService:
             self._record("executive_escalation.generation_failed", result)
             return result
 
-        materials = sorted(set(snapshot.blockers) | set(snapshot.approvals_required))
         if not materials:
             result = EscalationResult(workspace_id, chat_id, "no_new_material", 0, 0, "")
             self._record("executive_escalation.no_new_material", result)
@@ -663,11 +666,7 @@ class MaterialEscalationService:
 
     @staticmethod
     def _render(materials: list[str]) -> str:
-        lines = ["Material escalation — Matt review needed:"]
-        lines.extend(f"- {item}" for item in materials[:10])
-        if len(materials) > 10:
-            lines.append(f"...and {len(materials) - 10} more.")
-        return "\n".join(lines)[:3500]
+        return render_material_update(materials)
 
     def _record(self, event_type: str, result: EscalationResult) -> None:
         self.record_event(
