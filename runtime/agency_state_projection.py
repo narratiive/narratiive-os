@@ -98,7 +98,7 @@ class AgencyStateProjector:
                     status="decision_required",
                     next_action=next_action,
                     owner="Matt",
-                    evidence=(approval,),
+                    evidence=self._workflow_evidence(summary, (approval,)),
                     requires_matt=True,
                     blocks_agency_outcome=self._has_business_consequence(approval),
                     entity_id=entity_id,
@@ -181,7 +181,7 @@ class AgencyStateProjector:
             status=item.state,
             next_action=next_action,
             owner=item.owner,
-            evidence=item.evidence,
+            evidence=self._workflow_evidence(summary, item.evidence),
             blocked=item.state == "blocked",
             blocks_agency_outcome=(item.state == "blocked" and business_consequence),
             requires_matt=requires_matt,
@@ -191,6 +191,20 @@ class AgencyStateProjector:
             significance=significance,
             why_matters=why_matters,
         )
+
+    @staticmethod
+    def _workflow_evidence(summary: Mapping[str, Any] | None, references: tuple[str, ...]) -> tuple[str, ...]:
+        """Carry exact-version evidence through briefing eligibility and delivery."""
+        if summary is None:
+            return references
+        versions = []
+        token = str(summary.get("approval_token") or "").strip()
+        if token:
+            versions.append(f"approval_version:{token}")
+        artifact = summary.get("latest_artefact")
+        if isinstance(artifact, Mapping) and artifact.get("checksum"):
+            versions.append(f"artefact_version:{artifact['checksum']}")
+        return tuple(dict.fromkeys((*references, *versions)))
 
     @staticmethod
     def _company_label(summary: Mapping[str, Any]) -> str:

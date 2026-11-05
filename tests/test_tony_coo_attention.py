@@ -2,6 +2,9 @@
 from dataclasses import replace
 from types import SimpleNamespace
 import unittest
+import tempfile
+from pathlib import Path
+from runtime.briefing_intelligence import ExecutiveBriefingPipeline, FileBriefingBaselineStore
 
 from runtime.agency_state_projection import AgencyStateProjector
 from runtime.founder_brief import decision_ready_items, decision_ready_materials, render_material_update
@@ -101,6 +104,22 @@ class COOAttentionTests(unittest.TestCase):
         first, second = decision_ready_items(source), decision_ready_items(revised)
         self.assertEqual(first[0].text, second[0].text)
         self.assertNotEqual(first[0].key, second[0].key)
+
+    def test_scheduled_baseline_does_not_hide_revised_gate_on_the_same_run(self):
+        source = snapshot(
+            approvals_required=("workflow:one-run:Approve",),
+            workflow_runs=({"run_id": "one-run", "entity_id": "example-coffee", "company": "Example Coffee",
+                "workflow_id": "growth_blueprint_deliverable_production", "updated_at": "2026-11-05",
+                "approval_token": "token-one", "latest_artefact": {"checksum": "version-one"}},),
+        )
+        revised = replace(source, workflow_runs=({**source.workflow_runs[0],
+            "approval_token": "token-two", "latest_artefact": {"checksum": "version-two"}},))
+        with tempfile.TemporaryDirectory() as directory:
+            pipeline = ExecutiveBriefingPipeline(baseline_store=FileBriefingBaselineStore(Path(directory) / "baseline.json"))
+            state = pipeline.refine(AgencyStateProjector().project(source))
+            pipeline.record_delivered(pipeline.snapshot(state, period="morning"))
+            self.assertEqual(decision_ready_items(source, pipeline=pipeline), ())
+            self.assertEqual(len(decision_ready_items(revised, pipeline=pipeline)), 1)
 
     def test_failure_with_sanitized_identity_still_names_the_work(self):
         state = SimpleNamespace(
