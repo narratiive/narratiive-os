@@ -55,6 +55,7 @@ class WorkflowActionPreviewService:
                 "artifact_version": _artifact_version(artifact),
             },
             "human_review_artifact": review,
+            "proposal_review": review.get("proposal_review") if review else None,
             "draft_client_communication": output.get("draft_client_communication"),
             "commercial_proposal_inputs": output.get("commercial_proposal_inputs"),
             "evidence_summary": _evidence_summary(output),
@@ -88,6 +89,13 @@ class WorkflowActionPreviewService:
         review = self._review_artifact(state, artifact)
         if not review:
             raise WorkflowActionPreviewError("approved artefact has no polished human-review PDF")
+        if review.get('renderer_id') != 'narratiive-fieldwork-proposal':
+            raise WorkflowActionPreviewError('Legacy proposal cannot be sent; a reviewed Fieldwork revision is required')
+        approved_binding = next((item.get('approval_binding', {}).get('fieldwork_proposal')
+            for item in reversed(state.approval_history)
+            if item.get('approval_binding', {}).get('fieldwork_proposal')), None)
+        if not approved_binding or approved_binding.get('pdf_sha256') != review['checksum'] or approved_binding.get('email_draft', {}).get('draft_sha256') != (review.get('proposal_review') or {}).get('email_draft', {}).get('draft_sha256'):
+            raise WorkflowActionPreviewError('Exact Fieldwork PDF, scope and fee approval is missing or stale')
         company = _company_name(state)
         recipient_name = _intended_recipient_name(state, company)
         body = _resolve_simulation_body(source_body, recipient_name)
@@ -101,7 +109,7 @@ class WorkflowActionPreviewService:
             "recipient_email": INTERNAL_REVIEW_ADDRESS,
             "cc": [],
             "bcc": [],
-            "subject": f"{company} — Growth Sprint Proposal",
+            "subject": f"{company} — Fieldwork proposal",
             "body_description": _body_description(body),
             "full_body": body,
             "body_source_field": "draft_client_communication",
@@ -121,7 +129,7 @@ class WorkflowActionPreviewService:
             "source_artifact_version": _artifact_version(artifact),
             "intended_consequence": (
                 "Deliver an internal simulation of the approved client communication and polished proposal PDF; "
-                "no KatKin person or domain will be contacted."
+                "no actual client person or domain will be contacted."
             ),
         }
         digest = _digest(action)
@@ -273,6 +281,7 @@ class WorkflowActionPreviewService:
             "page_count": int(manifest.get("page_count") or 0),
             "renderer_id": str(manifest.get("renderer_id") or ""),
             "renderer_version": str(manifest.get("renderer_version") or ""),
+            "proposal_review": manifest.get("proposal_review"),
         }
 
     def _review_location(self, state: WorkflowState, review_id: str) -> Path:

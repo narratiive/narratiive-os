@@ -84,13 +84,13 @@ Font-dependent render tests skip explicitly on hosts without the approved Mac
 fonts; validation/path/isolation tests still run. Local Mac visual comparison
 is required in addition to CI.
 
-## Pass 2 remains separate
+## Workflow integration
 
-Wire this renderer into the existing proposal workflow and revision mechanism;
-update the production/quality contracts; preserve the legacy proposal and its
-history; bind a new PDF candidate, exact fee and email draft to review; enforce
-separate content/commercial approval and external-send authorisation; reconcile
-Tony, Notion and Mission Control. Pass 1 does not change any of these states.
+Pass 2 connects this unchanged rendering API to the existing Proposal workflow,
+quality checks, immutable review store, email draft and separate approval gates.
+See `docs/operations/fieldwork-proposal-review.md` for the executable contract.
+The renderer itself remains pure authoring: no approval, communication or
+workflow persistence occurs inside it.
 
 Owning stream: Worker Infrastructure. Affected stream: Delivery Engine
-(`templates/fieldwork/v4`). The existing runtime/workflow interfaces are unchanged.
+(`templates/fieldwork/v4`). Legacy workflow IDs are preserved.

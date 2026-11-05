@@ -191,7 +191,7 @@ def _fixture_output(workflow_id: str) -> dict[str, Any]:
     if workflow_id == "blueprint_lite_to_discovery_preparation":
         return discovery_output()
     if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-        return proposal_output()
+        return proposal_output(workspace_id=WORKSPACE_ID, client_id=CLIENT_ID)
     if workflow_id == "growth_sprint_to_research_engine":
         return _research_output()
     if workflow_id == "research_to_strategic_synthesis":
@@ -865,6 +865,10 @@ def execute_native_lifecycle_until_failure(root: Path) -> tuple[TonyWorkflowRunt
     return runtime, reached, None
 
 
+from tests.fieldwork_test_support import lifecycle_pdf_fixture
+
+
+@lifecycle_pdf_fixture
 class TonyFullLifecycleTest(unittest.TestCase):
     def test_synthetic_new_lead_enters_the_existing_inbound_lifecycle(self) -> None:
         lead = InboundLead(

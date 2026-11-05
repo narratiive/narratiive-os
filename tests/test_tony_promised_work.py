@@ -44,6 +44,10 @@ def discovery_evidence() -> dict:
     }
 
 
+from tests.fieldwork_test_support import lifecycle_pdf_fixture
+
+
+@lifecycle_pdf_fixture
 class TonyPromisedWorkTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -151,21 +155,22 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(delivered.promised_work_delivery["status"], "delivered")
         self.assertEqual(len(self.gmail_calls), 1)
         self.assertEqual(len(self.telegram_messages), 1)
-        self.assertIn("Gate 2 is ready", self.telegram_messages[0])
+        self.assertIn("Fieldwork proposal is ready", self.telegram_messages[0])
         self.assertLess(len(self.telegram_messages[0]), 900)
         attachment = self.gmail_calls[0]["payload"]["attachments"][0]
         self.assertEqual(attachment["mime_type"], "application/pdf")
         self.assertTrue(attachment["filename"].endswith(".pdf"))
         self.assertLess(len(self.gmail_calls[0]["payload"]["body"]), 3000)
-        self.assertEqual(len(self.gmail_calls[0]["payload"]["body"].splitlines()), 3)
+        self.assertIn("CLIENT EMAIL DRAFT — NOT SENT", self.gmail_calls[0]["payload"]["body"])
+        self.assertIn("PDF SHA-256:", self.gmail_calls[0]["payload"]["body"])
         self.assertIn("Review copy: https://mail.google.com/", self.telegram_messages[0])
         visible = "\n".join(
             page.extract_text() or ""
             for page in PdfReader(io.BytesIO(base64.b64decode(attachment["content_base64"]))).pages
         )
-        self.assertIn("Growth Sprint Proposal", visible)
-        self.assertIn("The growth challenge", visible)
-        self.assertIn("Proposed workstreams", visible)
+        self.assertIn("FIELDWORK PROPOSAL", visible)
+        self.assertIn("THE MARKETING OPPORTUNITY", visible)
+        self.assertIn("THREE OUTPUTS", visible)
         for internal in (
             "provider_message_id", "worker_execution", "selection_reason",
             "source_refs", "artifact-", "safe-promised-source",

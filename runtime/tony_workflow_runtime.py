@@ -68,6 +68,7 @@ class TonyWorkflowRuntime:
     runs: WorkflowRunService
     business_projection: WorkflowBusinessProjectionService | None = None
     blueprint_director_learning: BlueprintDirectorLearningStore | None = None
+    review_artifact_root: Path | None = None
 
     def enqueue(
         self,
@@ -103,6 +104,20 @@ class TonyWorkflowRuntime:
         approval_binding: Mapping[str, object] | None = None,
     ) -> dict[str, Any]:
         current = self.runs.load_run(run_id)
+        if current.workflow_id == 'discovery_evidence_to_growth_sprint_proposal':
+            if current.status is not WorkflowStatus.AWAITING_APPROVAL or current.approval_status != 'pending':
+                raise ValueError('Fieldwork proposal is not at its current review gate')
+            from runtime.human_review_artifacts import HumanReviewArtifactStore, HumanReviewPresentationService
+            source = current.stages[-1].output_artifacts[-1]
+            raw = Path(source.location).read_bytes()
+            if hashlib.sha256(json.dumps(json.loads(raw), sort_keys=True, separators=(',', ':')).encode()).hexdigest() != source.checksum:
+                raise ValueError('Proposal source checksum mismatch')
+            review = HumanReviewPresentationService(HumanReviewArtifactStore(
+                self.review_artifact_root or self.coordinator.artifacts.root.parent/'human-review-artifacts')).produce(
+                    state=current, source=source, output=json.loads(raw))
+            approval_binding = dict(approval_binding or {})
+            approval_binding['fieldwork_proposal'] = dict(review.proposal_review)
+            approval_binding['fieldwork_proposal']['commercial_decision'] = 'approved_exact_proposed_fee_scope_and_pdf'
         state = self.coordinator.approve(
             run_id,
             approver=approver,
@@ -120,8 +135,18 @@ class TonyWorkflowRuntime:
         reviewer: str,
         rationale: str,
         approval_binding: Mapping[str, object] | None = None,
+        fieldwork_revision_inputs: Mapping[str, Any] | None = None,
     ) -> dict[str, Any]:
         current = self.runs.load_run(run_id)
+        if fieldwork_revision_inputs is not None:
+            from runtime.fieldwork_proposal import validate_inputs
+            if current.workflow_id != 'discovery_evidence_to_growth_sprint_proposal':
+                raise ValueError('Fieldwork revision inputs require the existing proposal run')
+            data = validate_inputs(fieldwork_revision_inputs)
+            if data['workspace_id'] != current.workspace_id or data['client_id'] != current.client_id:
+                raise ValueError('Fieldwork revision scope mismatch')
+            if current.status is WorkflowStatus.BLOCKED:
+                raise ValueError('Supply Fieldwork inputs at the pending review revision gate')
         if current.status is WorkflowStatus.BLOCKED:
             state = self.runs.request_blocked_revision(
                 run_id,
@@ -134,6 +159,7 @@ class TonyWorkflowRuntime:
                 reviewer=reviewer,
                 rationale=rationale,
                 approval_binding=approval_binding,
+                revision_inputs={"fieldwork_revision_inputs": dict(fieldwork_revision_inputs)} if fieldwork_revision_inputs is not None else None,
             )
         self._record_blueprint_learning(current, reviewer=reviewer, rationale=rationale, approved=False)
         self._project(state)
@@ -928,6 +954,7 @@ def build_tony_workflow_runtime(
         runs=runs,
         business_projection=projection,
         blueprint_director_learning=blueprint_director_learning,
+        review_artifact_root=Path(root)/"human-review-artifacts",
     )
 
 

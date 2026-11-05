@@ -36,6 +36,10 @@ def lifecycle() -> ClientLifecycleRecord:
     )
 
 
+from tests.fieldwork_test_support import lifecycle_pdf_fixture
+
+
+@lifecycle_pdf_fixture
 class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
     def test_safe_company_traverses_internal_chain_with_quality_lineage_and_gates(self) -> None:
         calls = []
@@ -50,7 +54,7 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             if workflow_id == "blueprint_lite_to_discovery_preparation":
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-                return proposal_output()
+                return proposal_output(workspace_id=workflow_context['workspace_id'], client_id=workflow_context['client_id'])
             if workflow_id == "research_to_strategic_synthesis":
                 return strategic_synthesis_output()
             if workflow_id == "strategic_synthesis_to_strategy_thesis":

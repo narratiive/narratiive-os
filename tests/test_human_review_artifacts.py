@@ -38,6 +38,23 @@ def state(workflow_id: str) -> WorkflowState:
 
 
 class HumanReviewArtifactContractTests(unittest.TestCase):
+    def test_pre_fieldwork_non_proposal_manifest_replays_byte_identically(self) -> None:
+        current = state('growth_diagnostic_to_blueprint_lite')
+        output = blueprint_output()
+        encoded = json.dumps(output, sort_keys=True, separators=(',', ':')).encode()
+        source = ArtifactRef(artifact_id='safe-legacy-source', artifact_type='blueprint_lite',
+            location='unused', checksum=hashlib.sha256(encoded).hexdigest())
+        with tempfile.TemporaryDirectory() as tmp:
+            service = HumanReviewPresentationService(HumanReviewArtifactStore(tmp))
+            first = service.produce(state=current, source=source, output=output)
+            manifest = Path(first.location).parent/'manifest.json'
+            before = manifest.read_bytes()
+            # This is the pre-upgrade shape: no extra nullable proposal key.
+            self.assertNotIn('proposal_review', json.loads(before))
+            second = service.produce(state=current, source=source, output=output)
+            self.assertEqual(manifest.read_bytes(), before)
+            self.assertEqual(second.checksum, first.checksum)
+
     def test_minimum_document_products_have_explicit_review_contracts(self) -> None:
         cases = (
             ("growth_diagnostic_to_blueprint_lite", blueprint_output(), "Blueprint Lite"),
@@ -106,6 +123,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
         self.assertNotIn("internal-message", visible)
         self.assertNotIn("internal-worker", visible)
 
+    @unittest.skipUnless(__import__('pathlib').Path('/System/Library/Fonts/Supplemental/Baskerville.ttc').exists(), 'Exact approved Mac fonts required')
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()
         output.update(
@@ -143,12 +161,12 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
 
             self.assertEqual(source_path.read_bytes(), encoded + b"\n")
             self.assertEqual(review.mime_type, "application/pdf")
-            self.assertGreaterEqual(review.page_count, 3)
+            self.assertEqual(review.page_count, 2)
             visible = "\n".join(
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
-            self.assertIn("Growth Sprint Proposal", visible)
-            self.assertIn("Proposed workstreams", visible)
+            self.assertIn("FIELDWORK PROPOSAL", visible)
+            self.assertIn("THREE OUTPUTS", visible)
             for internal_value in (
                 "DO-NOT-SHOW-PROVIDER",
                 "DO-NOT-SHOW-MODEL",

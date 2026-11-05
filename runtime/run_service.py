@@ -779,6 +779,7 @@ class WorkflowRunService:
         reviewer: str,
         rationale: str,
         approval_binding: Mapping[str, object] | None = None,
+        revision_inputs: Mapping[str, object] | None = None,
     ) -> WorkflowState:
         """Record an explicit rejection and reopen the producing step.
 
@@ -797,7 +798,18 @@ class WorkflowRunService:
         if not completed:
             raise ValueError("workflow run has no completed step to revise")
         owner = completed[-1]
+        if revision_inputs:
+            if state.workflow_id != 'discovery_evidence_to_growth_sprint_proposal' or set(revision_inputs) != {'fieldwork_revision_inputs'}:
+                raise ValueError('Unsupported revision input fields')
+            from runtime.fieldwork_proposal import validate_inputs
+            supplied = validate_inputs(revision_inputs['fieldwork_revision_inputs'])
+            if supplied['workspace_id'] != state.workspace_id or supplied['client_id'] != state.client_id:
+                raise ValueError('Revision workspace/client mismatch')
+            state.input_payload.update(dict(revision_inputs))
         rejection = {
+            'decision': 'request_revision',
+            'owner_stage_id': owner.stage_id,
+            'revision_input_fields': sorted(revision_inputs or {}),
             "reviewer": identity,
             "rationale": reason,
             "rejected_at": datetime.now(timezone.utc).isoformat(),

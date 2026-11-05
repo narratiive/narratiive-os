@@ -87,7 +87,7 @@ def run(root: Path) -> dict:
         if workflow_id == "blueprint_lite_to_discovery_preparation":
             return discovery_output()
         if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-            return proposal_output()
+            return proposal_output(workspace_id='golden-path-certification', client_id=CLIENT_ID)
         if workflow_id == "research_to_strategic_synthesis":
             return strategic_synthesis_output()
         if workflow_id == "strategic_synthesis_to_strategy_thesis":

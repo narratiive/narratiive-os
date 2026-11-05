@@ -36,7 +36,7 @@ from runtime.workflow_entity_classification import (
 class WorkflowCommandBackend(Protocol):
     def list_states(self) -> tuple[WorkflowState, ...]: ...
     def approve(self, state: WorkflowState, *, approver: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState: ...
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None, fieldwork_revision_inputs: Mapping[str, Any] | None = None) -> WorkflowState: ...
     def resume(self, state: WorkflowState) -> WorkflowState: ...
     def recover_with_approved_artifact(
         self,
@@ -176,7 +176,7 @@ class FileWorkflowCommandBackend:
         )
         return runtime.runs.load_run(state.run_id)
 
-    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None) -> WorkflowState:
+    def reject(self, state: WorkflowState, *, reviewer: str, rationale: str, approval_token: str, decision_evidence: Mapping[str, Any] | None = None, fieldwork_revision_inputs: Mapping[str, Any] | None = None) -> WorkflowState:
         binding = None
         if state.approval_status == "pending":
             binding = approval_binding_evidence(state, approval_token)
@@ -188,6 +188,7 @@ class FileWorkflowCommandBackend:
             reviewer=reviewer,
             rationale=rationale,
             approval_binding=binding,
+            fieldwork_revision_inputs=fieldwork_revision_inputs,
         )
         return runtime.runs.load_run(state.run_id)
 
@@ -1187,6 +1188,8 @@ class TonyWorkflowCommandService:
                     rationale=rationale,
                     approval_token=approval_token,
                     decision_evidence=decision_evidence,
+                    **({'fieldwork_revision_inputs': inputs['fieldwork_revision_inputs']}
+                       if inputs and 'fieldwork_revision_inputs' in inputs else {}),
                 )
                 return CommandResponse("reject", "healthy", f"Revision requested for {changed.run_id}; progression remains stopped until revised work passes quality.", self._summary(changed))
             if name == "manual-recovery":

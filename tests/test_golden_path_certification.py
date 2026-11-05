@@ -7,6 +7,10 @@ from pathlib import Path
 from scripts.run_golden_path_certification import run
 
 
+from tests.fieldwork_test_support import lifecycle_pdf_fixture
+
+
+@lifecycle_pdf_fixture
 class GoldenPathCertificationTests(unittest.TestCase):
     def test_fresh_isolated_certification_reaches_exact_version_blueprint_gate(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

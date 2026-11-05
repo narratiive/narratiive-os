@@ -113,10 +113,13 @@ class HumanReviewArtifact:
     decision_prompt: str
     next_if_approved: str
     telegram_notification: str
+    proposal_review: Mapping[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["focus_points"] = list(self.focus_points)
+        if self.proposal_review is None:
+            value.pop("proposal_review", None)
         return value
 
 
@@ -136,6 +139,7 @@ class HumanReviewArtifactStore:
         page_count: int,
         renderer_id: str = RENDERER_ID,
         renderer_version: str = RENDERER_VERSION,
+        proposal_review: Mapping[str, Any] | None = None,
     ) -> HumanReviewArtifact:
         source_checksum = str(source.checksum or "").strip()
         if not source_checksum:
@@ -184,6 +188,7 @@ class HumanReviewArtifactStore:
             decision_prompt=plan.decision_prompt,
             next_if_approved=plan.next_if_approved,
             telegram_notification=telegram_notification,
+            proposal_review=proposal_review,
         )
         manifest_bytes = (json.dumps(record.to_dict(), sort_keys=True, indent=2) + "\n").encode("utf-8")
         directory.mkdir(parents=True, exist_ok=True)
@@ -211,6 +216,8 @@ class HumanReviewPresentationService:
         source: ArtifactRef,
         output: Mapping[str, Any],
     ) -> HumanReviewArtifact:
+        if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+            return self._produce_fieldwork(state=state, source=source, output=output)
         if state.workflow_id == "growth_blueprint_deliverable_production":
             return self._ingest_growth_blueprint_review(state=state, source=source, output=output)
         plan = build_review_plan(state, output)
@@ -223,6 +230,35 @@ class HumanReviewPresentationService:
             pdf_bytes=pdf_bytes,
             page_count=pages,
         )
+
+    def _produce_fieldwork(self, *, state, source, output):
+        from runtime.fieldwork_proposal import TEMPLATE, TEMPLATE_VERSION, render_fieldwork_proposal
+        from runtime.fieldwork_workflow import proposal_inputs, email_draft
+        data = proposal_inputs(output)
+        encoded = json.dumps(dict(output), sort_keys=True, separators=(',', ':')).encode()
+        if hashlib.sha256(encoded).hexdigest() != source.checksum:
+            raise HumanReviewArtifactError('Fieldwork output does not match its immutable source')
+        if data['workspace_id'] != state.workspace_id or data['client_id'] != state.client_id:
+            raise HumanReviewArtifactError('Fieldwork input belongs to another workspace/client')
+        result = render_fieldwork_proposal(data, asset_root=TEMPLATE)
+        draft = email_draft(output, result.checksum, source_checksum=str(source.checksum))
+        plan = ReviewDocumentPlan(product='Fieldwork Proposal', gate_label='PROPOSAL REVIEW',
+            company=data['client_name'], subtitle='Exact PDF, scope and proposed fee for review', sections=(),
+            focus_points=(data['copy']['headline'].replace('<br/>',' '),
+                f"Proposed investment: £{data['proposed_fee']['amount']} excluding VAT; not approved.",
+                'Delivery: seven working days after agreed prerequisites.'),
+            decision_prompt='Review this exact PDF, scope, fee and email draft. Approval does not authorise sending.',
+            next_if_approved='Separate exact-message and attachment send authorisation is required.')
+        record = self.store.persist(state=state, source=source, plan=plan, pdf_bytes=result.pdf,
+            page_count=2, renderer_id='narratiive-fieldwork-proposal', renderer_version=TEMPLATE_VERSION,
+            proposal_review=dict(pdf_sha256=result.checksum, proposed_fee=data['proposed_fee'],
+                template_version=TEMPLATE_VERSION, email_draft=draft))
+        folder = Path(record.location).parent
+        _persist_immutable(folder/'fieldwork-validation.json', (json.dumps(result.manifest,sort_keys=True,indent=2)+'\n').encode())
+        _persist_immutable(folder/'client-email-draft.json', (json.dumps(draft,sort_keys=True,indent=2)+'\n').encode())
+        if hashlib.sha256(Path(record.location).read_bytes()).hexdigest() != result.checksum:
+            raise HumanReviewArtifactError('Stored Fieldwork PDF failed read-back verification')
+        return record
 
     def _ingest_growth_blueprint_review(
         self,
@@ -817,6 +853,10 @@ def _produced_growth_blueprint_plan(company: str, output: Mapping[str, Any]) -> 
 
 
 def _telegram_notification(plan: ReviewDocumentPlan) -> str:
+    if plan.product == 'Fieldwork Proposal':
+        return (f"{plan.company} — Fieldwork proposal is ready for Matt’s review. "
+            'The two-page PDF and proposed client email have been emailed for review. '
+            'Please review the exact PDF, scope and proposed fee; sending requires separate authorisation.')
     decision = plan.decision_prompt.rstrip(".")
     if decision.casefold().startswith("decide whether "):
         decision = "whether " + decision[len("decide whether ") :]
