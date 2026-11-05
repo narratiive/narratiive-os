@@ -25,6 +25,7 @@ from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersiste
 from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 from runtime.workflow_portfolio import project_client_portfolio
+from runtime.client_visibility import client_engagements, client_summary, verified_review_link
 from runtime.workflow_entity_classification import (
     FileWorkflowEntityClassificationJournal,
     INTERNAL_SYNTHETIC_TEST,
@@ -706,7 +707,7 @@ class TonyWorkflowCommandService:
     """Concise, deterministic executive controls over persisted workflow truth."""
 
     _COMMANDS = {
-        "workflow", "work", "approvals", "blockers", "artefact", "artifact",
+        "workflow", "client", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover", "manual-recovery",
         "projection", "sync-notion", "research",
         "deliver-review",
@@ -826,8 +827,16 @@ class TonyWorkflowCommandService:
                 recovered = self.backend.recover()
                 return CommandResponse("recover", "healthy", f"Recovery checked; {recovered} interrupted run(s) recovered.", {"recovered": recovered})
             states = self.backend.list_states()
-            if name in {"campaigns", "clients"}:
-                return self._portfolio(states)
+            if name in {"clients", "campaigns"}:
+                return self._client_visibility(states)
+            if name == "client":
+                reference, _ = self._arguments(parts[1:])
+                if not reference: return self._error(name, "missing_argument", "Client name or recorded alias is required.")
+                return self._client_visibility(states, reference)
+            if name == "workflow" and len(parts) > 1:
+                reference, _ = self._arguments(parts[1:])
+                if not any(s.run_id.casefold() == reference.casefold() for s in states):
+                    return self._client_visibility(states, reference)
             if name in {"learning", "learning-queue", "sync-learning"}:
                 reference, rationale = self._arguments(parts[1:])
                 if self.campaign_learning is None:
@@ -1329,6 +1338,34 @@ class TonyWorkflowCommandService:
         lines = [f"{len(selected)} {label}(s)."]
         lines.extend(f"• {_state_name(state)} — {state.workflow_id}: {state.status.value.replace('_', ' ')}" for state in selected[:10])
         return CommandResponse(name, "blocked" if name == "blockers" and selected else "healthy", "\n".join(lines), {"runs": [self._summary(state) for state in selected]})
+
+    def _client_visibility(self, states, reference=""):
+        engagements = client_engagements(states, reference)
+        if not engagements:
+            if reference:
+                return self._error("client", "client_not_found", "No recorded client name or alias matched: " + reference)
+            return CommandResponse("clients", "healthy", "No recorded client journeys.", {"clients": [], "client_count": 0})
+        rows, lines = [], []
+        for state, row in engagements:
+            link = verified_review_link(state, self.backend)
+            text = client_summary(state, row, link)
+            row = dict(row, review_link=link, summary=text)
+            rows.append(row)
+            if sum(len(line)+1 for line in lines) + len(text) < 3000:
+                lines.append(text)
+        heading = ("Client reference is ambiguous across recorded engagements; choose the engagement before taking action."
+                   if reference and len(rows)>1 else "Recorded client status" if reference else "Client journeys")
+        if len(lines)<len(rows): lines.append(f"Showing {len(lines)} of {len(rows)} engagements; use /client <recorded name> for a narrower view.")
+        data = {"clients": rows, "client_count": len(rows), "ambiguous": bool(reference and len(rows)>1),
+                "blocked_count": sum(bool(r["blockers"]) for r in rows),
+                "approval_count": sum(r["human_approval_required"] for r in rows),
+                "fulfilled_count": sum(r["journey_status"] == "fulfilled" for r in rows), "external_action_taken": False}
+        if reference and len(engagements)==1:
+            data = {**self._summary(engagements[0][0]), **data}
+        return CommandResponse("client" if reference else "clients", "attention_required" if any(
+            row["blockers"] or row["human_approval_required"] for row in rows) else "healthy",
+            heading + "\n" + "\n".join(f"{i}. {line}" for i,line in enumerate(lines,1)),
+            data)
 
     def _portfolio(self, states: tuple[WorkflowState, ...]) -> CommandResponse:
         clients = project_client_portfolio(states)
