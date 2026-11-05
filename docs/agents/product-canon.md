@@ -1,43 +1,51 @@
 # Narratiive OS Product Canon
 
-Status: Governance index to existing canon
+Status: Current commercial naming canon, version 1.2.0 — 5 November 2026
 
-This document locates and protects existing product truth. It does not replace
-the canonical files it references.
+Read [START_HERE.md](../../START_HERE.md) first. Matt's approved commercial names
+are **Groundwork, Fieldwork, Sketchbook and Launchpad**. This naming decision
+supersedes conflicting external-product labels in older repository documents;
+it does not change their technical contracts or immutable history.
 
-## Canonical names
+## Commercial products and internal names
 
-| Name | Meaning |
+| Commercial product | Purpose |
 | --- | --- |
-| `Narratiive OS` | The repository and operating system |
-| `Growth Specification` | The canonical parent object for the strategy-to-performance lifecycle |
-| `Growth Diagnostic` | The instant self-serve inbound diagnostic result generated from prospect inputs |
-| `Blueprint Lite` | The free personalised inbound follow-up generated from a completed Growth Diagnostic plus outside-in research |
-| `Growth Sprint` | The paid strategic engagement commissioned after Discovery |
-| `Narratiive Growth Blueprint` / `Growth Blueprint` | The premium strategic product and its working short name |
-| `Campaign World` | The campaign-territory artefact downstream of the Growth Blueprint |
-| `Creative Director's Bible` | The creative-direction artefact downstream of Campaign World |
-| `Production Pack` | The asset-level production contract downstream of approved creative direction |
-| `Asset Manifest` | The machine-readable register of asset identity, state, lineage, and delivery |
-| `Performance Feedback` | The governed performance-learning object downstream of delivered assets |
-| `Narratiive Signal` | The external unsolicited outreach product |
-| `Opportunity Card Pipeline` | The internal workflow name for Narratiive Signal |
+| Groundwork | Lead intelligence, qualification, business/market research and Discovery preparation. |
+| Fieldwork | “Seven days to find a clearer way to grow.” Premium evidence-led strategy delivered within seven working days after agreed prerequisites/inputs: find the growth audience, build the advantage, show the way to growth. Executive presentation with appropriate research, source and financial appendices. |
+| Sketchbook | Rich creative-world development from approved Fieldwork: territories, distinctive brand assets, typography, imagery, copywriting, motion, storytelling, formats and contextual campaign concepts. |
+| Launchpad | Creative production, asset QA, delivery preparation and approved activation. Publication and spend retain independent gates. |
 
-The canonical inbound commercial journey is:
+The commercial journey is **Groundwork → Discovery → Fieldwork → Sketchbook → Launchpad**.
+This is a commercial description, not a migration or renaming of executable stages.
 
-`Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
+| Internal name | Meaning retained for compatibility |
+| --- | --- |
+| Narratiive OS | Repository and operating system. |
+| Growth Diagnostic | Existing diagnostic result/entry mechanism, not a fifth commercial product. |
+| Blueprint Lite | Historical inbound/pre-sales artefact and workflow label; retired as a client-facing product name. |
+| Growth Sprint | Historical paid-engagement/workflow label; retired as a client-facing product name. |
+| Growth Specification | Parent object for the strategy-to-performance lifecycle. |
+| Narratiive Growth Blueprint / Growth Blueprint | Strategic artefact contract used within Fieldwork; not a separate current offer. |
+| Campaign World | Creative-territory artefact used within Sketchbook. |
+| Creative Director's Bible / Creative Bible | Creative-direction artefact used within Sketchbook. |
+| Production Pack / Asset Manifest | Production contract and asset identity/state/lineage register used in Launchpad. |
+| Performance Feedback | Governed downstream learning object. |
+| Narratiive Signal / Opportunity Card Pipeline | Existing specialist outreach contract and its internal workflow label; not additional names for the four commercial products. |
 
-Inside the paid Growth Sprint, the canonical evidence-to-strategy sequence is:
+Preserve those internal names, historical workflow IDs, file paths, schemas,
+specialist names and existing compatibility behaviour. Do not bulk-rename source
+or historical records. The existing internal Fieldwork strategy sequence remains
+`Research → Strategic Synthesis → Strategy Thesis → Growth Blueprint`.
+`knowledge/strategy-thesis/README.md` governs the internal thesis contract and
+exact-version gate. Tony orchestrates; specialists own content; Matt retains
+commercial and client-facing approval. Naming does not grant execution authority.
 
-`Research → Strategic Synthesis → Strategy Thesis → Growth Blueprint`
-
-`knowledge/strategy-thesis/README.md` is the canonical internal contract for
-Strategic Synthesis and the exact-version Strategy Thesis Gate 3. These are
-internal stages of the Growth Sprint, not additional external products. The
-Strategy Director owns their content, Matt owns the Gate 3 decision, and Tony
-orchestrates without acquiring authorship or approval authority.
-
-Do not use `Narratiive Shift` or `Opportunity Card` as external names in this inbound journey. Do not use `Opportunity Card` as an external product name anywhere. `Opportunity Card Pipeline` remains an internal workflow label for Narratiive Signal only. Do not rename a specialist or collapse the Growth Specification, Growth Blueprint, Campaign World, Creative Director's Bible, Production Pack, Asset Manifest, or Performance Feedback into one generic “strategy deck.”
+Do not use Blueprint Lite, Growth Sprint, Narratiive Shift or Opportunity Card
+as current client-facing product names. Older product files below remain
+technical/specialist references; their historical commercial descriptions do
+not override this naming canon. This reconciliation does not change output
+requirements, pricing, release gates or workflow behaviour.
 
 ## Growth Specification
 
@@ -97,11 +105,12 @@ The stable reusable templates are:
 Their headings, markers, YAML contracts, tables, order, and placeholders are
 part of the contract.
 
-## Blueprint Lite
+## Historical Blueprint Lite compatibility contract
 
-`products/blueprint-lite/README.md` is the canonical inbound pre-sales product contract.
+`products/blueprint-lite/README.md` retains the existing technical pre-sales
+contract. Its historical name is not approved for new client-facing work.
 
-Blueprint Lite is generated only after a completed Growth Diagnostic and combines the prospect's own inputs with selective outside-in research. It is deliberately concise and provisional. Its job is to create recognition, useful strategic tension and excitement about potential while preserving a clear curiosity gap for Discovery and the paid Growth Sprint.
+Blueprint Lite is generated only after a completed Growth Diagnostic and combines the prospect's own inputs with selective outside-in research. It is deliberately concise and provisional. Its job is to create recognition, useful strategic tension and excitement about potential while preserving a clear curiosity gap for Discovery and paid Fieldwork.
 
 It is not the instant diagnostic result, not Narratiive Signal, not a generic lead magnet, and not a shortened paid Growth Blueprint.
 
@@ -118,7 +127,7 @@ are:
 - `visual-framework-library-v1.md`
 - `visual-intelligence-system-v1.md`
 
-The Blueprint is a premium strategic product, not merely a presentation. It
+The Blueprint is the internal strategic artefact supporting Fieldwork, not merely a presentation or a separately named commercial offer. It
 should be intelligent, commercial, evidence-based, visually communicable, and
 founder-friendly. Every slide carries evidence, insight, interpretation, and
 implication, and must answer “So what?”
@@ -144,7 +153,7 @@ assets by default.
 The founder-grade target is 9.5/10. That target does not authorise score
 inflation or replace human review.
 
-## Narratiive Signal
+## Narratiive Signal specialist outreach contract
 
 The canonical files in `products/narratiive-signal/` must be read in this order:
 
@@ -220,3 +229,11 @@ and client-facing outputs.
 
 Never edit a checksum-locked component without updating its governed version and
 manifest through the established import/version process.
+
+## Naming reconciliation changelog
+
+- **1.2.0 — 5 November 2026:** Matt explicitly instructed repository reconciliation
+  to Groundwork, Fieldwork, Sketchbook and Launchpad. Retired Blueprint Lite and
+  Growth Sprint as external names; retained technical contracts, stable IDs,
+  specialist ownership and historical artefacts. Added the root contributor
+  introduction. No checksum-locked Blueprint component or runtime rule changed.

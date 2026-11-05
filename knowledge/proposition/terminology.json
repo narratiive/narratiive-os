@@ -1,27 +1,86 @@
 {
   "policy_id": "narratiive_terminology",
-  "version": "1.1.0",
-  "version_note": "Retired Narratiive terms are rewritten into approved descriptive language rather than blocking Tony outputs.",
+  "version": "1.2.0",
+  "version_note": "Matt-approved commercial naming reconciliation, 5 November 2026. Approved-name/context metadata updated; existing retired-term scan/rewrite rules unchanged for runtime compatibility.",
   "status": "active",
   "owner": "Narratiive",
   "governance": {
     "source_of_truth": "This repository",
     "change_rule": "Terminology changes require an explicit versioned repository update.",
-    "conflict_rule": "Repository policy overrides wording inherited from prior chats or superseded documents."
+    "conflict_rule": "Repository policy overrides wording inherited from prior chats or superseded documents.",
+    "introduction": "START_HERE.md",
+    "product_canon": "docs/agents/product-canon.md"
   },
   "approved_terms": [
-    {"term": "Narratiive OS", "use": "The operating system and repository-backed business infrastructure."},
-    {"term": "Tony", "use": "The Chief-of-Staff interface and orchestration layer."},
-    {"term": "Growth Blueprint", "use": "The canonical strategic output defined by the Blueprint registry."},
-    {"term": "Campaign World", "use": "The approved post-Blueprint creative platform output."},
-    {"term": "Creative Bible", "use": "The executional creative system derived from an approved Campaign World."}
+    {
+      "term": "Groundwork",
+      "use": "Lead intelligence, qualification, business/market research and Discovery preparation."
+    },
+    {
+      "term": "Fieldwork",
+      "use": "Evidence-led strategic engagement: find the growth audience, build the advantage, show the way to growth."
+    },
+    {
+      "term": "Sketchbook",
+      "use": "Creative-world development from approved Fieldwork."
+    },
+    {
+      "term": "Launchpad",
+      "use": "Creative production, asset QA, delivery preparation and separately approved activation."
+    },
+    {
+      "term": "Narratiive OS",
+      "use": "The operating system and repository-backed business infrastructure."
+    },
+    {
+      "term": "Tony",
+      "use": "The Chief Operating Officer and operational orchestration interface."
+    },
+    {
+      "term": "Growth Blueprint",
+      "use": "The canonical strategic output defined by the Blueprint registry."
+    },
+    {
+      "term": "Campaign World",
+      "use": "The approved post-Blueprint creative platform output."
+    },
+    {
+      "term": "Creative Bible",
+      "use": "The executional creative system derived from an approved Campaign World."
+    }
   ],
-  "unsettled_terms": [
-    {"concept": "Personalised prospecting asset", "rule": "Do not assign a permanent market-facing product name until it is explicitly approved and versioned here."},
-    {"concept": "Paid commercial engagement", "rule": "Do not invent or revive an engagement label; use descriptive language until an approved name is versioned here."}
-  ],
+  "unsettled_terms": [],
   "retired_terms": [
-    {"term": "Opportunity Card", "replacement": "personalised prospecting asset", "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."},
-    {"term": "Growth Sprint", "replacement": "paid commercial engagement", "rationale": "The phrase has been superseded and is not an approved commercial engagement name."}
-  ]
+    {
+      "term": "Opportunity Card",
+      "replacement": "personalised prospecting asset",
+      "rationale": "The phrase is no longer part of the current Narratiive approach and must not re-enter outputs through chat history."
+    },
+    {
+      "term": "Growth Sprint",
+      "replacement": "paid commercial engagement",
+      "rationale": "The phrase has been superseded and is not an approved commercial engagement name."
+    }
+  ],
+  "commercial_product_names": [
+    "Groundwork",
+    "Fieldwork",
+    "Sketchbook",
+    "Launchpad"
+  ],
+  "internal_artefact_names": [
+    "Growth Blueprint",
+    "Campaign World",
+    "Creative Director's Bible",
+    "Production Pack",
+    "Asset Manifest",
+    "Performance Feedback"
+  ],
+  "legacy_compatibility": {
+    "client_facing_retired_names": [
+      "Blueprint Lite",
+      "Growth Sprint"
+    ],
+    "rule": "Do not use these as current client-facing products. Preserve historical workflow IDs, internal contracts, artefacts and existing runtime compatibility. Metadata does not rename or rewrite persisted records."
+  }
 }
