@@ -34,6 +34,7 @@ from runtime.proactive_executive_delivery import (  # noqa: E402
     ProactiveExecutiveDeliveryService,
     WorkspaceDeliveryLock,
 )
+from runtime.founder_brief import decision_ready_items
 from runtime.repositories import WorkflowEvent  # noqa: E402
 from runtime.tony_executive_commands import TonyExecutiveCommandService  # noqa: E402
 from runtime.workspaces import WorkspaceNotFound  # noqa: E402
@@ -231,7 +232,7 @@ def run_escalation(*, simulate_transport_failure: bool) -> dict[str, Any]:
     workspace_id = _workspace_id_from_env()
 
     try:
-        workspace_runtime, _, mission_control_loader = build_components(
+        workspace_runtime, executive_service, mission_control_loader = build_components(
             runtime_root=runtime_root, workspace_id=workspace_id
         )
     except ProactiveBriefConfigurationError as exc:
@@ -271,6 +272,9 @@ def run_escalation(*, simulate_transport_failure: bool) -> dict[str, Any]:
 
     service = MaterialEscalationService(
         mission_control_loader=mission_control_loader,
+        material_selector=lambda snapshot: decision_ready_items(
+            snapshot, pipeline=getattr(executive_service, "briefing_pipeline", None)
+        ),
         send_message=send,
         key_store=key_store,
         last_sent_store=last_sent_store,

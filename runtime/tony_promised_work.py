@@ -6,6 +6,9 @@ from typing import Any
 from urllib.parse import quote
 
 from runtime.models import WorkflowState
+from runtime.agency_state_projection import AgencyStateProjector
+from runtime.workflow_mission_control import workflow_state_name
+from runtime.founder_brief import founder_text
 from runtime.tony_internal_review_delivery import reviewable_artifact
 from runtime.tony_workflow_commands import WorkflowCommandBackend
 
@@ -51,11 +54,10 @@ class TonyPromisedWorkWorker:
                 ):
                     return state
                 state = self.backend.advance(state)
-        except Exception as exc:
+        except Exception:
             return self._deliver_once(
                 state,
-                "I couldn’t continue the promised work reliably. The durable work item is preserved for recovery; "
-                f"the current blocker is {type(exc).__name__}.",
+                self._failure_message(state),
                 "worker_failure",
             )
         if state.input_payload.get('_synthetic_rehearsal') and state.status.value in {'awaiting_approval','complete'}:
@@ -75,12 +77,9 @@ class TonyPromisedWorkWorker:
             return self._deliver_once(state, message,
                 'review_delivery_blocked' if (delivery.get('delivered') is not True and state.input_payload.get('_synthetic_rehearsal') and state.input_payload.get('asset_versions')) else 'gate_ready')
         if state.status.value in {"blocked", "failed"}:
-            blocker = str(state.blocker or "specialist work did not complete reliably").replace("_", " ")
             return self._deliver_once(
                 state,
-                "I couldn’t complete the promised work reliably. "
-                f"I’ve preserved the work and failure evidence; it is blocked by {blocker}. "
-                "I haven’t treated it as complete or moved past the gate.",
+                self._failure_message(state),
                 "work_failed",
             )
         if state.status.value == "complete":
@@ -101,6 +100,30 @@ class TonyPromisedWorkWorker:
                 "work_complete" if link else "review_delivery_blocked",
             )
         return state
+
+    @staticmethod
+    def _failure_message(state: WorkflowState) -> str:
+        product = AgencyStateProjector._founder_product_label(state.workflow_id)
+        raw_company = workflow_state_name(state)
+        company = founder_text(raw_company, limit=100)
+        if not company or raw_company in {state.run_id, state.entity_id, state.client_id}:
+            company = "The current client"
+        quality_failed = str(state.blocker or "").startswith("quality_failed")
+        reason = (
+            "The draft did not meet the quality checks, so it is not ready for your review."
+            if quality_failed else
+            "Execution stopped before I could verify a reliable result."
+        )
+        next_step = (
+            "My recommendation is to have the responsible specialist correct the review findings, then run the quality checks again."
+            if quality_failed else
+            "My recommendation is an engineering check of the recorded failure before retrying the existing work."
+        )
+        return (
+            f"{company} — {product} is paused. {reason} {next_step} "
+            "The work and diagnostic evidence are preserved. Recovery has not yet been verified; "
+            "there is no finished deliverable for you to approve at this point."
+        )
 
     @staticmethod
     def _delivery_required(state: WorkflowState) -> bool:

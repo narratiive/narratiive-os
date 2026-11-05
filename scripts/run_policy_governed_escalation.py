@@ -12,6 +12,7 @@ if str(REPOSITORY_ROOT) not in sys.path:
 
 from openclaw.telegram_outbound import TelegramConfig, TelegramDeliveryError, TelegramSender  # noqa: E402
 from runtime.interruption_policy import FixedCooldownInterruptionPolicy  # noqa: E402
+from runtime.founder_brief import decision_ready_items
 from runtime.policy_governed_escalation import PolicyGovernedMaterialEscalationService  # noqa: E402
 from runtime.proactive_executive_delivery import (  # noqa: E402
     FileDeliveryKeyStore,
@@ -39,7 +40,7 @@ def run(*, simulate_transport_failure: bool = False) -> dict[str, Any]:
     workspace_id = _workspace_id_from_env()
 
     try:
-        workspace_runtime, _, mission_control_loader = build_components(
+        workspace_runtime, executive_service, mission_control_loader = build_components(
             runtime_root=runtime_root, workspace_id=workspace_id
         )
     except ProactiveBriefConfigurationError as exc:
@@ -75,6 +76,9 @@ def run(*, simulate_transport_failure: bool = False) -> dict[str, Any]:
     )
     service = PolicyGovernedMaterialEscalationService(
         mission_control_loader=mission_control_loader,
+        material_selector=lambda snapshot: decision_ready_items(
+            snapshot, pipeline=getattr(executive_service, "briefing_pipeline", None)
+        ),
         send_message=send,
         key_store=FileDeliveryKeyStore(
             workspace_runtime.paths.root / "proactive-delivery" / "escalation-keys.json"

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from typing import Any, Iterable, Mapping
 
@@ -51,7 +52,9 @@ class AgencyStateProjector:
         items = []
         for workstream in snapshot.workstreams:
             run_id = self._workflow_run_id(workstream.workstream_id)
-            if run_id and run_id in summaries and run_id not in authoritative:
+            if run_id and run_id in summaries and (
+                run_id not in authoritative or self._internal_summary(summaries[run_id])
+            ):
                 continue
             items.append(self._project_workstream(workstream, summaries.get(run_id)))
 
@@ -61,14 +64,20 @@ class AgencyStateProjector:
         for index, approval in enumerate(snapshot.approvals_required):
             run_id = self._approval_run_id(approval)
             summary = summaries.get(run_id)
-            if run_id and summary is not None and run_id not in authoritative:
+            if run_id and summary is not None and (
+                run_id not in authoritative or self._internal_summary(summary)
+            ):
+                continue
+            # A machine approval without its business context is not a
+            # decision-ready founder request. Keep it in Mission Control.
+            if summary is None and approval.startswith(("workflow:", "github:", "pr:")):
                 continue
             title = self._humanise(approval)
             next_action = f"Decide whether to approve {title}."
             entity_id = approval
             aliases: tuple[str, ...] = ()
             if summary is not None:
-                company = str(summary.get("company") or summary.get("entity_id") or "this work")
+                company = self._company_label(summary)
                 workflow = str(summary.get("workflow_id") or "workflow")
                 # Explicitly labelled internal certification and test records
                 # remain in the audit state, never in a founder briefing.
@@ -89,14 +98,14 @@ class AgencyStateProjector:
                     status="decision_required",
                     next_action=next_action,
                     owner="Matt",
-                    evidence=(approval,),
+                    evidence=self._workflow_evidence(summary, (approval,)),
                     requires_matt=True,
                     blocks_agency_outcome=self._has_business_consequence(approval),
                     entity_id=entity_id,
                     aliases=aliases,
                     classification="genuine_approval_request",
                     significance="P1",
-                    why_matters="The current authoritative artefact cannot progress through its human gate without a founder decision.",
+                    why_matters="This work needs your review before it can be used with the client.",
                 )
             )
 
@@ -149,30 +158,77 @@ class AgencyStateProjector:
         requires_matt = item.owner.strip().casefold() == "matt"
 
         entity_id = str((summary or {}).get("entity_id") or (summary or {}).get("client_id") or item.workstream_id)
-        company = str((summary or {}).get("company") or "")
+        company = self._company_label(summary) if summary else ""
+        title = item.title
+        if summary and str(summary.get("company") or "").strip():
+            title = f"{company} — {self._founder_product_label(str(summary.get('workflow_id') or ''))}"
         significance = "P1" if requires_matt else "P3"
         if item.state == "blocked" and is_platform and business_consequence:
             significance = "P0"
+        next_action = item.next_action
+        why_matters = (
+            "A current operational exception is preventing progress on this work."
+            if item.state == "blocked"
+            else "This is material progress on the current authoritative workflow."
+        )
+        if summary and item.state == "blocked" and str(item.blocker or "").startswith("quality_failed"):
+            why_matters = "The draft did not meet the quality checks and is not ready for approval."
+            next_action = "Have the responsible specialist correct the review findings, then repeat the quality checks."
         return AgencyItem(
             item_id=item.workstream_id,
             area=area,
-            title=item.title,
+            title=title,
             status=item.state,
-            next_action=item.next_action,
+            next_action=next_action,
             owner=item.owner,
-            evidence=item.evidence,
+            evidence=self._workflow_evidence(summary, item.evidence),
             blocked=item.state == "blocked",
-            blocks_agency_outcome=(item.state == "blocked" and is_platform and business_consequence),
+            blocks_agency_outcome=(item.state == "blocked" and business_consequence),
             requires_matt=requires_matt,
             entity_id=entity_id,
             aliases=tuple(filter(None, (company, item.workstream_id))),
             classification="operational_exception" if item.state == "blocked" else "current_authoritative_workflow",
             significance=significance,
-            why_matters=(
-                "A current operational exception is preventing progress on this work."
-                if item.state == "blocked"
-                else "This is material progress on the current authoritative workflow."
-            ),
+            why_matters=why_matters,
+        )
+
+    @staticmethod
+    def _workflow_evidence(summary: Mapping[str, Any] | None, references: tuple[str, ...]) -> tuple[str, ...]:
+        """Carry exact-version evidence through briefing eligibility and delivery."""
+        if summary is None:
+            return references
+        versions = []
+        token = str(summary.get("approval_token") or "").strip()
+        if token:
+            versions.append(f"approval_version:{token}")
+        artifact = summary.get("latest_artefact")
+        if isinstance(artifact, Mapping) and artifact.get("checksum"):
+            versions.append(f"artefact_version:{artifact['checksum']}")
+        return tuple(dict.fromkeys((*references, *versions)))
+
+    @staticmethod
+    def _company_label(summary: Mapping[str, Any]) -> str:
+        company = str(summary.get("company") or "").strip()
+        # Older runs used their opaque run/entity ID as the company fallback.
+        # Do not pretend that is a client name.
+        identity_fallback = company in {
+            str(summary.get(key) or "") for key in ("run_id", "entity_id", "client_id")
+        }
+        if not company or (identity_fallback and (
+            re.search(r"(?:\d{8}|[_:]|[0-9a-f]{8}-[0-9a-f-]{20,})", company, re.I)
+            or company == str(summary.get("run_id") or "")
+        )):
+            return "Client work (company name not recorded)"
+        return company
+
+    @staticmethod
+    def _internal_summary(summary: Mapping[str, Any]) -> bool:
+        label = str(summary.get("company") or "").strip().casefold()
+        return (
+            label.startswith(("test / fictional", "safe ", "synthetic "))
+            or "do not contact" in label
+            or "-live-acceptance-" in label
+            or "founder certification" in label
         )
 
     @staticmethod
@@ -193,6 +249,11 @@ class AgencyStateProjector:
             "blueprint_lite_to_discovery_preparation": "Discovery preparation",
             "discovery_evidence_to_growth_sprint_proposal": "FIELDWORK proposal",
             "growth_blueprint_deliverable_production": "Growth Blueprint",
+            "strategy_thesis_to_growth_blueprint": "Growth Blueprint",
+            "research_to_growth_blueprint": "Growth Blueprint",
+            "growth_sprint_proposal_to_research": "research",
+            "research_to_strategic_synthesis": "strategic synthesis",
+            "strategic_synthesis_to_strategy_thesis": "Strategy Thesis",
         }
         return labels.get(workflow_id, "current client deliverable")
 
