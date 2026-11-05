@@ -82,6 +82,19 @@ class TonyWorkflowRuntime:
         entity_id: str,
         correlation_id: str,
     ) -> dict[str, Any]:
+        if workflow_id == 'creative_bible_to_asset_production' and isinstance(inputs.get('creative_bible_approval'), Mapping) and inputs['creative_bible_approval'].get('synthetic_rehearsal') is True:
+            parent_id = inputs.get('_lineage', {}).get('parent_run_id')
+            if not parent_id:
+                raise PermissionError('Synthetic production requires its canonical Creative Bible parent')
+            parent = self.runs.load_run(str(parent_id))
+            self._synthetic_rehearsal_service().policy(parent)
+            if parent.workflow_id != 'campaign_world_to_creative_bible' or parent.status is not WorkflowStatus.COMPLETE or entity_id != parent.entity_id:
+                raise PermissionError('Synthetic production parent is not the completed Creative Bible')
+            approved = next((a for a in reversed(parent.approval_history) if a.get('decision') == 'creative_bible_approval'), None)
+            if (approved != inputs['creative_bible_approval'] or
+                inputs.get('_synthetic_rehearsal') != parent.input_payload.get('_synthetic_rehearsal') or
+                _workflow_value_checksum(inputs.get('approved_creative_bible')) != approved.get('creative_bible_checksum')):
+                raise PermissionError('Synthetic production is not bound to its exact canonical Bible decision')
         validate_operational_inputs(workflow_id, inputs)
         state = self.coordinator.enqueue(
             workflow_id,

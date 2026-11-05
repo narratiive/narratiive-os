@@ -72,7 +72,8 @@ class TonyPromisedWorkWorker:
             except Exception:
                 delivery = {"delivered": False}
             message = self._gate_message(state, delivery)
-            return self._deliver_once(state, message, "gate_ready")
+            return self._deliver_once(state, message,
+                'gate_ready' if delivery.get('delivered') is True else 'review_delivery_blocked')
         if state.status.value in {"blocked", "failed"}:
             blocker = str(state.blocker or "specialist work did not complete reliably").replace("_", " ")
             return self._deliver_once(
@@ -105,6 +106,8 @@ class TonyPromisedWorkWorker:
     def _delivery_required(state: WorkflowState) -> bool:
         delivery = state.promised_work_delivery
         if not delivery:
+            return True
+        if delivery.get('status') == 'delivered' and delivery.get('kind') == 'review_delivery_blocked' and state.status.value == 'awaiting_approval':
             return True
         return (
             delivery.get("status") == "delivered"

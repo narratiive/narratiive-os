@@ -1116,7 +1116,7 @@ class WorkflowRunService:
                 return state
             follow_up_allowed = (
                 existing.get("status") == "delivered"
-                and existing.get("kind") in {"worker_failure", "work_failed"}
+                and existing.get("kind") in {"worker_failure", "work_failed", "review_delivery_blocked"}
                 and kind in {"gate_ready", "work_complete", "review_delivery_blocked"}
                 and state.status in {WorkflowStatus.AWAITING_APPROVAL, WorkflowStatus.COMPLETE}
             )

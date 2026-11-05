@@ -100,6 +100,9 @@ class SyntheticRehearsalService:
             if e.event_type=='synthetic_rehearsal_authorised' and e.event_id==reference.get('policy_event_id')),None)
         if not event or event.payload.get('stop_at')!='asset_review' or event.payload.get('maximum_assets')!=2:
             raise PermissionError('Canonical rehearsal authorisation not found')
+        latest=next((a for stage in reversed(proposal.stages) for a in reversed(stage.output_artifacts)),None)
+        if proposal.approval_status!='approved' or latest is None or latest.checksum!=event.payload.get('proposal_checksum'):
+            raise PermissionError('Rehearsal proposal approval is stale or superseded')
         return event
 
     def review(self,state):
