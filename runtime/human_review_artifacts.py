@@ -118,6 +118,8 @@ class HumanReviewArtifact:
     def to_dict(self) -> dict[str, Any]:
         value = asdict(self)
         value["focus_points"] = list(self.focus_points)
+        if self.proposal_review is None:
+            value.pop("proposal_review", None)
         return value
 
 
