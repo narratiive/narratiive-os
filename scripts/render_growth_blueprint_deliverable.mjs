@@ -103,7 +103,7 @@ function directorStory(slide, s, index) {
     text(slide, s.body, {left:68, top:234, width:1080, height:260}, {fontSize:30, bold:true, color:ink});
     text(slide, s.takeaway, {left:68, top:530, width:1080, height:76}, {fontSize:20, color:dark ? C.lilac : C.purple, bold:true});
   }
-  text(slide, `Sources: ${(s.citation_labels || []).join(", ")}`, {left:68, top:638, width:850, height:22}, {fontSize:11, color:muted});
+  text(slide, `Sources: ${(s.citation_labels || []).join(", ")}`, {left:68, top:632, width:780, height:30}, {fontSize:16, bold:true, color:ink});
   text(slide, s.claim_status || "STRATEGIC INTERPRETATION", {left:900, top:638, width:310, height:22}, {fontSize:10, bold:true, color:muted});
   text(slide, `${index} / ${spec.slides.length} · INTERNAL REVIEW`, {left:68, top:684, width:1100, height:18}, {fontSize:10, color:muted});
   notes(slide, s);

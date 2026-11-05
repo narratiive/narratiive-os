@@ -31,7 +31,7 @@ class GrowthBlueprintDeliverableWorkerError(RuntimeError):
     """Raised when a Blueprint deliverable cannot be produced truthfully."""
 
 
-RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v11"
+RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v12"
 
 
 class GrowthBlueprintDeliverableWorker:
