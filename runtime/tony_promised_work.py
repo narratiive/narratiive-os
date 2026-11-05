@@ -73,7 +73,7 @@ class TonyPromisedWorkWorker:
                 delivery = {"delivered": False}
             message = self._gate_message(state, delivery)
             return self._deliver_once(state, message,
-                'gate_ready' if delivery.get('delivered') is True else 'review_delivery_blocked')
+                'review_delivery_blocked' if (delivery.get('delivered') is not True and state.input_payload.get('_synthetic_rehearsal') and state.input_payload.get('asset_versions')) else 'gate_ready')
         if state.status.value in {"blocked", "failed"}:
             blocker = str(state.blocker or "specialist work did not complete reliably").replace("_", " ")
             return self._deliver_once(
@@ -107,7 +107,7 @@ class TonyPromisedWorkWorker:
         delivery = state.promised_work_delivery
         if not delivery:
             return True
-        if delivery.get('status') == 'delivered' and delivery.get('kind') == 'review_delivery_blocked' and state.status.value == 'awaiting_approval':
+        if (delivery.get('status') == 'delivered' and delivery.get('kind') == 'review_delivery_blocked' and state.status.value == 'awaiting_approval' and state.input_payload.get('_synthetic_rehearsal') and state.input_payload.get('asset_versions')):
             return True
         return (
             delivery.get("status") == "delivered"
