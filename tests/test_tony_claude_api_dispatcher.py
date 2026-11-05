@@ -228,6 +228,7 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         )
         for workflow_id in (
             "blueprint_lite_to_discovery_preparation",
+            "discovery_evidence_to_growth_sprint_proposal",
             "research_to_strategic_synthesis",
             "strategic_synthesis_to_strategy_thesis",
             "strategy_thesis_to_growth_blueprint",
@@ -486,6 +487,14 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         self.assertEqual(lineage["interpretation"], lineage["interpretations"])
         self.assertEqual(lineage["hypothesis"], lineage["hypotheses"])
         self.assertTrue(TonyInboundBlueprintLiteService._quality_gate(evidence)["passed"])
+
+    @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
+    def test_empty_truncated_response_retains_actionable_error(self, urlopen):
+        urlopen.return_value = _Response({'id':'msg_empty_truncated','model':'claude-test-model',
+            'stop_reason':'max_tokens','content':[]})
+        dispatcher = build_claude_api_dispatcher(self._env())
+        with self.assertRaisesRegex(RuntimeError,'truncated at the configured max_tokens limit'):
+            dispatcher(self._contract())
 
     @mock.patch("runtime.tony_claude_api_dispatcher.request.urlopen")
     def test_truncated_claude_response_fails_before_partial_work_can_reach_quality_gate(self, urlopen):

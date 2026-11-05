@@ -78,6 +78,7 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             growth_blueprint_max_tokens
             if _workflow_id(contract) in {
                 "blueprint_lite_to_discovery_preparation",
+                "discovery_evidence_to_growth_sprint_proposal",
                 "research_to_strategic_synthesis",
                 "strategic_synthesis_to_strategy_thesis",
                 "strategy_thesis_to_growth_blueprint",
@@ -151,11 +152,11 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
                 budget_guard.retain_ambiguous_reservation(reservation)
             raise
 
+        if str(returned.get("stop_reason") or "").strip() == "max_tokens":
+            raise RuntimeError("Claude API work product was truncated at the configured max_tokens limit")
         text = _response_text(returned)
         if not text:
             raise RuntimeError("Claude API returned no text work product")
-        if str(returned.get("stop_reason") or "").strip() == "max_tokens":
-            raise RuntimeError("Claude API work product was truncated at the configured max_tokens limit")
         evidence = _parse_work_product(text)
         evidence.setdefault("work_product", text)
         evidence["verified"] = True
