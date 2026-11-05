@@ -1,5 +1,8 @@
 # Narratiive OS
 
+Read [START_HERE.md](START_HERE.md) for current commercial products, operating
+context and contributor entry instructions before using the technical guides below.
+
 ## Local runtime setup
 
 Narratiive OS requires Python 3.10 or newer and uses the repository virtual

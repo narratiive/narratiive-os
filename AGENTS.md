@@ -1,7 +1,8 @@
 # Narratiive OS Agent Governance
 
-This file is the repository entry point for every human or AI contributor. It
-governs the whole repository. More specific instructions may add constraints,
+Read `START_HERE.md` first for the current authoritative product introduction.
+This file governs every human or AI contributor across the whole repository.
+More specific instructions may add constraints,
 but may not weaken this file, the product canon, evidence rules, approval gates,
 or immutable history.
 
@@ -9,6 +10,7 @@ or immutable history.
 
 Before proposing or changing anything, read:
 
+0. `START_HERE.md`
 1. `docs/agents/ai-constitution.md`
 2. `docs/agents/decision-authority.md`
 3. `docs/agents/product-canon.md`
@@ -77,8 +79,11 @@ security, or human approval for client-facing release.
 
 Before editing:
 
-- inspect `git status`, the active branch, relevant history, and local
-  instructions;
+- inspect `git status`, the active branch, relevant history, local
+  instructions, and active pull requests with their changed files before coding;
+- use Groundwork, Fieldwork, Sketchbook and Launchpad as the current commercial
+  product names; Blueprint Lite and Growth Sprint survive only as historical or
+  internal compatibility labels, never approved names for new client-facing work;
 - identify the owning workstream and affected downstream consumers;
 - inspect existing tests and conventions;
 - leave unrelated and generated local files untouched.
@@ -207,9 +212,9 @@ the existing governance hierarchy or reserved decisions.
 - Integrate capabilities promptly and demonstrate their behaviour with actual
   runtime evidence. Mission Control is an evidence-backed view, not a separate
   source of truth.
-- Treat commercial journey labels (GROUNDWORK, Discovery, FIELDWORK,
-  provisional SKETCHBOOK, Creative Production, Campaign Preparation) as
-  presentation groupings, not replacements for canonical workflow stages.
+- Treat Groundwork, Fieldwork, Sketchbook and Launchpad as the approved commercial
+  products, with Discovery as an activity. These labels do not replace historical
+  technical workflow IDs, canonical artefact names or specialist stages.
   Identify unimplemented or unverified stages explicitly.
 - Use clearly labelled synthetic clients and isolated test adapters to exercise
   transitions, specialist handoffs, artefacts, quality gates, and approvals.
