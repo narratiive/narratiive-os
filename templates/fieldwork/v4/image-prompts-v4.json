@@ -1,0 +1,34 @@
+[
+  {
+    "role": "audience",
+    "source": "/Users/admin/.codex/generated_images/01a1a6b8-a191-7d12-b2f9-2d1b96412630/exec-f73490c0-0c6c-4c45-a031-f822e4250781.png",
+    "asset": "assets/origin-audience-editorial-v4.png",
+    "prompt": "Use case: photorealistic-natural. Asset type: editorial illustration for a premium two-page coffee wholesale strategy proposal. An established independent British neighbourhood cafe interior before opening, thoughtful oak counter, warm plaster walls, stone tables, professional espresso machine, a few carefully set ceramics, welcoming yet commercially credible. Wide editorial architectural photograph, no people. Frame for a wide 2:1 crop. Match a warm off-white, forest green, muted bronze and natural oak palette with soft daylight, refined magazine photography, authentic material texture and gentle contrast. No text, logos, visible branding, watermarks, charts or graphics. This is generic illustrative hospitality imagery, not actual Origin Coffee premises, staff, products or customers. Generate one standalone landscape photograph, not a collage or layout.",
+    "method": "built-in image_gen",
+    "status": "AI-generated generic illustration; not Origin premises, staff, customers or outcome evidence"
+  },
+  {
+    "role": "value",
+    "source": "/Users/admin/.codex/generated_images/01a1a6b8-a191-7d12-b2f9-2d1b96412630/exec-3f0af4ca-485d-49d7-a1ad-0b6fabd7c21c.png",
+    "asset": "assets/origin-value-editorial-v4.png",
+    "prompt": "Use case: photorealistic-natural. Asset type: editorial illustration for a premium two-page coffee wholesale strategy proposal. Close editorial photograph of the hands of an experienced coffee trainer guiding a hospitality colleague through precise espresso grinder calibration beside a professional espresso machine. Hands, grinder and small espresso cups are the focus, believable equipment and anatomy, no faces needed. Warm tactile detail, wide 2:1 crop. Match a warm off-white, forest green, muted bronze and natural oak palette with soft daylight, refined magazine photography, authentic material texture and gentle contrast. No text, logos, visible branding, watermarks, charts or graphics. This is generic illustrative hospitality imagery, not actual Origin Coffee premises, staff, products or customers. Generate one standalone landscape photograph, not a collage or layout.",
+    "method": "built-in image_gen",
+    "status": "AI-generated generic illustration; not Origin premises, staff, customers or outcome evidence"
+  },
+  {
+    "role": "activation",
+    "source": "/Users/admin/.codex/generated_images/01a1a6b8-a191-7d12-b2f9-2d1b96412630/exec-61657425-a96d-4632-9194-88eb4112cab0.png",
+    "asset": "assets/origin-activation-editorial-v4.png",
+    "prompt": "Use case: photorealistic-natural. Asset type: editorial illustration for a premium two-page coffee wholesale strategy proposal. A small professionally hosted coffee tasting for hospitality buyers at a roastery: three diverse adult cafe owners considering cups and talking with a coffee specialist across a tasting counter, daylight, restrained natural materials, candid and commercially credible rather than posed business stock. Wide editorial 2:1 crop. Match a warm off-white, forest green, muted bronze and natural oak palette with soft daylight, refined magazine photography, authentic material texture and gentle contrast. No text, logos, visible branding, watermarks, charts or graphics. This is generic illustrative hospitality imagery, not actual Origin Coffee premises, staff, products or customers. Generate one standalone landscape photograph, not a collage or layout.",
+    "method": "built-in image_gen",
+    "status": "AI-generated generic illustration; not Origin premises, staff, customers or outcome evidence"
+  },
+  {
+    "role": "service",
+    "source": "/Users/admin/.codex/generated_images/01a1a6b8-a191-7d12-b2f9-2d1b96412630/exec-97dac9d8-cdb3-4766-9f43-f1f3d9c462d3.png",
+    "asset": "assets/origin-service-editorial-v4.png",
+    "prompt": "Use case: photorealistic-natural. Asset type: editorial illustration for a premium two-page coffee wholesale strategy proposal. A beautiful established boutique hotel breakfast room in Britain during morning service: a professional server carrying two small cups of coffee to a carefully set table, understated oak and stone, warm natural window light, quietly busy hospitality context. Wide cinematic editorial composition that works as a 5:1 horizontal banner, key scene centred, no faces in close-up. Match a warm off-white, forest green, muted bronze and natural oak palette with soft daylight, refined magazine photography, authentic material texture and gentle contrast. No text, logos, visible branding, watermarks, charts or graphics. This is generic illustrative hospitality imagery, not actual Origin Coffee premises, staff, products or customers. Generate one standalone landscape photograph, not a collage or layout.",
+    "method": "built-in image_gen",
+    "status": "AI-generated generic illustration; not Origin premises, staff, customers or outcome evidence"
+  }
+]

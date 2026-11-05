@@ -1,0 +1,19 @@
+{
+  "version": 4,
+  "parent_version": 3,
+  "status": "FINAL_REFINED_FICTIONAL_REFERENCE_EXAMPLE",
+  "reference_standard": "REFERENCE_STANDARD.md",
+  "reference_structure_approved": true,
+  "approved_exact_fee": false,
+  "pdf": "Origin-Coffee-Fieldwork-internal-review-v4.pdf",
+  "sha256": "3dc801365e80af0261d93b26721dfbc3deaa634a3676d5a219ab66c8b8a0d504",
+  "pages": 2,
+  "bytes": 1674931,
+  "distinct_image_sources": 5,
+  "model_unchanged": "financial-model-v3.json",
+  "fee_ex_vat_gbp": 9800,
+  "fee_status": "provisional_pending_Matt_exact_fee_approval",
+  "client_release_approved": false,
+  "send_authorisation": null,
+  "validation": "Two-page visual inspection; exact text comparison allowing only version/Investment/image disclosure edits; distinct asset hashes; financial JSON byte-identical. No broad tests."
+}
