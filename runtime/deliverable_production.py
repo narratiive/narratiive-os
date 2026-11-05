@@ -213,6 +213,53 @@ def build_blueprint_director_presentation_spec(
     )
 
 
+def enrich_blueprint_director_review(specification, *, commercial_model, source_register, evidence_pack):
+    """Bind readable sources and factual model appendices without rewriting the Director story."""
+    entries=[dict(e) for e in source_register.get('entries',[]) if isinstance(e,Mapping)]
+    if len(entries)<3 or not any(e.get('source_id')=='T1' for e in entries):
+        raise ValueError('Director review requires readable sources and its strategy lineage')
+    for entry in entries:
+        if any(not str(entry.get(k) or '').strip() for k in ('source_id','title','publisher','location','classification')):
+            raise ValueError('Director source register entry is incomplete')
+        refs=set(entry.get('evidence_refs') or [])
+        for record in evidence_pack.get('records') or []:
+            if entry['source_id'] in (record.get('source_ids') or [record.get('source_id')]):
+                refs.add(str(record.get('evidence_id') or ''))
+        entry['evidence_refs']=sorted(ref for ref in refs if ref)
+        entry['applies_to_pages']=[]
+    original=[]
+    for slide in specification.slides:
+        labels=_source_labels_for_slide(slide,entries) or ('T1',)
+        original.append(replace(slide,layout_type='single_thesis_page',citation_labels=labels,
+            claim_status=_claim_status(labels,entries),source_notes=slide.source_notes+tuple(
+                f"{e['source_id']}: {e['publisher']} — {e['title']}: {e['location']}"
+                for e in entries if e['source_id'] in labels)))
+    if len(original)<2:raise ValueError('Director review requires an ordered substantive story')
+    model_sources=tuple(dict.fromkeys(str(sid) for item in commercial_model.get('inputs',[]) for sid in item.get('source_ids',[]))) or ('T1',)
+    appendices=[PresentationSlideSpec(slide_no=0,title='The commercial opportunity, with assumptions exposed',
+        takeaway='Illustrative scenarios are a decision aid, not company results or a guaranteed return.',
+        body=('Account counts, annual account revenue and the year-one ramp are assumptions. Revenue is not profit.' if commercial_model.get('mechanism')=='incremental_accounts_year_one' else 'Market-share and margin scenarios are labelled assumptions, not company forecasts.'),
+        visual_treatment='Compare the three calculated scenarios.',layout_type='commercial_model',
+        citation_labels=model_sources,claim_status='ILLUSTRATIVE ASSUMPTIONS',source_notes=('Exact model inputs and source register are retained.',),
+        content_data={'scenarios':commercial_model['scenarios'],'mechanism':commercial_model.get('mechanism'),
+            'currency':commercial_model.get('currency'),'period':commercial_model.get('period')}),
+      PresentationSlideSpec(slide_no=0,title='What the model assumes — and what remains unknown',
+        takeaway=('Profit and payback remain uncalculated while required commercial inputs are unknown.' if commercial_model.get('contribution_status')=='unavailable_not_invented' else 'Named assumptions and source evidence make the calculation reviewable.'),
+        body='The model inputs and source register distinguish supplied evidence, assumptions and unresolved inputs.',
+        visual_treatment='Separate assumptions from missing evidence.',layout_type='commercial_assumptions',
+        citation_labels=model_sources,claim_status='ASSUMPTIONS / EVIDENCE GAPS',source_notes=('No profit or baseline revenue has been invented.',),
+        content_data={'inputs':commercial_model['inputs'],'implementation_cost':commercial_model['implementation_cost']}),
+      PresentationSlideSpec(slide_no=0,title='Sources and evidence lineage',
+        takeaway='Public sources, strategic interpretation and modelling assumptions remain distinguishable.',
+        body='Read the companion source register for full provenance and evidence limitations.',
+        visual_treatment='A readable source register.',layout_type='source_register',
+        citation_labels=tuple(str(e['source_id']) for e in entries),claim_status='SOURCE REGISTER',
+        source_notes=('The original evidence pack and immutable specialist artefacts retain the detailed lineage.',),
+        content_data={'source_register_entries':entries})]
+    slides=original[:-1]+appendices+original[-1:]
+    return replace(specification,slides=tuple(replace(slide,slide_no=i) for i,slide in enumerate(slides,1))),{'entries':entries}
+
+
 def _human_source_note(section: str) -> str:
     return f"Internal provenance retained for {section}; detailed evidence remains in the review record."
 
@@ -431,7 +478,7 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
         and len(slide_22.get("territories") or []) >= 3
         and all(len(slide_22.get(key) or []) >= 2 for key in ("verbal_assets", "tone_motion_cues", "recurring_formats"))
     )
-    return {
+    checks = {
         "editorial_arc_is_complete": (
             bool(specification.slides)
             and [slide.slide_no for slide in specification.slides]
@@ -468,6 +515,12 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
         ),
         "strategic_source_unchanged": specification.strategic_source_unchanged,
     }
+    if specification.template_source.startswith('Narratiive Blueprint Director'):
+        checks.pop('canonical_schema_v3_slide_roles_are_preserved')
+        checks.pop('canonical_schema_v3_slide_roles_are_substantive')
+        checks['director_story_is_ordered_and_substantive'] = len(specification.slides)>=4 and all(
+            s.title.strip() and s.body.strip() and s.takeaway.strip() for s in specification.slides)
+    return checks
 
 
 def build_quantified_commercial_model(intelligence: Mapping[str, Any]) -> dict[str, Any]:

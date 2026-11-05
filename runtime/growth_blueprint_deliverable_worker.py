@@ -18,6 +18,8 @@ from runtime.deliverable_production import (
     augment_specification_with_commercial_evidence,
     bind_source_register_to_specification,
     build_growth_blueprint_presentation_spec,
+    build_blueprint_director_presentation_spec,
+    enrich_blueprint_director_review,
     build_quantified_commercial_model,
     commercial_model_quality_checks,
 )
@@ -29,7 +31,7 @@ class GrowthBlueprintDeliverableWorkerError(RuntimeError):
     """Raised when a Blueprint deliverable cannot be produced truthfully."""
 
 
-RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v10"
+RENDERER_CONTRACT_VERSION = "growth-blueprint-renderer-v11"
 
 
 class GrowthBlueprintDeliverableWorker:
@@ -91,7 +93,9 @@ class GrowthBlueprintDeliverableWorker:
         stable_id = hashlib.sha256(
             f"{RENDERER_CONTRACT_VERSION}:{workspace_id}:{client_id}:{run_id}:{source_id}:{source_checksum}".encode("utf-8")
         ).hexdigest()[:20]
-        specification = build_growth_blueprint_presentation_spec(
+        director_source = isinstance(blueprint.get('client_facing_blueprint'), Mapping)
+        mapper = build_blueprint_director_presentation_spec if director_source else build_growth_blueprint_presentation_spec
+        specification = mapper(
             blueprint,
             specification_id=f"blueprint-spec-{stable_id}",
             source_blueprint_id=source_id,
@@ -106,12 +110,17 @@ class GrowthBlueprintDeliverableWorker:
             model_checks = commercial_model_quality_checks(commercial_model)
             if not all(model_checks.values()):
                 raise ValueError(f"commercial model quality failed: {model_checks}")
-            specification = augment_specification_with_commercial_evidence(
-                specification,
-                commercial_model=commercial_model,
-                source_register=source_register,
-                production_direction=commercial_intelligence.get("production_direction") or {},
-            )
+            if director_source:
+                specification, source_register = enrich_blueprint_director_review(
+                    specification, commercial_model=commercial_model, source_register=source_register,
+                    evidence_pack=contract.get('evidence_pack') or {})
+            else:
+                specification = augment_specification_with_commercial_evidence(
+                    specification,
+                    commercial_model=commercial_model,
+                    source_register=source_register,
+                    production_direction=commercial_intelligence.get("production_direction") or {},
+                )
             specification, source_register = bind_source_register_to_specification(
                 specification, source_register
             )

@@ -56,3 +56,11 @@ Owning stream: Worker Infrastructure; Delivery Engine affected by the existing
 production/model output contracts. Independent review and normal PR/deployment
 checks apply. This feature does not merge or supersede the unrelated/conflicting
 Stripe sandbox PR; it makes no actual payment claim.
+
+The Blueprint Director's approved editorial story is handed to document production
+through its existing Director mapper. Its source checksum and original story copy
+are retained; labelled commercial-assumption and source appendices accompany the
+review document. Legacy schema-v3 sources retain their existing 30-slide contract.
+An account-based illustrative revenue model leaves contribution unknown when cost
+inputs are absent. Document review is not publication or final creative approval.
+The Campaign World receives the same quality-accepted blueprint with parent lineage.

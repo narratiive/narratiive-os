@@ -24,6 +24,10 @@ def build_next_workflow_inputs(
         combined.setdefault("approved_growth_sprint_scope", output.get("proposed_scope"))
         combined.setdefault("research_requirements", {"workstreams_and_questions": output.get("workstreams_and_questions", [])})
         combined.setdefault("client_context", combined.get("commercial_context"))
+    elif source.workflow_id == 'growth_blueprint_deliverable_production':
+        blueprint = source.input_payload.get('quality_accepted_growth_blueprint')
+        if isinstance(blueprint, Mapping):
+            combined['growth_blueprint'] = dict(blueprint)
     elif source.workflow_id == "strategic_synthesis_to_strategy_thesis":
         artifact = next(
             (stage.output_artifacts[-1] for stage in reversed(source.stages) if stage.output_artifacts),
