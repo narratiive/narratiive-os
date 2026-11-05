@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.review_rendered_blueprint import rendered_copy_gaps
+from scripts.review_rendered_blueprint import rendered_copy_gaps, rendered_model_is_present
 
 
 class RenderedBlueprintReviewTests(unittest.TestCase):
@@ -46,3 +46,20 @@ class RenderedBlueprintReviewTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+class DirectorRenderedCopyTests(unittest.TestCase):
+    def test_director_cover_and_closing_keep_full_authored_body_visible(self):
+        pages = [dict(slide_no=i, title='A precise strategic conclusion',
+            body='The authored argument must remain visible through its final essential words.',
+            takeaway='A bounded commercial consequence.', layout_type='closing_mandate') for i in (1, 2)]
+        complete = ['A precise strategic conclusion The authored argument must remain visible through its final essential words. A bounded commercial consequence.'] * 2
+        self.assertEqual(rendered_copy_gaps(pages, complete, director=True), [])
+        self.assertEqual(rendered_copy_gaps(pages, ['Missing copy', complete[1]], director=True),
+            [{'slide': 1, 'missing': ['body ending']}])
+
+    def test_account_revenue_requires_profit_disclaimer_and_legacy_still_requires_contribution(self):
+        account = {"content_data": {"mechanism": "incremental_accounts_year_one"}}
+        self.assertTrue(rendered_model_is_present(account, "Year-one revenue. Revenue, not profit."))
+        self.assertFalse(rendered_model_is_present(account, "Year-one revenue."))
+        self.assertFalse(rendered_model_is_present({}, "Revenue, not profit."))
+        self.assertTrue(rendered_model_is_present({}, "Revenue and contribution."))

@@ -230,7 +230,7 @@ def enrich_blueprint_director_review(specification, *, commercial_model, source_
     original=[]
     for slide in specification.slides:
         labels=_source_labels_for_slide(slide,entries) or ('T1',)
-        original.append(replace(slide,layout_type='single_thesis_page',citation_labels=labels,
+        original.append(replace(slide,citation_labels=labels,
             claim_status=_claim_status(labels,entries),source_notes=slide.source_notes+tuple(
                 f"{e['source_id']}: {e['publisher']} — {e['title']}: {e['location']}"
                 for e in entries if e['source_id'] in labels)))

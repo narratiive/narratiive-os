@@ -125,7 +125,7 @@ class BlueprintDirectorProductionWiringTests(unittest.TestCase):
         pages=[{'page_number':i,'act':'The proposed strategy','headline':f'Specific strategic conclusion {i}',
             'body':f'Evidence-led reasoning for the distinct decision on page {i}. This is a synthetic contract fixture, not a company fact.',
             'commercial_consequence':'A bounded decision that requires validation before activation.',
-            'visual_opportunity':'One clear editorial argument per page.','visual_archetype':'single_thesis_page'} for i in range(1,13)]
+            'visual_opportunity':'One clear editorial argument per page.','visual_archetype':'audience_reality_split' if i == 4 else 'single_thesis_page'} for i in range(1,13)]
         source={'client_facing_blueprint':{'title':'SAFE Director strategy','pages':pages},
             'editorial_trace':[{'page_number':i,'evidence_refs':['ev-audience']} for i in range(1,13)]}
         intelligence={'mechanism':'incremental_accounts_year_one','inputs':[
@@ -140,6 +140,7 @@ class BlueprintDirectorProductionWiringTests(unittest.TestCase):
             original=[s for s in slides if s['title'].startswith('Specific strategic conclusion')]
             self.assertEqual([s['title'] for s in original],[p['headline'] for p in pages])
             self.assertEqual(len(slides),15)
+            self.assertEqual(original[3]['layout_type'], 'audience_reality_split')
             register_slide = next(s for s in slides if s['layout_type'] == 'source_register')
             self.assertEqual(register_slide['content_data']['entries'], result['source_register']['entries'])
             self.assertTrue(all(e['applies_to_pages'] for e in register_slide['content_data']['entries']))

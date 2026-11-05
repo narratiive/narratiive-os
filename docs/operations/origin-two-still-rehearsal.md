@@ -64,3 +64,9 @@ review document. Legacy schema-v3 sources retain their existing 30-slide contrac
 An account-based illustrative revenue model leaves contribution unknown when cost
 inputs are absent. Document review is not publication or final creative approval.
 The Campaign World receives the same quality-accepted blueprint with parent lineage.
+Director review uses rendered pixels and OCR against the actual commissioned
+story, including full cover and closing body copy, citations, sources, and the
+revenue/profit qualification. Legacy example-client role keywords apply only to
+the legacy deck. Duplicate, truncation, layout/package, legibility and citation
+checks remain active. Director visual archetypes are retained and rendered as
+source-based editorial compositions without invented chart data or brand imagery.
