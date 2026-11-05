@@ -13,6 +13,7 @@ from runtime.tony_internal_review_delivery import workflow_approval_token
 from runtime.tony_promised_work import TonyPromisedWorkWorker
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend
 from runtime.tony_workflow_runtime import build_tony_workflow_runtime
+from runtime.run_service import resolve_notion_record_identity
 from tests.test_tony_workflow_commands import blueprint_output
 from tests.test_workflow_quality import proposal_output
 from runtime.workspaces import WorkspaceRuntimeManager
@@ -66,8 +67,11 @@ class TonyPromisedWorkTests(unittest.TestCase):
 
         return {"Claude": claude, "Gmail": gmail}
 
-    def _commission(self, dispatchers=None):
+    def _commission(self, dispatchers=None, *, notion_identity=None):
         dispatchers = dispatchers or self._dispatchers()
+        notion_identity = notion_identity or {
+            "notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+        }
         runtime = build_tony_workflow_runtime(
             self.root,
             workspace_id="narratiive",
@@ -78,7 +82,11 @@ class TonyPromisedWorkTests(unittest.TestCase):
         runtime.enqueue(
             "growth_diagnostic_to_blueprint_lite",
             "safe-promised-source",
-            {"diagnostic_input_package": {"overall_score": 42}, "company": "SAFE Promised Work Company"},
+            {
+                "diagnostic_input_package": {"overall_score": 42},
+                "company": "SAFE Promised Work Company",
+                **notion_identity,
+            },
             entity_id="safe-lead",
             correlation_id="telegram-safe-conversation",
         )
@@ -116,6 +124,10 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(state.status.value, "active")
         self.assertEqual(state.input_payload["_promised_work"]["state"], "commissioned")
         self.assertNotIn("evidence_lineage", state.input_payload)
+        self.assertEqual(
+            state.input_payload["notion_page_id"],
+            "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+        )
         self.assertTrue(repeated_replay)
         self.assertEqual(repeated.run_id, state.run_id)
 
@@ -413,6 +425,68 @@ class TonyPromisedWorkTests(unittest.TestCase):
         self.assertEqual(second.status.value, "active")
         self.assertEqual(third.status.value, "active")
         self.assertEqual(len(self.telegram_messages), 1)
+
+    def test_projection_inherits_existing_parent_notion_identity_for_legacy_commission(self) -> None:
+        notion_calls = []
+
+        def notion(contract):
+            notion_calls.append(contract)
+            return {
+                "external_action_taken": True,
+                "record_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+                "projection_key": contract["idempotency_key"],
+            }
+
+        dispatchers = self._dispatchers()
+        dispatchers["Notion"] = notion
+        state, _, _ = self._commission(dispatchers)
+        runtime = build_tony_workflow_runtime(
+            self.root,
+            workspace_id="narratiive",
+            client_id="safe-client",
+            dispatchers=dispatchers,
+            environ={},
+        )
+        legacy = runtime.runs.load_run(state.run_id)
+        legacy.input_payload.pop("notion_page_id")
+        runtime.runs.repository.save(legacy)
+
+        synced = runtime.sync_business_projection(
+            state.run_id,
+            approver="telegram:matt",
+            rationale="Reconcile the exact inherited Notion record identity.",
+        )
+        persisted = runtime.runs.load_run(state.run_id)
+        events = runtime.runs.event_log.read(state.run_id)
+        replay = runtime.sync_business_projection(
+            state.run_id,
+            approver="telegram:matt",
+            rationale="Verify the inherited Notion projection is idempotent.",
+        )
+
+        self.assertEqual(synced["projection_status"], "verified")
+        self.assertEqual(replay["projection_status"], "duplicate_suppressed")
+        self.assertEqual(
+            persisted.input_payload["notion_page_id"],
+            "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+        )
+        self.assertEqual(len(notion_calls), 1)
+        self.assertEqual(
+            sum(event.event_type == "workflow.notion_identity_inherited" for event in events),
+            1,
+        )
+
+    def test_commission_rejects_conflicting_or_malformed_parent_notion_identity(self) -> None:
+        with self.assertRaisesRegex(ValueError, "invalid or conflicting Notion"):
+            self._commission(
+                notion_identity={
+                    "notion_page_id": "40d0c9cf-a8f2-810f-b599-d478255f11e4",
+                    "notion_record_id": "50d0c9cf-a8f2-810f-b599-d478255f11e5",
+                }
+            )
+
+        with self.assertRaisesRegex(ValueError, "invalid or conflicting Notion"):
+            resolve_notion_record_identity({"notion_page_id": "not-a-provider-page-id"})
 
     def test_ambiguous_telegram_send_is_not_blindly_retried_after_restart(self) -> None:
         _, _, dispatchers = self._commission()

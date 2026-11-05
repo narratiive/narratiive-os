@@ -15,6 +15,29 @@ from .repositories import EventLog, WorkflowEvent, WorkflowRunRepository
 from .state_machine import WorkflowEngine
 
 
+def resolve_notion_record_identity(payload: Mapping[str, object]) -> str:
+    """Resolve one explicit valid Notion identity or fail closed on legacy conflict."""
+
+    raw = {
+        str(payload.get(key) or "").strip()
+        for key in ("notion_page_id", "notion_record_id")
+        if str(payload.get(key) or "").strip()
+    }
+    if not raw:
+        return ""
+    valid = {
+        identity
+        for identity in raw
+        if re.fullmatch(
+            r"(?:[0-9a-fA-F]{32}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})",
+            identity,
+        )
+    }
+    if len(valid) != 1 or valid != raw:
+        raise ValueError("workflow has an invalid or conflicting Notion record identity")
+    return next(iter(valid))
+
+
 class WorkflowRunService:
     """Application service joining definitions, transitions, snapshots and events."""
 
@@ -951,6 +974,39 @@ class WorkflowRunService:
                     for stage in state.stages
                     for artifact in stage.output_artifacts
                 ],
+            },
+        )
+        return state
+
+    def inherit_notion_identity_from_parent(self, run_id: str) -> WorkflowState:
+        """Persist the exact parent Notion identity on a commissioned child run."""
+
+        state = self.repository.load(run_id)
+        lineage = state.input_payload.get("_lineage")
+        if not isinstance(lineage, Mapping):
+            return state
+        parent_run_id = str(lineage.get("parent_run_id") or "").strip()
+        if not parent_run_id:
+            return state
+        parent = self.repository.load(parent_run_id)
+
+        inherited = resolve_notion_record_identity(parent.input_payload)
+        if not inherited:
+            return state
+        current_identity = resolve_notion_record_identity(state.input_payload)
+        if current_identity:
+            if current_identity != inherited:
+                raise ValueError("child workflow has a different Notion record identity")
+            return state
+
+        state.input_payload["notion_page_id"] = inherited
+        state.touch()
+        self._commit(
+            state,
+            "workflow.notion_identity_inherited",
+            {
+                "parent_run_id": parent_run_id,
+                "notion_page_id": inherited,
             },
         )
         return state

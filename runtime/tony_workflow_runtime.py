@@ -21,7 +21,7 @@ from runtime.models import StageStatus, WorkflowState, WorkflowStatus
 from runtime.repositories import FileWorkflowRunRepository, JsonlEventLog
 from runtime.research_workflow_adapter import ResearchWorkflowAdapter
 from runtime.senior_strategist_review_worker import SeniorStrategistReviewWorker
-from runtime.run_service import WorkflowRunService
+from runtime.run_service import WorkflowRunService, resolve_notion_record_identity
 from runtime.serialization import workflow_to_dict
 from runtime.tony_blueprint_lite_inbound import TonyInboundBlueprintLiteService
 from runtime.tony_dispatch_adapters import build_http_dispatchers
@@ -726,6 +726,12 @@ class TonyWorkflowRuntime:
         target_stage = target.stages[0]
         required = target_stage.input_contract.required_fields
         supplied = {**dict(source_output), **dict(additional_inputs)}
+        source_notion_id = resolve_notion_record_identity(source.input_payload)
+        supplied_notion_id = resolve_notion_record_identity(supplied)
+        if source_notion_id and supplied_notion_id and source_notion_id != supplied_notion_id:
+            raise ValueError("commissioned workflow cannot replace the source Notion record identity")
+        if source_notion_id:
+            supplied["notion_page_id"] = source_notion_id
         supplied["_lineage"] = {
             "parent_workflow_id": source.workflow_id,
             "parent_run_id": source.run_id,
@@ -803,8 +809,9 @@ class TonyWorkflowRuntime:
     def sync_business_projection(self, run_id: str, *, approver: str, rationale: str) -> dict[str, Any]:
         if self.business_projection is None:
             raise ValueError("business projection is not configured")
+        state = self.runs.inherit_notion_identity_from_parent(run_id)
         return self.business_projection.sync(
-            self.runs.load_run(run_id),
+            state,
             approver=approver,
             rationale=rationale,
         )
