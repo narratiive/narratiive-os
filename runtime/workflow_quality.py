@@ -574,7 +574,10 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
             isinstance(item, Mapping)
             and item.get("classification") == "illustrative_scenario"
             and isinstance(item.get("incremental_annual_revenue"), int)
-            and isinstance(item.get("incremental_annual_contribution"), int)
+            and (isinstance(item.get("incremental_annual_contribution"), int) or
+                 (commercial_model.get("mechanism") == "incremental_accounts_year_one"
+                  and commercial_model.get("contribution_status") == "unavailable_not_invented"
+                  and item.get("incremental_annual_contribution") is None))
             for item in model_scenarios
         ),
         "source_register_is_present": isinstance(source_entries, list)
@@ -598,6 +601,12 @@ def growth_blueprint_deliverable_quality_gate(output: Mapping[str, Any]) -> Mapp
         "approval_is_pending": str(output.get("approval_status") or "pending") == "pending",
         "no_external_action_taken": output.get("external_action_taken") is False,
     }
+    if isinstance(presentation, Mapping) and str(presentation.get('template_source') or '').startswith('Narratiive Blueprint Director'):
+        for key in ('full_blueprint_has_exactly_thirty_slides','canonical_schema_v3_slide_roles_are_preserved','canonical_schema_v3_slide_roles_are_substantive'):
+            checks.pop(key,None)
+        checks['director_presentation_is_ordered_and_substantive'] = (isinstance(presentation_slides,list)
+            and len(presentation_slides)>=4 and [s.get('slide_no') for s in presentation_slides]==list(range(1,len(presentation_slides)+1))
+            and all(s.get('title') and s.get('body') and s.get('takeaway') for s in presentation_slides))
     return _result(checks)
 
 

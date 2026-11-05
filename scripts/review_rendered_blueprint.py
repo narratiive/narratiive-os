@@ -57,7 +57,7 @@ def compact_copy(value: object, limit: int) -> str:
     return content[:cut if cut > 24 else limit].rstrip(" ,;:") + "."
 
 
-def rendered_copy_gaps(expected: list[dict], ocr_text: list[str]) -> list[dict]:
+def rendered_copy_gaps(expected: list[dict], ocr_text: list[str], *, director: bool = False) -> list[dict]:
     """Find copy that the renderer contract says must be visible in the pixels."""
     body_layouts = {
         "single_thesis_page": 430, "question_frame": 430, "ecosystem_map_of_forces": 190,
@@ -76,12 +76,22 @@ def rendered_copy_gaps(expected: list[dict], ocr_text: list[str]) -> list[dict]:
         if index not in (1, len(expected)):
             required.append(("takeaway ending", text_fragment(compact_copy(slide.get("takeaway"), 210), tail=True)))
         body_limit = body_layouts.get(str(slide.get("layout_type") or ""))
-        if index != 1 and body_limit:
+        if director and str(slide.get("layout_type") or "") not in {"commercial_model", "commercial_assumptions", "source_register"}:
+            body_limit = 420
+        if (index != 1 or director) and body_limit:
             required.append(("body ending", text_fragment(compact_copy(slide.get("body"), body_limit), tail=True)))
         missing = [label for label, fragment in required if fragment and fragment not in observed]
         if missing:
             gaps.append({"slide": index, "missing": missing})
     return gaps
+
+
+def rendered_model_is_present(slide: dict, observed: str) -> bool:
+    words = " ".join(normalized_words(observed))
+    account_model = (slide.get("content_data") or {}).get("mechanism") == "incremental_accounts_year_one"
+    return "revenue" in words and (
+        "not profit" in words if account_model else "contribution" in words
+    )
 
 
 def main() -> int:
@@ -94,6 +104,7 @@ def main() -> int:
     args = parser.parse_args()
 
     spec = load_object(args.specification)
+    director = str(spec.get("template_source") or "").startswith("Narratiive Blueprint Director")
     slides = sorted(args.slides_dir.glob("slide-*.png"))
     expected = spec.get("slides") or []
     ocr_path = args.output.with_name("rendered-slide-ocr.json")
@@ -149,7 +160,7 @@ def main() -> int:
         )
         for slide in expected
     )
-    copy_gaps = rendered_copy_gaps(expected, ocr_text)
+    copy_gaps = rendered_copy_gaps(expected, ocr_text, director=director)
     role_terms = {
         8: ("ownable space", "the gap", "committed dtc buyers", "fresh food competitors"),
         13: ("customer language", "paraphrased", "search shows", "reviews reveal", "social shows"),
@@ -161,6 +172,13 @@ def main() -> int:
         and all(term in " ".join(normalized_words(ocr_text[slide_no - 1])) for term in terms)
         for slide_no, terms in role_terms.items()
     )
+
+    if director:
+        story = [slide for slide in expected if slide.get("layout_type") not in {"commercial_model", "commercial_assumptions", "source_register"}]
+        rendered_roles = bool(story) and not copy_gaps
+        narrative_complete = len(story) >= 12 and all(str(slide.get("title") or "").strip() for slide in story)
+    else:
+        narrative_complete = len(progression_hits) == len(progression_terms)
 
     receipt_path = args.slides_dir.parent / "render-receipt.json"
     receipt = load_object(receipt_path) if receipt_path.exists() else {}
@@ -191,12 +209,11 @@ def main() -> int:
         ),
         "rendered_commercial_model_is_present": bool(model_slides) and all(
             slide_no <= len(ocr_text)
-            and "revenue" in ocr_text[slide_no - 1].casefold()
-            and "contribution" in ocr_text[slide_no - 1].casefold()
+            and rendered_model_is_present(expected[slide_no - 1], ocr_text[slide_no - 1])
             for slide_no in model_slides
         ),
-        "rendered_narrative_progression_is_complete": len(progression_hits) == len(progression_terms),
-        "rendered_images_match_approved_roles": image_relevance,
+        "rendered_narrative_progression_is_complete": narrative_complete,
+        "rendered_images_match_approved_roles": image_relevance or (director and not visual_manifest),
     }
     findings = []
     if truncated:
@@ -209,8 +226,10 @@ def main() -> int:
         findings.append("presentation specification contains incomplete or backstage body/takeaway copy")
     if copy_gaps:
         findings.append(f"expected rendered copy is missing or clipped: {copy_gaps}")
+    if model_slides and not checks["rendered_commercial_model_is_present"]:
+        findings.append("rendered commercial model or its revenue/profit qualification is missing")
     if not rendered_roles:
-        findings.append("rendered canonical role checks failed for slides 8, 13, 19 or 22")
+        findings.append("rendered Director story copy is missing" if director else "rendered canonical role checks failed for slides 8, 13, 19 or 22")
     minimum_citation_slides = max(1, len(slides) - 2)
     if len(citation_slides) < minimum_citation_slides:
         findings.append(
@@ -218,7 +237,7 @@ def main() -> int:
             f"{len(citation_slides)} of {len(slides)} slides; expected at least {minimum_citation_slides}"
         )
     missing_progression = sorted(set(progression_terms) - set(progression_hits))
-    if missing_progression:
+    if missing_progression and not director:
         findings.append(f"rendered narrative stages not visible: {missing_progression}")
     report = {
         "status": "passed" if all(checks.values()) else "failed",
