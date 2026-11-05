@@ -67,3 +67,16 @@ class ClientVisibilityTests(unittest.TestCase):
         receipt['artifact_checksum']='stale';self.assertIsNone(verified_review_link(s,backend))
         receipt['artifact_checksum']='source-checksum';receipt['review_artifact_checksum']='old-pdf'
         self.assertIsNone(verified_review_link(s,backend))
+
+    def test_untagged_descendant_belongs_only_to_its_explicit_parent_campaign(self):
+        parent=state('shared','growth_blueprint_deliverable_production',company='Origin')
+        first=state('campaign-a',parent='shared',company='Origin',campaign_identity={'campaign_id':'a'})
+        second=state('campaign-b',parent='shared',company='Origin',campaign_identity={'campaign_id':'b'})
+        child=state('a-child','campaign_world_to_creative_bible',parent='campaign-a',company='Origin')
+        rows=client_engagements([parent,first,second,child],'Origin')
+        self.assertEqual({r['campaign_id']:s.run_id for s,r in rows},{'a':'a-child','b':'campaign-b'})
+
+    def test_client_absent_from_workflows_preserves_existing_campaign_lookup(self):
+        fallback=SimpleNamespace(execute=lambda command,objects:('legacy read',command))
+        service=TonyWorkflowCommandService(fallback,SimpleNamespace(list_states=lambda:()))
+        self.assertEqual(service.execute('/client Existing Campaign',[]),('legacy read','/client Existing Campaign'))

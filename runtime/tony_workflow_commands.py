@@ -832,6 +832,8 @@ class TonyWorkflowCommandService:
             if name == "client":
                 reference, _ = self._arguments(parts[1:])
                 if not reference: return self._error(name, "missing_argument", "Client name or recorded alias is required.")
+                if not client_engagements(states, reference) and self.command_service is not None:
+                    return self.command_service.execute(command, objects)
                 return self._client_visibility(states, reference)
             if name == "workflow" and len(parts) > 1:
                 reference, _ = self._arguments(parts[1:])

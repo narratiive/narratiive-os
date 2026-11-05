@@ -60,20 +60,28 @@ def client_engagements(states, reference=''):
     for key,state in nodes.items():
         if root(key) in selected_roots: groups.setdefault(root(key), []).append(state)
     result = []
+    def campaign_for(state):
+        seen = set()
+        while state is not None and (state.workspace_id, state.run_id) not in seen:
+            seen.add((state.workspace_id, state.run_id))
+            identity = state.input_payload.get('campaign_identity')
+            if isinstance(identity, Mapping) and identity.get('campaign_id'):
+                return str(identity['campaign_id'])
+            lineage = state.input_payload.get('_lineage')
+            state = nodes.get((state.workspace_id, lineage.get('parent_run_id'))) if isinstance(lineage, Mapping) else None
+        return None
     partitions = []
     for group in groups.values():
-        campaign_ids = {s.input_payload.get('campaign_identity', {}).get('campaign_id')
-                        for s in group if isinstance(s.input_payload.get('campaign_identity'), Mapping)} - {None, ''}
+        campaign_ids = {campaign_for(s) for s in group} - {None}
         if len(campaign_ids)>1:
             for campaign_id in sorted(campaign_ids):
-                partitions.append([s for s in group if not isinstance(s.input_payload.get('campaign_identity'), Mapping)
-                    or not s.input_payload['campaign_identity'].get('campaign_id')
-                    or s.input_payload['campaign_identity']['campaign_id']==campaign_id])
+                partitions.append([s for s in group if campaign_for(s) in {None, campaign_id}])
         else: partitions.append(group)
     for group in partitions:
         rows = project_client_portfolio(group)
         row = max(rows, key=lambda r:(r['current_gate'],r['updated_at'],r['current_run_id']))
         current = next(s for s in group if s.run_id == row['current_run_id'])
+        row = dict(row, campaign_id=campaign_for(current) or row["campaign_id"])
         product, phase = PRODUCTS[current.workflow_id]
         result.append((current, dict(row, commercial_product=product, phase=phase,
             engagement_started_at=min(s.created_at for s in group))))
