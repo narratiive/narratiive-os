@@ -1,0 +1,240 @@
+{
+  "blueprint_id": "fieldwork-fictional-growth-blueprint-demo-v1",
+  "canon_relationship": "Additive Issue #471 demonstration profile. The checksum-locked 30-slide production canon remains unchanged.",
+  "chapters": [
+    {
+      "argument": "FIELDWORK could test an annualised ecommerce revenue scenario of £1,890,000, £690,000 above the assumed baseline.",
+      "classification": "MODELLED",
+      "decision": "Validate the baseline and economics before treating the scenario as an investment case.",
+      "evidence_ids": [
+        "A1",
+        "A2",
+        "A3"
+      ],
+      "title": "The Opportunity"
+    },
+    {
+      "argument": "The working constraint is proposition clarity, not reach: FIELDWORK has no validated reason for qualified buyers to choose it over familiar alternatives.",
+      "classification": "ASSUMPTION",
+      "decision": "If a clearer proposition fails to improve qualified landing-page progression and purchase intent versus the current message, reject this diagnosis.",
+      "evidence_ids": [
+        "A4"
+      ],
+      "title": "The Constraint"
+    },
+    {
+      "argument": "The proposed advantage is practical design for the overlap between work and home, expressed with more honesty and character than generic productivity products.",
+      "classification": "ASSUMPTION",
+      "decision": "Compare relevance, distinctiveness, willingness to pay and unprompted recall against two alternative territories.",
+      "evidence_ids": [
+        "A5"
+      ],
+      "title": "The Advantage"
+    },
+    {
+      "argument": "Make FIELDWORK the most useful and recognisable expression of modern work at home, then prove the proposition in conversion and repeat before scaling acquisition.",
+      "classification": "ASSUMPTION",
+      "decision": "Approve only the next tests, not the modelled revenue outcome.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "C1"
+      ],
+      "recommendations": [
+        {
+          "action": "Replace a broad lifestyle proposition with one specific job and reason to choose.",
+          "evidence_ids": [
+            "A4",
+            "A5"
+          ],
+          "lever": "Qualified conversion",
+          "name": "Sharpen the promise",
+          "owner": "Strategy Director",
+          "test": "Controlled message and landing-page test",
+          "trade_off": "A narrower promise may reduce broad but low-intent traffic."
+        },
+        {
+          "action": "Build content and merchandising around visible use, material choices and everyday durability.",
+          "evidence_ids": [
+            "A5",
+            "C1"
+          ],
+          "lever": "Conversion and average order value",
+          "name": "Prove the product story",
+          "owner": "Creative Director",
+          "test": "Product-story comprehension and basket test",
+          "trade_off": "More proof requires disciplined production and may expose weak claims."
+        },
+        {
+          "action": "Create post-purchase, referral and replenishment tests before increasing paid acquisition.",
+          "evidence_ids": [
+            "A6"
+          ],
+          "lever": "Repeat revenue and allowable acquisition cost",
+          "name": "Earn repeat before reach",
+          "owner": "Strategy Director",
+          "test": "Cohort retention and referral pilot",
+          "trade_off": "Near-term reach grows more slowly while economics are validated."
+        }
+      ],
+      "title": "The Strategy"
+    },
+    {
+      "argument": "Built for the work of living: Objects that respect the untidy overlap between useful work and a life worth living.",
+      "classification": "CREATIVE ILLUSTRATION",
+      "decision": "Test founder authenticity, customer recognition, distinctiveness and whether the territory improves product understanding.",
+      "evidence_ids": [
+        "A5",
+        "C1"
+      ],
+      "territory": {
+        "description": "Show real, imperfect work in warm domestic spaces. Pair precise product details with candid observations about how people actually organise a day.",
+        "evidence_ids": [
+          "A5",
+          "C1"
+        ],
+        "example_execution": "A short film follows one desk object across a day: invoice, lunch, school drawing, late call. On-screen annotations identify the practical design decisions. End line: Built for the work of living.",
+        "name": "Built for the work of living",
+        "platform": "Objects that respect the untidy overlap between useful work and a life worth living.",
+        "primary_phrase": "USEFUL BY DESIGN",
+        "principles": [
+          [
+            "OBSERVE",
+            "Real work leaves traces"
+          ],
+          [
+            "PROVE",
+            "Materials and use stay visible"
+          ],
+          [
+            "REPEAT",
+            "One warm orange work mark"
+          ]
+        ],
+        "secondary_phrase": "HUMAN IN PRACTICE",
+        "validation_test": "Test founder authenticity, customer recognition, distinctiveness and whether the territory improves product understanding."
+      },
+      "title": "The Creative Future"
+    },
+    {
+      "argument": "Use owned product proof to improve conversion, then let CRM and referral establish repeat economics before expanding paid reach.",
+      "channels": [
+        {
+          "channel": "Owned site",
+          "gate": "Message comprehension and net conversion",
+          "role": "Prove the proposition and convert qualified demand"
+        },
+        {
+          "channel": "CRM",
+          "gate": "Cohort contribution and opt-out guardrail",
+          "role": "Build repeat, cross-sell and referral evidence"
+        },
+        {
+          "channel": "Paid social",
+          "gate": "Incremental contribution after creative and media cost",
+          "role": "Scale tested creative and proposition routes"
+        },
+        {
+          "channel": "Partnerships",
+          "gate": "Qualified traffic and assisted conversion",
+          "role": "Reach relevant work and design communities"
+        }
+      ],
+      "classification": "ASSUMPTION",
+      "decision": "Increase paid acquisition only after proposition comprehension, net conversion and cohort contribution improve without unacceptable returns or discounting.",
+      "evidence_ids": [
+        "A6"
+      ],
+      "measurement": [
+        {
+          "level": "LEADING",
+          "metrics": "Proposition comprehension, qualified click-through, product-page progression"
+        },
+        {
+          "level": "BEHAVIOURAL",
+          "metrics": "Net conversion, average order value, repeat and referral"
+        },
+        {
+          "level": "COMMERCIAL",
+          "metrics": "Contribution after returns, fulfilment, media and implementation"
+        }
+      ],
+      "title": "The Growth Engine"
+    },
+    {
+      "argument": "A staged validation programme protects cash while the business replaces assumptions with evidence.",
+      "classification": "ASSUMPTION",
+      "decision": "Matt approves the commercial recommendation and exact client-facing artefact before release.",
+      "evidence_ids": [
+        "A4",
+        "A5",
+        "A6",
+        "A7",
+        "C1"
+      ],
+      "phases": [
+        {
+          "decision_gate": "Matt selects a proposition test and approves its bounded budget.",
+          "evidence_ids": [
+            "A4",
+            "A5",
+            "A7"
+          ],
+          "name": "Establish the truth",
+          "outcome": "Verify economics, interview customers and test three proposition routes.",
+          "owner": "Research Analyst and Strategy Director",
+          "period": "Months 1-3"
+        },
+        {
+          "decision_gate": "Continue only if comprehension and net conversion improve.",
+          "evidence_ids": [
+            "A6",
+            "A7",
+            "C1"
+          ],
+          "name": "Prove the proposition",
+          "outcome": "Run controlled site, product-story and CRM tests with contribution guardrails.",
+          "owner": "Strategy Director and Creative Director",
+          "period": "Months 4-6"
+        },
+        {
+          "decision_gate": "Approve scale only when repeat economics and stock capacity support it.",
+          "evidence_ids": [
+            "A6",
+            "A7"
+          ],
+          "name": "Build the engine",
+          "outcome": "Codify winning creative, CRM and referral mechanics and assess capacity.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 7-9"
+        },
+        {
+          "decision_gate": "Matt approves any material commercial commitment or client-facing release.",
+          "evidence_ids": [
+            "A6",
+            "A7"
+          ],
+          "name": "Scale selectively",
+          "outcome": "Increase investment in validated routes and document what changed commercially.",
+          "owner": "Tony coordinating responsible specialists",
+          "period": "Months 10-12"
+        }
+      ],
+      "title": "The Next 12 Months"
+    }
+  ],
+  "commercial_model_id": "fieldwork-fictional-ecommerce-opportunity-v1",
+  "external_action_taken": false,
+  "fictional_demonstration": true,
+  "opening_slide_functions": [
+    "Where the business could go",
+    "What the commercial opportunity looks like",
+    "What currently prevents growth",
+    "What strategic moves are required",
+    "What the future could look like"
+  ],
+  "release_state": "pending_human_approval",
+  "status": "INTERNAL REVIEW DRAFT - HUMAN APPROVAL REQUIRED",
+  "title": "Narratiive Growth Blueprint - FIELDWORK"
+}
