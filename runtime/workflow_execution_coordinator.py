@@ -34,6 +34,10 @@ QualityValidator = Callable[[Mapping[str, Any]], Mapping[str, Any]]
 
 
 _BOUNDED_STRATEGY_CONTEXT_FIELDS: dict[str, tuple[str, ...]] = {
+    "growth_blueprint_to_campaign_world": (
+        "client_context", "production_context", "production_constraints",
+        "evidence_and_uncertainty", "source_register", "_lineage",
+    ),
     "research_to_strategic_synthesis": ("contradictions", "research_gaps", "_lineage"),
     "strategic_synthesis_to_strategy_thesis": ("contradictions_and_gaps", "open_inputs", "_lineage"),
     "strategy_thesis_to_growth_blueprint": ("evidence_and_uncertainty", "_lineage"),
