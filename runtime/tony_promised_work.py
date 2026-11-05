@@ -21,12 +21,17 @@ class TonyPromisedWorkWorker:
         self.sender = sender
 
     def run_once(self) -> WorkflowState | None:
+        states = tuple(self.backend.list_states())
+        handed_off = {s.input_payload.get('_lineage',{}).get('parent_run_id') for s in states}
         candidates = sorted(
             (
                 state
-                for state in self.backend.list_states()
+                for state in states
                 if isinstance(state.input_payload.get("_promised_work"), Mapping)
-                and self._delivery_required(state)
+                and (self._delivery_required(state) or (state.input_payload.get('_synthetic_rehearsal') and
+                    (state.status.value in {'active','complete'} or
+                     (state.status.value == 'awaiting_approval' and not state.input_payload.get('asset_versions')))))
+                and not (state.input_payload.get('_synthetic_rehearsal') and state.status.value == 'complete' and state.run_id in handed_off)
             ),
             key=lambda state: (state.created_at, state.run_id),
         )
@@ -53,6 +58,14 @@ class TonyPromisedWorkWorker:
                 f"the current blocker is {type(exc).__name__}.",
                 "worker_failure",
             )
+        if state.input_payload.get('_synthetic_rehearsal') and state.status.value in {'awaiting_approval','complete'}:
+            try:
+                progressed = self.backend.progress_synthetic_rehearsal(state)
+                if progressed.run_id != state.run_id or progressed.status.value != 'awaiting_approval':
+                    return progressed
+            except Exception as exc:
+                return self._deliver_once(state, 'Origin fictional rehearsal is paused at an internal gate: '
+                    + str(exc)[:350] + '. No final asset approval or client release has occurred.', 'worker_failure')
         if state.status.value == "awaiting_approval":
             try:
                 delivery = dict(self.backend.deliver_internal_review(state, recipient="hello@narratiive.com"))
@@ -158,6 +171,8 @@ class TonyPromisedWorkWorker:
                 "I’ve kept the gate pending and won’t claim it was emailed."
             )
         notification = str(delivery.get("telegram_notification") or "").strip()
+        if delivery.get('kind') == 'asset_review_folder':
+            return notification[:2800]
         if notification:
             link = str(delivery.get("review_link") or "").strip()
             return notification[:2800] + (f"\nReview copy: {link}" if link else "")

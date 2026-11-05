@@ -108,7 +108,7 @@ class HiggsfieldCreativeProductionDispatcher:
             capability = _text(task.get("required_capability"))
             if capability not in self._SUPPORTED:
                 raise HiggsfieldProviderError(f"Higgsfield does not support production capability: {capability}")
-            version, receipt = self._produce(asset, task, specification, manifest_checksum, provider_scope)
+            version, receipt = self._produce(asset, task, specification, manifest_checksum, provider_scope, str(contract.get("asset_review_folder_id") or ""))
             versions.append(version)
             receipts.append(receipt)
             request_ids.append(_text(receipt.get("provider_request_id")))
@@ -127,7 +127,7 @@ class HiggsfieldCreativeProductionDispatcher:
             "media_spend_authorised": False,
         }
 
-    def _produce(self, asset, task, specification, manifest_checksum, provider_scope):
+    def _produce(self, asset, task, specification, manifest_checksum, provider_scope, review_folder_id=""):
         asset_id = _text(asset.get("asset_id"))
         job_id = _text(asset.get("production_job_id"))
         if not asset_id or not job_id:
@@ -170,6 +170,7 @@ class HiggsfieldCreativeProductionDispatcher:
             "payload": {
                 "kind": "creative_asset_version", "local_path": str(local_path),
                 "filename": local_path.name, "mime_type": content_type, "checksum": checksum,
+                "parent_folder_id": review_folder_id,
                 "asset_id": asset_id, "asset_version_id": version_id,
                 "production_job_id": job_id, "provider_request_id": request_id,
             },
@@ -182,6 +183,7 @@ class HiggsfieldCreativeProductionDispatcher:
             "asset_version_id": version_id, "asset_id": asset_id, "production_job_id": job_id,
             "file_checksum": checksum, "drive_uri": drive_uri,
             "source_manifest_checksum": manifest_checksum,
+            "parent_folder_id": review_folder_id,
             "version_number": int(asset.get("planned_version") or 1), "status": "in_review",
             "approval_status": "pending", "human_review_required": True,
             "delivery_authorised": False, "publication_authorised": False,

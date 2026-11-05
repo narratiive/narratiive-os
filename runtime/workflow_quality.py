@@ -843,13 +843,17 @@ def production_planning_quality_gate(output: Mapping[str, Any]) -> Mapping[str, 
     specification_ids = {
         str(item.get("specification_id") or "") for item in specifications or [] if isinstance(item, Mapping)
     }
+    selection = pack.get('selection_scope') if isinstance(pack, Mapping) else None
+    two_stills = (isinstance(selection, Mapping) and selection.get('maximum_assets') == 2 and
+        selection.get('allowed_capabilities') == ['image_generation'] and len(tasks or []) == 2 and
+        all(task.get('required_capability') == 'image_generation' for task in tasks))
     checks = {
         "production_pack_is_checksum_bound": isinstance(pack, Mapping)
         and _meaningful(pack.get("production_pack_id"))
         and _meaningful(pack.get("checksum"))
         and _meaningful(pack.get("source_bible_checksum")),
         "channel_specifications_are_complete": isinstance(specifications, list)
-        and len(specifications) >= 3
+        and (len(specifications) == 2 if two_stills else len(specifications) >= 3)
         and all(
             isinstance(item, Mapping)
             and all(

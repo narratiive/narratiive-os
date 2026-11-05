@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,6 +70,8 @@ class TonyWorkflowRuntime:
     business_projection: WorkflowBusinessProjectionService | None = None
     blueprint_director_learning: BlueprintDirectorLearningStore | None = None
     review_artifact_root: Path | None = None
+    rehearsal_root: Path | None = None
+    rehearsal_classifier_id: str = ""
 
     def enqueue(
         self,
@@ -390,6 +393,7 @@ class TonyWorkflowRuntime:
         candidate_checksum: str,
         approver: str,
         rationale: str,
+        synthetic_rehearsal: bool = False,
     ) -> dict[str, Any]:
         state = self.runs.load_run(run_id)
         brief = self.campaign_world_selection_brief(run_id)
@@ -405,10 +409,13 @@ class TonyWorkflowRuntime:
         expected = _workflow_value_checksum(selected)
         if not candidate_checksum.strip() or expected != candidate_checksum.strip():
             raise ValueError("Campaign World selection checksum is stale or incorrect")
+        if synthetic_rehearsal:
+            self._synthetic_rehearsal_service().policy(self.runs.load_run(run_id))
         changed = self.runs.record_campaign_world_selection(
             run_id,
             approver=approver,
             rationale=rationale,
+            synthetic_rehearsal=synthetic_rehearsal,
             candidate_id=candidate_id,
             candidate_checksum=expected,
         )
@@ -445,6 +452,7 @@ class TonyWorkflowRuntime:
         creative_bible_checksum: str,
         approver: str,
         rationale: str,
+        synthetic_rehearsal: bool = False,
     ) -> dict[str, Any]:
         brief = self.creative_bible_approval_brief(run_id)
         expected = str(brief.get("creative_bible_checksum") or "")
@@ -452,10 +460,13 @@ class TonyWorkflowRuntime:
             raise ValueError("Creative Bible approval checksum is stale or incorrect")
         if brief.get("requires_matt") is not True or brief.get("tony_disposition") != "forward":
             raise ValueError("Creative Bible has not been forwarded by Tony for Matt approval")
+        if synthetic_rehearsal:
+            self._synthetic_rehearsal_service().policy(self.runs.load_run(run_id))
         changed = self.runs.record_creative_bible_approval(
             run_id,
             approver=approver,
             rationale=rationale,
+            synthetic_rehearsal=synthetic_rehearsal,
             creative_bible_checksum=expected,
         )
         self._project(changed)
@@ -575,7 +586,9 @@ class TonyWorkflowRuntime:
             inputs["blueprint_canon"] = {
                 "artifact_id": source_artifact.artifact_id,
                 "checksum": source_artifact.checksum,
-                "status": "quality_accepted_and_human_approved",
+                "status": ("quality_accepted_and_synthetically_reviewed"
+                    if any(a.get('approval_binding',{}).get('synthetic_rehearsal') for a in state.approval_history)
+                    else "quality_accepted_and_human_approved"),
             }
         if state.workflow_id == "strategic_synthesis_to_strategy_thesis":
             source_artifact = artifacts[-1]
@@ -842,6 +855,15 @@ class TonyWorkflowRuntime:
             rationale=rationale,
         )
 
+    def _synthetic_rehearsal_service(self):
+        from runtime.synthetic_rehearsal import SyntheticRehearsalService
+        from runtime.workflow_entity_classification import FileWorkflowEntityClassificationJournal
+        if self.rehearsal_root is None or not self.rehearsal_classifier_id:
+            raise PermissionError('Synthetic rehearsal classification is not configured')
+        journal = FileWorkflowEntityClassificationJournal(self.rehearsal_root,
+            authorised_classifier_id=self.rehearsal_classifier_id)
+        return SyntheticRehearsalService(self, journal, lambda: ())
+
     def _project(self, state: WorkflowState) -> None:
         if self.business_projection is not None:
             self.business_projection.prepare(state)
@@ -858,6 +880,7 @@ def build_tony_workflow_runtime(
 ) -> TonyWorkflowRuntime:
     """Compose the production workflow runtime without executing any work."""
 
+    runtime_env = os.environ if environ is None else environ
     scope = hashlib.sha256(f"{workspace_id}:{client_id}".encode("utf-8")).hexdigest()[:24]
     scoped_root = Path(root) / scope
     repository = FileWorkflowRunRepository(
@@ -955,6 +978,9 @@ def build_tony_workflow_runtime(
         business_projection=projection,
         blueprint_director_learning=blueprint_director_learning,
         review_artifact_root=Path(root)/"human-review-artifacts",
+        rehearsal_root=Path(root),
+        rehearsal_classifier_id=('telegram:' + str(runtime_env.get('TONY_TELEGRAM_CHAT_ID')).strip()
+            if str(runtime_env.get('TONY_TELEGRAM_CHAT_ID') or '').strip() else ''),
     )
 
 
