@@ -642,7 +642,9 @@ class TonyWorkflowCommandTests(unittest.TestCase):
 
         response = self.service.execute("/workflow SAFE Executive Workflow Test", [])
 
-        self.assertEqual(response.status, "error")
+        self.assertEqual(response.status, "attention_required")
+        self.assertTrue(response.data["ambiguous"])
+        self.assertEqual(response.data["client_count"], 2)
         self.assertIn("ambiguous", response.message)
 
     def test_non_workflow_command_delegates(self) -> None:
