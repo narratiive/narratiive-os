@@ -19,6 +19,7 @@ from runtime.human_review_artifacts import (
 
 INTERNAL_REVIEW_ADDRESS = "hello@narratiive.com"
 INTERNAL_REVIEW_APPROVAL_SCOPE = "narratiive_internal_artifact_review"
+FIELDWORK_PROPOSAL_WORKFLOW_ID = "discovery_evidence_to_growth_sprint_proposal"
 
 SUBSTANTIAL_ARTIFACT_TYPES = frozenset(
     {
@@ -110,7 +111,36 @@ def assert_current_approval_token(state: WorkflowState, supplied: str) -> None:
         )
 
 
-def approval_binding_evidence(state: WorkflowState, supplied: str) -> dict[str, str]:
+def fieldwork_commercial_offer_preview(
+    state: WorkflowState, supplied: str, offer: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Show the immutable commercial offer which must be reviewed before approval."""
+
+    binding = approval_binding_evidence(state, supplied)
+    if state.workflow_id != FIELDWORK_PROPOSAL_WORKFLOW_ID:
+        raise InternalReviewDeliveryError("commercial offer binding is only valid for the FIELDWORK proposal workflow")
+    normalised = _normalise_fieldwork_commercial_offer(state, binding, offer)
+    digest = fieldwork_commercial_offer_digest(binding["approval_binding_digest"], normalised)
+    return {
+        "workflow_id": state.workflow_id,
+        "run_id": state.run_id,
+        "proposal_artifact_id": normalised["proposal_artifact_id"],
+        "proposal_artifact_version": normalised["proposal_artifact_version"],
+        "proposal_artifact_checksum": normalised["proposal_artifact_checksum"],
+        "commercial_offer": normalised,
+        "commercial_offer_digest": digest,
+        "approval_token": binding["approval_binding_digest"],
+        "external_action_taken": False,
+    }
+
+
+def approval_binding_evidence(
+    state: WorkflowState,
+    supplied: str,
+    *,
+    fieldwork_commercial_offer: Mapping[str, Any] | None = None,
+    commercial_offer_digest: str = "",
+) -> dict[str, Any]:
     """Return the exact, already-validated artefact/gate binding for the audit log."""
 
     assert_current_approval_token(state, supplied)
@@ -139,7 +169,92 @@ def approval_binding_evidence(state: WorkflowState, supplied: str) -> dict[str, 
                 ),
             }
         )
+    if fieldwork_commercial_offer is not None:
+        if state.workflow_id != FIELDWORK_PROPOSAL_WORKFLOW_ID:
+            raise InternalReviewDeliveryError("commercial offer binding is only valid for the FIELDWORK proposal workflow")
+        offer = _normalise_fieldwork_commercial_offer(state, binding, fieldwork_commercial_offer)
+        expected = fieldwork_commercial_offer_digest(binding["approval_binding_digest"], offer)
+        if not commercial_offer_digest.strip() or not hmac.compare_digest(expected, commercial_offer_digest.strip()):
+            raise InternalReviewDeliveryError("commercial offer digest is stale or does not match the reviewed proposal terms")
+        binding["fieldwork_commercial_offer"] = offer
+        binding["fieldwork_commercial_offer_digest"] = expected
     return binding
+
+
+def _normalise_fieldwork_commercial_offer(
+    state: WorkflowState, binding: Mapping[str, Any], supplied: Mapping[str, Any]
+) -> dict[str, Any]:
+    def text(name: str) -> str:
+        return str(supplied.get(name) or "").strip()
+
+    def amount(name: str) -> int:
+        value = supplied.get(name)
+        if isinstance(value, bool):
+            raise InternalReviewDeliveryError(f"commercial offer {name} must be an integer amount")
+        try:
+            result = int(value)
+        except (TypeError, ValueError) as exc:
+            raise InternalReviewDeliveryError(f"commercial offer {name} must be an integer amount") from exc
+        if result <= 0:
+            raise InternalReviewDeliveryError(f"commercial offer {name} must be positive")
+        return result
+
+    proposal_id = text("proposal_id")
+    recipient_email = text("recipient_email").casefold()
+    proposal_url = text("proposal_url")
+    scope_summary = text("scope_summary")
+    balance_terms = text("balance_terms")
+    service_terms_url = text("service_terms_url")
+    artifact_id = text("proposal_artifact_id")
+    artifact_version = text("proposal_artifact_version")
+    artifact_checksum = text("proposal_artifact_checksum").removeprefix("sha256:")
+    currency = text("currency").upper()
+    if not proposal_id or not recipient_email or "@" not in recipient_email:
+        raise InternalReviewDeliveryError("commercial offer requires an exact approved recipient email and proposal ID")
+    if not proposal_url.startswith("https://"):
+        raise InternalReviewDeliveryError("commercial offer proposal URL must use HTTPS")
+    if not scope_summary or not balance_terms:
+        raise InternalReviewDeliveryError("commercial offer requires the exact approved scope and balance terms")
+    if not service_terms_url.startswith("https://"):
+        raise InternalReviewDeliveryError("commercial offer service terms URL must use HTTPS")
+    if len(currency) != 3 or not currency.isalpha():
+        raise InternalReviewDeliveryError("commercial offer currency must be a three-letter ISO code")
+    if (
+        artifact_id != str(binding.get("artifact_id") or "")
+        or artifact_version != str(binding.get("artifact_version") or "")
+        or not artifact_checksum
+        or not hmac.compare_digest(artifact_checksum, str(binding.get("artifact_checksum") or "").removeprefix("sha256:"))
+    ):
+        raise InternalReviewDeliveryError("commercial offer must bind the exact current proposal artefact, version and checksum")
+    fixed_investment_minor = amount("fixed_investment_minor")
+    deposit_amount_minor = amount("deposit_amount_minor")
+    if deposit_amount_minor > fixed_investment_minor:
+        raise InternalReviewDeliveryError("commercial offer deposit cannot exceed the fixed investment")
+    return {
+        "canonical_workspace_id": state.workspace_id,
+        "canonical_client_id": state.client_id,
+        "proposal_id": proposal_id,
+        "recipient_email": recipient_email,
+        "proposal_url": proposal_url,
+        "scope_summary": scope_summary,
+        "balance_terms": balance_terms,
+        "service_terms_url": service_terms_url,
+        "proposal_artifact_id": artifact_id,
+        "proposal_artifact_version": artifact_version,
+        "proposal_artifact_checksum": artifact_checksum,
+        "fixed_investment_minor": fixed_investment_minor,
+        "deposit_amount_minor": deposit_amount_minor,
+        "currency": currency,
+    }
+
+
+def fieldwork_commercial_offer_digest(approval_token: str, offer: Mapping[str, Any]) -> str:
+    material = json.dumps(
+        {"approval_token": approval_token, "commercial_offer": dict(offer)},
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
 
 class InternalReviewDeliveryService:

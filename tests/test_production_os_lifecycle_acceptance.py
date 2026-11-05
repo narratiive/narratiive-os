@@ -168,129 +168,38 @@ class ProductionOSLifecycleAcceptanceTests(unittest.TestCase):
             proposal_run = proposal.data["run_id"]
             self.assertEqual(proposal.data["workflow_id"], "discovery_evidence_to_growth_sprint_proposal")
             self.assertEqual(proposal.data["status"], "awaiting_approval")
+            proposal_state = next(item for item in commands().backend.list_states() if item.run_id == proposal_run)
+            artifact = proposal_state.stages[-1].output_artifacts[-1]
+            offer = {
+                "proposal_id": "safe-final-fieldwork-v1", "recipient_email": "client@example.invalid",
+                "proposal_url": "https://drive.example.invalid/safe-final-fieldwork-v1",
+                "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+                "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+                "deposit_amount_minor": 300000, "currency": "GBP",
+                "scope_summary": "Synthetic FIELDWORK scope for lifecycle acceptance coverage.",
+                "balance_terms": "Synthetic balance due on delivery.",
+                "service_terms_url": "https://narratiive.example.invalid/terms",
+            }
+            offer_preview = service.execute(
+                f"/fieldwork-offer {proposal_run}", [],
+                inputs={"approval_token": proposal.data["approval_token"], "fieldwork_commercial_offer": offer},
+            )
             service.execute(
                 f"/approve {proposal_run} because SAFE Growth Sprint scope reviewed",
                 [],
                 principal_id="openclaw:native-approval",
-                inputs={"approval_token": proposal.data["approval_token"]},
-            )
-
-            thesis = service.execute(
-                f"/continue {proposal_run}",
-                [],
                 inputs={
-                    "research_sources": [
-                        {
-                            "source_id": "safe-category",
-                            "source_type": "document",
-                            "uri": "category.md",
-                            "policy": {"approved": True, "allow_local_files": True},
-                        },
-                        {
-                            "source_id": "safe-audience",
-                            "source_type": "document",
-                            "uri": "audience.md",
-                            "policy": {"approved": True, "allow_local_files": True},
-                        },
-                    ]
+                    "approval_token": proposal.data["approval_token"],
+                    "fieldwork_commercial_offer": offer,
+                    "commercial_offer_digest": offer_preview.data["commercial_offer_digest"],
                 },
             )
-            research_backend = commands().backend
-            states = research_backend.list_states()
-            research_state = next(
-                item for item in states if item.workflow_id == "growth_sprint_to_research_engine"
-            )
-            research_output = research_backend.latest_output(research_state)
-            self.assertIsNotNone(research_output)
-            self.assertTrue(research_output["source_provenance"])
-            self.assertTrue(research_output["fact_interpretation_hypothesis_lineage"]["facts"])
-            synthesis_state = next(
-                item for item in states if item.workflow_id == "research_to_strategic_synthesis"
-            )
-            self.assertEqual(synthesis_state.status.value, "complete")
-            thesis_run = thesis.data["run_id"]
-            self.assertEqual(thesis.data["workflow_id"], "strategic_synthesis_to_strategy_thesis")
-            self.assertEqual(thesis.data["status"], "awaiting_approval")
-            self.assertTrue(thesis.data["quality_passed"])
-            service.execute(
-                f"/approve {thesis_run} because SAFE exact Strategy Thesis reviewed",
-                [],
-                principal_id="openclaw:native-approval",
-                inputs={"approval_token": thesis.data["approval_token"]},
-            )
 
-            weak_blueprint = service.execute(f"/continue {thesis_run}", [])
-            self.assertEqual(weak_blueprint.data["status"], "blocked")
-            self.assertEqual(
-                weak_blueprint.data["blocker"],
-                "quality_failed:growth_blueprint_quality_gate",
-            )
-            blueprint_run = weak_blueprint.data["run_id"]
-            revision = service.execute(
-                f"/reject {blueprint_run} because the thesis is generic and fails competitor substitution",
-                [],
-                principal_id="openclaw:native-approval",
-            )
-            self.assertEqual(revision.data["status"], "active")
-            blueprint = service.execute(f"/continue {blueprint_run}", [])
-            blueprint_run = blueprint.data["run_id"]
-            self.assertEqual(blueprint.data["workflow_id"], "strategy_thesis_to_growth_blueprint")
-            self.assertEqual(blueprint.data["status"], "awaiting_approval")
-            self.assertTrue(blueprint.data["quality_passed"])
-            self.assertFalse(blueprint.data["external_action_taken"])
-            blueprint_state = next(
-                item for item in commands().backend.list_states() if item.run_id == blueprint_run
-            )
-            thesis_state = next(
-                item for item in commands().backend.list_states() if item.run_id == thesis_run
-            )
-            thesis_artifact = thesis_state.stages[0].output_artifacts[-1]
-            candidate_versions = blueprint_state.stage("prepare_growth_blueprint").output_artifacts
-            self.assertEqual(len(candidate_versions), 1)
-            failed_candidate = blueprint_state.stage("prepare_growth_blueprint").attempts[0]["candidate_artifact"]
-            self.assertNotEqual(failed_candidate["checksum"], candidate_versions[-1].checksum)
-            self.assertEqual(candidate_versions[-1].metadata["version"], 2)
-            directed_blueprint = blueprint_state.stage("direct_growth_blueprint").output_artifacts[-1]
-            review_artifact = blueprint_state.stage("review_growth_blueprint").output_artifacts[-1]
-            self.assertEqual(
-                review_artifact.metadata["reviewed_artifact_checksum"],
-                directed_blueprint.checksum,
-            )
-            self.assertEqual(
-                blueprint_state.input_payload["strategy_thesis_identity"]["artifact_id"],
-                thesis_artifact.artifact_id,
-            )
-            self.assertEqual(
-                blueprint_state.input_payload["strategy_thesis_identity"]["checksum"],
-                thesis_artifact.checksum,
-            )
-
-            restarted = commands()
-            recovered = restarted.execute("/recover", [])
-            still_waiting = restarted.execute(f"/workflow {blueprint_run}", [])
-            self.assertEqual(recovered.status, "healthy")
-            self.assertEqual(still_waiting.data["status"], "awaiting_approval")
-            self.assertFalse(still_waiting.data["external_action_taken"])
-            approvals = restarted.execute("/approvals", [])
-            self.assertIn(blueprint_run, {item["run_id"] for item in approvals.data["runs"]})
-
-            approved = restarted.execute(
-                f"/approve {blueprint_run} because SAFE internal Growth Blueprint draft reviewed",
-                [],
-                principal_id="openclaw:native-approval",
-                inputs={"approval_token": still_waiting.data["approval_token"]},
-            )
-            self.assertEqual(approved.data["status"], "complete")
-            self.assertFalse(approved.data["external_action_taken"])
-            approved_state = next(
-                item for item in restarted.backend.list_states() if item.run_id == blueprint_run
-            )
-            binding = approved_state.approval_history[-1]["approval_binding"]
-            self.assertEqual(
-                binding["reviewed_artifact_checksum"],
-                directed_blueprint.checksum,
-            )
-            self.assertGreaterEqual(len(calls), 5)
+            blocked = service.execute(f"/continue {proposal_run}", [])
+            self.assertEqual(blocked.status, "error")
+            self.assertIn("verified payment authorisation", blocked.message)
+            states = commands().backend.list_states()
+            self.assertFalse(any(item.workflow_id == "growth_sprint_to_research_engine" for item in states))
 
 
 if __name__ == "__main__":

@@ -52,20 +52,41 @@ def _lifecycle() -> ClientLifecycleRecord:
 
 def _approval(service, run_id: str, token: str, label: str) -> None:
     instruction = f"TEST APPROVAL — I explicitly approve the current {label} artefact for run {run_id} for internal continuation only."
+    inputs = {
+        "approval_token": token,
+        "approval_decision_evidence": {
+            "explicit_decision_intent": "approve",
+            "human_instruction": instruction,
+            "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
+            "turn_run_id": f"certification:{run_id}:{label}",
+            "verbatim_current_human_instruction_verified": True,
+        },
+    }
+    state = next(item for item in service.backend.list_states() if item.run_id == run_id)
+    if state.workflow_id == "discovery_evidence_to_growth_sprint_proposal":
+        artifact = state.stages[-1].output_artifacts[-1]
+        offer = {
+            "proposal_id": f"certification-{run_id}", "recipient_email": "synthetic-client@example.invalid",
+            "proposal_url": f"https://example.invalid/proposals/{run_id}",
+            "proposal_artifact_id": artifact.artifact_id, "proposal_artifact_version": "v1",
+            "proposal_artifact_checksum": artifact.checksum, "fixed_investment_minor": 600000,
+            "deposit_amount_minor": 300000, "currency": "GBP",
+            "scope_summary": "Synthetic FIELDWORK scope for golden-path certification.",
+            "balance_terms": "Synthetic balance due on delivery.",
+            "service_terms_url": "https://narratiive.example.invalid/terms",
+        }
+        preview = service.execute(
+            f"/fieldwork-offer {run_id}", [],
+            inputs={"approval_token": token, "fieldwork_commercial_offer": offer},
+        )
+        if preview.status == "error":
+            raise RuntimeError(preview.message)
+        inputs.update({"fieldwork_commercial_offer": offer, "commercial_offer_digest": preview.data["commercial_offer_digest"]})
     response = service.execute(
         f"/approve {run_id} because {instruction}",
         [],
         principal_id="matt:synthetic-certification",
-        inputs={
-            "approval_token": token,
-            "approval_decision_evidence": {
-                "explicit_decision_intent": "approve",
-                "human_instruction": instruction,
-                "human_instruction_sha256": hashlib.sha256(instruction.encode("utf-8")).hexdigest(),
-                "turn_run_id": f"certification:{run_id}:{label}",
-                "verbatim_current_human_instruction_verified": True,
-            },
-        },
+        inputs=inputs,
     )
     if response.status == "error":
         raise RuntimeError(response.message)
@@ -180,28 +201,37 @@ def run(root: Path) -> dict:
         },
     )
     _approval(service, proposal.data["run_id"], proposal.data["approval_token"], "Growth Sprint proposal")
-    thesis = service.execute(
-        f"/continue {proposal.data['run_id']}",
-        [],
-        inputs={
-            "research_sources": [
-                {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
-                {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
-            ]
-        },
+    proposal_state = next(item for item in backend.list_states() if item.run_id == proposal.data["run_id"])
+    research_inputs = {
+        "approved_growth_sprint_scope": ["Synthetic FIELDWORK certification scope"],
+        "research_requirements": ["Synthetic category and audience evidence"],
+        "research_sources": [
+            {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
+            {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
+        ],
+        "client_context": {"company": COMPANY, "synthetic_test": True},
+    }
+    research, replayed = backend.commission(
+        proposal_state,
+        target_workflow_id="growth_sprint_to_research_engine",
+        inputs=research_inputs,
+        commitment_id="synthetic-certification-verified-payment",
+        payment_authorised=True,
     )
+    if replayed:
+        raise RuntimeError("initial synthetic payment-authorised commission replayed")
+    thesis = service.execute(f"/continue {research.run_id}", [])
+    while thesis.data.get("workflow_id") != "strategic_synthesis_to_strategy_thesis":
+        thesis = service.execute(f"/continue {thesis.data['run_id']}", [])
     before_replay = len(backend.list_states())
-    replay = service.execute(
-        f"/continue {proposal.data['run_id']}",
-        [],
-        inputs={
-            "research_sources": [
-                {"source_id": "safe-category", "source_type": "document", "uri": "category.md", "policy": {"approved": True, "allow_local_files": True}},
-                {"source_id": "safe-audience", "source_type": "document", "uri": "audience.md", "policy": {"approved": True, "allow_local_files": True}},
-            ]
-        },
+    replay, replayed = backend.commission(
+        proposal_state,
+        target_workflow_id="growth_sprint_to_research_engine",
+        inputs=research_inputs,
+        commitment_id="synthetic-certification-verified-payment",
+        payment_authorised=True,
     )
-    if len(backend.list_states()) != before_replay or replay.data.get("run_id") != thesis.data.get("run_id"):
+    if len(backend.list_states()) != before_replay or not replayed or replay.run_id != research.run_id:
         raise RuntimeError("duplicate handoff was not idempotent")
     _approval(service, thesis.data["run_id"], thesis.data["approval_token"], "Strategy Thesis")
     weak = service.execute(f"/continue {thesis.data['run_id']}", [])

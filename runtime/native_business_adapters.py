@@ -348,10 +348,13 @@ class GmailDispatcher(GoogleAdapter):
             _require_write(contract)
         subject = _text(payload.get("subject") or payload.get("email_subject") or target.get("subject"))
         body = _text(payload.get("body") or payload.get("email_body") or target.get("body"))
+        html_body = _text(payload.get("html_body"))
         if not recipient or "@" not in recipient or not subject or not body:
             raise BusinessAdapterError("gmail_send_requires_exact_recipient_subject_and_body")
+        if len(html_body.encode("utf-8")) > 200_000:
+            raise BusinessAdapterError("gmail_html_body_too_large")
         key = _text(contract.get("idempotency_key")) or hashlib.sha256(
-            f"{recipient}\0{subject}\0{body}".encode("utf-8")
+            f"{recipient}\0{subject}\0{body}\0{html_body}".encode("utf-8")
         ).hexdigest()
         message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
         query = parse.urlencode({"q": f"in:sent rfc822msgid:{message_header}", "maxResults": "1"})
@@ -372,6 +375,8 @@ class GmailDispatcher(GoogleAdapter):
         email["Subject"] = subject
         email["Message-ID"] = message_header
         email.set_content(body)
+        if html_body:
+            email.add_alternative(html_body, subtype="html")
         attachments = payload.get("attachments")
         if attachments is not None:
             if not isinstance(attachments, list) or len(attachments) > 3:
@@ -962,7 +967,42 @@ class NotionWorkflowProjectionDispatcher:
             ids = [_text(item.get("id")) for item in result.get("results", []) if isinstance(item, Mapping) and _text(item.get("id"))]
             return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"notion:data_source:{self.data_source_id}", "record_ids": ids, "summary": "The canonical Notion data source was read without mutation."}
         _require_write(contract)
-        if _text(payload.get("kind")) != "workflow_business_state_projection" or not page_id:
+        kind = _text(payload.get("kind"))
+        if kind == "fieldwork_verified_acceptance_payment":
+            if not page_id:
+                raise BusinessAdapterError("fieldwork_payment_projection_requires_exact_record")
+            key = _text(payload.get("projection_key") or contract.get("idempotency_key"))
+            proposal_id = _text(payload.get("proposal_id"))
+            payment_intent = _text(payload.get("payment_intent"))
+            if not key or not proposal_id or not payment_intent:
+                raise BusinessAdapterError("fieldwork_payment_projection_requires_evidence")
+            current = self.client.call(f"{self.api_base}/v1/pages/{parse.quote(page_id, safe='')}", headers=self._headers())
+            marker = f"[fieldwork-payment:{key}]"
+            summary_text = _notion_plain_text(_mapping(_mapping(current.get("properties")).get("AI Summary")))
+            if marker in summary_text:
+                return {"verified": True, "updated": True, "mutation_count": 0, "duplicate_suppressed": True, "record_id": _text(current.get("id")), "projection_key": key}
+            summary = (
+                f"FIELDWORK proposal {proposal_id} was accepted and its agreed deposit was verified "
+                f"through Stripe Checkout. Payment evidence: {payment_intent}. {marker}"
+            )
+            properties = {
+                "Status": {"status": {"name": "Active"}},
+                "Pipeline Stage": {"select": {"name": "Growth Sprint"}},
+                "Approval Status": {"select": {"name": "Approved"}},
+                "AI Summary": {"rich_text": [{"type": "text", "text": {"content": summary[:1900]}}]},
+                "Recommended Next Action": {"rich_text": [{"type": "text", "text": {"content": _text(payload.get("recommended_next_action"))[:1900]}}]},
+            }
+            updated = self.client.call(
+                f"{self.api_base}/v1/pages/{parse.quote(page_id, safe='')}",
+                method="PATCH",
+                headers=self._headers(),
+                body={"properties": properties},
+            )
+            returned_id = _text(updated.get("id"))
+            if returned_id != page_id:
+                raise BusinessAdapterError("fieldwork_payment_projection_unverified")
+            return {"verified": True, "updated": True, "mutation_count": 1, "record_id": returned_id, "projection_key": key}
+        if kind != "workflow_business_state_projection" or not page_id:
             raise BusinessAdapterError("notion_projection_requires_exact_page_and_kind")
         key = _text(payload.get("projection_key") or contract.get("idempotency_key"))
         if not key:
