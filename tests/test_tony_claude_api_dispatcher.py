@@ -229,6 +229,8 @@ class TonyClaudeAPIDispatcherTests(unittest.TestCase):
         for workflow_id in (
             "blueprint_lite_to_discovery_preparation",
             "discovery_evidence_to_growth_sprint_proposal",
+            "growth_blueprint_to_campaign_world",
+            "campaign_world_to_creative_bible",
             "research_to_strategic_synthesis",
             "strategic_synthesis_to_strategy_thesis",
             "strategy_thesis_to_growth_blueprint",

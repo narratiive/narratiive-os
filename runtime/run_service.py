@@ -764,6 +764,9 @@ class WorkflowRunService:
         }
         if approval_binding:
             approval["approval_binding"] = dict(approval_binding)
+            if approval_binding.get('synthetic_rehearsal') is True:
+                approval['approval_kind'] = 'synthetic_rehearsal'
+                approval['human_approval'] = False
         state.approval_history.append(approval)
         state.approval_status = "approved"
         state.proposed_next_action = None
@@ -858,6 +861,7 @@ class WorkflowRunService:
         *,
         approver: str,
         rationale: str,
+        synthetic_rehearsal: bool = False,
         candidate_id: str,
         candidate_checksum: str,
     ) -> WorkflowState:
@@ -866,9 +870,14 @@ class WorkflowRunService:
             raise ValueError("Campaign World selection belongs to the Campaign World workflow")
         if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
             raise ValueError("Campaign World selection requires an approved completed review gate")
-        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+        if synthetic_rehearsal:
+            if not any(a.get('approval_binding',{}).get('synthetic_rehearsal') is True for a in state.approval_history):
+                raise PermissionError('Synthetic selection requires the prior explicit synthetic gate record')
+        if not synthetic_rehearsal and "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
             raise ValueError("Campaign World selection requires Matt's authenticated identity")
         decision = {
+            "synthetic_rehearsal": synthetic_rehearsal,
+            "human_approval": not synthetic_rehearsal,
             "decision": "campaign_world_selection",
             "approver": approver.strip(),
             "rationale": rationale.strip(),
@@ -895,6 +904,7 @@ class WorkflowRunService:
         *,
         approver: str,
         rationale: str,
+        synthetic_rehearsal: bool = False,
         creative_bible_checksum: str,
     ) -> WorkflowState:
         state = self.repository.load(run_id)
@@ -902,9 +912,14 @@ class WorkflowRunService:
             raise ValueError("Creative Bible approval belongs to the Creative Bible workflow")
         if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
             raise ValueError("Creative Bible approval requires an approved completed Tony review gate")
-        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+        if synthetic_rehearsal:
+            if not any(a.get('approval_binding',{}).get('synthetic_rehearsal') is True for a in state.approval_history):
+                raise PermissionError('Synthetic selection requires the prior explicit synthetic gate record')
+        if not synthetic_rehearsal and "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
             raise ValueError("Creative Director's Bible approval requires Matt's authenticated identity")
         decision = {
+            "synthetic_rehearsal": synthetic_rehearsal,
+            "human_approval": not synthetic_rehearsal,
             "decision": "creative_bible_approval",
             "approver": approver.strip(),
             "rationale": rationale.strip(),
@@ -1101,7 +1116,7 @@ class WorkflowRunService:
                 return state
             follow_up_allowed = (
                 existing.get("status") == "delivered"
-                and existing.get("kind") in {"worker_failure", "work_failed"}
+                and existing.get("kind") in {"worker_failure", "work_failed", "review_delivery_blocked"}
                 and kind in {"gate_ready", "work_complete", "review_delivery_blocked"}
                 and state.status in {WorkflowStatus.AWAITING_APPROVAL, WorkflowStatus.COMPLETE}
             )

@@ -533,8 +533,69 @@ class FileWorkflowCommandBackend:
             rationale=rationale,
         )
 
+    def progress_synthetic_rehearsal(self, state: WorkflowState) -> WorkflowState:
+        runtime = self._runtime(state)
+        rehearsal = runtime._synthetic_rehearsal_service()
+        rehearsal.policy(state)
+        if state.workflow_id == 'creative_bible_to_asset_production' and state.input_payload.get('asset_versions'):
+            return state
+        if state.status.value == 'awaiting_approval':
+            state = rehearsal.review(state)
+        try:
+            return self.advance(state)
+        except ValueError as exc:
+            current = runtime.runs.load_run(state.run_id)
+            if current.status.value != 'complete': raise
+            return runtime.runs.record_handoff_blocked(current.run_id,
+                blocker='handoff_synthetic_rehearsal_inputs',
+                proposed_next_action='Supply the missing or corrected handoff inputs: ' + str(exc)[:350])
+
+    def _asset_review_folder(self, runtime, state):
+        from urllib.parse import urlparse, parse_qs
+        runtime._synthetic_rehearsal_service().policy(state)
+        versions = state.input_payload.get('asset_versions')
+        folder_id = str(state.input_payload.get('asset_review_folder_id') or '')
+        if not isinstance(versions, list) or len(versions) != 2 or not folder_id:
+            raise ValueError('Two produced stills and an exact review folder are required')
+        drive = (self.dispatchers or {}).get('Google Drive')
+        if drive is None: raise ValueError('Drive verification is unavailable')
+        def metadata(file_id):
+            result = drive({'execution_mode':'autonomous_read','operation':'get_metadata',
+                'target':{'file_id':file_id}})
+            if result.get('verified') is not True or not isinstance(result.get('metadata'), Mapping):
+                raise ValueError('Drive metadata read-back is unverified')
+            return result['metadata']
+        folder = metadata(folder_id)
+        if folder.get('id') != folder_id or folder.get('mimeType') != 'application/vnd.google-apps.folder':
+            raise ValueError('Asset review folder is not verified')
+        for version in versions:
+            if version.get('approval_status') != 'pending' or version.get('human_review_required') is not True:
+                raise ValueError('Produced assets must remain pending Matt review')
+            parsed = urlparse(str(version.get('drive_uri') or ''))
+            if parsed.hostname not in {'drive.google.com','docs.google.com'}:
+                raise ValueError('Asset URI is outside Google Drive')
+            file_id = parse_qs(parsed.query).get('id', [''])[0]
+            if not file_id and '/d/' in parsed.path: file_id = parsed.path.split('/d/',1)[1].split('/')[0]
+            file = metadata(file_id)
+            dimensions = file.get('imageMediaMetadata') or {}
+            if (file.get('id') != file_id or folder_id not in file.get('parents', []) or
+                file.get('appProperties',{}).get('narratiiveChecksum') != version.get('file_checksum') or
+                not str(file.get('mimeType') or '').startswith('image/') or
+                min(int(dimensions.get('width') or 0),int(dimensions.get('height') or 0)) < 1024):
+                raise ValueError('A campaign still failed folder/checksum/image read-back')
+        link = str(folder.get('webViewLink') or f'https://drive.google.com/drive/folders/{folder_id}')
+        company = _state_name(state)
+        receipt = {'kind':'asset_review_folder_verified','folder_id':folder_id,'folder_url':link,
+            'asset_count':2,'asset_versions':versions,'approval_status':'pending','fictional_rehearsal':True}
+        runtime.runs.record_external_action(state.run_id,idempotency_key='asset-review-folder:'+hashlib.sha256(
+            json.dumps(receipt,sort_keys=True).encode()).hexdigest(),receipt=receipt)
+        return {'status':'asset_review_ready','kind':'asset_review_folder','delivered':True,'review_link':link,
+            'telegram_notification':f'{company} — Creative production complete for the fictional rehearsal. Two branded campaign stills are produced and waiting for your review. Please review the branding, headlines, CTA and image quality. Asset folder: {link}. No client delivery or publication has been authorised.'}
+
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]:
         runtime = self._runtime(state)
+        if state.workflow_id == 'creative_bible_to_asset_production' and state.input_payload.get('_synthetic_rehearsal') and state.input_payload.get('asset_versions'):
+            return self._asset_review_folder(runtime,state)
         service = InternalReviewDeliveryService(self.root, self.dispatchers.get("Gmail") if self.dispatchers else None)
         return service.deliver(runtime, state, recipient=recipient)
 

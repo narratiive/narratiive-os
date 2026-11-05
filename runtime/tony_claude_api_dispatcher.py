@@ -79,6 +79,8 @@ def build_claude_api_dispatcher(environ: Mapping[str, str]):
             if _workflow_id(contract) in {
                 "blueprint_lite_to_discovery_preparation",
                 "discovery_evidence_to_growth_sprint_proposal",
+                "growth_blueprint_to_campaign_world",
+                "campaign_world_to_creative_bible",
                 "research_to_strategic_synthesis",
                 "strategic_synthesis_to_strategy_thesis",
                 "strategy_thesis_to_growth_blueprint",

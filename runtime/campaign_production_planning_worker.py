@@ -101,6 +101,14 @@ class CampaignProductionPlanningWorker:
         north_star = bible.get("creative_north_star")
         bible_version = str(north_star.get("version") or "1") if isinstance(north_star, Mapping) else "1"
         market_ids = [str(item) for item in identity.get("market_ids") or []]
+        selection = contract.get('production_selection')
+        if selection is not None:
+            if not isinstance(selection, Mapping) or selection.get('maximum_assets') != 2 or selection.get('allowed_capabilities') != ['image_generation']:
+                raise CampaignProductionPlanningError('Bounded still selection requires exactly two image jobs')
+            matrix = [row for row in matrix if isinstance(row, Mapping) and
+                _technical_profile(_slug(str(row.get('asset_type') or '')))[-1] == 'image_generation'][:2]
+            if len(matrix) != 2:
+                raise CampaignProductionPlanningError('Creative Bible does not contain two still-image concepts')
         specifications = []
         tasks = []
         assets = []
@@ -163,6 +171,13 @@ class CampaignProductionPlanningWorker:
                 "publication_authorised": False,
                 "media_spend_authorised": False,
             }
+            if selection is not None:
+                specification['creative_direction']['production_notes'] = (
+                    str(specification['creative_direction'].get('production_notes') or '') +
+                    ' Produce a complete, client-ready campaign STILL, not a bare photograph. '
+                    f"Include legible {selection.get('brand_name') or identity.get('client_id')} branding, the supplied campaign headline and a clear CTA: "
+                    f"{selection.get('cta') or 'Discover more'}. Distinct composition for each still. "
+                    'No invented commercial claims, fabricated packaging text, watermark or presentation mockup.')
             specifications.append(specification)
             tasks.append(task)
             assets.append(asset)
@@ -175,6 +190,8 @@ class CampaignProductionPlanningWorker:
             "channel_asset_specifications": specifications,
             "production_tasks": tasks,
         }
+        if selection is not None:
+            pack_payload['selection_scope'] = dict(selection)
         pack_checksum = _checksum(pack_payload)
         manifest_payload = {
             "manifest_id": f"manifest-{identity['campaign_id']}-{pack_checksum[:12]}",

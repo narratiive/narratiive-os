@@ -472,6 +472,39 @@ def presentation_quality_checks(specification: PresentationSpecification) -> dic
 
 def build_quantified_commercial_model(intelligence: Mapping[str, Any]) -> dict[str, Any]:
     """Calculate a bounded opportunity model from sourced inputs and named assumptions."""
+    if intelligence.get('mechanism') == 'incremental_accounts_year_one':
+        raw_inputs = intelligence.get('inputs')
+        assumptions = intelligence.get('scenario_assumptions')
+        if not isinstance(raw_inputs,list) or not raw_inputs or not all(isinstance(i,Mapping) and i.get('source_ids') and i.get('status') for i in raw_inputs):
+            raise ValueError('Account model inputs require explicit provenance and evidence status')
+        by_id = {str(i.get('input_id')): i for i in raw_inputs}
+        revenue = Decimal(str(by_id['annual_account_revenue']['value']))
+        if not revenue.is_finite() or revenue <= 0 or not isinstance(assumptions,list) or len(assumptions)!=3:
+            raise ValueError('Positive annual account revenue and three account scenarios required')
+        scenarios=[]
+        previous=Decimal('-1')
+        for row in assumptions:
+            accounts=Decimal(str(row['additional_accounts']))
+            ramp=Decimal(str(row['year_one_ramp']))
+            if not accounts.is_finite() or accounts <= 0 or accounts != accounts.to_integral_value() or not ramp.is_finite() or not 0 < ramp <= 1:
+                raise ValueError('Invalid account count or year-one ramp')
+            value=(accounts*revenue*ramp).quantize(Decimal('1'))
+            if value < previous:raise ValueError('Account scenarios must be conservative through upside')
+            previous=value
+            scenarios.append({'name':str(row['name']),'additional_accounts':int(accounts),
+                'annual_account_revenue':float(revenue),'year_one_ramp':float(ramp),
+                'incremental_annual_revenue':int(value),'incremental_annual_contribution':None,
+                'classification':'illustrative_scenario'})
+        implementation=intelligence.get('implementation_cost')
+        if not isinstance(implementation,Mapping) or implementation.get('status')!='unavailable' or implementation.get('value') is not None:
+            raise ValueError('Unverified implementation cost must remain explicitly unavailable')
+        return {'model_id':str(intelligence.get('model_id') or 'account-revenue-model'),
+            'mechanism':'incremental_accounts_year_one','currency':'GBP','period':'year one',
+            'classification':'illustrative_scenario_model','inputs':raw_inputs,
+            'estimated_current_annual_revenue':None,'contribution_status':'unavailable_not_invented',
+            'scenarios':scenarios,'implementation_cost':dict(implementation),
+            'net_value_status':'unavailable_pending_cost_evidence',
+            'warnings':[str(x) for x in intelligence.get('warnings') or []]}
     raw_inputs = intelligence.get("inputs")
     raw_scenarios = intelligence.get("scenario_assumptions")
     if not isinstance(raw_inputs, list) or not isinstance(raw_scenarios, list):
@@ -559,7 +592,10 @@ def commercial_model_quality_checks(model: Mapping[str, Any]) -> dict[str, bool]
         "revenue_and_contribution_are_calculated": isinstance(scenarios, list) and all(
             isinstance(item, Mapping)
             and isinstance(item.get("incremental_annual_revenue"), int)
-            and isinstance(item.get("incremental_annual_contribution"), int)
+            and (isinstance(item.get("incremental_annual_contribution"), int) or
+                (model.get('mechanism') == 'incremental_accounts_year_one' and
+                 model.get('contribution_status') == 'unavailable_not_invented' and
+                 item.get('incremental_annual_contribution') is None))
             for item in scenarios
         ),
         "inputs_retain_sources_and_status": isinstance(inputs, list) and all(
@@ -665,13 +701,16 @@ def augment_specification_with_commercial_evidence(
     )
     share_gain = float(base_scenario.get("incremental_market_share_points") or 0)
     base_revenue = int(base_scenario.get("incremental_annual_revenue") or 0)
+    account_model = commercial_model.get('mechanism') == 'incremental_accounts_year_one'
     overrides = {
         23: {
-            "takeaway": f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario.",
-            "body": "Conservative, base and ambitious cases size a market-share opportunity; they are not company forecasts.",
+            "takeaway": (f"The central account-and-ramp case implies about £{base_revenue:,.0f} incremental year-one revenue; all inputs are assumed."
+                if account_model else f"A {share_gain:g}-point share gain implies about £{base_revenue / 1_000_000:.1f}m in incremental annual revenue in the base scenario."),
+            "body": ("Additional wholesale accounts × net annual account revenue × year-one ramp. Not Origin financial results, a forecast or profit."
+                if account_model else "Conservative, base and ambitious cases size a market-share opportunity; they are not company forecasts."),
             "claim_status": "ESTIMATE + ASSUMPTION",
             "citations": model_sources,
-            "content": {"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period")},
+            "content": {"scenarios": scenarios, "currency": commercial_model.get("currency"), "period": commercial_model.get("period"), "mechanism": commercial_model.get('mechanism')},
         },
         27: {
             "takeaway": str(creative.get("takeaway") or "The strategy translates into a distinctive, testable visual territory."),

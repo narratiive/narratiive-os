@@ -610,9 +610,9 @@ class GoogleDriveDispatcher(GoogleAdapter):
                 }
             if not file_id:
                 raise BusinessAdapterError("drive_read_requires_file_id")
-            fields = parse.quote("id,name,mimeType,modifiedTime,webViewLink,parents", safe=",")
+            fields = parse.quote("id,name,mimeType,modifiedTime,webViewLink,parents,appProperties,size,imageMediaMetadata", safe=",")
             item = self.client.call(f"{self.api_base}/files/{parse.quote(file_id, safe='')}?fields={fields}", headers=self._headers())
-            return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"drive:file:{file_id}", "file_id": _text(item.get("id")), "summary": "Drive metadata was read without mutation."}
+            return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": f"drive:file:{file_id}", "file_id": _text(item.get("id")), "metadata": dict(item), "summary": "Drive metadata was read without mutation."}
         _require_write(contract)
         kind = _text(payload.get("kind"))
         if kind == "client_delivery_drive_workspace":
