@@ -255,7 +255,7 @@ def enrich_blueprint_director_review(specification, *, commercial_model, source_
         visual_treatment='A readable source register.',layout_type='source_register',
         citation_labels=tuple(str(e['source_id']) for e in entries),claim_status='SOURCE REGISTER',
         source_notes=('The original evidence pack and immutable specialist artefacts retain the detailed lineage.',),
-        content_data={'source_register_entries':entries})]
+        content_data={'source_register_entries':entries, 'entries':entries})]
     slides=original[:-1]+appendices+original[-1:]
     return replace(specification,slides=tuple(replace(slide,slide_no=i) for i,slide in enumerate(slides,1))),{'entries':entries}
 
@@ -785,7 +785,7 @@ def augment_specification_with_commercial_evidence(
         labels = tuple(override.get("citations") or labels)
         content = dict(layout_content.get(content_key_by_slide.get(slide.slide_no, "")) or {})
         content.update(dict(override.get("content") or {}))
-        if slide.slide_no == 30:
+        if slide.slide_no == 30 or slide.layout_type == "source_register":
             content["source_register_entries"] = [dict(entry) for entry in entries]
             content["source_register_summary"] = "SOURCE REGISTER / governed companion deliverable included"
         enriched.append(replace(
@@ -838,8 +838,10 @@ def bind_source_register_to_specification(
     bound_slides = []
     for slide in specification.slides:
         content = dict(slide.content_data)
-        if slide.slide_no == 30:
+        if slide.slide_no == 30 or slide.layout_type == "source_register":
             content["source_register_entries"] = [dict(entry) for entry in bound_entries]
+        if slide.layout_type == "source_register":
+            content["entries"] = [dict(entry) for entry in bound_entries]
         bound_slides.append(replace(slide, content_data=content))
     return replace(specification, slides=tuple(bound_slides)), bound_register
 

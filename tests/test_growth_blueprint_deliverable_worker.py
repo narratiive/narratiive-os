@@ -140,6 +140,9 @@ class BlueprintDirectorProductionWiringTests(unittest.TestCase):
             original=[s for s in slides if s['title'].startswith('Specific strategic conclusion')]
             self.assertEqual([s['title'] for s in original],[p['headline'] for p in pages])
             self.assertEqual(len(slides),15)
+            register_slide = next(s for s in slides if s['layout_type'] == 'source_register')
+            self.assertEqual(register_slide['content_data']['entries'], result['source_register']['entries'])
+            self.assertTrue(all(e['applies_to_pages'] for e in register_slide['content_data']['entries']))
             self.assertEqual(result['commercial_model']['scenarios'][1]['incremental_annual_revenue'],118800)
             self.assertTrue(growth_blueprint_deliverable_quality_gate(result)['passed'], growth_blueprint_deliverable_quality_gate(result))
             self.assertNotIn('full_blueprint_has_exactly_thirty_slides',growth_blueprint_deliverable_quality_gate(result)['checks'])
