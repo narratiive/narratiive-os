@@ -4,7 +4,9 @@ import hashlib
 from datetime import datetime
 from typing import Any, Callable, Iterable
 
-from runtime.founder_brief import decision_ready_materials, render_material_update
+from runtime.founder_brief import (
+    ExecutiveAttentionItem, decision_ready_items, material_identity, render_material_update,
+)
 from runtime.executive_delivery import (
     CallableTextChannelAdapter,
     ChannelAdapter,
@@ -42,7 +44,7 @@ class PolicyGovernedMaterialEscalationService:
         self,
         *,
         mission_control_loader: MissionControlLoader,
-        material_selector: Callable[[MissionControlSnapshot], Iterable[str]] | None = None,
+        material_selector: Callable[[MissionControlSnapshot], Iterable[ExecutiveAttentionItem | str]] | None = None,
         key_store: DeliveryKeyStore,
         last_sent_store: FileLastEscalationStore,
         interruption_policy: InterruptionPolicy,
@@ -63,7 +65,7 @@ class PolicyGovernedMaterialEscalationService:
         canonical_channel = channel.strip().lower()
         if not canonical_channel:
             raise ValueError("channel is required")
-        self.material_selector = material_selector or decision_ready_materials
+        self.material_selector = material_selector or decision_ready_items
         self.mission_control_loader = mission_control_loader
         self.channel = canonical_channel
         self.channel_adapter = channel_adapter or CallableTextChannelAdapter(
@@ -128,7 +130,7 @@ class PolicyGovernedMaterialEscalationService:
             InterruptionContext(
                 workspace_id=canonical_workspace_id,
                 recipient_id=canonical_chat_id,
-                material_ids=tuple(materials),
+                material_ids=tuple(material_identity(item) for item in materials),
                 now=now,
                 last_sent_at=self.last_sent_store.read(canonical_workspace_id),
             )
@@ -209,8 +211,8 @@ class PolicyGovernedMaterialEscalationService:
         return result
 
     @staticmethod
-    def build_digest_key(*, workspace_id: str, materials: Iterable[str]) -> str:
-        digest = hashlib.sha256("\n".join(materials).encode("utf-8")).hexdigest()
+    def build_digest_key(*, workspace_id: str, materials: Iterable[ExecutiveAttentionItem | str]) -> str:
+        digest = hashlib.sha256("\n".join(sorted(material_identity(item) for item in materials)).encode("utf-8")).hexdigest()
         return f"{workspace_id.strip()}:material:{digest}"
 
     def _record(

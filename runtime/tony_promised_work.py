@@ -104,9 +104,10 @@ class TonyPromisedWorkWorker:
     @staticmethod
     def _failure_message(state: WorkflowState) -> str:
         product = AgencyStateProjector._founder_product_label(state.workflow_id)
-        company = founder_text(workflow_state_name(state), limit=100)
-        if company in {state.run_id, state.entity_id, state.client_id}:
-            company = "the current client"
+        raw_company = workflow_state_name(state)
+        company = founder_text(raw_company, limit=100)
+        if not company or raw_company in {state.run_id, state.entity_id, state.client_id}:
+            company = "The current client"
         quality_failed = str(state.blocker or "").startswith("quality_failed")
         reason = (
             "The draft did not meet the quality checks, so it is not ready for your review."

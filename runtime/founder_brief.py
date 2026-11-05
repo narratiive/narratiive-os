@@ -1,6 +1,9 @@
 """Founder-safe presentation helpers; detailed evidence stays in the audit record."""
 
+import hashlib
+import json
 import re
+from dataclasses import dataclass
 
 
 _RUNTIME_REFERENCE = re.compile(
@@ -44,7 +47,16 @@ def is_generic_founder_action(value: str) -> bool:
     return " ".join(str(value).casefold().split()).rstrip(".?!") in _GENERIC_ACTION
 
 
-def decision_ready_materials(snapshot, *, pipeline=None) -> tuple[str, ...]:
+@dataclass(frozen=True)
+class ExecutiveAttentionItem:
+    key: str
+    text: str
+
+    def __str__(self) -> str:
+        return self.text
+
+
+def decision_ready_items(snapshot, *, pipeline=None) -> tuple[ExecutiveAttentionItem, ...]:
     """Use the agency attention policy before interrupting, never raw IDs.
 
     No state is changed and technical evidence remains in Mission Control.
@@ -63,17 +75,50 @@ def decision_ready_materials(snapshot, *, pipeline=None) -> tuple[str, ...]:
         reason = founder_text(item.why_matters, limit=220)
         action = founder_text(item.next_action, limit=240)
         line = f"{title}. {reason}. Recommended next step: {action}."
-        if line not in lines:
-            lines.append(line)
+        # Identity is deliberately separate from prose: a new artefact/run
+        # must alert even when its business explanation is unchanged.
+        versions = {
+            str(summary.get("run_id")): {
+                "approval_token": summary.get("approval_token"),
+                "latest_artefact": summary.get("latest_artefact"),
+            }
+            for summary in snapshot.workflow_runs
+            if any(
+                reference == f"workflow_run:{summary.get('run_id')}"
+                or reference.startswith(f"workflow:{summary.get('run_id')}:")
+                for reference in (item.item_id, *item.evidence)
+            )
+        }
+        identity = json.dumps({
+            "versions": versions,
+            "entity": item.entity_id or item.item_id,
+            "evidence": sorted(item.evidence),
+            "status": item.status,
+            "action": item.next_action,
+            "text": line,
+        }, sort_keys=True, separators=(",", ":"))
+        key = hashlib.sha256(identity.encode("utf-8")).hexdigest()
+        if not any(existing.key == key for existing in lines):
+            lines.append(ExecutiveAttentionItem(key, line))
     return tuple(lines)
 
 
-def render_material_update(materials: tuple[str, ...] | list[str]) -> str:
+def decision_ready_materials(snapshot, *, pipeline=None) -> tuple[str, ...]:
+    """Presentation-only compatibility view; never use prose as delivery identity."""
+    return tuple(item.text for item in decision_ready_items(snapshot, pipeline=pipeline))
+
+
+def material_identity(item: ExecutiveAttentionItem | str) -> str:
+    return item.key if isinstance(item, ExecutiveAttentionItem) else item
+
+
+def render_material_update(materials: tuple[ExecutiveAttentionItem | str, ...] | list[ExecutiveAttentionItem | str]) -> str:
     """A complete bounded summary with a concrete route to the full queue."""
     lines = ["Tony — decisions and delivery risks"]
     selected = 0
     footer = "Ask me for the remaining decisions and delivery risks for the full queue."
-    for item in materials:
+    for material in materials:
+        item = str(material)
         reserved_footer = f"{len(materials)} other business items remain in Mission Control. {footer}"
         candidate = "\n\n".join((*lines, item, reserved_footer))
         if len(candidate) > 3500:

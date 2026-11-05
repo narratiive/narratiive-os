@@ -34,7 +34,7 @@ from runtime.proactive_executive_delivery import (  # noqa: E402
     ProactiveExecutiveDeliveryService,
     WorkspaceDeliveryLock,
 )
-from runtime.founder_brief import decision_ready_materials
+from runtime.founder_brief import decision_ready_items
 from runtime.repositories import WorkflowEvent  # noqa: E402
 from runtime.tony_executive_commands import TonyExecutiveCommandService  # noqa: E402
 from runtime.workspaces import WorkspaceNotFound  # noqa: E402
@@ -272,7 +272,7 @@ def run_escalation(*, simulate_transport_failure: bool) -> dict[str, Any]:
 
     service = MaterialEscalationService(
         mission_control_loader=mission_control_loader,
-        material_selector=lambda snapshot: decision_ready_materials(
+        material_selector=lambda snapshot: decision_ready_items(
             snapshot, pipeline=getattr(executive_service, "briefing_pipeline", None)
         ),
         send_message=send,

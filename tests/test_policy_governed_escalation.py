@@ -89,7 +89,7 @@ class PolicyGovernedMaterialEscalationTests(TestCase):
         self.assertEqual(context.workspace_id, "narratiive")
         self.assertEqual(context.recipient_id, "12345")
         self.assertEqual(len(context.material_ids), 2)
-        self.assertTrue(all("Recommended next step" in item for item in context.material_ids))
+        self.assertTrue(all(len(item) == 64 for item in context.material_ids))
         self.assertEqual(context.last_sent_at, prior)
         self.assertEqual(self.sent, [])
         self.assertEqual(self.events[-1]["interruption_policy_reason"], "cooldown_active")

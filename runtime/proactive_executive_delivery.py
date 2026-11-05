@@ -10,7 +10,9 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any, Callable, Iterable, Protocol
 
-from runtime.founder_brief import decision_ready_materials, render_material_update
+from runtime.founder_brief import (
+    ExecutiveAttentionItem, decision_ready_items, material_identity, render_material_update,
+)
 from runtime.mission_control import MissionControlSnapshot
 from runtime.tony_command_service import CommandResponse
 
@@ -571,7 +573,7 @@ class MaterialEscalationService:
         self,
         *,
         mission_control_loader: MissionControlLoader,
-        material_selector: Callable[[MissionControlSnapshot], Iterable[str]] | None = None,
+        material_selector: Callable[[MissionControlSnapshot], Iterable[ExecutiveAttentionItem | str]] | None = None,
         send_message: MessageSender,
         key_store: DeliveryKeyStore,
         last_sent_store: FileLastEscalationStore,
@@ -584,7 +586,7 @@ class MaterialEscalationService:
             raise ValueError("max_attempts must be at least 1")
         if min_interval_seconds < 0:
             raise ValueError("min_interval_seconds must not be negative")
-        self.material_selector = material_selector or decision_ready_materials
+        self.material_selector = material_selector or decision_ready_items
         self.mission_control_loader = mission_control_loader
         self.send_message = send_message
         self.key_store = key_store
@@ -660,12 +662,12 @@ class MaterialEscalationService:
         return result
 
     @staticmethod
-    def build_digest_key(*, workspace_id: str, materials: Iterable[str]) -> str:
-        digest = hashlib.sha256("\n".join(materials).encode("utf-8")).hexdigest()
+    def build_digest_key(*, workspace_id: str, materials: Iterable[ExecutiveAttentionItem | str]) -> str:
+        digest = hashlib.sha256("\n".join(sorted(material_identity(item) for item in materials)).encode("utf-8")).hexdigest()
         return f"{workspace_id.strip()}:material:{digest}"
 
     @staticmethod
-    def _render(materials: list[str]) -> str:
+    def _render(materials: list[ExecutiveAttentionItem | str]) -> str:
         return render_material_update(materials)
 
     def _record(self, event_type: str, result: EscalationResult) -> None:

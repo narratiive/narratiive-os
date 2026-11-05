@@ -4,7 +4,9 @@ from types import SimpleNamespace
 import unittest
 
 from runtime.agency_state_projection import AgencyStateProjector
-from runtime.founder_brief import decision_ready_materials, render_material_update
+from runtime.founder_brief import decision_ready_items, decision_ready_materials, render_material_update
+from runtime.proactive_executive_delivery import MaterialEscalationService
+from runtime.policy_governed_escalation import PolicyGovernedMaterialEscalationService
 from runtime.mission_control import MissionControlSnapshot, WorkstreamStatus
 from runtime.tony_promised_work import TonyPromisedWorkWorker
 
@@ -64,6 +66,50 @@ class COOAttentionTests(unittest.TestCase):
         self.assertIn(materials[0], text)
         self.assertNotIn(materials[-1], text)
         self.assertTrue(text.endswith("full queue."))
+
+    def test_new_review_version_changes_identity_even_when_prose_is_identical(self):
+        def source(run_id):
+            return snapshot(
+                approvals_required=(f"workflow:{run_id}:Approve",),
+                workflow_runs=({"run_id": run_id, "entity_id": "example-coffee", "company": "Example Coffee",
+                    "workflow_id": "growth_blueprint_deliverable_production", "updated_at": "2026-11-05"},),
+            )
+        first = decision_ready_items(source("version-one"))
+        second = decision_ready_items(source("version-two"))
+        self.assertEqual(str(first[0]), str(second[0]))
+        self.assertNotEqual(first[0].key, second[0].key)
+        for service in (MaterialEscalationService, PolicyGovernedMaterialEscalationService):
+            self.assertNotEqual(
+                service.build_digest_key(workspace_id="synthetic", materials=first),
+                service.build_digest_key(workspace_id="synthetic", materials=second),
+            )
+            self.assertEqual(
+                service.build_digest_key(workspace_id="synthetic", materials=first),
+                service.build_digest_key(workspace_id="synthetic", materials=decision_ready_items(source("version-one"))),
+            )
+        self.assertNotIn("version-one", render_material_update(first))
+
+    def test_same_run_new_artefact_changes_delivery_identity(self):
+        source = snapshot(
+            approvals_required=("workflow:one-run:Approve",),
+            workflow_runs=({"run_id": "one-run", "entity_id": "example-coffee", "company": "Example Coffee",
+                "workflow_id": "growth_blueprint_deliverable_production", "updated_at": "2026-11-05",
+                "latest_artefact": {"artifact_id": "synthetic-artifact", "checksum": "version-one"}},),
+        )
+        revised = replace(source, workflow_runs=({**source.workflow_runs[0],
+            "latest_artefact": {"artifact_id": "synthetic-artifact", "checksum": "version-two"}},))
+        first, second = decision_ready_items(source), decision_ready_items(revised)
+        self.assertEqual(first[0].text, second[0].text)
+        self.assertNotEqual(first[0].key, second[0].key)
+
+    def test_failure_with_sanitized_identity_still_names_the_work(self):
+        state = SimpleNamespace(
+            workflow_id="growth_blueprint_deliverable_production", run_id="synthetic-run",
+            client_id="growth_blueprint_deliverable", entity_id="growth_blueprint_deliverable",
+            input_payload={}, blocker="quality_failed:synthetic_gate",
+        )
+        text = TonyPromisedWorkWorker._failure_message(state)
+        self.assertTrue(text.startswith("The current client — Growth Blueprint is paused."))
 
     def test_opaque_company_fallback_is_not_presented_as_a_client_name(self):
         label = AgencyStateProjector._company_label({"company": "origin-coffee-fictional-e2e-20261103", "entity_id": "origin-coffee-fictional-e2e-20261103"})
