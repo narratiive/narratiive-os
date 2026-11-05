@@ -94,6 +94,27 @@ def rendered_model_is_present(slide: dict, observed: str) -> bool:
     )
 
 
+def visible_registered_citation_slides(expected: list[dict], ocr_text: list[str]) -> list[int]:
+    """Count only page-specific citations resolved by the rendered source register."""
+    registered = {
+        str(entry.get("source_id") or "").strip()
+        for slide in expected
+        for entry in (slide.get("content_data") or {}).get("source_register_entries", [])
+        if isinstance(entry, dict)
+        and all(str(entry.get(key) or "").strip()
+                for key in ("source_id", "title", "publisher", "location", "classification"))
+    }
+    visible = []
+    for number, slide in enumerate(expected, 1):
+        labels = {str(label).strip() for label in slide.get("citation_labels", []) if str(label).strip()}
+        if number > len(ocr_text) or not labels or not labels.issubset(registered):
+            continue
+        if all(re.search(r"(?<!\w)" + re.escape(label) + r"(?!\w)",
+                         ocr_text[number - 1], re.IGNORECASE) for label in labels):
+            visible.append(number)
+    return visible
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("slides_dir", type=Path)
@@ -143,8 +164,7 @@ def main() -> int:
         index + 1 for index, slide in enumerate(expected)
         if isinstance(slide, dict) and slide.get("layout_type") == "commercial_model"
     ]
-    citation_pattern = re.compile(r"\b(?:S\d+[A-Z]?|T1)\b")
-    citation_slides = [index for index, content in enumerate(ocr_text, 1) if citation_pattern.search(content)]
+    citation_slides = visible_registered_citation_slides(expected, ocr_text)
     backstage_pattern = re.compile(
         r"\b(?:growth_opportunity|activation_implications|market_category_diagnosis|"
         r"growth_barriers|source_of_difference|evidence_and_uncertainty|artifact-|workflow_run|ev_)\b",

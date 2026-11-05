@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from scripts.review_rendered_blueprint import rendered_copy_gaps, rendered_model_is_present
+from scripts.review_rendered_blueprint import rendered_copy_gaps, rendered_model_is_present, visible_registered_citation_slides
 
 
 class RenderedBlueprintReviewTests(unittest.TestCase):
@@ -63,3 +63,25 @@ class DirectorRenderedCopyTests(unittest.TestCase):
         self.assertFalse(rendered_model_is_present(account, "Year-one revenue."))
         self.assertFalse(rendered_model_is_present({}, "Revenue, not profit."))
         self.assertTrue(rendered_model_is_present({}, "Revenue and contribution."))
+
+
+class RegisteredCitationRegressionTests(unittest.TestCase):
+    def test_origin_p1_assumption_citations_require_registered_source_and_exact_visible_label(self):
+        register = [{"source_id": name, "title": title, "publisher": "Narratiive",
+                     "location": location, "classification": classification}
+                    for name, title, location, classification in [
+                        ("P1", "Fictional proposal financial assumptions", "inputs/financial-model.md", "assumption"),
+                        ("T1", "Rehearsal strategy", "canonical-strategy", "synthetically_reviewed_strategy")]]
+        pages = [{"citation_labels": ["P1"]} for _ in range(19)]
+        pages[0] = {"citation_labels": ["T1"]}
+        pages[17] = {"citation_labels": ["P1", "T1"], "content_data": {"source_register_entries": register}}
+        ocr = ["Sources: P1"] * 19
+        ocr[0] = "Sources: T1"
+        ocr[17] = "Source register P1 T1"
+        self.assertEqual(visible_registered_citation_slides(pages, ocr), list(range(1, 20)))
+        ocr[1] = "Sources: P10"  # A longer ID must not satisfy P1.
+        pages[2] = {"citation_labels": ["P2"]}  # Visible but unregistered.
+        ocr[2] = "Sources: P2"
+        self.assertEqual(visible_registered_citation_slides(pages, ocr), [1] + list(range(4, 20)))
+        register[0]["location"] = ""  # An incomplete register entry is not evidence.
+        self.assertEqual(visible_registered_citation_slides(pages, ocr), [1])
