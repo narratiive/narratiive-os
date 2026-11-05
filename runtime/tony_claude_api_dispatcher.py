@@ -200,6 +200,15 @@ def _render_prompt(contract: Mapping[str, Any]) -> str:
             "Use short evidence source identifiers in evidence_refs and source_refs. "
             "Do not add a work_product wrapper."
         )
+    elif workflow_id == "growth_blueprint_to_campaign_world":
+        return_contract = (
+            "Return exactly one compact JSON object and no markdown fences. "
+            "Return only the top-level fields named in TASK plus external_action_taken=false. "
+            "Preserve all three materially distinct routes and every required schema field, asset count, "
+            "platform, channel, evidence reference and uncertainty. Use concise complete descriptions "
+            "and short source identifiers; do not repeat source passages or upstream work. "
+            "Do not add a work_product wrapper, unrelated deliverables or commentary."
+        )
     elif workflow_id in {"strategy_thesis_to_growth_blueprint", "research_to_growth_blueprint"}:
         return_contract = (
             "Return exactly one compact JSON object under 6,000 words and no markdown fences. "

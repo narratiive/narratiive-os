@@ -671,3 +671,34 @@ class WorkflowExecutionCoordinatorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CampaignWorldPromptRegressionTests(unittest.TestCase):
+    def test_campaign_world_keeps_approved_brief_but_excludes_accumulated_journey_and_unrelated_return_work(self):
+        from types import SimpleNamespace
+        from runtime.tony_claude_api_dispatcher import _render_prompt
+        from runtime.workflow_instructions import workflow_instruction
+        required = ("campaign_identity", "approved_growth_blueprint", "evidence_lineage", "activation_implications")
+        brief = {key: {"source": key, "unchanged": True} for key in required}
+        brief.update(client_context={"name": "TEST fictional coffee"},
+            production_context={"exactly_two_stills": True}, production_constraints=["No publication"],
+            evidence_and_uncertainty=["Assumed account economics"], source_register={"entries": ["P1"]},
+            _lineage={"parent_run_id": "approved-review"},
+            work_product="duplicate" * 10000, presentation_specification={"unneeded": True},
+            quality_accepted_growth_blueprint={"duplicate": True}, fieldwork_proposal={"past": True})
+        original = json.dumps(brief, sort_keys=True)
+        state = SimpleNamespace(workflow_id="growth_blueprint_to_campaign_world", input_payload=brief)
+        bounded = WorkflowExecutionCoordinator._worker_contract(state, required)
+        for key in (*required, "client_context", "production_context", "production_constraints",
+                    "evidence_and_uncertainty", "source_register", "_lineage"):
+            self.assertEqual(bounded[key], brief[key])
+        for key in ("work_product", "presentation_specification", "quality_accepted_growth_blueprint", "fieldwork_proposal"):
+            self.assertNotIn(key, bounded)
+        bounded["workflow_context"] = {"workflow_id": state.workflow_id}
+        prompt = _render_prompt({"target": bounded, "instruction": workflow_instruction(
+            state.workflow_id, "generate_campaign_world", ("campaign_world_candidates",))})
+        self.assertIn("exactly three materially different", prompt)
+        self.assertIn("at least twelve still asset specifications", prompt)
+        self.assertIn("every required schema field", prompt)
+        self.assertNotIn("For Blueprint Lite work", prompt)
+        self.assertEqual(json.dumps(brief, sort_keys=True), original)
