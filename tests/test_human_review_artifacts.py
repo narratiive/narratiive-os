@@ -106,6 +106,7 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
         self.assertNotIn("internal-message", visible)
         self.assertNotIn("internal-worker", visible)
 
+    @unittest.skipUnless(__import__('pathlib').Path('/System/Library/Fonts/Supplemental/Baskerville.ttc').exists(), 'Exact approved Mac fonts required')
     def test_review_pdf_is_immutable_derived_output_and_excludes_runtime_metadata(self) -> None:
         output = proposal_output()
         output.update(
@@ -143,12 +144,12 @@ class HumanReviewArtifactContractTests(unittest.TestCase):
 
             self.assertEqual(source_path.read_bytes(), encoded + b"\n")
             self.assertEqual(review.mime_type, "application/pdf")
-            self.assertGreaterEqual(review.page_count, 3)
+            self.assertEqual(review.page_count, 2)
             visible = "\n".join(
                 page.extract_text() or "" for page in PdfReader(review.location).pages
             )
-            self.assertIn("Growth Sprint Proposal", visible)
-            self.assertIn("Proposed workstreams", visible)
+            self.assertIn("FIELDWORK PROPOSAL", visible)
+            self.assertIn("THREE OUTPUTS", visible)
             for internal_value in (
                 "DO-NOT-SHOW-PROVIDER",
                 "DO-NOT-SHOW-MODEL",

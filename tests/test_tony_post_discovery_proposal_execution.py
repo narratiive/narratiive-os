@@ -42,48 +42,15 @@ class ProposalDraftStub:
 
 
 class TonyPostDiscoveryProposalExecutionTests(unittest.TestCase):
-    def test_reviewed_proposal_requires_send_approval_then_notion_approval(self):
+    def test_legacy_text_cannot_replace_exact_pdf_and_fee_review(self):
         with tempfile.TemporaryDirectory() as tmp:
             calls = []
-
-            def gmail(dispatch):
-                calls.append(("gmail", dispatch))
-                self.assertEqual(dispatch["execution_mode"], "approval_gated_write")
-                self.assertTrue(dispatch["approval_granted"])
-                self.assertEqual(dispatch["payload"]["email_subject"], "Proposal for Example Co")
-                self.assertEqual(dispatch["payload"]["email_body"], PROPOSAL)
-                return {"sent": True, "message_id": "proposal-msg-1", "thread_id": "thread-1"}
-
-            def notion(dispatch):
-                calls.append(("notion", dispatch))
-                self.assertEqual(dispatch["execution_mode"], "approval_gated_write")
-                self.assertEqual(dispatch["payload"]["status"], "Proposal sent")
-                self.assertEqual(dispatch["payload"]["gmail_message_id"], "proposal-msg-1")
-                return {"updated": True, "record_id": "notion-1"}
-
-            service = TonyPostDiscoveryProposalExecutionCommandService(
-                ProposalDraftStub(),
-                {"Gmail": gmail, "Notion": notion},
-                store_path=Path(tmp) / "state.json",
-            )
-
-            reviewed = service.execute("check proposal", ())
-            self.assertEqual(reviewed.data["execution_status"], "post_discovery_proposal_ready_for_send_approval")
+            service = TonyPostDiscoveryProposalExecutionCommandService(ProposalDraftStub(),
+                {'Gmail': lambda dispatch: calls.append(dispatch)}, store_path=Path(tmp)/'state.json')
+            reviewed = service.execute('check proposal', ())
+            self.assertEqual(reviewed.data['execution_status'], 'post_discovery_proposal_revision_required')
+            service.execute('send it', ())
             self.assertEqual(calls, [])
-            self.assertIn("Say 'send it'", reviewed.message)
-            self.assertFalse(reviewed.data["proposal_review"]["external_action_taken"])
-
-            sent = service.execute("send it", ())
-            self.assertEqual([name for name, _ in calls], ["gmail"])
-            self.assertEqual(sent.data["execution_status"], "proposal_send_verified_notion_approval_required")
-            self.assertEqual(sent.data["gmail_message_id"], "proposal-msg-1")
-            self.assertIn("Say 'do that'", sent.message)
-
-            synced = service.execute("do that", ())
-            self.assertEqual([name for name, _ in calls], ["gmail", "notion"])
-            self.assertEqual(synced.data["execution_status"], "proposal_commercial_state_sync_verified")
-            self.assertEqual(synced.data["notion_receipt"], "notion-1")
-            self.assertIn("commercial success is still an outcome to track", synced.message)
 
     def test_weak_proposal_never_reaches_gmail(self):
         class WeakStub(ProposalDraftStub):
@@ -104,17 +71,18 @@ class TonyPostDiscoveryProposalExecutionTests(unittest.TestCase):
             self.assertEqual(calls, [])
             self.assertIn("would not send", result.message)
 
-    def test_unverified_gmail_send_does_not_prepare_notion_update(self):
+    def test_restart_with_legacy_pending_send_cannot_dispatch(self):
+        import json
         with tempfile.TemporaryDirectory() as tmp:
-            service = TonyPostDiscoveryProposalExecutionCommandService(
-                ProposalDraftStub(),
-                {"Gmail": lambda dispatch: {"sent": False}},
-                store_path=Path(tmp) / "state.json",
-            )
-            service.execute("check proposal", ())
-            result = service.execute("send it", ())
-            self.assertEqual(result.data["execution_status"], "proposal_send_unverified")
-            self.assertFalse(result.data["external_action_taken"])
+            path = Path(tmp)/'state.json'
+            path.write_text(json.dumps({'pending_send': {'subject':'Old proposal', 'body':PROPOSAL}}))
+            calls = []
+            service = TonyPostDiscoveryProposalExecutionCommandService(ProposalDraftStub(),
+                {'Gmail': lambda dispatch: calls.append(dispatch)}, store_path=path)
+            result = service.execute('send it', ())
+            self.assertEqual(result.data['execution_status'], 'legacy_proposal_send_blocked')
+            self.assertFalse(result.data['external_action_taken'])
+            self.assertEqual(calls, [])
 
 
 if __name__ == "__main__":

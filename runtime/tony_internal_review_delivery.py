@@ -415,6 +415,13 @@ def _email_body(company: str, review: HumanReviewArtifact, *, approval_status: s
         if approval_status == "approved"
         else "Approval is pending. Please approve or request changes through Tony in Telegram."
     )
+    if review.proposal_review:
+        draft = review.proposal_review['email_draft']
+        return '\n'.join((f"{company} — Fieldwork proposal is attached for review.", next_step,
+            'Review the exact PDF, seven-working-day scope and proposed fee. Sending needs separate authorisation.',
+            f"PDF SHA-256: {review.checksum}", f"Proposed fee: {draft['proposed_fee']['amount']} GBP excluding VAT (unapproved)",
+            'CLIENT EMAIL DRAFT — NOT SENT', f"Subject: {draft['subject']}", draft['body'],
+            'No client recipient has been authorised. No Origin contact or payment is permitted.'))
     return "\n".join((
         f"{compact(company)} — {compact(review.product)} is attached for review.",
         next_step,

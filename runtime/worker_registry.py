@@ -237,7 +237,7 @@ def build_tony_worker_registry(
                 str(context.get("stage_id") or ""),
                 tuple(str(item) for item in expected),
             )
-            return claude(
+            result = claude(
                 {
                     "worker": "Claude",
                     "execution_mode": "autonomous_prepare",
@@ -248,6 +248,17 @@ def build_tony_worker_registry(
                     "target": dict(contract),
                 }
             )
+            if context.get('workflow_id') == 'discovery_evidence_to_growth_sprint_proposal' and 'fieldwork_revision_inputs' in contract:
+                supplied = contract['fieldwork_revision_inputs']
+                from runtime.fieldwork_proposal import validate_inputs
+                supplied = validate_inputs(supplied)
+                # Approved reference copy is a supplied specialist input, not rewritten by orchestration.
+                result['fieldwork_proposal'] = supplied
+                commercial = dict(result.get('commercial_proposal_inputs') or {})
+                commercial.update(timeline='7 working days', proposed_fee=supplied['proposed_fee'],
+                    approval_status='pending', human_approval_required=True)
+                result['commercial_proposal_inputs'] = commercial
+            return result
 
         registrations.append(
             WorkerRegistration(

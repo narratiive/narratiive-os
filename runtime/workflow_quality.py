@@ -207,8 +207,16 @@ def discovery_preparation_quality_gate(output: Mapping[str, Any]) -> Mapping[str
 
 
 def growth_sprint_proposal_quality_gate(output: Mapping[str, Any]) -> Mapping[str, Any]:
+    from runtime.fieldwork_workflow import proposal_inputs
+    try:
+        proposal_inputs(output)
+        fieldwork_valid = True
+    except (ValueError, TypeError, KeyError):
+        fieldwork_valid = False
     commercial = output.get("commercial_proposal_inputs")
     checks = {
+        "approved_fieldwork_template_exact_fee_and_seven_days": fieldwork_valid,
+        "client_email_uses_fieldwork": not any(term in str(output.get("draft_client_communication") or "").casefold() for term in ("growth sprint", "blueprint lite")),
         "discovery_synthesis_is_substantive": _substantive_text(output.get("discovery_synthesis"), minimum_words=35),
         "growth_problem_or_opportunity_is_clear": _substantive_text(output.get("growth_problem_or_opportunity"), minimum_words=15),
         "further_work_is_justified": _substantive_text(output.get("why_further_strategic_work_is_justified"), minimum_words=20),

@@ -61,6 +61,7 @@ class TonyPostDiscoveryProposalExecutionCommandService:
         words = len(body.split()) if body else 0
         folded = body.casefold()
         checks = {
+            "canonical_fieldwork_pdf_review_required": False,
             "proposal_present": bool(body),
             "proposal_substantive": 70 <= words <= 1200,
             "problem_present": any(term in folded for term in ("problem", "challenge", "need", "diagnos")),
@@ -101,41 +102,11 @@ class TonyPostDiscoveryProposalExecutionCommandService:
         )
 
     def _send(self, pending: dict[str, Any]) -> CommandResponse:
-        gmail = self.dispatchers.get("Gmail")
-        if gmail is None:
-            return CommandResponse("post_discovery_proposal", "healthy", "The reviewed proposal is approved for send, but no live Gmail dispatcher is configured. Nothing has been sent.", {"execution_status": "proposal_gmail_dispatcher_unavailable", "external_action_taken": False})
-        dispatch = {
-            "eligible": False,
-            "state": "approved_pending_execution",
-            "worker": "Gmail",
-            "instruction": "Send the reviewed proposal exactly as supplied. Do not alter the subject or body and do not perform any other external action.",
-            "target": {"lead_id": pending.get("lead_id", ""), "contact": pending.get("contact", ""), "company": pending.get("company", ""), "area": "commercial"},
-            "execution_mode": "approval_gated_write",
-            "expected_evidence": "verified Gmail send with message identifier",
-            "return_to": "Tony",
-            "execution_truth": "not_dispatched",
-            "approval_granted": True,
-            "approval_scope": "post_discovery_proposal_send",
-            "payload": {"kind": "reviewed_post_discovery_proposal", "email_subject": pending.get("subject", ""), "email_body": pending.get("body", "")},
-        }
-        try:
-            evidence = gmail(dict(dispatch))
-        except Exception as exc:
-            return CommandResponse("post_discovery_proposal", "healthy", f"The approved proposal send failed: {exc}. I am not treating it as sent.", {"execution_status": "proposal_send_failed", "external_action_taken": False})
-        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(dispatch, evidence)
-        message_id = str(evidence.get("message_id") or "").strip() if isinstance(evidence, dict) else ""
-        if not verified or not message_id:
-            return CommandResponse("post_discovery_proposal", "healthy", f"Gmail did not return enough evidence to prove the proposal was sent ({reason if not verified else 'missing message identifier'}). I am not treating it as sent.", {"execution_status": "proposal_send_unverified", "external_action_taken": False})
-        notion_pending = {**dict(pending), "gmail_message_id": message_id}
-        self.state["pending_send"] = None
-        self.state["pending_notion"] = notion_pending
-        self._persist()
-        return CommandResponse(
-            "post_discovery_proposal",
-            "healthy",
-            f"Confirmed. Gmail returned verified send evidence for the reviewed proposal with message {message_id}. I have prepared the matching Notion update to mark the opportunity Proposal sent, but I have not changed the record. Say 'do that' to approve that exact stage update.",
-            {"execution_status": "proposal_send_verified_notion_approval_required", "gmail_message_id": message_id, "proposal_send_evidence": dict(evidence), "commercial_state_sync": {"state": "awaiting_approval", "status": "Proposal sent", **notion_pending}, "external_action_taken": True},
-        )
+        # Historical text-only pending sends cannot establish an approved PDF,
+        # exact fee, or checksum-bound message. Retain their record, fail closed.
+        return CommandResponse('post_discovery_proposal', 'blocked',
+            'This legacy text-only proposal cannot be sent. Use the canonical Fieldwork PDF review and separate exact-attachment action approval.',
+            {'execution_status': 'legacy_proposal_send_blocked', 'external_action_taken': False})
 
     def _sync_notion(self, pending: dict[str, Any]) -> CommandResponse:
         notion = self.dispatchers.get("Notion")

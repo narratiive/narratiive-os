@@ -162,6 +162,7 @@ DISCOVERY_EVIDENCE_TO_GROWTH_SPRINT_PROPOSAL = _workflow(
             "workstreams_and_questions",
             "expected_growth_blueprint_outputs",
             "commercial_proposal_inputs",
+            "fieldwork_proposal",
             "draft_client_communication",
             "assumptions_and_dependencies",
             "evidence_lineage",

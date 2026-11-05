@@ -29,6 +29,7 @@ def lifecycle(client_id: str) -> ClientLifecycleRecord:
     )
 
 
+@unittest.skipUnless(Path('/System/Library/Fonts/Supplemental/Baskerville.ttc').exists(), 'Exact approved Mac fonts required')
 class WorkflowActionPreviewTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary = tempfile.TemporaryDirectory()
@@ -47,7 +48,7 @@ class WorkflowActionPreviewTests(unittest.TestCase):
             if workflow_id == "blueprint_lite_to_discovery_preparation":
                 return discovery_output()
             if workflow_id == "discovery_evidence_to_growth_sprint_proposal":
-                return proposal_output()
+                return proposal_output(client_id="safe-katkin")
             raise AssertionError(workflow_id)
 
         self.dispatchers = {"Claude": claude, "Gmail": gmail}
