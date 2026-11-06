@@ -116,3 +116,11 @@ class DocumentHandbackTests(unittest.TestCase):
         service.draft(self.state,recovery['recovery_id'])
         self.assertIn('Gmail draft is verified unsent',summary())
         self.assertIn('separate authorisation',summary())
+
+    def test_specialist_brief_preserves_engagement_strategy_and_real_reference(self):
+        brief=DocumentHandbackService(self.runtime,{}).brief(self.state)
+        self.assertEqual(brief['strategy_from_engagement'],self.state.input_payload['quality_accepted_growth_blueprint'])
+        self.assertEqual(brief['client_name'],'SAFE handback fixture')
+        self.assertIn('1KmY6uMS',brief['reference'])
+        self.assertIn('find the growth audience',brief['commercial_purpose'])
+        self.assertIn('Not supplied',brief['deadline'])
