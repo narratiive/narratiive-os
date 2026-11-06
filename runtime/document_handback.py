@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib import request, parse
 from runtime.serialization import artifact_to_dict
 from runtime.workflow_mission_control import workflow_state_name
-from runtime.tony_workflow_runtime import _workflow_value_checksum
+from runtime.tony_workflow_runtime import _workflow_value_checksum, manual_recovery_required_outputs
 
 RAVE_REFERENCE = 'https://drive.google.com/file/d/1ciJ2-Y8O0MIS5DAIe_tuoS3OXbIKUx--/view'
 FIELDWORK_SPEC = 'https://docs.google.com/document/d/1KmY6uMSbdhGbl730bdXOPJh53nfhYjve6AVzexkXM1I/edit'
@@ -26,14 +26,15 @@ class DocumentHandbackService:
             'commercial_purpose': 'Fieldwork: find the growth audience, build the advantage, show the way to growth.' if state.workflow_id == 'growth_blueprint_deliverable_production' else 'Produce the current stage deliverable without changing approved upstream strategy.',
             'strategy_from_engagement': state.input_payload.get('quality_accepted_growth_blueprint') or state.input_payload.get('approved_growth_blueprint') or state.input_payload.get('approved_strategy_thesis'),
             'source_register': state.input_payload.get('source_register'),
-            'required_outputs': list(state.stage(state.current_stage_id).expected_outputs) if state.current_stage_id else [],
+            'required_outputs': list(manual_recovery_required_outputs(state, state.stage(state.current_stage_id))) if state.current_stage_id else [],
+            'optional_outputs': ['editable_pptx'] if state.workflow_id == 'growth_blueprint_deliverable_production' else [],
             'strategy_identity': state.input_payload.get('blueprint_identity'),
             'evidence': state.input_payload.get('evidence_lineage', []),
             'reference': FIELDWORK_SPEC if state.workflow_id == 'growth_blueprint_deliverable_production' else None,
             'methodology_reference': RAVE_REFERENCE if state.workflow_id == 'growth_blueprint_deliverable_production' else None,
             'constraints': state.input_payload.get('production_constraints', []),
             'deadline': state.input_payload.get('agreed_deadline') or 'Not supplied; agree with Matt.', 'quality': 'Use the stage contract and source evidence; upload is not quality acceptance.',
-            'return_to': 'Register against this exact engagement with producer, version, PDF and complete stage-output bundle. Then Matt reviews the exact candidate before manual recovery.',
+            'return_to': 'Register against this exact engagement with producer, version, PDF and complete required stage-output bundle (Fieldwork PPTX is optional internal source). Then Matt reviews the exact candidate before manual recovery.',
             'automation': 'No specialist generation invoked.'}
 
     def register(self, state, inputs, principal):
@@ -66,7 +67,7 @@ class DocumentHandbackService:
                 for key, expected in (('workspace_id',state.workspace_id),('client_id',state.client_id),('run_id',state.run_id))):
             raise ValueError('Embedded document identity contradicts the engagement')
         if set(output) - set(stage.expected_outputs): raise ValueError('Output bundle cannot replace upstream inputs or governance')
-        missing = [key for key in stage.expected_outputs if not output.get(key)]
+        missing = [key for key in manual_recovery_required_outputs(state, stage) if not output.get(key)]
         if missing: raise ValueError('Stage-output bundle missing required fields: ' + ', '.join(missing))
         files = inputs.get('files')
         if not isinstance(files, list) or not files: raise ValueError('Actual file bytes or verified Drive file required')
@@ -106,11 +107,15 @@ class DocumentHandbackService:
                 with target.open('xb') as handle: handle.write(data)
             supplied[field] = str(target)
             provenance.append({'field':field,'filename':name,'sha256':checksum,'source':source,'size':len(data)})
-        if state.workflow_id == 'growth_blueprint_deliverable_production' and not {'review_pdf','editable_pptx'}.issubset(supplied):
-            raise ValueError('Fieldwork contract requires actual review PDF and editable PPTX; candidate cannot substitute placeholders')
+        if state.workflow_id == 'growth_blueprint_deliverable_production' and 'review_pdf' not in supplied:
+            raise ValueError('Fieldwork requires an actual review PDF; editable PPTX is optional internal source material')
         exact = dict(output, **supplied)
+        if state.workflow_id == 'growth_blueprint_deliverable_production' and 'editable_pptx' not in supplied:
+            exact.pop('editable_pptx', None)  # Never retain an unverified source-file placeholder.
         exact['external_document_provenance'] = {'producing_specialist':producer,'version':version,'title':title,
             'submitted_by':principal,'automated_completion':False,'files':provenance,'client_id':state.client_id,'workspace_id':state.workspace_id}
+        if state.workflow_id == 'growth_blueprint_deliverable_production':
+            exact['external_document_provenance']['authoritative_client_facing_field'] = 'review_pdf'
         checksum = _workflow_value_checksum(exact); identity='handback-'+checksum[:24]
         key='document_handback:'+identity
         if key in state.input_payload: return state.input_payload[key]
@@ -215,8 +220,8 @@ def format_document_brief(state, brief):
     if not urls:
         add("Evidence", "No source URLs recorded on this exact run; supply evidence before production.")
     add("Production workspace", "No verified production-folder link is exposed by this brief; do not assume a destination.")
-    eligible = bool(stage and state.status.value == "blocked" and stage.side_effect_classification == "preparation" and state.stages[-1].stage_id == stage.stage_id and {"review_pdf", "editable_pptx"}.issubset(stage.expected_outputs))
-    add("Next action", "Return PDF/PPTX and the complete declared stage-output bundle with producer/version; register a candidate for Matt's exact-version review. Upload is not approval." if eligible else "This run cannot adopt an external document at its current boundary. Identify the intended eligible preparation run before handback; no upstream work will be replayed.", 350)
+    eligible = bool(stage and state.status.value == "blocked" and stage.side_effect_classification == "preparation" and state.stages[-1].stage_id == stage.stage_id and "review_pdf" in stage.expected_outputs)
+    add("Next action", "Return the PDF, optional internal PPTX and complete required stage-output bundle with producer/version; register a candidate for Matt's exact-version review. Upload is not approval." if eligible else "This run cannot adopt an external document at its current boundary. Identify the intended eligible preparation run before handback; no upstream work will be replayed.", 350)
     add("Safety", "No file created, production invoked, approval changed or client contact authorised.")
     required = {"Fieldwork v7 specification", "Production workspace", "Next action", "Safety"}
     remaining = 3400 - sum(len(line)+1 for label, line in lines if label in required)

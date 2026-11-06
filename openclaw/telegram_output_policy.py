@@ -18,7 +18,7 @@ _ARTEFACT_NAMES = (
 _HEADING = re.compile(r"(?m)^\s*(?:#{1,4}\s+|\*\*\s*(?:\d+\.|[A-Z][A-Z0-9 —&/-]{3,})|\d+\.\s+[A-Z])")
 
 
-def protect_telegram_output(value: str) -> str:
+def protect_telegram_output(value: str, *, literal: bool = False) -> str:
     """Keep conversation in Telegram and long-form artefacts in their workflow.
 
     Semantic artefact detection is primary. The fixed envelope is a final Bot
@@ -34,7 +34,15 @@ def protect_telegram_output(value: str) -> str:
             "I’ve kept the full review artefact out of Telegram because this channel is for conversation and decisions. "
             "It has not been represented as emailed here. I need to persist the exact artefact in Narratiive OS, deliver the review copy through the internal-review route, and then return with the concise gate summary and verified delivery evidence."
         )
+    if literal:
+        # The existing published n8n send node uses legacy Markdown. Treat
+        # deterministic COO summaries as literal text, including client names.
+        text = re.sub(r'</?[A-Za-z][^>]*>', '', text)
+        text = re.sub(r'([\\_*`\[])', r'\\\1', text)
     if len(text) <= TELEGRAM_SAFE_CHARACTERS:
         return text
     suffix = "\n\nI’ve shortened this conversational reply to fit Telegram. Any full review artefact belongs in the internal review delivery channel."
-    return text[: TELEGRAM_SAFE_CHARACTERS - len(suffix) - 1].rstrip() + "…" + suffix
+    shortened = text[: TELEGRAM_SAFE_CHARACTERS - len(suffix) - 1].rstrip()
+    if literal:
+        shortened = shortened.rstrip("\\")  # Never split a Markdown escape pair.
+    return shortened + "…" + suffix

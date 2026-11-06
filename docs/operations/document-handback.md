@@ -14,7 +14,9 @@ run a specialist, approve an upload, advance a subsequent workflow or send mail.
    files must first be exported; this adapter does not mutate originals.
 3. Registration is currently permitted only at an already blocked **final
    preparation stage** supported by existing manual recovery. Fieldwork requires
-   a PDF and editable PPTX plus its complete stage-output bundle. The adapter may
+   the exact review PDF plus its complete required stage-output bundle. An editable
+   PPTX is optional internal source material, not a condition of PDF adoption or
+   delivery. The PDF becomes client-facing only after Matt approves its exact version. The adapter may
    reuse a checksum-verified persisted failed candidate's bundle, or accept a
    specialist-supplied complete bundle. It cannot invent missing outputs, replace
    upstream strategy/governance fields or skip later quality stages.
@@ -40,3 +42,12 @@ Unsupported current stages (including multi-stage Campaign World generation),
 missing commercial/quality fields, absent verified recipients and absent booking
 links remain explicit blockers. Booking, acceptance and payment monitoring are
 not added by this adapter. An email or user assertion is not settlement evidence.
+
+
+The completed Origin Fieldwork rehearsal has no supported authenticated revision
+operation: rejection/revision applies to pending review or a qualifying blocked
+stage, while manual adoption requires an already blocked final preparation stage.
+Do not reopen the completed run, manufacture a blocker or reuse its approval for
+a replacement PDF. Retain its history and report the missing completed-run
+revision operation separately. Other products' editable-source contracts remain
+unchanged. PDF approval never authorises client communication.

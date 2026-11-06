@@ -44,6 +44,21 @@ class TonyLiveBridgeOpenClawRoutingTests(unittest.TestCase):
         store = FileInboundLeadStore(Path(tmp) / "leads.json")
         return LeadAwareTonyApplication(base, store, agent_gateway=gateway), base, gateway
 
+    def test_coo_command_message_and_reply_share_safe_literal_presentation(self):
+        from runtime.tony_command_service import CommandResponse
+        with tempfile.TemporaryDirectory() as tmp:
+            app,base,gateway=self._app(tmp)
+            app.workflow_command_service=mock.Mock()
+            app.workflow_command_service.supports.return_value=True
+            app.workflow_command_service.execute.return_value=CommandResponse('workflow','healthy','<b>Origin</b>: PDF_ready [review]',{'run_id':'audit-only'})
+            status,payload=self._request(app,'/workflow exact-run')
+        self.assertTrue(status.startswith('200'))
+        self.assertEqual(payload['message'],payload['reply'])
+        self.assertNotIn('<b>',payload['message'])
+        self.assertIn(r'PDF\_ready',payload['message'])
+        self.assertEqual(payload['data']['run_id'],'audit-only')
+        gateway.converse.assert_not_called()
+
     def test_plain_language_uses_openclaw_not_legacy_command_service(self):
         with tempfile.TemporaryDirectory() as tmp:
             app, base, gateway = self._app(tmp)

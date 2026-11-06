@@ -376,10 +376,10 @@ class LeadAwareTonyApplication:
                     response = self.workflow_command_service.execute(text, (), principal_id=principal)
                     status = HTTPStatus.OK
                     payload = {
-                        "ok": response.status != "error",
-                        "reply": protect_telegram_output(response.message),
-                        "message": protect_telegram_output(response.message),
                         **response.to_dict(),
+                        "ok": response.status != "error",
+                        "reply": protect_telegram_output(response.message, literal=response.command != "document-brief"),
+                        "message": protect_telegram_output(response.message, literal=response.command != "document-brief"),
                     }
                 else:
                     status, payload = self.base._handle_telegram_command(text)

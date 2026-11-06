@@ -19,10 +19,19 @@ class TelegramOutputPolicyTests(unittest.TestCase):
             "\n**4. OPPORTUNITY**\n" + "A provisional opportunity. " * 30
         )
         protected = protect_telegram_output(document)
+        self.assertEqual(protect_telegram_output(document,literal=True),protected)
         self.assertLess(len(protected), 600)
         self.assertNotIn("Substantial evidence", protected)
         self.assertIn("kept the full review artefact out of Telegram", protected)
         self.assertIn("not been represented as emailed", protected)
+
+    def test_literal_coo_summary_removes_html_and_escapes_legacy_markdown(self):
+        import re
+        text=protect_telegram_output('<b>Origin</b>: PDF_ready [review]* `exact`',literal=True)
+        self.assertNotIn('<b>',text)
+        self.assertNotRegex(re.sub(r'\\.', '', text),r'[_*`\[]')
+        long=protect_telegram_output('_'*4000,literal=True)
+        self.assertLessEqual(len(long),TELEGRAM_SAFE_CHARACTERS)
 
     def test_hard_envelope_is_only_the_final_safeguard(self) -> None:
         protected = protect_telegram_output("Conversational detail. " * 300)

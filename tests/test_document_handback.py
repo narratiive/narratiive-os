@@ -52,9 +52,41 @@ class DocumentHandbackTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,'binding'):service.register(self.state,wrong,'human')
         wrong=copy.deepcopy(self.inputs);wrong['output']['approval_status']='approved'
         with self.assertRaisesRegex(ValueError,'upstream inputs'):service.register(self.state,wrong,'human')
-        wrong=copy.deepcopy(self.inputs);wrong['files']=wrong['files'][:1]
-        with self.assertRaisesRegex(ValueError,'editable PPTX'):service.register(self.state,wrong,'human')
+        wrong=copy.deepcopy(self.inputs);wrong['files']=wrong['files'][1:]
+        with self.assertRaisesRegex(ValueError,'actual review PDF'):service.register(self.state,wrong,'human')
         self.assertEqual(self.runtime.runs.load_run(self.state.run_id).approval_status,'not_required')
+
+    def test_pdf_only_candidate_retains_exact_human_gate_and_optional_source_policy(self):
+        from runtime.tony_workflow_runtime import manual_recovery_required_outputs
+        from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersistenceService
+        service=DocumentHandbackService(self.runtime, {'Gmail':Mock(return_value={'verified':True,'sent':False,'draft_id':'pdf-only-test'})})
+        supplied=copy.deepcopy(self.inputs);supplied['files']=supplied['files'][:1]
+        supplied['output'].pop('editable_pptx')
+        prior=copy.deepcopy(self.state.approval_history)
+        record=service.register(self.state,supplied,'test-human')
+        recovery=record['manual_recovery']
+        self.assertNotIn('editable_pptx',recovery['output'])
+        self.assertEqual(recovery['output']['external_document_provenance']['authoritative_client_facing_field'],'review_pdf')
+        self.assertEqual(self.runtime.runs.load_run(self.state.run_id).approval_history,prior)
+        with self.assertRaisesRegex(ValueError,'human manual recovery approval'):service.draft(self.state,recovery['recovery_id'])
+        self.runtime.recover_with_approved_artifact(self.state.run_id,**recovery,approver='test-human',rationale='Fixture only',approval_evidence=_approval('Approve this exact PDF fixture only.'))
+        completed=self.runtime.runs.load_run(self.state.run_id)
+        self.assertEqual(completed.status.value,'complete')
+        self.assertIn('editable_pptx',completed.stages[0].expected_outputs)
+        self.assertFalse(service.draft(completed,recovery['recovery_id'])['sent'])
+        preview=WorkflowDeliverablePersistenceService(self.tmp.name,None).preview(completed,drive_folder_id='verified-test-folder')
+        self.assertEqual([f['field'] for f in preview['files']],['review_pdf'])
+        # Completed-run revision is genuinely unavailable, without changing it.
+        frozen=copy.deepcopy(completed.approval_history)
+        with self.assertRaisesRegex(ValueError,'not awaiting approval'):
+            self.runtime.reject_for_revision(completed.run_id,reviewer='test-human',rationale='Fixture revision')
+        self.assertEqual(self.runtime.runs.load_run(completed.run_id).approval_history,frozen)
+        other=copy.deepcopy(self.state);other.workflow_id='campaign_world_to_creative_bible'
+        self.assertIn('editable_pptx',manual_recovery_required_outputs(other,other.stages[0]))
+        # Byte changes cannot silently replace the exact approved PDF in delivery.
+        Path(recovery['output']['review_pdf']).write_bytes(b'%PDF-1.7 changed')
+        with self.assertRaisesRegex(ValueError,'bytes changed'):
+            WorkflowDeliverablePersistenceService(self.tmp.name,None).preview(completed,drive_folder_id='verified-test-folder')
 
     def test_gmail_draft_is_read_back_and_never_calls_send(self):
         gmail=GmailDispatcher(GoogleOAuthConfig(access_token='test-only'))
@@ -124,6 +156,8 @@ class DocumentHandbackTests(unittest.TestCase):
         self.assertIn('1KmY6uMS',brief['reference'])
         self.assertIn('find the growth audience',brief['commercial_purpose'])
         self.assertIn('Not supplied',brief['deadline'])
+        self.assertNotIn('editable_pptx',brief['required_outputs'])
+        self.assertEqual(brief['optional_outputs'],['editable_pptx'])
 
     def test_selected_v2_approval_and_draft_do_not_request_stale_v1_manual_recovery(self):
         from runtime.client_visibility import external_document_attention,client_summary,client_engagements

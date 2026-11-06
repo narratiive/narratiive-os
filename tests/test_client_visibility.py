@@ -18,6 +18,23 @@ class ClientVisibilityTests(unittest.TestCase):
         backend=SimpleNamespace(list_states=lambda:tuple(states), artifact_detail=lambda s: (_ for _ in ()).throw(ValueError('No review')))
         return TonyWorkflowCommandService(None, backend)
 
+    def test_completed_fieldwork_reports_revision_limit_in_coo_language_without_ids(self):
+        origin=state('internal-origin-completed-id',workflow='growth_blueprint_deliverable_production',
+                     client_context={'name':'Origin Coffee — FICTIONAL REHEARSAL'})
+        origin.status=WorkflowStatus.COMPLETE;origin.approval_status='approved';origin.blocker=None
+        origin.approval_history=[{'approval_kind':'synthetic_rehearsal','human_approval':False}]
+        before=copy.deepcopy(origin)
+        response=self.service([origin]).execute('/workflow internal-origin-completed-id',[])
+        self.assertIn('complete',response.message)
+        self.assertIn('simulated review, not Matt or client approval',response.message)
+        self.assertIn('no supported supervised revision route',response.message)
+        self.assertIn('I recommend',response.message)
+        self.assertIn('Matt: confirm whether you need a revised PDF',response.message)
+        self.assertNotIn(origin.run_id,response.message)
+        self.assertEqual(response.data['run_id'],origin.run_id)
+        self.assertLessEqual(len(response.message.split()),120)
+        self.assertEqual(origin,before)
+
     def test_observed_origin_and_katkin_commands_use_workflow_records_without_mutation(self):
         origin=state('origin-current',client_context={'name':'Origin Coffee — FICTIONAL REHEARSAL','aliases':['Origin']})
         katkin=state('katkin-review','growth_blueprint_deliverable_production',client='katkin',company='KatKin')
