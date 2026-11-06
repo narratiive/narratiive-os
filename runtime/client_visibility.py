@@ -118,14 +118,14 @@ def external_document_attention(state):
                and a.get('artifact_checksum') == checksum for a in state.approval_history):
             approved.add(identity)
         else: pending.append(identity)
-    if pending: return 'candidate_review', len(pending)
-    if any((entry.get('receipt') or {}).get('kind') == 'external_document_internal_draft'
+    if state.approval_status == 'approved' and any((entry.get('receipt') or {}).get('kind') == 'external_document_internal_draft'
            and (entry.get('receipt') or {}).get('candidate_id') in approved
            and (entry.get('receipt') or {}).get('verified') is True
            and (entry.get('receipt') or {}).get('sent') is False
            for entry in state.external_action_receipts):
         return 'unsent_draft_review', 1
-    if approved: return 'approved_document', len(approved)
+    if approved and state.approval_status == 'approved': return 'approved_document', len(approved)
+    if pending: return 'candidate_review', len(pending)
     return '', 0
 
 

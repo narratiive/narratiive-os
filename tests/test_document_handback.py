@@ -124,3 +124,19 @@ class DocumentHandbackTests(unittest.TestCase):
         self.assertIn('1KmY6uMS',brief['reference'])
         self.assertIn('find the growth audience',brief['commercial_purpose'])
         self.assertIn('Not supplied',brief['deadline'])
+
+    def test_selected_v2_approval_and_draft_do_not_request_stale_v1_manual_recovery(self):
+        from runtime.client_visibility import external_document_attention,client_summary,client_engagements
+        service=DocumentHandbackService(self.runtime,{'Gmail':Mock(return_value={'verified':True,'sent':False,'draft_id':'test-v2-draft'})})
+        first=service.register(self.state,self.inputs,'test-human')
+        second_inputs=copy.deepcopy(self.inputs);second_inputs['version']='v2'
+        second=service.register(self.state,second_inputs,'test-human')
+        self.assertEqual(external_document_attention(self.runtime.runs.load_run(self.state.run_id)),('candidate_review',2))
+        recovery=second['manual_recovery']
+        self.runtime.recover_with_approved_artifact(self.state.run_id,**recovery,approver='test-human',rationale='Select exact v2 fixture',approval_evidence=_approval('Recover the exact approved v2 SAFE fixture.'))
+        self.assertEqual(external_document_attention(self.runtime.runs.load_run(self.state.run_id)),('approved_document',1))
+        service.draft(self.state,recovery['recovery_id'])
+        state=self.runtime.runs.load_run(self.state.run_id)
+        self.assertEqual(external_document_attention(state),('unsent_draft_review',1))
+        self.assertIn('Gmail draft is verified unsent',client_summary(state,client_engagements([state])[0][1],None))
+        self.assertIn('document_handback:'+first['manual_recovery']['recovery_id'],state.input_payload)
