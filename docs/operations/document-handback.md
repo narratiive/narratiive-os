@@ -40,3 +40,13 @@ Unsupported current stages (including multi-stage Campaign World generation),
 missing commercial/quality fields, absent verified recipients and absent booking
 links remain explicit blockers. Booking, acceptance and payment monitoring are
 not added by this adapter. An email or user assertion is not settlement evidence.
+
+For a Fieldwork commission, request the exact approved Fieldwork presentation run,
+not its original diagnostic root. The command does not substitute another run.
+Its founder-facing response is one complete copyable Claude brief; the detailed
+`specialist_audit` retains exact identities, approval evidence, strategy, source
+register, assumptions and expected output keys. Fictional rehearsal approval is
+labelled separately from Matt/client approval. Fieldwork v7 includes the v7.2
+operating addendum in the linked canonical specification. Oversized or incomplete
+records return an explicit blocker instead of a truncated commission. An asset
+review folder is not evidence of an available Fieldwork working destination.

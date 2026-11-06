@@ -22,7 +22,7 @@ class DocumentHandbackService:
         self.dispatchers = dispatchers or {}
 
     def brief(self, state):
-        return {'client': state.client_id, 'client_name': workflow_state_name(state), 'engagement': state.run_id, 'workflow': state.workflow_id,
+        result = {'client': state.client_id, 'client_name': workflow_state_name(state), 'engagement': state.run_id, 'workflow': state.workflow_id,
             'commercial_purpose': 'Fieldwork: find the growth audience, build the advantage, show the way to growth.' if state.workflow_id == 'growth_blueprint_deliverable_production' else 'Produce the current stage deliverable without changing approved upstream strategy.',
             'strategy_from_engagement': state.input_payload.get('quality_accepted_growth_blueprint') or state.input_payload.get('approved_growth_blueprint') or state.input_payload.get('approved_strategy_thesis'),
             'source_register': state.input_payload.get('source_register'),
@@ -35,6 +35,25 @@ class DocumentHandbackService:
             'deadline': state.input_payload.get('agreed_deadline') or 'Not supplied; agree with Matt.', 'quality': 'Use the stage contract and source evidence; upload is not quality acceptance.',
             'return_to': 'Register against this exact engagement with producer, version, PDF and complete stage-output bundle. Then Matt reviews the exact candidate before manual recovery.',
             'automation': 'No specialist generation invoked.'}
+        if state.workflow_id == 'growth_blueprint_deliverable_production':
+            # Exact requested record only. Keep full evidence and identities in the
+            # existing detailed result, separate from the founder-facing prose.
+            result['specialist_audit'] = {
+                'requested_run_id': state.run_id, 'workspace_id': state.workspace_id,
+                'client_id': state.client_id, 'approval_status': state.approval_status,
+                'approval_history': state.approval_history,
+                'strategy_identity': state.input_payload.get('blueprint_identity'),
+                'strategy': {key: state.input_payload.get(key) for key in (
+                    'central_thesis', 'growth_opportunity', 'audience', 'key_strategic_choices',
+                    'commercial_model', 'assumption_control', 'evidence_and_uncertainty')},
+                'source_register': state.input_payload.get('source_register'),
+                'evidence_lineage': state.input_payload.get('evidence_lineage'),
+                'expected_outputs': result['required_outputs'],
+                'specification': FIELDWORK_SPEC, 'specification_sections': ['v7.0', 'v7.1', 'v7.2'],
+                'recorded_asset_review_folder_url': state.input_payload.get('asset_review_folder_url'),
+                'handback': result['return_to'],
+            }
+        return result
 
     def register(self, state, inputs, principal):
         state = self.runtime.runs.load_run(state.run_id)
@@ -185,6 +204,9 @@ def format_document_brief(state, brief):
         line = escape(label + ": ") + " " + "".join(escaped)
         lines.append((label, line))
 
+    if state.workflow_id == 'growth_blueprint_deliverable_production':
+        return format_fieldwork_specialist_brief(state, brief)
+
     stage = state.stage(state.current_stage_id) if state.current_stage_id else None
     diagnostic = state.input_payload.get("diagnostic_input_package") or {}
     diagnostic = diagnostic.get("diagnostic", diagnostic) if isinstance(diagnostic, dict) else {}
@@ -228,3 +250,64 @@ def format_document_brief(state, brief):
             selected.append(line)
             remaining -= len(line)+1
     return "\n".join(selected)
+
+
+def format_fieldwork_specialist_brief(state, brief):
+    """A complete copyable commission from this exact Fieldwork record only."""
+    payload = state.input_payload
+    problem = payload.get('growth_opportunity') or {}
+    thesis = payload.get('central_thesis') or {}
+    missing = []
+    if state.approval_status != 'approved': missing.append('approved Fieldwork evidence')
+    if not isinstance(problem, dict) or not problem.get('diagnosis'): missing.append('central strategic problem')
+    if not isinstance(thesis, dict) or not thesis.get('insight'): missing.append('strategic recommendation')
+    register = payload.get('source_register') or {}
+    entries = register.get('entries', []) if isinstance(register, dict) else []
+    if not entries: missing.append('source register')
+    model = payload.get('commercial_model') or {}
+    uncertainty = payload.get('evidence_and_uncertainty') or []
+    if not uncertainty: missing.append('evidence limitations and known assumptions')
+    if missing:
+        return 'Fieldwork commissioning brief unavailable: missing ' + ', '.join(missing) + '. Matt: select the exact approved Fieldwork engagement or supply these records. No run was substituted or changed.'
+    synthetic = any(item.get('approval_kind') == 'synthetic_rehearsal' for item in state.approval_history)
+    approval = 'Fictional rehearsal approval only; not Matt/client approval.' if synthetic else 'Recorded Fieldwork approval; no new work or release authorised.'
+    sources = []
+    for entry in entries:
+        location = str(entry.get('location') or '')
+        if location.startswith('https://'):
+            sources.append(str(entry.get('source_id') or '') + ' ' + location)
+        else:
+            sources.append(str(entry.get('source_id') or '') + ' ' + str(entry.get('title') or 'Internal supplied source') + ' (' + str(entry.get('classification') or 'verification status unknown').replace('_', ' ') + '; audit location)')
+    model_note = 'No verified client baseline: do not invent a forecast, profit or ROI.'
+    if model.get('classification') == 'illustrative_scenario_model':
+        scenarios = model.get('scenarios') or []
+        parts = []
+        for scenario in scenarios:
+            if all(scenario.get(key) is not None for key in ('additional_accounts', 'annual_account_revenue', 'year_one_ramp', 'incremental_annual_revenue')):
+                parts.append(f"{scenario['additional_accounts']} accounts × £{scenario['annual_account_revenue']:g} × {scenario['year_one_ramp']:g} = £{scenario['incremental_annual_revenue']:g}")
+        if parts:
+            basis = '/'.join(str(entry.get('source_id')) for entry in entries if entry.get('classification') == 'assumption') or 'Recorded model'
+            model_note = basis + ' illustrative assumptions, year-one revenue, not forecast/profit: ' + '; '.join(parts) + '.'
+    handback_note = 'The completed run cannot adopt a new version without an eligible preparation boundary.' if state.status.value == 'complete' else 'Ask Tony to verify the current stage is an eligible blocked final-preparation boundary before adoption.'
+    paragraphs = [
+        f"{brief.get('client_name') or brief.get('client')} — Fieldwork presentation. {approval}",
+        'Problem: ' + str(problem['diagnosis']),
+        "Tony recommends: revise Fieldwork using the recorded strategy below.",
+        'Copy to Claude:',
+        'Create Fieldwork for ' + str(brief.get('client_name') or brief.get('client')) + ' under Matt’s direction. Strategic direction: ' + str(thesis['insight']),
+        'Evidence limits: ' + ' '.join(str(item).replace('growth-sprint', 'Fieldwork') for item in uncertainty),
+        model_note,
+        'Sources (recorded, not newly verified): ' + '; '.join(sources),
+
+        'Follow Fieldwork v7, including v7.1 evidence rules and v7.2 handback: ' + FIELDWORK_SPEC,
+        'Use Rave’s six-act argument, competitor/audience evidence, five-lever table, SO WHAT and 90-day marketing activation; no copied findings.',
+        'Return editable PPTX + matching PDF, presentation specification, commercial model, source register, visual QA, production evidence and release recommendation. Cite claims; label facts, inferences and assumptions.',
+        'Handback: v7.2 filenames/versioning, producer, source/strategy references and file manifest to Matt; registration is not approval. ' + handback_note,
+        'Matt next: confirm scope, deadline and a verified Fieldwork working folder (not a stills folder); copy this brief to Claude. Return files for exact-version review. No automatic production, send or publication.',
+    ]
+    # Keep the already deployed Telegram transport/escaping contract unchanged.
+    text = '\n\n'.join(paragraphs)
+    escaped = ''.join('\\' + char if char in '\\_*`[' else char for char in text)
+    if len(escaped) > 3400:
+        return 'The exact Fieldwork evidence exceeds one complete Telegram commissioning brief. Matt: request an authorised linked brief before commissioning; no evidence was truncated, file created or run substituted.'
+    return escaped
