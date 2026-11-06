@@ -6,6 +6,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from openclaw.mission_control_web import MissionControlWebApplication
 from openclaw.mission_control_web import HTML
@@ -257,6 +258,177 @@ class MissionControlOperatorTests(unittest.TestCase):
 
         self.assertTrue(status["value"].startswith("200"))
         self.assertEqual(json.loads(b"".join(body)), {"safe": True})
+
+    def test_review_route_presents_the_exact_in_scope_pdf_with_pending_approval_metadata(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        stage = state.stage(state.current_stage_id)
+        artifact = stage.output_artifacts[0]
+        # Legacy canonical workflow artefacts can live in the shared immutable
+        # store. They are not themselves downloadable, but a separately
+        # client-scoped review copy may still be presented after checksum binding.
+        shared = self.root / "artifacts" / "artifact-v1.json"
+        shared.parent.mkdir(parents=True)
+        shared.write_text('{"safe":true}', encoding="utf-8")
+        artifact = ArtifactRef(
+            artifact.artifact_id, artifact.artifact_type, str(shared), artifact.checksum, artifact.metadata
+        )
+        stage.output_artifacts[0] = artifact
+        review_dir = self.root / "human-review-artifacts" / "narratiive" / "catkin" / "review-safe"
+        review_pdf = review_dir / "KatKin-Growth-Blueprint-v5.pdf"
+        review_pdf.parent.mkdir(parents=True)
+        review_pdf.write_bytes(b"%PDF-safe-founder-review")
+        (review_dir / "manifest.json").write_text(
+            json.dumps({
+                "review_artifact_id": "review-safe",
+                "source_artifact_id": artifact.artifact_id,
+                "source_artifact_checksum": artifact.checksum,
+                "location": str(review_pdf),
+                "checksum": hashlib.sha256(review_pdf.read_bytes()).hexdigest(),
+                "product": "KatKin Growth Blueprint v5",
+                "page_count": 30,
+            }),
+            encoding="utf-8",
+        )
+        snapshot = self.projector.project(states=[state], leads=[])
+        projected = snapshot["opportunities"][0]["artefacts"][-1]
+        self.assertIsNone(projected["open_url"])
+        self.assertEqual(projected["review_url"], "/mission-control/review?artifact_id=artifact-v1")
+        app = MissionControlWebApplication(lambda: snapshot, workflow_root=self.root)
+
+        status = {}
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+        page = b"".join(body).decode("utf-8")
+        self.assertTrue(status["value"].startswith("200"))
+        self.assertIn("KatKin Growth Blueprint v5", page)
+        self.assertIn("pending", page)
+        self.assertIn("abc", page)
+        self.assertIn("/mission-control/review-pdf?artifact_id=artifact-v1", page)
+
+        status = {}
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review-pdf","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+        self.assertTrue(status["value"].startswith("200"))
+        self.assertIn(("Content-Type", "application/pdf"), status["headers"])
+        self.assertIn(("X-Frame-Options", "SAMEORIGIN"), status["headers"])
+        self.assertEqual(b"".join(body), b"%PDF-safe-founder-review")
+
+    def test_review_route_rejects_pdf_outside_the_workflow_root(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        artifact = state.stage(state.current_stage_id).output_artifacts[0]
+        outside = self.root.parent / "outside-review.pdf"
+        outside.write_bytes(b"%PDF-outside")
+        review_dir = self.root / "human-review-artifacts" / "narratiive" / "catkin" / "review-outside"
+        review_dir.mkdir(parents=True)
+        (review_dir / "manifest.json").write_text(json.dumps({
+            "review_artifact_id": "review-outside", "source_artifact_id": artifact.artifact_id,
+            "source_artifact_checksum": artifact.checksum, "location": str(outside),
+            "checksum": hashlib.sha256(outside.read_bytes()).hexdigest(),
+        }), encoding="utf-8")
+        app = MissionControlWebApplication(
+            lambda: self.projector.project(states=[state], leads=[]), workflow_root=self.root,
+        )
+        status = {}
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+        self.assertTrue(status["value"].startswith("404"))
+        self.assertEqual(b"".join(body), b"Artefact unavailable")
+
+    def test_review_route_rejects_a_sibling_client_review_binding(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        artifact = state.stage(state.current_stage_id).output_artifacts[0]
+        review_dir = self.root / "human-review-artifacts" / "narratiive" / "other-client" / "review-safe"
+        review_pdf = review_dir / "other-client.pdf"
+        review_pdf.parent.mkdir(parents=True)
+        review_pdf.write_bytes(b"%PDF-other-client")
+        (review_dir / "manifest.json").write_text(json.dumps({
+            "review_artifact_id": "review-safe", "source_artifact_id": artifact.artifact_id,
+            "source_artifact_checksum": artifact.checksum, "location": str(review_pdf),
+            "checksum": hashlib.sha256(review_pdf.read_bytes()).hexdigest(),
+        }), encoding="utf-8")
+        snapshot = self.projector.project(states=[state], leads=[])
+        self.assertIsNone(snapshot["opportunities"][0]["artefacts"][-1].get("review_url"))
+
+    def test_review_route_rejects_traversal_in_persisted_client_scope(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        state.client_id = "../narratiive/other-client"
+        artifact = state.stage(state.current_stage_id).output_artifacts[0]
+        review_dir = self.root / "human-review-artifacts" / "narratiive" / "other-client" / "review-safe"
+        review_pdf = review_dir / "other-client.pdf"
+        review_pdf.parent.mkdir(parents=True)
+        review_pdf.write_bytes(b"%PDF-other-client")
+        (review_dir / "manifest.json").write_text(json.dumps({
+            "review_artifact_id": "review-safe", "source_artifact_id": artifact.artifact_id,
+            "source_artifact_checksum": artifact.checksum, "location": str(review_pdf),
+            "checksum": hashlib.sha256(review_pdf.read_bytes()).hexdigest(),
+        }), encoding="utf-8")
+        snapshot = self.projector.project(states=[state], leads=[])
+        self.assertIsNone(snapshot["opportunities"][0]["artefacts"][-1].get("review_url"))
+
+    def test_review_route_rejects_traversal_in_projected_review_scope(self):
+        snapshot = {"opportunities": [{"artefacts": [{
+            "artifact_id": "artifact-v1", "checksum": "abc",
+            "review_url": "/mission-control/review?artifact_id=artifact-v1",
+            "review": {
+                "workspace_id": "narratiive", "client_id": "../other-client",
+                "review_artifact_id": "review-safe", "checksum": "abc",
+            },
+        }]}]}
+        app = MissionControlWebApplication(lambda: snapshot, workflow_root=self.root)
+        status = {}
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+        self.assertTrue(status["value"].startswith("404"))
+        self.assertEqual(b"".join(body), b"Review document unavailable")
+
+    def test_review_route_rejects_a_review_pdf_that_changes_after_binding(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        artifact = state.stage(state.current_stage_id).output_artifacts[0]
+        review_dir = self.root / "human-review-artifacts" / "narratiive" / "catkin" / "review-safe"
+        review_pdf = review_dir / "KatKin-Growth-Blueprint-v5.pdf"
+        review_pdf.parent.mkdir(parents=True)
+        review_pdf.write_bytes(b"%PDF-original")
+        (review_dir / "manifest.json").write_text(json.dumps({
+            "review_artifact_id": "review-safe", "source_artifact_id": artifact.artifact_id,
+            "source_artifact_checksum": artifact.checksum, "location": str(review_pdf),
+            "checksum": hashlib.sha256(review_pdf.read_bytes()).hexdigest(),
+        }), encoding="utf-8")
+        snapshot = self.projector.project(states=[state], leads=[])
+        review_pdf.write_bytes(b"%PDF-substituted")
+        app = MissionControlWebApplication(lambda: snapshot, workflow_root=self.root)
+        status = {}
+        body = app.handle(
+            {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review-pdf","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+            lambda value, headers: status.update(value=value, headers=headers),
+        )
+        self.assertTrue(status["value"].startswith("404"))
+        self.assertEqual(b"".join(body), b"Review document unavailable")
+
+    def test_review_pdf_serves_the_single_verified_byte_buffer(self):
+        state = self._state(status=WorkflowStatus.AWAITING_APPROVAL, approval="pending")
+        snapshot = self.projector.project(states=[state], leads=[])
+        artifact = snapshot["opportunities"][0]["artefacts"][-1]
+        artifact.update({
+            "review_url": "/mission-control/review?artifact_id=artifact-v1",
+            "review": {"review_artifact_id": "review-safe"},
+        })
+        app = MissionControlWebApplication(lambda: snapshot, workflow_root=self.root)
+        status = {}
+        with patch.object(app, "_review_document", return_value=(b"%PDF-verified-buffer", {})):
+            body = app.handle(
+                {"REQUEST_METHOD":"GET","PATH_INFO":"/mission-control/review-pdf","QUERY_STRING":"artifact_id=artifact-v1","REMOTE_ADDR":"127.0.0.1"},
+                lambda value, headers: status.update(value=value, headers=headers),
+            )
+        self.assertTrue(status["value"].startswith("200"))
+        self.assertEqual(b"".join(body), b"%PDF-verified-buffer")
 
     def test_connection_projection_uses_only_canonical_states(self):
         result = self.projector.project(
