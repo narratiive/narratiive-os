@@ -106,9 +106,42 @@ def verified_review_link(state, backend):
     return None
 
 
+def external_document_attention(state):
+    candidates = [value for key,value in state.input_payload.items()
+                  if key.startswith('document_handback:') and isinstance(value, dict)]
+    pending = []
+    approved = set()
+    for record in candidates:
+        recovery = record.get('manual_recovery') or {}
+        identity, checksum = recovery.get('recovery_id'), recovery.get('artifact_checksum')
+        if any(a.get('decision') == 'manual_recovery_approved' and a.get('recovery_id') == identity
+               and a.get('artifact_checksum') == checksum for a in state.approval_history):
+            approved.add(identity)
+        else: pending.append(identity)
+    if state.approval_status == 'approved' and any((entry.get('receipt') or {}).get('kind') == 'external_document_internal_draft'
+           and (entry.get('receipt') or {}).get('candidate_id') in approved
+           and (entry.get('receipt') or {}).get('verified') is True
+           and (entry.get('receipt') or {}).get('sent') is False
+           for entry in state.external_action_receipts):
+        return 'unsent_draft_review', 1
+    if approved and state.approval_status == 'approved': return 'approved_document', len(approved)
+    if pending: return 'candidate_review', len(pending)
+    return '', 0
+
+
 def client_summary(state, row, review_link):
     status = state.status.value
-    if status in {'blocked','failed'}:
+    document_attention, count = external_document_attention(state)
+    if document_attention == 'candidate_review':
+        issue = f'{count} externally supplied document candidate(s) await exact manual review; upload has not completed this stage.'
+        action = 'Matt: review the exact candidate and explicitly approve manual recovery or keep it pending.'
+    elif document_attention == 'unsent_draft_review':
+        issue = 'The externally supplied document is approved and an internal Gmail draft is verified unsent.'
+        action = 'Matt: review the exact message and attachment. Sending still requires separate authorisation.'
+    elif document_attention == 'approved_document':
+        issue = 'The exact external document has recorded human manual-recovery approval.'
+        action = 'Matt: request internal draft preparation; no send is authorised.'
+    elif status in {'blocked','failed'}:
         code = str(state.blocker or '')
         if 'quality_failed' in code:
             issue = 'Quality review requires specialist correction.'

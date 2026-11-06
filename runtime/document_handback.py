@@ -8,6 +8,7 @@ import json
 from pathlib import Path
 from urllib import request, parse
 from runtime.serialization import artifact_to_dict
+from runtime.workflow_mission_control import workflow_state_name
 from runtime.tony_workflow_runtime import _workflow_value_checksum
 
 RAVE_REFERENCE = 'https://drive.google.com/file/d/1ciJ2-Y8O0MIS5DAIe_tuoS3OXbIKUx--/view'
@@ -21,14 +22,17 @@ class DocumentHandbackService:
         self.dispatchers = dispatchers or {}
 
     def brief(self, state):
-        return {'client': state.client_id, 'engagement': state.run_id, 'workflow': state.workflow_id,
+        return {'client': state.client_id, 'client_name': workflow_state_name(state), 'engagement': state.run_id, 'workflow': state.workflow_id,
+            'commercial_purpose': 'Fieldwork: find the growth audience, build the advantage, show the way to growth.' if state.workflow_id == 'growth_blueprint_deliverable_production' else 'Produce the current stage deliverable without changing approved upstream strategy.',
+            'strategy_from_engagement': state.input_payload.get('quality_accepted_growth_blueprint') or state.input_payload.get('approved_growth_blueprint') or state.input_payload.get('approved_strategy_thesis'),
+            'source_register': state.input_payload.get('source_register'),
             'required_outputs': list(state.stage(state.current_stage_id).expected_outputs) if state.current_stage_id else [],
             'strategy_identity': state.input_payload.get('blueprint_identity'),
             'evidence': state.input_payload.get('evidence_lineage', []),
             'reference': FIELDWORK_SPEC if state.workflow_id == 'growth_blueprint_deliverable_production' else None,
             'methodology_reference': RAVE_REFERENCE if state.workflow_id == 'growth_blueprint_deliverable_production' else None,
             'constraints': state.input_payload.get('production_constraints', []),
-            'deadline': 'Not supplied; agree with Matt.', 'quality': 'Use the stage contract and source evidence; upload is not quality acceptance.',
+            'deadline': state.input_payload.get('agreed_deadline') or 'Not supplied; agree with Matt.', 'quality': 'Use the stage contract and source evidence; upload is not quality acceptance.',
             'return_to': 'Register against this exact engagement with producer, version, PDF and complete stage-output bundle. Then Matt reviews the exact candidate before manual recovery.',
             'automation': 'No specialist generation invoked.'}
 

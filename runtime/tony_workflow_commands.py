@@ -25,7 +25,7 @@ from runtime.workflow_deliverable_persistence import WorkflowDeliverablePersiste
 from runtime.workflow_run_identity import downstream_run_id
 from runtime.workflow_mission_control import workflow_state_name, workflow_state_summary
 from runtime.workflow_portfolio import project_client_portfolio
-from runtime.client_visibility import client_engagements, client_summary, verified_review_link
+from runtime.client_visibility import client_engagements, client_summary, verified_review_link, external_document_attention
 from runtime.workflow_entity_classification import (
     FileWorkflowEntityClassificationJournal,
     INTERNAL_SYNTHETIC_TEST,
@@ -1368,7 +1368,7 @@ class TonyWorkflowCommandService:
         for state, row in engagements:
             link = verified_review_link(state, self.backend)
             text = client_summary(state, row, link)
-            row = dict(row, review_link=link, summary=text)
+            row = dict(row, review_link=link, summary=text, external_document_status=external_document_attention(state)[0])
             rows.append(row)
             if sum(len(line)+1 for line in lines) + len(text) < 3000:
                 lines.append(text)
@@ -1382,7 +1382,7 @@ class TonyWorkflowCommandService:
         if reference and len(engagements)==1:
             data = {**self._summary(engagements[0][0]), **data}
         return CommandResponse("client" if reference else "clients", "attention_required" if any(
-            row["blockers"] or row["human_approval_required"] for row in rows) else "healthy",
+            row["blockers"] or row["human_approval_required"] or row["external_document_status"] in {"candidate_review", "unsent_draft_review"} for row in rows) else "healthy",
             heading + "\n" + "\n".join(f"{i}. {line}" for i,line in enumerate(lines,1)),
             data)
 
