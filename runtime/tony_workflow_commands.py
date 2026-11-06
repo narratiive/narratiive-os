@@ -1273,7 +1273,7 @@ class TonyWorkflowCommandService:
                         approval_token=approval_token,
                         decision_evidence=decision_evidence,
                     )
-                    return CommandResponse(name, "healthy", f"Approved {changed.run_id} for its exact proposed action. No external action was performed.", self._summary(changed))
+                    return CommandResponse(name, "healthy", "Your exact-version approval is recorded. This clears only the proposed gate, not a client send or publication. I recommend keeping the approved version as the reference for the next supported step. Matt: no further approval has been assumed.", self._summary(changed))
                 changed = self.backend.reject(
                     state,
                     reviewer=principal_id,
@@ -1283,7 +1283,7 @@ class TonyWorkflowCommandService:
                     **({'fieldwork_revision_inputs': inputs['fieldwork_revision_inputs']}
                        if inputs and 'fieldwork_revision_inputs' in inputs else {}),
                 )
-                return CommandResponse("reject", "healthy", f"Revision requested for {changed.run_id}; progression remains stopped until revised work passes quality.", self._summary(changed))
+                return CommandResponse("reject", "healthy", "Your revision request is recorded. Progression remains stopped until the revised work passes quality and the required review. I recommend retaining the current version while the specialist makes the agreed changes. Matt: review the revised version when it is ready; no release is authorised.", self._summary(changed))
             if name == "manual-recovery":
                 if not principal_id.strip():
                     return self._error(name, "authorised_principal_required", "Manual recovery requires Matt's authenticated identity.")
@@ -1419,29 +1419,20 @@ class TonyWorkflowCommandService:
 
     def _status(self, state: WorkflowState) -> CommandResponse:
         summary = self._summary(state)
-        message = f"{_state_name(state)} — {state.workflow_id}: {state.status.value.replace('_', ' ')}."
-        if state.current_stage_id:
-            stage = state.stage(state.current_stage_id)
-            stage_state = stage.status.value.replace("_", " ")
-            message += f" Current step: {state.current_stage_id.replace('_', ' ')} ({stage_state})."
-            if stage.started_at:
-                message += f" Started: {stage.started_at}."
-            if stage.status.value == "ready" and stage.retry_count:
-                message += " The interrupted execution was recovered and is ready for its governed retry."
-        if state.blocker:
-            message += f" Blocker: {state.blocker}."
-        next_action = state.current_proposed_next_action()
-        if next_action:
-            message += f" Next: {next_action}"
+        rows = client_engagements([state])
+        if rows:
+            message = client_summary(state, rows[0][1], verified_review_link(state, self.backend))
+        else:
+            message = f"{_state_name(state)}: {state.status.value.replace('_', ' ')}. The recorded work remains within its existing approval gates. I recommend checking its detailed record before taking action. Matt: no new action has been authorised."
         return CommandResponse("workflow", "blocked" if state.status.value == "blocked" else "healthy", message, summary)
 
     def _approval(self, state: WorkflowState) -> CommandResponse:
         pending = state.approval_status == "pending"
-        message = f"{state.run_id}: " + (f"approval required for: {state.proposed_next_action}" if pending else f"approval status is {state.approval_status}.")
+        message = self._status(state).message
         return CommandResponse("approvals", "blocked" if pending else "healthy", message, self._summary(state))
 
     def _blocker(self, state: WorkflowState) -> CommandResponse:
-        message = f"{state.run_id}: " + (f"blocked by {state.blocker}. Next: {state.proposed_next_action}" if state.blocker else "no blocker is recorded.")
+        message = self._status(state).message
         return CommandResponse("blockers", "blocked" if state.blocker else "healthy", message, self._summary(state))
 
     def _proposed(self, state: WorkflowState) -> CommandResponse:

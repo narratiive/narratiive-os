@@ -325,7 +325,7 @@ class TonyWorkflowRuntime:
         supplied = dict(output)
         missing = [
             field
-            for field in stage.expected_outputs
+            for field in manual_recovery_required_outputs(state, stage)
             if field not in supplied or supplied[field] in (None, "", [], {})
         ]
         if missing:
@@ -1001,3 +1001,14 @@ def _workflow_value_checksum(value: Any) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":"), default=str).encode("utf-8")
     ).hexdigest()
+
+
+def manual_recovery_required_outputs(state, stage):
+    """Fieldwork external adoption is PDF-first; other stage contracts stay intact.
+
+    Keep historical expected_outputs unchanged. Only the existing exact-human
+    manual adoption path treats its editable source as optional.
+    """
+    return tuple(field for field in stage.expected_outputs
+                 if not (state.workflow_id == 'growth_blueprint_deliverable_production'
+                         and field == 'editable_pptx'))

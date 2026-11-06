@@ -67,7 +67,7 @@ def approved_state(root: Path) -> WorkflowState:
 
 
 class WorkflowDeliverablePersistenceTests(unittest.TestCase):
-    def test_preview_and_exact_approval_persist_two_files_once(self) -> None:
+    def test_preview_and_exact_approval_persist_authoritative_pdf_once(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             state = approved_state(root)
@@ -86,7 +86,7 @@ class WorkflowDeliverablePersistenceTests(unittest.TestCase):
 
             service = WorkflowDeliverablePersistenceService(root, drive)
             preview = service.preview(state, drive_folder_id="verified-folder-1")
-            self.assertEqual(len(preview["files"]), 2)
+            self.assertEqual(len(preview["files"]), 1)
             self.assertEqual(preview["sharing"], "not_authorised")
             self.assertFalse(preview["external_action_taken"])
 
@@ -117,7 +117,7 @@ class WorkflowDeliverablePersistenceTests(unittest.TestCase):
                 rationale="Retry after restart",
             )
 
-            self.assertEqual(len(calls), 2)
+            self.assertEqual(len(calls), 1)
             self.assertTrue(result["external_action_taken"])
             self.assertTrue(replay["duplicate_suppressed"])
             self.assertFalse(replay["external_action_taken"])
@@ -138,7 +138,7 @@ class WorkflowDeliverablePersistenceTests(unittest.TestCase):
             output = json.loads(Path(output_artifact.location).read_text(encoding="utf-8"))
             outside_file = Path(outside) / "escaped.pptx"
             outside_file.write_bytes(b"PK\x03\x04 escaped")
-            output["editable_pptx"] = str(outside_file)
+            output["review_pdf"] = str(outside_file)
             encoded = json.dumps(output, sort_keys=True, separators=(",", ":")).encode()
             Path(output_artifact.location).write_bytes(encoded + b"\n")
             state.stages[0].output_artifacts[0] = ArtifactRef(

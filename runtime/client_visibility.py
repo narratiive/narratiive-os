@@ -132,14 +132,22 @@ def external_document_attention(state):
 def client_summary(state, row, review_link):
     status = state.status.value
     document_attention, count = external_document_attention(state)
+    meaning = 'This is the recorded position; no later work or client release is implied.'
+    recommendation = 'I recommend keeping the current work within its existing review and approval gates.'
     if document_attention == 'candidate_review':
         issue = f'{count} externally supplied document candidate(s) await exact manual review; upload has not completed this stage.'
+        meaning = 'The file is preserved, but upload is neither quality acceptance nor approval.'
+        recommendation = 'I recommend reviewing the exact document before deciding.'
         action = 'Matt: review the exact candidate and explicitly approve manual recovery or keep it pending.'
     elif document_attention == 'unsent_draft_review':
         issue = 'The externally supplied document is approved and an internal Gmail draft is verified unsent.'
+        meaning = 'The message and attachment are ready for internal review; nothing has been sent.'
+        recommendation = 'I recommend checking both together before authorising a send.'
         action = 'Matt: review the exact message and attachment. Sending still requires separate authorisation.'
     elif document_attention == 'approved_document':
         issue = 'The exact external document has recorded human manual-recovery approval.'
+        meaning = 'This approves only that version; it does not authorise communication.'
+        recommendation = 'I recommend preparing an internal draft for review next.'
         action = 'Matt: request internal draft preparation; no send is authorised.'
     elif status in {'blocked','failed'}:
         code = str(state.blocker or '')
@@ -150,19 +158,31 @@ def client_summary(state, row, review_link):
         elif 'inputs' in code:
             issue = 'Required handoff inputs are missing or invalid.'
         else: issue = 'A recorded operational blocker needs investigation.'
+        meaning = 'Work is stopped; there is no evidence of completion.'
+        recommendation = 'I recommend resolving the recorded blocker before commissioning more work.'
         action = 'Matt: no approval requested while this is blocked.'
     elif state.approval_status == 'pending':
         issue = 'Awaiting your review.'
+        meaning = 'Progression remains gated until the exact version has your decision.'
+        recommendation = 'I recommend checking the latest review copy against the agreed brief.'
         action = 'Matt: review this exact version, then approve or request changes.'
     elif status == 'complete':
         issue = 'Current step completed; no later completion is claimed.'
         action = 'Matt: no new approval requested.'
+        if state.workflow_id == 'growth_blueprint_deliverable_production':
+            meaning = 'There is no supported supervised revision route for this completed Fieldwork engagement. Recovery only accepts work that is already blocked.'
+            recommendation = 'I recommend retaining the existing version while that revision gap is resolved. Editable PPTX is optional for future eligible PDF handbacks.'
+            action = 'Matt: confirm whether you need a revised PDF. No new approval has been applied.'
+            if any(item.get('approval_kind') == 'synthetic_rehearsal' for item in state.approval_history):
+                issue = 'The rehearsal step is complete under simulated review, not Matt or client approval.'
     else:
         issue = 'Work is in progress.'
+        meaning = 'The current step has not reached a verified completion or approval gate.'
+        recommendation = 'I recommend monitoring this work without creating a duplicate commission.'
         action = 'Matt: no action required at this stage.'
     link = 'Review: ' + review_link if review_link else 'No verified current review link is recorded.'
     name = row['company']
     if '_' in name or re.search(r'-\d{6,}', name): name = 'Client name not supplied'
     recorded = row['engagement_started_at'][:16].replace('T',' ')
     return (f"{name} (recorded {recorded}) — {row['commercial_product']} / {row['phase']}: {status.replace('_',' ')}. "
-            f"{issue} {action} {link}")
+            f"{issue} {meaning} {recommendation} {action} {link}")

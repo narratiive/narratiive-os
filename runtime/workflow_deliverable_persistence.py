@@ -34,10 +34,9 @@ class WorkflowDeliverablePersistenceService:
         if not folder_id:
             raise WorkflowDeliverablePersistenceError("verified Drive folder identifier is required")
         artifact, output = self._artifact_output(state)
-        files = (
-            self._file(output, "editable_pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-            self._file(output, "review_pdf", "application/pdf"),
-        )
+        # This approved-delivery action is PDF-first. Optional internal source
+        # material is neither a condition nor an automatic client deliverable.
+        files = [self._file(output, "review_pdf", "application/pdf")]
         action = {
             "kind": "persist_reviewed_growth_blueprint_files",
             "source_workflow": state.workflow_id,
@@ -171,6 +170,10 @@ class WorkflowDeliverablePersistenceService:
         if not location.is_file():
             raise WorkflowDeliverablePersistenceError(f"{field} is unavailable")
         content = location.read_bytes()
+        provenance = output.get('external_document_provenance') or {}
+        expected = next((item.get('sha256') for item in provenance.get('files', []) if item.get('field') == field), None)
+        if expected and hashlib.sha256(content).hexdigest() != expected:
+            raise WorkflowDeliverablePersistenceError('Approved document bytes changed')
         return {
             "field": field,
             "filename": location.name,
