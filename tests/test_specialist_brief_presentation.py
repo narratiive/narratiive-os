@@ -34,7 +34,7 @@ class SpecialistBriefPresentationTests(unittest.TestCase):
         for phrase in ('Fieldwork presentation','Problem:','Tony recommends:','Copy to Claude:',
                        'Established hospitality','boutique hotels','£118800','not forecast/profit',
                        'v7.2','editable PPTX + matching PDF','source register','visual QA','Handback:',
-                       'Matt next:','Leadership priority unconfirmed','completed run cannot adopt',FIELDWORK_SPEC):
+                       'Matt next:','Public-source verification failed.','completed run cannot adopt',FIELDWORK_SPEC):
             self.assertIn(phrase,text)
         self.assertNotIn('Obsolete subscription',text)
         self.assertNotIn(selected.run_id,text)
@@ -59,8 +59,20 @@ class SpecialistBriefPresentationTests(unittest.TestCase):
         self.assertIn('strategic recommendation',text)
         self.assertIn('No run was substituted',text)
 
+    def test_all_material_uncertainties_and_internal_sources_remain_in_brief(self):
+        selected=fieldwork()
+        selected.input_payload['evidence_and_uncertainty'].append('Later caveat: model cannot support subscriber growth.')
+        selected.input_payload['source_register']['entries']=[{'source_id':'P1','title':'Supplied assumptions',
+            'location':'/immutable/model.md','classification':'assumption'}]
+        result=DocumentHandbackService(None,{}).brief(selected)
+        text=format_document_brief(selected,result)
+        self.assertIn('Later caveat: model cannot support subscriber growth.',text)
+        self.assertIn('P1 Supplied assumptions',text)
+        self.assertIn('audit location',text)
+        self.assertEqual(result['specialist_audit']['source_register']['entries'][0]['location'],'/immutable/model.md')
+
     def test_oversized_evidence_does_not_silently_truncate_the_copyable_brief(self):
-        selected=fieldwork();selected.input_payload['assumption_control']['missing_evidence']=['A'*4000]
+        selected=fieldwork();selected.input_payload['evidence_and_uncertainty'].append('A'*4000)
         text=format_document_brief(selected,DocumentHandbackService(None,{}).brief(selected))
         self.assertIn('exceeds one complete Telegram',text)
         self.assertIn('no evidence was truncated',text)

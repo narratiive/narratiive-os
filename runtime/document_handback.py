@@ -276,6 +276,8 @@ def format_fieldwork_specialist_brief(state, brief):
         location = str(entry.get('location') or '')
         if location.startswith('https://'):
             sources.append(str(entry.get('source_id') or '') + ' ' + location)
+        else:
+            sources.append(str(entry.get('source_id') or '') + ' ' + str(entry.get('title') or 'Internal supplied source') + ' (' + str(entry.get('classification') or 'verification status unknown').replace('_', ' ') + '; audit location)')
     model_note = 'No verified client baseline: do not invent a forecast, profit or ROI.'
     if model.get('classification') == 'illustrative_scenario_model':
         scenarios = model.get('scenarios') or []
@@ -286,28 +288,21 @@ def format_fieldwork_specialist_brief(state, brief):
         if parts:
             basis = '/'.join(str(entry.get('source_id')) for entry in entries if entry.get('classification') == 'assumption') or 'Recorded model'
             model_note = basis + ' illustrative assumptions, year-one revenue, not forecast/profit: ' + '; '.join(parts) + '.'
-    limits = ' '.join(str(item) for item in uncertainty)
-    gaps = (payload.get('assumption_control') or {}).get('missing_evidence', [])
-    if 'failed' in limits.lower() and 'verif' in limits.lower():
-        verification_note = 'Public-page re-verification failed in the supplied pack; source links are documentary leads, not independently verified facts.'
-    else:
-        verification_note = 'Preserve the source register’s verification status; do not treat supplied links as independently verified facts.'
     handback_note = 'The completed run cannot adopt a new version without an eligible preparation boundary.' if state.status.value == 'complete' else 'Ask Tony to verify the current stage is an eligible blocked final-preparation boundary before adoption.'
     paragraphs = [
         f"{brief.get('client_name') or brief.get('client')} — Fieldwork presentation. {approval}",
         'Problem: ' + str(problem['diagnosis']),
-        "Tony recommends: revise the Fieldwork deck from the recorded approved evidence below; preserve its strategic focus.",
+        "Tony recommends: revise Fieldwork using the recorded strategy below.",
         'Copy to Claude:',
-        'Prepare the complete Fieldwork deck for ' + str(brief.get('client_name') or brief.get('client')) + ' under Matt’s direction. Strategic direction: ' + str(thesis['insight']),
-        'Evidence limits: ' + str(uncertainty[0]),
+        'Create Fieldwork for ' + str(brief.get('client_name') or brief.get('client')) + ' under Matt’s direction. Strategic direction: ' + str(thesis['insight']),
+        'Evidence limits: ' + ' '.join(str(item).replace('growth-sprint', 'Fieldwork') for item in uncertainty),
         model_note,
         'Sources (recorded, not newly verified): ' + '; '.join(sources),
-        verification_note,
-        'Known gaps: ' + '; '.join(str(item) for item in gaps),
+
         'Follow Fieldwork v7, including v7.1 evidence rules and v7.2 handback: ' + FIELDWORK_SPEC,
-        'Use Rave’s six-act argument, competitor/audience evidence, five-lever table, clear SO WHAT and 90-day marketing activation. No copied findings or invented certainty.',
-        'Return editable PPTX + matching PDF, presentation specification, commercial model, source register, visual QA, production evidence and release recommendation. Cite claims on slides; retain facts/inferences/assumptions and QA gaps.',
-        'Handback: follow v7.2 filenames/versioning; return producer, version, source/strategy references and file manifest to Matt. Registration and exact-version approval remain separate. ' + handback_note,
+        'Use Rave’s six-act argument, competitor/audience evidence, five-lever table, SO WHAT and 90-day marketing activation; no copied findings.',
+        'Return editable PPTX + matching PDF, presentation specification, commercial model, source register, visual QA, production evidence and release recommendation. Cite claims; label facts, inferences and assumptions.',
+        'Handback: v7.2 filenames/versioning, producer, source/strategy references and file manifest to Matt; registration is not approval. ' + handback_note,
         'Matt next: confirm scope, deadline and a verified Fieldwork working folder (not a stills folder); copy this brief to Claude. Return files for exact-version review. No automatic production, send or publication.',
     ]
     # Keep the already deployed Telegram transport/escaping contract unchanged.
