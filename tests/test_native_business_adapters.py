@@ -280,6 +280,36 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         with self.assertRaisesRegex(BusinessAdapterError, "scope_rejected"):
             adapter(rejected)
 
+    def test_gmail_reviewed_html_is_created_as_unsent_multipart_draft(self):
+        router = Router([
+            {"drafts": []},
+            {"id": "draft-1", "message": {"id": "message-1", "threadId": "thread-1"}},
+        ])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+        result = adapter(
+            approved_contract(
+                {
+                    "kind": "reviewed_outreach_email",
+                    "operation": "create_draft",
+                    "recipient_email": "matt@example.invalid",
+                    "subject": "SAFE discovery invitation",
+                    "body": "SAFE plain-text alternative",
+                    "email_html": "<html><body><strong>SAFE HTML</strong></body></html>",
+                }
+            )
+        )
+
+        self.assertTrue(result["drafted"])
+        self.assertFalse(result["sent"])
+        self.assertEqual(result["draft_id"], "draft-1")
+        self.assertEqual(router.requests[1].full_url, "https://gmail.googleapis.com/gmail/v1/users/me/drafts")
+        encoded = json.loads(router.requests[1].data)["message"]["raw"]
+        decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded) % 4)).decode("utf-8")
+        self.assertIn("Content-Type: multipart/alternative", decoded)
+        self.assertIn("Content-Type: text/plain", decoded)
+        self.assertIn("Content-Type: text/html", decoded)
+        self.assertIn("SAFE HTML", decoded)
+
     def test_calendar_freebusy_is_read_only_and_create_uses_deterministic_id(self):
         router = Router([
             {"calendars": {"primary": {"busy": [{"start": "2026-09-08T10:00:00Z", "end": "2026-09-08T10:30:00Z"}]}}},

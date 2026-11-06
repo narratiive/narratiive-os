@@ -137,6 +137,22 @@ class TonyPersistentAutonomousResultCommandService(TonyAutonomousDispatchCommand
                     "subject": subject,
                     "body": body,
                 }
+                recipient_email = str(
+                    target.get("recipient_email") or target.get("email") or ""
+                ).strip()
+                if recipient_email:
+                    dispatch["payload"]["recipient_email"] = recipient_email
+                email_html = str(evidence.get("reviewed_outreach_html") or "").strip()
+                if email_html:
+                    dispatch["payload"].update(
+                        {
+                            "operation": "create_draft",
+                            "email_html": email_html,
+                            "template_version": str(
+                                evidence.get("reviewed_outreach_template_version") or ""
+                            ).strip(),
+                        }
+                    )
                 creative = str(evidence.get("reviewed_outreach_creative_brief") or "").strip()
                 if creative:
                     dispatch["payload"]["creative_brief"] = creative

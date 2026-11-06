@@ -1099,7 +1099,12 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         workflow_runtime_root=workflow_runtime_root,
         researcher=BlueprintLiteWebsiteResearch(workflow_runtime_root / "blueprint-lite-research"),
     )
-    dispatch_service = TonyCommercialAutonomousJudgementCommandService(memory_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))))
+    dispatch_service = TonyCommercialAutonomousJudgementCommandService(
+        memory_service,
+        dispatchers=live_dispatchers,
+        store_path=Path(os.getenv("TONY_AUTONOMOUS_RESULT_CONTEXT_PATH", str(REPOSITORY_ROOT / ".runtime" / "autonomous-result-context.json"))),
+        discovery_booking_url=os.getenv("TONY_DISCOVERY_BOOKING_URL", ""),
+    )
 
     def accept_verified_commercial_result(worker: str, dispatch: dict[str, Any], evidence: dict[str, Any], executive_result: str) -> dict[str, Any]:
         verified, reason = dispatch_service._verify_evidence(dispatch, evidence)
