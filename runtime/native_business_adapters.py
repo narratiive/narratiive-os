@@ -9,6 +9,8 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from email.message import EmailMessage
+from email.parser import BytesParser
+from email import policy
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib import parse, request
@@ -354,10 +356,12 @@ class GmailDispatcher(GoogleAdapter):
             f"{recipient}\0{subject}\0{body}".encode("utf-8")
         ).hexdigest()
         message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
-        query = parse.urlencode({"q": f"in:sent rfc822msgid:{message_header}", "maxResults": "1"})
-        existing = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
-        matches = existing.get("messages", [])
-        if isinstance(matches, list) and matches:
+        draft = _text(contract.get("operation")) == "create_draft"
+        collection = "drafts" if draft else "messages"
+        query = parse.urlencode({"q": f"in:{'drafts' if draft else 'sent'} rfc822msgid:{message_header}", "maxResults": "1"})
+        existing = self.client.call(f"{self.api_base}/users/me/{collection}?{query}", headers=self._headers())
+        matches = existing.get(collection, [])
+        if not draft and isinstance(matches, list) and matches:
             prior = _mapping(matches[0])
             return {
                 "verified": True,
@@ -392,6 +396,30 @@ class GmailDispatcher(GoogleAdapter):
                 maintype, subtype = mime_type.split("/", 1)
                 email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
         raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
+        if draft:
+            if isinstance(matches, list) and matches:
+                draft_id = _text(_mapping(matches[0]).get("id"))
+            else:
+                created = self.client.call(f"{self.api_base}/users/me/drafts", method="POST",
+                    headers=self._headers(), body={"message": {"raw": raw}})
+                draft_id = _text(created.get("id"))
+            if not draft_id: raise BusinessAdapterError("gmail_draft_unverified")
+            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers())
+            encoded = _text(_mapping(checked.get("message")).get("raw"))
+            decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded)%4))
+            actual = BytesParser(policy=policy.default).parsebytes(decoded)
+            def files(message):
+                return [(part.get_filename(), hashlib.sha256(part.get_payload(decode=True)).hexdigest())
+                        for part in message.iter_attachments()]
+            actual_body = actual.get_body(preferencelist=("plain",))
+            if (str(actual.get("To")) != recipient or str(actual.get("Subject")) != subject
+                or actual_body is None or actual_body.get_content().replace('\r\n','\n').strip() != body.replace('\r\n','\n').strip()
+                or files(actual) != files(email)):
+                raise BusinessAdapterError("gmail_draft_readback_mismatch")
+            return {"verified": True, "sent": False, "draft_id": draft_id,
+                "message_id": _text(_mapping(checked.get("message")).get("id")),
+                "mutation_count": 0 if matches else 1, "duplicate_suppressed": bool(matches),
+                "attachment_checksums": [checksum for _,checksum in files(actual)]}
         sent = self.client.call(
             f"{self.api_base}/users/me/messages/send",
             method="POST",

@@ -360,6 +360,14 @@ class FileWorkflowCommandBackend:
             return None
         return value if isinstance(value, Mapping) else None
 
+    def document_handback(self, state, operation, inputs, principal):
+        from runtime.document_handback import DocumentHandbackService
+        service = DocumentHandbackService(self._runtime(state), self.dispatchers)
+        if operation == "document-brief": return service.brief(state)
+        if operation == "handback": return service.register(state, inputs, principal)
+        if not principal: raise ValueError("Authenticated principal required for internal draft")
+        return service.draft(state, str(inputs.get("candidate_id") or ""))
+
     def artifact_detail(self, state: WorkflowState) -> Mapping[str, Any]:
         return WorkflowActionPreviewService(
             self.root,
@@ -709,6 +717,7 @@ class TonyWorkflowCommandService:
     _COMMANDS = {
         "workflow", "client", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover", "manual-recovery",
+        "handback", "document-brief", "draft-document",
         "projection", "sync-notion", "research",
         "deliver-review",
         "commission",
@@ -924,6 +933,14 @@ class TonyWorkflowCommandService:
                     {"event_id": event.event_id, "entity_id": event.entity_id, "workflow_id": event.workflow_id},
                 )
             state = self._resolve(states, reference)
+            if name in {"handback", "document-brief", "draft-document"}:
+                if reference != state.run_id: raise ValueError("Use the exact engagement run ID for document handback")
+                result = self.backend.document_handback(state, name, dict(inputs or {}), principal_id)
+                return CommandResponse(name, "healthy", {
+                    "handback": "External document candidate registered; Matt review and exact approval are still required. No workflow completed or email sent.",
+                    "document-brief": "Specialist handoff brief ready. No production invoked.",
+                    "draft-document": "Exact approved attachment is in a verified unsent internal Gmail draft. Separate send authorisation remains required."
+                }[name], result)
             if name == "manual-recovery" and reference != state.run_id:
                 return self._error(
                     name,
