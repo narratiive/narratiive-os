@@ -41,6 +41,17 @@ class DocumentBriefDeliveryTests(unittest.TestCase):
         self.assertFalse(reply.endswith('\\'))
         self.assertIn(FIELDWORK_SPEC, reply)
 
+    def test_required_guidance_survives_maximum_escaped_optional_content(self):
+        dynamic = "_" * 1000
+        original = state(run_id="_" * 350, input_payload={"diagnostic_input_package":{"diagnostic":{
+            "challenge":dynamic, "recommended_actions":[dynamic]*3,
+            "raw_answers":{"unknowns":[dynamic]*5, "source_urls":["https://example.test/" + "_"*150 + str(i) for i in range(3)]}}}})
+        reply = format_document_brief(original, {"client_name":dynamic, "deadline":dynamic})
+        for phrase in ("Fieldwork v7 specification", "Production workspace", "Next action", "This run cannot adopt", "Safety"):
+            self.assertIn(phrase, reply)
+        self.assertLessEqual(len(reply), 3400)
+        self.assertNotRegex(re.sub(r'\\.', '', reply), r'[_*`\[]')
+
     def test_brief_is_readable_honest_and_preserves_required_next_action(self):
         original = state(input_payload={'diagnostic_input_package':{'diagnostic':{
             'challenge':'Test growth opportunity, not validated.',

@@ -170,9 +170,20 @@ def format_document_brief(state, brief):
         text = " ".join(str(value).split())
         if len(text) > limit:
             text = text[:limit-1] + "…"
-        line = escape(label + ": " + text)
-        if sum(len(item)+1 for item in lines) + len(line) <= 3400:
-            lines.append(line)
+        # Count escaped characters, not just source characters, and never split
+        # an escape pair. Long dynamic values cannot crowd out required guidance.
+        cap = min(limit, 300) if label != "Exact engagement" else 400
+        if text.startswith("https://"):
+            cap = len(escape(text))  # Include a complete URL or omit its line; never invent a truncated link.
+        escaped = []
+        for char in text:
+            token = escape(char) if not char.isspace() else " "
+            if sum(len(item) for item in escaped) + len(token) > cap:
+                escaped.append("…")
+                break
+            escaped.append(token)
+        line = escape(label + ": ") + " " + "".join(escaped)
+        lines.append((label, line))
 
     stage = state.stage(state.current_stage_id) if state.current_stage_id else None
     diagnostic = state.input_payload.get("diagnostic_input_package") or {}
@@ -207,4 +218,13 @@ def format_document_brief(state, brief):
     eligible = bool(stage and state.status.value == "blocked" and stage.side_effect_classification == "preparation" and state.stages[-1].stage_id == stage.stage_id and {"review_pdf", "editable_pptx"}.issubset(stage.expected_outputs))
     add("Next action", "Return PDF/PPTX and the complete declared stage-output bundle with producer/version; register a candidate for Matt's exact-version review. Upload is not approval." if eligible else "This run cannot adopt an external document at its current boundary. Identify the intended eligible preparation run before handback; no upstream work will be replayed.", 350)
     add("Safety", "No file created, production invoked, approval changed or client contact authorised.")
-    return "\n".join(lines)
+    required = {"Fieldwork v7 specification", "Production workspace", "Next action", "Safety"}
+    remaining = 3400 - sum(len(line)+1 for label, line in lines if label in required)
+    selected = []
+    for label, line in lines:
+        if label in required:
+            selected.append(line)
+        elif len(line)+1 <= remaining:
+            selected.append(line)
+            remaining -= len(line)+1
+    return "\n".join(selected)
