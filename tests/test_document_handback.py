@@ -94,7 +94,7 @@ class DocumentHandbackTests(unittest.TestCase):
             gmail=GmailDispatcher(GoogleOAuthConfig(access_token='test-only'),opener=opener)
             contract={'execution_mode':'approved_write','approval_granted':True,'operation':'create_draft','idempotency_key':'large-test',
                 'payload':{'recipient_email':'hello@narratiive.com','subject':'TEST','body':'Internal only',
-                    'attachments':[{'filename':'fixture.pdf','mime_type':'application/pdf','content_base64':base64.b64encode(b'%PDF-'+b'x'*1_000_000).decode()}]}}
+                    'attachments':[{'filename':'fixture.pdf','mime_type':'application/pdf','content_base64':base64.b64encode(b'%PDF-'+b'x'*(999_995 if extra else 4_999_995)).decode()}]}}
             if extra:
                 from runtime.native_business_adapters import BusinessAdapterError
                 with self.assertRaisesRegex(BusinessAdapterError,'readback_mismatch'):gmail(contract)

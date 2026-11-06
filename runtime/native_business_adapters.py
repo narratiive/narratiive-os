@@ -91,7 +91,7 @@ class JsonApiClient:
         max_response_bytes: int | None = None,
     ) -> dict[str, Any]:
         limit = self.max_response_bytes if max_response_bytes is None else max_response_bytes
-        if not 0 < limit <= 8_000_000: raise BusinessAdapterError("provider_response_limit_invalid")
+        if max_response_bytes is not None and not 0 < limit <= 12_000_000: raise BusinessAdapterError("provider_response_limit_invalid")
         data: bytes | None = None
         final_headers = {"Accept": "application/json", **dict(headers or {})}
         if body is not None:
@@ -402,6 +402,8 @@ class GmailDispatcher(GoogleAdapter):
                 email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
         raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
         if draft:
+            if len(subject)>1000 or len(body)>20_000 or len(recipient)>320:
+                raise BusinessAdapterError("gmail_draft_headers_or_body_too_large")
             if isinstance(matches, list) and matches:
                 draft_id = _text(_mapping(matches[0]).get("id"))
             else:
@@ -409,7 +411,7 @@ class GmailDispatcher(GoogleAdapter):
                     headers=self._headers(), body={"message": {"raw": raw}})
                 draft_id = _text(created.get("id"))
             if not draft_id: raise BusinessAdapterError("gmail_draft_unverified")
-            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers(), max_response_bytes=8_000_000)
+            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers(), max_response_bytes=12_000_000)
             encoded = _text(_mapping(checked.get("message")).get("raw"))
             decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded)%4))
             actual = BytesParser(policy=policy.default).parsebytes(decoded)
