@@ -151,3 +151,60 @@ class DocumentHandbackService:
             receipt=dict(receipt,kind='external_document_internal_draft',candidate_id=candidate_id,attachment_sha256=pdf['sha256'],
                          recipient='hello@narratiive.com',subject=subject,body=body,send_authorised=False))
         return dict(receipt,subject=subject,body=body,attachment_sha256=pdf['sha256'],send_authorised=False)
+
+
+def format_document_brief(state, brief):
+    """Bounded human brief for the published n8n legacy-Markdown send node.
+
+    Escape before measuring: the existing formatter caps responses at 3500.
+    Do not flatten arbitrary strategy JSON or imply missing evidence is verified.
+    """
+    def escape(value):
+        text = " ".join(str(value).split())
+        return "".join("\\" + char if char in "\\_*`[" else char for char in text)
+
+    lines = []
+    def add(label, value, limit=400):
+        if not value:
+            return
+        text = " ".join(str(value).split())
+        if len(text) > limit:
+            text = text[:limit-1] + "…"
+        line = escape(label + ": " + text)
+        if sum(len(item)+1 for item in lines) + len(line) <= 3400:
+            lines.append(line)
+
+    stage = state.stage(state.current_stage_id) if state.current_stage_id else None
+    diagnostic = state.input_payload.get("diagnostic_input_package") or {}
+    diagnostic = diagnostic.get("diagnostic", diagnostic) if isinstance(diagnostic, dict) else {}
+    raw = diagnostic.get("raw_answers") or {}
+    add("Commissioning brief", brief.get("client_name") or brief.get("client"), 180)
+    add("Exact engagement", state.run_id, 400)
+    add("Recorded stage", f"{state.workflow_id} / {state.current_stage_id or 'none'} — {state.status.value}; approval: {state.approval_status}", 350)
+    add("Scope", "This exact run only; later child engagements are separate. This read-only brief does not reopen or approve work.")
+    strategy = brief.get("strategy_from_engagement")
+    if isinstance(strategy, dict):
+        opportunity = next((strategy.get(key) for key in ("growth_opportunity", "strategic_opportunity", "thesis_statement") if isinstance(strategy.get(key), str)), None)
+    else:
+        opportunity = strategy if isinstance(strategy, str) else None
+    add("Opportunity" if opportunity else "Recorded hypothesis, not approved strategy", opportunity or raw.get("hypothesis") or diagnostic.get("challenge") or "No strategic opportunity is recorded; Matt must supply or identify the approved strategy.", 420)
+    focus = diagnostic.get("recommended_actions")
+    add("Recommended Fieldwork focus", "; ".join(str(item) for item in focus[:3]) if isinstance(focus, list) else "Validate the growth audience, commercial evidence and strategic choices against the approved strategy.", 320)
+    missing = raw.get("unknowns")
+    add("Matt / missing evidence", "; ".join(str(item) for item in missing[:5]) if isinstance(missing, list) else "Confirm current strategy, scope and evidence gaps before commissioning.", 380)
+    add("Deadline", brief.get("deadline"), 100)
+    add("Fieldwork v7 specification", FIELDWORK_SPEC, 200)
+    urls = raw.get("source_urls") or []
+    register = brief.get("source_register") or {}
+    if isinstance(register, dict):
+        urls = list(urls) + [entry.get("location") for entry in register.get("entries", []) if isinstance(entry, dict)]
+    for url in list(dict.fromkeys(str(url) for url in urls if url))[:3]:
+        if url.startswith("https://") and len(url) <= 180:
+            add("Recorded evidence reference", url, 180)
+    if not urls:
+        add("Evidence", "No source URLs recorded on this exact run; supply evidence before production.")
+    add("Production workspace", "No verified production-folder link is exposed by this brief; do not assume a destination.")
+    eligible = bool(stage and state.status.value == "blocked" and stage.side_effect_classification == "preparation" and state.stages[-1].stage_id == stage.stage_id and {"review_pdf", "editable_pptx"}.issubset(stage.expected_outputs))
+    add("Next action", "Return PDF/PPTX and the complete declared stage-output bundle with producer/version; register a candidate for Matt's exact-version review. Upload is not approval." if eligible else "This run cannot adopt an external document at its current boundary. Identify the intended eligible preparation run before handback; no upstream work will be replayed.", 350)
+    add("Safety", "No file created, production invoked, approval changed or client contact authorised.")
+    return "\n".join(lines)

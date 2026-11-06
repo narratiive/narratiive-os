@@ -936,6 +936,9 @@ class TonyWorkflowCommandService:
             if name in {"handback", "document-brief", "draft-document"}:
                 if reference != state.run_id: raise ValueError("Use the exact engagement run ID for document handback")
                 result = self.backend.document_handback(state, name, dict(inputs or {}), principal_id)
+                if name == "document-brief":
+                    from runtime.document_handback import format_document_brief
+                    return CommandResponse(name, "healthy", format_document_brief(state, result), result)
                 return CommandResponse(name, "healthy", {
                     "handback": "External document candidate registered; Matt review and exact approval are still required. No workflow completed or email sent.",
                     "document-brief": "Specialist handoff brief ready. No production invoked.",
@@ -1335,7 +1338,8 @@ class TonyWorkflowCommandService:
         needle = reference.strip().casefold()
         if not needle:
             raise LookupError("A run, client, company or lead reference is required.")
-        matches = [state for state in states if needle in _search_terms(state)]
+        canonical = [state for state in states if state.run_id.casefold() == needle]
+        matches = canonical or [state for state in states if needle in _search_terms(state)]
         exact = [state for state in matches if needle in _exact_terms(state)]
         selected = exact or matches
         if not selected:
