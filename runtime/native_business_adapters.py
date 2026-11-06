@@ -88,7 +88,10 @@ class JsonApiClient:
         body: Mapping[str, Any] | None = None,
         form: Mapping[str, str] | None = None,
         timeout: float = 20.0,
+        max_response_bytes: int | None = None,
     ) -> dict[str, Any]:
+        limit = self.max_response_bytes if max_response_bytes is None else max_response_bytes
+        if not 0 < limit <= 8_000_000: raise BusinessAdapterError("provider_response_limit_invalid")
         data: bytes | None = None
         final_headers = {"Accept": "application/json", **dict(headers or {})}
         if body is not None:
@@ -100,12 +103,12 @@ class JsonApiClient:
         req = request.Request(url, data=data, headers=final_headers, method=method)
         try:
             with self.opener(req, timeout=timeout) as response:
-                raw = response.read(self.max_response_bytes + 1)
+                raw = response.read(limit + 1)
         except HTTPError as exc:
             raise BusinessAdapterError(f"provider_http_{exc.code}") from exc
         except (URLError, TimeoutError, OSError) as exc:
             raise BusinessAdapterError("provider_unavailable") from exc
-        if len(raw) > self.max_response_bytes:
+        if len(raw) > limit:
             raise BusinessAdapterError("provider_response_too_large")
         try:
             payload = json.loads(raw.decode("utf-8") or "{}")
@@ -377,6 +380,7 @@ class GmailDispatcher(GoogleAdapter):
         email["Message-ID"] = message_header
         email.set_content(body)
         attachments = payload.get("attachments")
+        attachment_bytes = 0
         if attachments is not None:
             if not isinstance(attachments, list) or len(attachments) > 3:
                 raise BusinessAdapterError("gmail_attachments_invalid")
@@ -391,7 +395,8 @@ class GmailDispatcher(GoogleAdapter):
                     content = base64.b64decode(encoded, validate=True)
                 except (ValueError, TypeError) as exc:
                     raise BusinessAdapterError("gmail_attachment_invalid") from exc
-                if len(content) > 5_000_000:
+                attachment_bytes += len(content)
+                if len(content) > 5_000_000 or (draft and attachment_bytes > 5_000_000):
                     raise BusinessAdapterError("gmail_attachment_too_large")
                 maintype, subtype = mime_type.split("/", 1)
                 email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
@@ -404,7 +409,7 @@ class GmailDispatcher(GoogleAdapter):
                     headers=self._headers(), body={"message": {"raw": raw}})
                 draft_id = _text(created.get("id"))
             if not draft_id: raise BusinessAdapterError("gmail_draft_unverified")
-            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers())
+            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers(), max_response_bytes=8_000_000)
             encoded = _text(_mapping(checked.get("message")).get("raw"))
             decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded)%4))
             actual = BytesParser(policy=policy.default).parsebytes(decoded)
@@ -412,7 +417,9 @@ class GmailDispatcher(GoogleAdapter):
                 return [(part.get_filename(), hashlib.sha256(part.get_payload(decode=True)).hexdigest())
                         for part in message.iter_attachments()]
             actual_body = actual.get_body(preferencelist=("plain",))
-            if (str(actual.get("To")) != recipient or str(actual.get("Subject")) != subject
+            if (len(actual.get_all("To", [])) != 1 or len(actual.get_all("Subject", [])) != 1
+                or actual.get_all("Cc", []) or actual.get_all("Bcc", [])
+                or str(actual.get("To")) != recipient or str(actual.get("Subject")) != subject
                 or actual_body is None or actual_body.get_content().replace('\r\n','\n').strip() != body.replace('\r\n','\n').strip()
                 or files(actual) != files(email)):
                 raise BusinessAdapterError("gmail_draft_readback_mismatch")

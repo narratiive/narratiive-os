@@ -57,6 +57,10 @@ class DocumentHandbackService:
                     raise ValueError('Existing stage-output bundle checksum mismatch')
                 output = {key:value[key] for key in stage.expected_outputs if key in value}
         if not isinstance(output, dict): raise ValueError('Supply the complete externally produced stage-output bundle; no fields will be invented')
+        spec = output.get('presentation_specification')
+        if isinstance(spec, dict) and any(spec.get(key) not in (None, '', expected)
+                for key, expected in (('workspace_id',state.workspace_id),('client_id',state.client_id),('run_id',state.run_id))):
+            raise ValueError('Embedded document identity contradicts the engagement')
         if set(output) - set(stage.expected_outputs): raise ValueError('Output bundle cannot replace upstream inputs or governance')
         missing = [key for key in stage.expected_outputs if not output.get(key)]
         if missing: raise ValueError('Stage-output bundle missing required fields: ' + ', '.join(missing))
@@ -89,7 +93,10 @@ class DocumentHandbackService:
                 raise ValueError('Document type does not match its stage role')
             checksum = hashlib.sha256(data).hexdigest()
             directory = self.runtime.coordinator.artifacts.root/'external-files'/checksum
-            directory.mkdir(parents=True,exist_ok=True); target = directory/name
+            directory.mkdir(parents=True,exist_ok=True)
+            directory.resolve().relative_to(self.runtime.coordinator.artifacts.root.resolve())
+            target = directory/name
+            if target.is_symlink(): raise ValueError('Document symlinks are not accepted')
             if target.exists() and target.read_bytes()!=data: raise ValueError('Immutable file collision')
             if not target.exists():
                 with target.open('xb') as handle: handle.write(data)

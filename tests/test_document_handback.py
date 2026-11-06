@@ -69,3 +69,34 @@ class DocumentHandbackTests(unittest.TestCase):
             'payload':{'recipient_email':'hello@narratiive.com','subject':'TEST fixture','body':'Internal review only.','attachments':[{'filename':'test.pdf','mime_type':'application/pdf','content_base64':base64.b64encode(b'%PDF fixture').decode()}]}})
         self.assertFalse(result['sent']);self.assertTrue(result['verified'])
         self.assertTrue(result['attachment_checksums']);self.assertFalse(any('/send' in url for url in calls))
+
+    def test_embedded_identity_conflicts_are_rejected(self):
+        service=DocumentHandbackService(self.runtime,{})
+        for key in ('workspace_id','client_id','run_id'):
+            inputs=copy.deepcopy(self.inputs);inputs['output']['presentation_specification'][key]='another-engagement'
+            with self.assertRaisesRegex(ValueError,'contradicts'):service.register(self.state,inputs,'test-human')
+
+    def test_real_json_client_accepts_supported_pdf_size_and_rejects_extra_recipient_headers(self):
+        from email.parser import BytesParser
+        from email import policy
+        from tests.test_native_business_adapters import Response
+        for extra in (None,'Bcc','Cc','To'):
+            stored={};calls=[]
+            def opener(req,timeout):
+                calls.append(req.full_url)
+                if '?q=' in req.full_url:return Response({'drafts':[]})
+                if req.method=='POST':
+                    stored.update(json.loads(req.data)['message']);return Response({'id':'draft1'})
+                raw=base64.urlsafe_b64decode(stored['raw']+'='*(-len(stored['raw'])%4))
+                if extra:
+                    raw=extra.encode()+b': unexpected@example.invalid\n'+raw
+                return Response({'id':'draft1','message':{'raw':base64.urlsafe_b64encode(raw).decode(),'id':'msg1'}})
+            gmail=GmailDispatcher(GoogleOAuthConfig(access_token='test-only'),opener=opener)
+            contract={'execution_mode':'approved_write','approval_granted':True,'operation':'create_draft','idempotency_key':'large-test',
+                'payload':{'recipient_email':'hello@narratiive.com','subject':'TEST','body':'Internal only',
+                    'attachments':[{'filename':'fixture.pdf','mime_type':'application/pdf','content_base64':base64.b64encode(b'%PDF-'+b'x'*1_000_000).decode()}]}}
+            if extra:
+                from runtime.native_business_adapters import BusinessAdapterError
+                with self.assertRaisesRegex(BusinessAdapterError,'readback_mismatch'):gmail(contract)
+            else:self.assertTrue(gmail(contract)['verified'])
+            self.assertFalse(any('/send' in url for url in calls))
