@@ -100,3 +100,19 @@ class DocumentHandbackTests(unittest.TestCase):
                 with self.assertRaisesRegex(BusinessAdapterError,'readback_mismatch'):gmail(contract)
             else:self.assertTrue(gmail(contract)['verified'])
             self.assertFalse(any('/send' in url for url in calls))
+
+    def test_client_status_distinguishes_candidate_exact_approval_and_unsent_draft(self):
+        from runtime.client_visibility import client_engagements,client_summary
+        service=DocumentHandbackService(self.runtime,{'Gmail':Mock(return_value={'verified':True,'sent':False,'draft_id':'test-only'})})
+        record=service.register(self.state,self.inputs,'test-human')
+        def summary():
+            state=self.runtime.runs.load_run(self.state.run_id)
+            row=client_engagements([state])[0][1]
+            return client_summary(state,row,None)
+        self.assertIn('await exact manual review',summary())
+        recovery=record['manual_recovery']
+        self.runtime.recover_with_approved_artifact(self.state.run_id,**recovery,approver='test-human',rationale='Fixture',approval_evidence=_approval('Recover this exact SAFE fixture.'))
+        self.assertIn('request internal draft preparation',summary())
+        service.draft(self.state,recovery['recovery_id'])
+        self.assertIn('Gmail draft is verified unsent',summary())
+        self.assertIn('separate authorisation',summary())
