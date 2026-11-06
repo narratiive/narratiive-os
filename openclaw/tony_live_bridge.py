@@ -511,6 +511,7 @@ class LeadAwareTonyApplication:
                 "resume": "resume",
                 "recover": "recover",
                 "manual-recovery": "manual-recovery",
+                "register-document": "handback", "document-brief": "document-brief", "prepare-document-draft": "draft-document",
                 "projection": "projection",
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
@@ -533,7 +534,7 @@ class LeadAwareTonyApplication:
             if inputs and operation not in {
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
-                "sync-campaign-learning", "classify-synthetic-test", "manual-recovery",
+                "sync-campaign-learning", "classify-synthetic-test", "manual-recovery", "register-document", "prepare-document-draft",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
@@ -541,7 +542,7 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery", "register-document", "prepare-document-draft"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
                 if operation in {"approve", "reject", "request-revision"}:

@@ -96,6 +96,11 @@ class FileWorkflowArtifactStore:
             governance=governance,
         )
 
+    def persist_external_candidate(self, state, stage_id, output, candidate_id):
+        return self._persist(state, stage_id, output, artifact_type="external_document_candidate",
+            discriminator=candidate_id, governance={"automated_completion": False,
+                "execution_mode": "external_document_candidate", "approval_status": "pending"})
+
     def persist_manual_recovery(
         self,
         state: WorkflowState,

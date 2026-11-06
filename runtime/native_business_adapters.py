@@ -9,6 +9,8 @@ import time
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
 from email.message import EmailMessage
+from email.parser import BytesParser
+from email import policy
 from pathlib import Path
 from typing import Any, Callable, Mapping
 from urllib import parse, request
@@ -86,7 +88,10 @@ class JsonApiClient:
         body: Mapping[str, Any] | None = None,
         form: Mapping[str, str] | None = None,
         timeout: float = 20.0,
+        max_response_bytes: int | None = None,
     ) -> dict[str, Any]:
+        limit = self.max_response_bytes if max_response_bytes is None else max_response_bytes
+        if max_response_bytes is not None and not 0 < limit <= 12_000_000: raise BusinessAdapterError("provider_response_limit_invalid")
         data: bytes | None = None
         final_headers = {"Accept": "application/json", **dict(headers or {})}
         if body is not None:
@@ -98,12 +103,12 @@ class JsonApiClient:
         req = request.Request(url, data=data, headers=final_headers, method=method)
         try:
             with self.opener(req, timeout=timeout) as response:
-                raw = response.read(self.max_response_bytes + 1)
+                raw = response.read(limit + 1)
         except HTTPError as exc:
             raise BusinessAdapterError(f"provider_http_{exc.code}") from exc
         except (URLError, TimeoutError, OSError) as exc:
             raise BusinessAdapterError("provider_unavailable") from exc
-        if len(raw) > self.max_response_bytes:
+        if len(raw) > limit:
             raise BusinessAdapterError("provider_response_too_large")
         try:
             payload = json.loads(raw.decode("utf-8") or "{}")
@@ -354,10 +359,12 @@ class GmailDispatcher(GoogleAdapter):
             f"{recipient}\0{subject}\0{body}".encode("utf-8")
         ).hexdigest()
         message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
-        query = parse.urlencode({"q": f"in:sent rfc822msgid:{message_header}", "maxResults": "1"})
-        existing = self.client.call(f"{self.api_base}/users/me/messages?{query}", headers=self._headers())
-        matches = existing.get("messages", [])
-        if isinstance(matches, list) and matches:
+        draft = _text(contract.get("operation")) == "create_draft"
+        collection = "drafts" if draft else "messages"
+        query = parse.urlencode({"q": f"in:{'drafts' if draft else 'sent'} rfc822msgid:{message_header}", "maxResults": "1"})
+        existing = self.client.call(f"{self.api_base}/users/me/{collection}?{query}", headers=self._headers())
+        matches = existing.get(collection, [])
+        if not draft and isinstance(matches, list) and matches:
             prior = _mapping(matches[0])
             return {
                 "verified": True,
@@ -373,6 +380,7 @@ class GmailDispatcher(GoogleAdapter):
         email["Message-ID"] = message_header
         email.set_content(body)
         attachments = payload.get("attachments")
+        attachment_bytes = 0
         if attachments is not None:
             if not isinstance(attachments, list) or len(attachments) > 3:
                 raise BusinessAdapterError("gmail_attachments_invalid")
@@ -387,11 +395,40 @@ class GmailDispatcher(GoogleAdapter):
                     content = base64.b64decode(encoded, validate=True)
                 except (ValueError, TypeError) as exc:
                     raise BusinessAdapterError("gmail_attachment_invalid") from exc
-                if len(content) > 5_000_000:
+                attachment_bytes += len(content)
+                if len(content) > 5_000_000 or (draft and attachment_bytes > 5_000_000):
                     raise BusinessAdapterError("gmail_attachment_too_large")
                 maintype, subtype = mime_type.split("/", 1)
                 email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
         raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
+        if draft:
+            if len(subject)>1000 or len(body)>20_000 or len(recipient)>320:
+                raise BusinessAdapterError("gmail_draft_headers_or_body_too_large")
+            if isinstance(matches, list) and matches:
+                draft_id = _text(_mapping(matches[0]).get("id"))
+            else:
+                created = self.client.call(f"{self.api_base}/users/me/drafts", method="POST",
+                    headers=self._headers(), body={"message": {"raw": raw}})
+                draft_id = _text(created.get("id"))
+            if not draft_id: raise BusinessAdapterError("gmail_draft_unverified")
+            checked = self.client.call(f"{self.api_base}/users/me/drafts/{parse.quote(draft_id,safe='')}?format=raw", headers=self._headers(), max_response_bytes=12_000_000)
+            encoded = _text(_mapping(checked.get("message")).get("raw"))
+            decoded = base64.urlsafe_b64decode(encoded + "=" * (-len(encoded)%4))
+            actual = BytesParser(policy=policy.default).parsebytes(decoded)
+            def files(message):
+                return [(part.get_filename(), hashlib.sha256(part.get_payload(decode=True)).hexdigest())
+                        for part in message.iter_attachments()]
+            actual_body = actual.get_body(preferencelist=("plain",))
+            if (len(actual.get_all("To", [])) != 1 or len(actual.get_all("Subject", [])) != 1
+                or actual.get_all("Cc", []) or actual.get_all("Bcc", [])
+                or str(actual.get("To")) != recipient or str(actual.get("Subject")) != subject
+                or actual_body is None or actual_body.get_content().replace('\r\n','\n').strip() != body.replace('\r\n','\n').strip()
+                or files(actual) != files(email)):
+                raise BusinessAdapterError("gmail_draft_readback_mismatch")
+            return {"verified": True, "sent": False, "draft_id": draft_id,
+                "message_id": _text(_mapping(checked.get("message")).get("id")),
+                "mutation_count": 0 if matches else 1, "duplicate_suppressed": bool(matches),
+                "attachment_checksums": [checksum for _,checksum in files(actual)]}
         sent = self.client.call(
             f"{self.api_base}/users/me/messages/send",
             method="POST",
