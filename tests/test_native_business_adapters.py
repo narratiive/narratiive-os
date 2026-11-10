@@ -383,6 +383,54 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
 
+    def test_calendar_search_returns_bounded_event_identifiers_without_mutation(self):
+        router = Router([
+            {
+                "items": [
+                    {
+                        "id": "event-pimentae-1",
+                        "summary": "Narratiive / Pimentae Discovery",
+                        "status": "confirmed",
+                        "start": {"dateTime": "2026-11-12T09:00:00Z"},
+                        "end": {"dateTime": "2026-11-12T09:30:00Z"},
+                        "attendees": [{"email": "hello@narratiive.com"}, {"email": "founder@pimentae.example"}],
+                        "htmlLink": "https://calendar.google.invalid/event-pimentae-1",
+                    }
+                ]
+            }
+        ])
+        adapter = GoogleCalendarDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"time_min": "2026-11-11T00:00:00Z", "time_max": "2026-11-13T00:00:00Z", "query": "Pimentae"},
+        })
+
+        self.assertTrue(result["read_only"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(result["result_count"], 1)
+        event = result["events"][0]
+        self.assertEqual(event["event_id"], "event-pimentae-1")
+        self.assertEqual(event["start"], "2026-11-12T09:00:00Z")
+        self.assertEqual(event["end"], "2026-11-12T09:30:00Z")
+        self.assertIn("founder@pimentae.example", event["attendees"])
+        self.assertIn("q=Pimentae", router.requests[0].full_url)
+
+    def test_calendar_get_event_returns_empty_on_404_without_raising(self):
+        router = Router([HTTPError("https://calendar.google.invalid", 404, "not found", {}, None)])
+        adapter = GoogleCalendarDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "get_event",
+            "target": {"event_id": "missing-event"},
+        })
+
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["events"], [])
+        self.assertEqual(result["result_count"], 0)
+
     def test_drive_workspace_creation_is_idempotent(self):
         router = Router([{"files": [{"id": "folder-1", "webViewLink": "https://drive.google.invalid/folder-1"}]}])
         adapter = GoogleDriveDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
