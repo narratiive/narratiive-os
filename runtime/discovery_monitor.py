@@ -53,6 +53,7 @@ class TonyDiscoveryMonitor:
         self.state = self._load()
 
     def run(self) -> dict[str, Any]:
+        self._notification_error: str | None = None
         active = self._active_tracking()
         adoption: CommandResponse | None = None
         if active is None:
@@ -66,6 +67,8 @@ class TonyDiscoveryMonitor:
                 "external_action_taken": False,
                 "notification_sent": False,
             }
+            if self._notification_error:
+                result["notification_error"] = self._notification_error
             self._record("discovery_monitor.no_tracked_discovery", result)
             return result
 
@@ -80,6 +83,8 @@ class TonyDiscoveryMonitor:
             "external_action_taken": False,
             "notification_sent": notification_sent,
         }
+        if self._notification_error:
+            result["notification_error"] = self._notification_error
         self._record("discovery_monitor.checked", result)
         return result
 
@@ -135,7 +140,17 @@ class TonyDiscoveryMonitor:
         delivered = self.state.get("delivered") if isinstance(self.state.get("delivered"), dict) else {}
         if delivered.get(lead_id) == digest:
             return False
-        self.notify(message)
+        try:
+            self.notify(message)
+        except Exception as exc:
+            # A transient founder-notification failure must remain retryable and
+            # must not abort the surrounding proactive escalation watch.
+            self._notification_error = str(exc)
+            self._record(
+                "discovery_monitor.notification_failed",
+                {"lead_id": lead_id, "status": status, "digest": digest, "error": str(exc)},
+            )
+            return False
         delivered[lead_id] = digest
         self.state["delivered"] = delivered
         self._persist()

@@ -77,7 +77,14 @@ class TonyProposalHandbackCommandService:
         if not data or len(data) > MAX_BYTES or not data.startswith(b"%PDF-"):
             return self._error("proposal_handback_not_a_pdf", "The supplied bytes are not a real, bounded-size PDF document.")
         checksum = hashlib.sha256(data).hexdigest()
-        recovery_id = f"proposal-handback-{checksum[:24]}"
+        # The same PDF bytes can legitimately be returned for two distinct
+        # leads. Idempotency is scoped to the governed lead + source brief,
+        # never globally to document bytes, so one client's metadata cannot be
+        # replayed into another client's record.
+        identity_digest = hashlib.sha256(
+            "\0".join((_text(lead_id), _text(brief_id), checksum)).encode("utf-8")
+        ).hexdigest()
+        recovery_id = f"proposal-handback-{identity_digest[:24]}"
         documents = dict(self.state.get("documents") or {})
         existing = documents.get(recovery_id)
         if existing is not None:
@@ -106,6 +113,7 @@ class TonyProposalHandbackCommandService:
             "title": _text(title),
             "filename": filename,
             "checksum": checksum,
+            "identity_digest": identity_digest,
             "path": str(target),
             "registered_by": _text(registered_by),
             "registered_at": self._now(),

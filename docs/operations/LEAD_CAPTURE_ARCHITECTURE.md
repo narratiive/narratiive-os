@@ -32,8 +32,10 @@ For inbound Growth Diagnostic leads, the canonical customer journey is:
 That historical compatibility path applies only when the captured request is
 Groundwork or does not state a service. A website enquiry that explicitly selects
 Fieldwork, Sketchbook, Launchpad or Discovery must preserve that selection and the
-submitted challenge, stop for a service-fit decision, and must not silently start
-Groundwork/Blueprint Lite preparation.
+submitted challenge and stop for a service-fit decision. Every legitimate enquiry
+still receives proportionate pre-call Groundwork as internal preparation; that
+does not reclassify the selected service, sell Blueprint Lite, or authorise any
+client-facing work. The selected service controls the downstream commercial route.
 
 ## Capture surfaces
 

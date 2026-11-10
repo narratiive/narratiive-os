@@ -121,6 +121,39 @@ class TonyDiscoveryMonitorTests(unittest.TestCase):
         self.assertEqual(result["status"], "discovery_evidence_pending")
         self.assertEqual(notifications, [])
 
+    def test_notification_failure_is_reported_and_remains_retryable(self):
+        response = CommandResponse(
+            "post_discovery_commercial",
+            "healthy",
+            "The fictional Pimente call needs Matt review.",
+            {
+                "execution_status": "post_discovery_proposal_approval_required",
+                "post_discovery_commercial": {"lead_id": "pimente-fictional"},
+                "external_action_taken": False,
+            },
+        )
+        attempts = []
+
+        def fail_notification(message):
+            attempts.append(message)
+            raise TimeoutError("Telegram temporarily unavailable")
+
+        monitor, discovery = self._monitor(post_response=response, notifications=[])
+        monitor.notify = fail_notification
+        discovery.state["active"] = {
+            "calendar_event_id": "pimente-event",
+            "lead_id": "pimente-fictional",
+            "company": "Pimente Fictional",
+            "slot": {"end": "2026-11-10T15:30:00Z"},
+        }
+
+        first = monitor.run()
+        second = monitor.run()
+
+        self.assertFalse(first["notification_sent"])
+        self.assertEqual(first["notification_error"], "Telegram temporarily unavailable")
+        self.assertEqual(len(attempts), 2)
+
 
 if __name__ == "__main__":
     unittest.main()

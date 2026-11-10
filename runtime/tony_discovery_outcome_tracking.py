@@ -506,8 +506,12 @@ class TonyDiscoveryOutcomeTrackingCommandService:
             if label.casefold() not in name.casefold():
                 continue
             modified = self._parse_timestamp(item.get("modifiedTime"))
-            if modified is not None and window_start is not None and not (window_start <= modified <= window_end):
-                continue
+            if window_start is not None:
+                # A booking-bounded match requires a trustworthy timestamp.
+                # Missing or malformed metadata cannot prove the document falls
+                # inside the meeting window and must therefore remain pending.
+                if modified is None or not (window_start <= modified <= window_end):
+                    continue
             matches.append(item)
         return matches
 

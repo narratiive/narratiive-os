@@ -94,7 +94,7 @@ class InboundLeadAlertService:
         if not self.chat_id:
             return self._record(
                 InboundLeadAlertResult(
-                    "delivery_failed", key, lead.lead_id, 0, error="TONY_TELEGRAM_CHAT_ID is not configured"
+                    "configuration_blocked", key, lead.lead_id, 0, error="TONY_TELEGRAM_CHAT_ID is not configured"
                 )
             )
         try:

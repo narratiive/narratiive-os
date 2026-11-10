@@ -47,6 +47,25 @@ class TonyProposalDocumentHandbackTests(unittest.TestCase):
         self.assertEqual(replay.data["execution_status"], "proposal_document_already_registered")
         self.assertEqual(len(service.state["documents"]), 1)
 
+    def test_identical_pdf_for_another_lead_has_separate_identity_and_metadata(self):
+        service = self._service()
+        first = self._register(service)
+        second = self._register(
+            service,
+            lead_id="lead-2",
+            brief_id="brief-def456",
+            company="SECOND SAFE TEST Co",
+            contact="second@safe-test.invalid",
+        )
+
+        first_record = first.data["proposal_handback"]
+        second_record = second.data["proposal_handback"]
+        self.assertEqual(second.data["execution_status"], "proposal_document_registered")
+        self.assertNotEqual(first_record["recovery_id"], second_record["recovery_id"])
+        self.assertEqual(second_record["lead_id"], "lead-2")
+        self.assertEqual(second_record["company"], "SECOND SAFE TEST Co")
+        self.assertEqual(len(service.state["documents"]), 2)
+
     def test_rejects_non_pdf_content(self):
         service = self._service()
         response = self._register(service, content_base64=base64.b64encode(b"not a pdf").decode())

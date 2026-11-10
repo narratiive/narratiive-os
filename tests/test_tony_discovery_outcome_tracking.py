@@ -285,6 +285,33 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
 
         self.assertEqual(response.data["execution_status"], "discovery_evidence_pending")
 
+    def test_gemini_drive_match_without_valid_modified_time_is_not_accepted(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+
+        for modified_time in (None, "not-a-timestamp"):
+            with self.subTest(modified_time=modified_time):
+                def drive(contract, value=modified_time):
+                    return {
+                        "verified": True,
+                        "read_only": True,
+                        "mutation_count": 0,
+                        "source_id": "drive:search",
+                        "files": [{"id": "unbounded-doc", "name": "Pimentae Discovery — Notes by Gemini", "modifiedTime": value}],
+                    }
+
+                service = self._service(
+                    {"Google Calendar": calendar, "Google Drive": drive},
+                    now,
+                    evidence_source="gemini_drive",
+                    upstream=NoOpCommandService(),
+                )
+                service.execute("sync calendar booking Pimentae", ())
+
+                response = service.execute("check discovery", ())
+
+                self.assertEqual(response.data["execution_status"], "discovery_evidence_pending")
+
     def test_gemini_drive_multiple_in_bounds_matches_are_ambiguous_not_guessed(self):
         now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
         calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
