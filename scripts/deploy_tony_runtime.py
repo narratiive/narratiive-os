@@ -19,7 +19,6 @@ RUNTIME_LABELS = (
     "com.narratiive.runtime",
     "com.narratiive.tony-http-bridge",
     "com.narratiive.tony-conversation-worker",
-    "com.narratiive.service-supervisor",
 )
 HEALTH_ENDPOINTS = (
     "http://127.0.0.1:8787/health",

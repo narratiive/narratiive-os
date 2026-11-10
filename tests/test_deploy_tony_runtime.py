@@ -9,6 +9,7 @@ from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
     DEPLOYMENT_STATE_PATH,
+    RUNTIME_LABELS,
     SMOKE_SCRIPT_PATH,
     DeploymentError,
     DeploymentResult,
@@ -80,6 +81,17 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertIn(
             ("launchctl", "kickstart", "-k", "gui/501/com.narratiive.runtime"),
             runner.calls,
+        )
+
+    def test_deployment_does_not_restart_interval_supervisor_before_receipt(self):
+        self.assertNotIn("com.narratiive.service-supervisor", RUNTIME_LABELS)
+        self.assertEqual(
+            RUNTIME_LABELS,
+            (
+                "com.narratiive.runtime",
+                "com.narratiive.tony-http-bridge",
+                "com.narratiive.tony-conversation-worker",
+            ),
         )
 
     def test_wait_for_health_retries_transient_failure(self):
