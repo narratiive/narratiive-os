@@ -289,7 +289,7 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
         now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
         calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
 
-        for modified_time in (None, "not-a-timestamp"):
+        for modified_time in (None, "not-a-timestamp", "2026-11-12T09:35:00"):
             with self.subTest(modified_time=modified_time):
                 def drive(contract, value=modified_time):
                     return {

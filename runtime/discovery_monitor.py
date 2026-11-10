@@ -54,6 +54,23 @@ class TonyDiscoveryMonitor:
 
     def run(self) -> dict[str, Any]:
         self._notification_error: str | None = None
+        retried = self._retry_pending_notification()
+        if retried is not None:
+            result = {
+                "status": retried["status"],
+                "lead_id": retried["lead_id"],
+                "external_action_taken": False,
+                "notification_sent": retried["sent"],
+            }
+            if self._notification_error:
+                result["notification_error"] = self._notification_error
+            event_type = (
+                "discovery_monitor.notification_retried"
+                if retried["sent"] is True
+                else "discovery_monitor.notification_retry_pending"
+            )
+            self._record(event_type, result)
+            return result
         active = self._active_tracking()
         adoption: CommandResponse | None = None
         if active is None:
@@ -61,6 +78,16 @@ class TonyDiscoveryMonitor:
             active = self._active_tracking()
             if adoption is not None and adoption.data.get("execution_status") == "discovery_outcome_tracking_active":
                 self._notify_once(adoption)
+                if self._notification_error:
+                    result = {
+                        "status": "discovery_outcome_tracking_active",
+                        "lead_id": self._lead_id(adoption.data),
+                        "external_action_taken": False,
+                        "notification_sent": False,
+                        "notification_error": self._notification_error,
+                    }
+                    self._record("discovery_monitor.checked", result)
+                    return result
         if active is None:
             result = {
                 "status": "no_tracked_discovery",
@@ -140,11 +167,41 @@ class TonyDiscoveryMonitor:
         delivered = self.state.get("delivered") if isinstance(self.state.get("delivered"), dict) else {}
         if delivered.get(lead_id) == digest:
             return False
+        pending = {"lead_id": lead_id, "status": status, "message": message, "digest": digest}
+        # Persist before transport. The post-Discovery service may clear its
+        # active record while retaining only a pending approval, so the exact
+        # founder notification must survive a process restart independently.
+        self.state["pending_notification"] = pending
+        self._persist()
+        return self._deliver_pending(pending)
+
+    def _retry_pending_notification(self) -> dict[str, Any] | None:
+        pending = self.state.get("pending_notification")
+        if not isinstance(pending, dict):
+            return None
+        sent = self._deliver_pending(pending)
+        return {
+            "sent": sent,
+            "lead_id": str(pending.get("lead_id") or "unknown"),
+            "status": str(pending.get("status") or "unknown"),
+        }
+
+    def _deliver_pending(self, pending: dict[str, Any]) -> bool:
+        lead_id = str(pending.get("lead_id") or "unknown")
+        status = str(pending.get("status") or "unknown")
+        message = str(pending.get("message") or "")
+        digest = str(pending.get("digest") or "")
+        delivered = self.state.get("delivered") if isinstance(self.state.get("delivered"), dict) else {}
+        if delivered.get(lead_id) == digest:
+            self.state.pop("pending_notification", None)
+            self._persist()
+            return False
         try:
             self.notify(message)
         except Exception as exc:
-            # A transient founder-notification failure must remain retryable and
-            # must not abort the surrounding proactive escalation watch.
+            # Leave the persisted outbox record intact. A transient founder-
+            # notification failure must remain retryable and must not abort the
+            # surrounding proactive escalation watch.
             self._notification_error = str(exc)
             self._record(
                 "discovery_monitor.notification_failed",
@@ -153,6 +210,9 @@ class TonyDiscoveryMonitor:
             return False
         delivered[lead_id] = digest
         self.state["delivered"] = delivered
+        current = self.state.get("pending_notification")
+        if isinstance(current, dict) and current.get("digest") == digest:
+            self.state.pop("pending_notification", None)
         self._persist()
         self._record(
             "discovery_monitor.notification_delivered",

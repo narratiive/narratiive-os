@@ -148,11 +148,28 @@ class TonyDiscoveryMonitorTests(unittest.TestCase):
         }
 
         first = monitor.run()
-        second = monitor.run()
+        # Production clears active tracking after creating the durable pending
+        # approval. Notification recovery cannot depend on Discovery rerunning.
+        discovery.state["active"] = None
+        notifications = []
+        restarted = TonyDiscoveryMonitor(
+            discovery_service=discovery,
+            post_discovery_service=monitor.post_discovery_service,
+            leads_loader=monitor.leads_loader,
+            notify=notifications.append,
+            state_path=monitor.state_path,
+            events_path=monitor.events_path,
+            clock=monitor.clock,
+        )
+        second = restarted.run()
 
         self.assertFalse(first["notification_sent"])
         self.assertEqual(first["notification_error"], "Telegram temporarily unavailable")
-        self.assertEqual(len(attempts), 2)
+        self.assertEqual(len(attempts), 1)
+        self.assertTrue(second["notification_sent"])
+        self.assertEqual(second["status"], "post_discovery_proposal_approval_required")
+        self.assertEqual(notifications, ["The fictional Pimente call needs Matt review."])
+        self.assertNotIn("pending_notification", restarted.state)
 
 
 if __name__ == "__main__":
