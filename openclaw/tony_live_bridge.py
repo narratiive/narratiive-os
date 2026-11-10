@@ -1136,10 +1136,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     workflow_runtime_root = Path(
         os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))
     )
+    groundwork_preparation_store = FileBlueprintLitePreparationStore(
+        Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
+    )
     blueprint_lite_service = TonyInboundBlueprintLiteService(
-        FileBlueprintLitePreparationStore(
-            Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
-        ),
+        groundwork_preparation_store,
         dispatchers=live_dispatchers,
         workflow_runtime_root=workflow_runtime_root,
         researcher=BlueprintLiteWebsiteResearch(workflow_runtime_root / "blueprint-lite-research"),
@@ -1162,8 +1163,18 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers, verified_result_sink=accept_verified_commercial_result)
     meeting_booking_service = TonyConfirmedMeetingBookingCommandService(meeting_reply_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))))
     booking_sync_service = TonyPostBookingNotionSyncCommandService(meeting_booking_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_BOOKING_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-booking-notion-sync.json"))))
-    discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(booking_sync_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))))
-    post_discovery_service = TonyPostDiscoveryCommercialCommandService(discovery_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json"))))
+    discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(
+        booking_sync_service,
+        dispatchers=live_dispatchers,
+        store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))),
+        evidence_source=str(os.getenv("TONY_DISCOVERY_EVIDENCE_SOURCE", "fireflies")).strip().casefold() or "fireflies",
+    )
+    post_discovery_service = TonyPostDiscoveryCommercialCommandService(
+        discovery_outcome_service,
+        dispatchers=live_dispatchers,
+        store_path=Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json"))),
+        groundwork_store=groundwork_preparation_store,
+    )
     proposal_execution_service = TonyPostDiscoveryProposalExecutionCommandService(post_discovery_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-proposal-execution.json"))))
     proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
