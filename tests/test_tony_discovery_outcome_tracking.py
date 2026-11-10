@@ -37,15 +37,24 @@ class BookingSyncStub:
         )
 
 
+class NoOpCommandService:
+    mission_control_loader = None
+    github_configured = False
+
+    def execute(self, command, objects):
+        return CommandResponse("noop", "healthy", "No upstream state change.", {"execution_status": "noop", "external_action_taken": False})
+
+
 class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
-    def _service(self, dispatchers, now):
+    def _service(self, dispatchers, now, *, evidence_source="fireflies", upstream=None):
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
         return TonyDiscoveryOutcomeTrackingCommandService(
-            BookingSyncStub(),
+            upstream if upstream is not None else BookingSyncStub(),
             dispatchers=dispatchers,
             store_path=Path(tmp.name) / "discovery.json",
             clock=lambda: now[0],
+            evidence_source=evidence_source,
         )
 
     def test_verified_booking_sync_starts_tracking_without_reading_meeting_tools(self):
@@ -115,6 +124,176 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
         self.assertFalse(response.data["external_action_taken"])
         self.assertIn("cannot verify attendance or meeting content", response.message)
         self.assertIn("No commercial outcome", response.message)
+
+    @staticmethod
+    def _pimentae_calendar_event():
+        return {
+            "event_id": "pimentae-event-1",
+            "summary": "Narratiive / Pimentae Discovery",
+            "status": "confirmed",
+            "start": "2026-11-12T09:00:00+00:00",
+            "end": "2026-11-12T09:30:00+00:00",
+            "attendees": ["hello@narratiive.com", "founder@pimentae.example"],
+            "html_link": "https://calendar.google.invalid/pimentae-event-1",
+        }
+
+    def _calendar_search_stub(self, events, calls=None):
+        def calendar(contract):
+            if calls is not None:
+                calls.append(contract)
+            self.assertEqual(contract["execution_mode"], "autonomous_read")
+            self.assertEqual(contract["operation"], "search")
+            return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "calendar:events", "events": list(events)}
+        return calendar
+
+    def test_booking_discovered_from_calendar_without_tony_creating_it(self):
+        now = [datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)]
+        calls = []
+        service = self._service(
+            {"Google Calendar": self._calendar_search_stub([self._pimentae_calendar_event()], calls)},
+            now,
+            upstream=NoOpCommandService(),
+        )
+
+        response = service.execute("sync calendar booking Pimentae", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_outcome_tracking_active")
+        tracking = response.data["discovery_outcome_tracking"]
+        self.assertEqual(tracking["calendar_event_id"], "pimentae-event-1")
+        self.assertEqual(tracking["contact"], "founder@pimentae.example")
+        self.assertEqual(tracking["slot"]["start"], "2026-11-12T09:00:00+00:00")
+        self.assertFalse(tracking["write_actions_allowed"])
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertEqual(len(calls), 1)
+
+    def test_replay_does_not_duplicate_tracking(self):
+        now = [datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)]
+        calls = []
+        service = self._service(
+            {"Google Calendar": self._calendar_search_stub([self._pimentae_calendar_event()], calls)},
+            now,
+            upstream=NoOpCommandService(),
+        )
+
+        first = service.execute("sync calendar booking Pimentae", ())
+        second = service.execute("sync calendar booking Pimentae", ())
+
+        self.assertEqual(first.data["execution_status"], "discovery_outcome_tracking_active")
+        self.assertEqual(second.data["execution_status"], "discovery_outcome_tracking_active")
+        self.assertIn("did not create a duplicate record", second.message)
+        reloaded = TonyDiscoveryOutcomeTrackingCommandService(
+            NoOpCommandService(), {}, store_path=service.store_path,
+        )
+        self.assertEqual(reloaded.state["active"]["calendar_event_id"], "pimentae-event-1")
+
+    def test_ambiguous_calendar_match_is_not_adopted(self):
+        now = [datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)]
+        events = [self._pimentae_calendar_event(), {**self._pimentae_calendar_event(), "event_id": "pimentae-event-2"}]
+        service = self._service({"Google Calendar": self._calendar_search_stub(events)}, now, upstream=NoOpCommandService())
+
+        response = service.execute("sync calendar booking Pimentae", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_booking_ambiguous")
+        self.assertIsNone(service.state["active"])
+
+    def test_conflicting_calendar_adoption_is_refused_not_overwritten(self):
+        now = [datetime(2026, 11, 10, 9, 0, tzinfo=timezone.utc)]
+        other_event = {**self._pimentae_calendar_event(), "event_id": "other-event", "summary": "Narratiive / Other Co Discovery"}
+        service = self._service(
+            {"Google Calendar": self._calendar_search_stub([self._pimentae_calendar_event()])},
+            now,
+            upstream=NoOpCommandService(),
+        )
+        service.execute("sync calendar booking Pimentae", ())
+        service.dispatchers["Google Calendar"] = self._calendar_search_stub([other_event])
+
+        response = service.execute("sync calendar booking Other Co", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_booking_tracking_conflict")
+        self.assertEqual(service.state["active"]["calendar_event_id"], "pimentae-event-1")
+
+    def _active_from_calendar(self, dispatchers, now):
+        service = self._service(dispatchers, now, upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+        return service
+
+    def test_gemini_drive_evidence_is_accepted_when_explicitly_configured(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+
+        def drive(contract):
+            if contract["operation"] == "search":
+                return {
+                    "verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:search",
+                    "files": [{"id": "doc-1", "name": "Pimentae Discovery — Notes by Gemini", "modifiedTime": "2026-11-12T09:35:00Z"}],
+                }
+            self.assertEqual(contract["target"]["file_id"], "doc-1")
+            return {
+                "verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:file:doc-1",
+                "content": "Pimentae's founder confirmed a positioning problem and asked for a concrete proposal.",
+            }
+
+        claude_calls = []
+        def claude(contract):
+            claude_calls.append(contract)
+            return {"summary": "Clear buying signal; proposal requested.", "recommendation": "Prepare a concise proposal for Matt review.", "work_product": "evidence-grounded review"}
+
+        service = self._service({"Google Calendar": calendar, "Google Drive": drive, "Claude": claude}, now, evidence_source="gemini_drive", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_outcome_review_ready")
+        outcome = response.data["discovery_outcome"]
+        self.assertEqual(outcome["evidence_source"], "gemini_drive")
+        self.assertEqual(outcome["meeting_evidence"]["drive_file_id"], "doc-1")
+        self.assertEqual(len(claude_calls), 1)
+
+    def test_gemini_drive_similarly_named_document_outside_bounds_is_not_accepted(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+
+        def drive(contract):
+            # A similarly named document from an unrelated, much earlier meeting
+            # must not be accepted merely because the name matches.
+            return {
+                "verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:search",
+                "files": [{"id": "stale-doc", "name": "Pimentae Discovery — Notes by Gemini", "modifiedTime": "2026-01-02T09:35:00Z"}],
+            }
+
+        service = self._service({"Google Calendar": calendar, "Google Drive": drive}, now, evidence_source="gemini_drive", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_evidence_pending")
+
+    def test_gemini_drive_pending_when_no_document_yet(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+        drive = lambda contract: {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:search", "files": []}
+
+        service = self._service({"Google Calendar": calendar, "Google Drive": drive}, now, evidence_source="gemini_drive", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_evidence_pending")
+
+    def test_fireflies_configured_as_explicit_alternative_is_not_substituted_by_drive(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+        drive_calls = []
+        drive = lambda contract: drive_calls.append(contract) or {"verified": True, "read_only": True, "mutation_count": 0, "files": []}
+
+        service = self._service({"Google Calendar": calendar, "Google Drive": drive}, now, evidence_source="fireflies", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_evidence_dispatcher_unavailable")
+        self.assertIn("Fireflies", response.message)
+        self.assertEqual(drive_calls, [])
 
 
 if __name__ == "__main__":
