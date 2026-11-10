@@ -96,4 +96,38 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",env,clear=True):
                     tony_live_bridge.build_app(recover_workflows=True)
                 self.assertEqual(recover.call_count, 1)
+
+    def test_mission_control_api_reports_discovery_proposal_journeys(self):
+        from datetime import datetime, timedelta, timezone
+        with tempfile.TemporaryDirectory() as tmp:
+            discovery_path = Path(tmp) / "discovery.json"
+            future_start = datetime.now(timezone.utc) + timedelta(hours=1)
+            future_end = future_start + timedelta(minutes=30)
+            discovery_path.write_text(json.dumps({
+                "active": {
+                    "calendar_event_id": "pimentae-event-1",
+                    "lead_id": "calendar:pimentae-event-1",
+                    "slot": {"start": future_start.isoformat(), "end": future_end.isoformat()},
+                },
+                "last_completed": None,
+            }), encoding="utf-8")
+            app, _, _ = self._build(tmp)
+
+            environ = {
+                "REQUEST_METHOD": "GET",
+                "PATH_INFO": "/mission-control/api",
+                "REMOTE_ADDR": "127.0.0.1",
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": io.BytesIO(b""),
+            }
+            captured = {}
+            body = b"".join(app.mission_control_web.handle(environ, lambda status, headers: captured.update(status=status, headers=dict(headers))))
+
+            self.assertEqual(captured["status"], "200 OK")
+            snapshot = json.loads(body)
+            journeys = {item["lead_id"]: item for item in snapshot["discovery_proposal_journeys"]}
+            self.assertIn("calendar:pimentae-event-1", journeys)
+            self.assertTrue(journeys["calendar:pimentae-event-1"]["states"]["meeting_booked"])
+            self.assertFalse(journeys["calendar:pimentae-event-1"]["states"]["verified_sent"])
+
 if __name__=="__main__": unittest.main()

@@ -45,6 +45,7 @@ from runtime.media_control import (
 )
 from runtime.media_provider_transports import build_configured_media_adapters
 from runtime.mission_control_operator import OperatorMissionControlProjector
+from runtime.discovery_proposal_mission_control import project_discovery_proposal_journey
 from runtime.meta_oauth import (
     META_PERMISSION_NAMES,
     META_REDIRECT_URI,
@@ -1166,23 +1167,26 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers, verified_result_sink=accept_verified_commercial_result)
     meeting_booking_service = TonyConfirmedMeetingBookingCommandService(meeting_reply_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))))
     booking_sync_service = TonyPostBookingNotionSyncCommandService(meeting_booking_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_BOOKING_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-booking-notion-sync.json"))))
+    discovery_outcome_tracking_path = Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json")))
+    post_discovery_commercial_path = Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json")))
+    proposal_handback_path = Path(os.getenv("TONY_PROPOSAL_HANDBACK_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback.json")))
     discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(
         booking_sync_service,
         dispatchers=live_dispatchers,
-        store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))),
+        store_path=discovery_outcome_tracking_path,
         evidence_source=str(os.getenv("TONY_DISCOVERY_EVIDENCE_SOURCE", "fireflies")).strip().casefold() or "fireflies",
     )
     post_discovery_service = TonyPostDiscoveryCommercialCommandService(
         discovery_outcome_service,
         dispatchers=live_dispatchers,
-        store_path=Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json"))),
+        store_path=post_discovery_commercial_path,
         groundwork_store=groundwork_preparation_store,
     )
     proposal_execution_service = TonyPostDiscoveryProposalExecutionCommandService(post_discovery_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-proposal-execution.json"))))
     proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
     proposal_handback_service = TonyProposalHandbackCommandService(
         live_dispatchers,
-        store_path=Path(os.getenv("TONY_PROPOSAL_HANDBACK_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback.json"))),
+        store_path=proposal_handback_path,
         documents_root=Path(os.getenv("TONY_PROPOSAL_HANDBACK_DOCUMENTS_ROOT", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback-documents"))),
     )
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
@@ -1325,11 +1329,40 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
                     )
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 pass
-        return operator_projector.project(
+        snapshot = operator_projector.project(
             states=workflow_backend.list_states(),
             leads=lead_store.read(),
             system_snapshot=system,
         )
+        snapshot["discovery_proposal_journeys"] = _discovery_proposal_journeys()
+        return snapshot
+
+    def _discovery_proposal_journeys() -> list[dict[str, Any]]:
+        """Truthful, read-only Discovery-to-proposal states for every lead this
+        runtime has evidence for — including a Calendar booking Tony adopted
+        rather than created, which carries no separate CRM lead record."""
+
+        lead_ids = {lead.lead_id for lead in lead_store.read()}
+        for path in (discovery_outcome_tracking_path, post_discovery_commercial_path):
+            try:
+                stored = json.loads(path.read_text(encoding="utf-8"))
+            except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(stored, dict):
+                continue
+            for key in ("active", "last_completed", "pending", "last_prepared"):
+                record = stored.get(key)
+                if isinstance(record, dict) and str(record.get("lead_id") or "").strip():
+                    lead_ids.add(str(record["lead_id"]).strip())
+        return [
+            project_discovery_proposal_journey(
+                lead_id,
+                discovery_tracking_path=discovery_outcome_tracking_path,
+                post_discovery_path=post_discovery_commercial_path,
+                proposal_handback_path=proposal_handback_path,
+            )
+            for lead_id in sorted(lead_ids)
+        ]
 
     mission_control_web = MissionControlWebApplication(
         load_operator_snapshot,
