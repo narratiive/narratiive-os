@@ -1,6 +1,7 @@
 # Narratiive OS launchd installation
 
-The repository can install four per-user macOS LaunchAgents:
+The repository installer creates eight per-user macOS LaunchAgents. The four
+core runtime agents are:
 
 - `com.narratiive.runtime` — authenticated Narratiive runtime gateway;
 - `com.narratiive.tony-http-bridge` — Tony HTTP bridge for n8n and Telegram;

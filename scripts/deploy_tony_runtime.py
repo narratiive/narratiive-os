@@ -30,6 +30,7 @@ DEPLOYMENT_LOCK_PATH = Path("runtime-state") / "deployment.lock"
 SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
 ENV_LOADER_PATH = Path("scripts") / "run_with_env.py"
 DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
+CANONICAL_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
 
 class DeploymentError(RuntimeError):
@@ -167,6 +168,15 @@ def assert_safe_repository(root: Path, runner: CommandRunner = run_command) -> s
     if dirty:
         raise DeploymentError("working tree has uncommitted changes; deployment refused")
     return branch
+
+
+def assert_canonical_deployment_root(root: Path) -> Path:
+    resolved = root.expanduser().resolve()
+    if resolved != CANONICAL_REPOSITORY_ROOT:
+        raise DeploymentError(
+            f"deployment must run from the canonical checkout: {CANONICAL_REPOSITORY_ROOT}"
+        )
+    return resolved
 
 
 def restart_services(
@@ -336,7 +346,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    root = args.repository.resolve()
+    try:
+        root = assert_canonical_deployment_root(args.repository)
+    except DeploymentError as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, indent=2, sort_keys=True))
+        return 1
     try:
         branch = assert_safe_repository(root)
         current = _git(run_command, root, "rev-parse", "HEAD")

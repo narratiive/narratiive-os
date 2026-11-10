@@ -15,6 +15,7 @@ from scripts.deploy_tony_runtime import (
     DeploymentError,
     DeploymentResult,
     assert_safe_repository,
+    assert_canonical_deployment_root,
     deploy,
     restart_services,
     run_smoke_check,
@@ -73,6 +74,16 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         runner = FakeRunner(dirty=True)
         with self.assertRaisesRegex(DeploymentError, "uncommitted changes"):
             assert_safe_repository(root, runner)
+
+    def test_cli_deployment_root_must_be_the_canonical_checkout(self):
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(DeploymentError, "canonical checkout"):
+                assert_canonical_deployment_root(Path(directory))
+
+        self.assertEqual(
+            assert_canonical_deployment_root(Path(__file__).resolve().parents[1]),
+            Path(__file__).resolve().parents[1],
+        )
 
     def test_restart_uses_user_launchd_domain(self):
         root = self.repository()
