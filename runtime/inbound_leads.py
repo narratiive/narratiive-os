@@ -71,26 +71,32 @@ def _normalise_selected_service(value: str) -> str:
 
 def _service_next_action(service: str, contact: str, company: str) -> str:
     subject = company or contact or "this lead"
+    groundwork = (
+        f"Proportionate Groundwork preparation for {subject} is already under way in the background, "
+        "regardless of the selected service."
+    )
     if service == "FIELDWORK":
         return (
-            f"Review {subject}'s stated FIELDWORK need and submitted challenge. If the fit is credible, decide whether "
-            "to invite the prospect to Discovery. Do not initiate research, send a reply, or make a client commitment "
-            "without approval."
+            f"{groundwork} Review {subject}'s stated FIELDWORK need and submitted challenge once Groundwork is ready. "
+            "If the fit is credible, decide whether to invite the prospect to Discovery. Do not send a reply or make a "
+            "client commitment without approval."
         )
     if service == "SKETCHBOOK":
         return (
-            f"Review {subject}'s stated SKETCHBOOK need and confirm the required approved FIELDWORK inputs before "
-            "proposing a next step. Do not start creative development or contact the prospect without approval."
+            f"{groundwork} Review {subject}'s stated SKETCHBOOK need and confirm the required approved FIELDWORK "
+            "inputs before proposing a next step. Do not start creative development or contact the prospect without "
+            "approval."
         )
     if service == "LAUNCHPAD":
         return (
-            f"Review {subject}'s stated LAUNCHPAD need and confirm the approved strategy, creative and production "
-            "prerequisites. Do not activate media, commission production, or contact the prospect without approval."
+            f"{groundwork} Review {subject}'s stated LAUNCHPAD need and confirm the approved strategy, creative and "
+            "production prerequisites. Do not activate media, commission production, or contact the prospect without "
+            "approval."
         )
     if service == "DISCOVERY":
         return (
-            f"Review {subject}'s request for Discovery, confirm fit, and decide whether to offer a conversation. "
-            "Do not book or contact the prospect without approval."
+            f"{groundwork} Review {subject}'s request for Discovery, confirm fit, and decide whether to offer a "
+            "conversation. Do not book or contact the prospect without approval."
         )
     return _default_inbound_next_action(contact, company)
 
