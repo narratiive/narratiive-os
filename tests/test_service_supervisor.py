@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import fcntl
 import json
 import subprocess
 import sys
@@ -34,6 +35,16 @@ class RecordingRunner:
 
 
 class ServiceSupervisorTests(unittest.TestCase):
+    def test_active_deployment_lock_suppresses_supervisor_work(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime-state" / "deployment.lock"
+            path.parent.mkdir(parents=True)
+            with path.open("a+", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                self.assertTrue(service_supervisor._deployment_in_progress(path))
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            self.assertFalse(service_supervisor._deployment_in_progress(path))
+
     def test_healthy_services_require_no_restart(self) -> None:
         runner = RecordingRunner()
         exit_code, report = service_supervisor.ServiceSupervisor(runner=runner).run(0, {})

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
+    DEPLOYMENT_LOCK_PATH,
     DEPLOYMENT_STATE_PATH,
     RUNTIME_LABELS,
     SMOKE_SCRIPT_PATH,
@@ -205,6 +206,39 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertEqual(smoked, [root.resolve()])
         receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
         self.assertEqual(receipt["deployed_revision"], "same")
+
+    def test_deployment_lock_is_held_through_health_and_released_afterward(self):
+        root = self.repository()
+        runner = FakeRunner(current="same", target="same")
+        lock_observations: list[bool] = []
+
+        def checker(_endpoint, _timeout):
+            import fcntl
+
+            with (root / DEPLOYMENT_LOCK_PATH).open("a+", encoding="utf-8") as handle:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    lock_observations.append(True)
+                else:
+                    lock_observations.append(False)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+        deploy(
+            root,
+            runner=runner,
+            checker=checker,
+            smoke_checker=lambda *_args: None,
+            labels=("runtime",),
+            endpoints=("http://runtime/health",),
+        )
+
+        self.assertEqual(lock_observations, [True])
+        with (root / DEPLOYMENT_LOCK_PATH).open("a+", encoding="utf-8") as handle:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def test_failed_tests_roll_back_before_reporting_failure_without_false_receipt(self):
         root = self.repository()

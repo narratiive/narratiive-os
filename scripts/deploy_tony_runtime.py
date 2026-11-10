@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import stat
@@ -25,6 +26,7 @@ HEALTH_ENDPOINTS = (
     "http://127.0.0.1:8790/health",
 )
 DEPLOYMENT_STATE_PATH = Path("runtime-state") / "deployment.json"
+DEPLOYMENT_LOCK_PATH = Path("runtime-state") / "deployment.lock"
 SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
 ENV_LOADER_PATH = Path("scripts") / "run_with_env.py"
 DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
@@ -32,6 +34,26 @@ DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env
 
 class DeploymentError(RuntimeError):
     """Raised when a deployment cannot be completed safely."""
+
+
+class DeploymentLock:
+    """Hold an OS lock so the interval supervisor cannot race deployment."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.handle = None
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.handle = self.path.open("a+", encoding="utf-8")
+        fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        if self.handle is not None:
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
+            self.handle.close()
+            self.handle = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -229,6 +251,26 @@ def deploy(
     endpoints: Sequence[str] = HEALTH_ENDPOINTS,
 ) -> DeploymentResult:
     root = root.resolve()
+    with DeploymentLock(root / DEPLOYMENT_LOCK_PATH):
+        return _deploy_locked(
+            root,
+            runner=runner,
+            checker=checker,
+            smoke_checker=smoke_checker,
+            labels=labels,
+            endpoints=endpoints,
+        )
+
+
+def _deploy_locked(
+    root: Path,
+    *,
+    runner: CommandRunner,
+    checker: HealthChecker,
+    smoke_checker: SmokeChecker,
+    labels: Sequence[str],
+    endpoints: Sequence[str],
+) -> DeploymentResult:
     branch = assert_safe_repository(root, runner)
     previous = _git(runner, root, "rev-parse", "HEAD")
 

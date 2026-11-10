@@ -7,12 +7,13 @@ The repository can install four per-user macOS LaunchAgents:
 - `com.narratiive.tony-conversation-worker` — durable long-running Tony work and correlated Telegram follow-up;
 - `com.narratiive.service-supervisor` — health check and narrow recovery every 60 seconds.
 
-The canonical deployment command restarts the three long-running runtime
-workers, but does not kick the interval-based supervisor before the new healthy
-deployment receipt exists. The supervisor runs naturally on its next 60-second
-interval; restarting it inside deployment would make it inspect the previous
-receipt while the services are still starting and race the deployment health
-check by restarting them a second time.
+The canonical deployment command holds `runtime-state/deployment.lock` across
+repository update, validation, service restart, health checks, smoke checks and
+the new healthy deployment receipt. The interval supervisor checks that OS lock
+before running and exits successfully without inspecting or restarting services
+while deployment is active. The deployer restarts the three long-running runtime
+workers, not the interval supervisor; the supervisor resumes naturally on its
+next 60-second interval after the lock is released.
 
 ## Secure environment file
 

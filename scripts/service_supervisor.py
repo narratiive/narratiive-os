@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
@@ -8,6 +9,9 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
+
+
+DEFAULT_DEPLOYMENT_LOCK_PATH = Path("runtime-state/deployment.lock")
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,7 +135,36 @@ def _append_event(path: str, report: dict) -> None:
         handle.write(json.dumps(report, sort_keys=True) + "\n")
 
 
+def _deployment_in_progress(path: Path) -> bool:
+    """Return true only while another process holds the deployment lock."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a+", encoding="utf-8") as handle:
+        try:
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return True
+        fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+    return False
+
+
 def main() -> None:
+    deployment_lock_path = Path(
+        os.getenv("NARRATIIVE_DEPLOYMENT_LOCK", str(DEFAULT_DEPLOYMENT_LOCK_PATH))
+    ).expanduser()
+    if _deployment_in_progress(deployment_lock_path):
+        report = {
+            "ok": True,
+            "status": "deployment_in_progress",
+            "doctor_exit_code": None,
+            "deployment_unhealthy": False,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "restarts": [],
+        }
+        event_log = os.getenv("NARRATIIVE_SUPERVISOR_EVENT_LOG", "").strip()
+        if event_log:
+            _append_event(event_log, report)
+        print(json.dumps(report, sort_keys=True))
+        raise SystemExit(0)
     doctor_command = _doctor_command()
     completed = subprocess.run(
         doctor_command,
