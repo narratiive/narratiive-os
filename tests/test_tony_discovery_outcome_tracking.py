@@ -268,6 +268,50 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
 
         self.assertEqual(response.data["execution_status"], "discovery_evidence_pending")
 
+    def test_gemini_drive_multiple_in_bounds_matches_are_ambiguous_not_guessed(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+
+        def drive(contract):
+            return {
+                "verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:search",
+                "files": [
+                    {"id": "doc-1", "name": "Pimentae Discovery — Notes by Gemini", "modifiedTime": "2026-11-12T09:35:00Z"},
+                    {"id": "doc-2", "name": "Pimentae Discovery — Notes by Gemini (copy)", "modifiedTime": "2026-11-12T09:40:00Z"},
+                ],
+            }
+
+        service = self._service({"Google Calendar": calendar, "Google Drive": drive}, now, evidence_source="gemini_drive", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_evidence_ambiguous")
+
+    def test_drive_read_failure_blocks_then_succeeds_on_retry(self):
+        now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
+        calendar = self._calendar_search_stub([self._pimentae_calendar_event()])
+        attempts = []
+
+        def flaky_drive(contract):
+            attempts.append(contract)
+            if len(attempts) == 1:
+                raise RuntimeError("Drive API temporarily unavailable")
+            if contract["operation"] == "search":
+                return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:search", "files": [{"id": "doc-1", "name": "Pimentae Discovery — Notes by Gemini", "modifiedTime": "2026-11-12T09:35:00Z"}]}
+            return {"verified": True, "read_only": True, "mutation_count": 0, "source_id": "drive:file:doc-1", "content": "Pimentae's founder asked for a concrete proposal."}
+
+        claude = lambda contract: {"summary": "Clear signal.", "recommendation": "Prepare a proposal.", "work_product": "review"}
+        service = self._service({"Google Calendar": calendar, "Google Drive": flaky_drive, "Claude": claude}, now, evidence_source="gemini_drive", upstream=NoOpCommandService())
+        service.execute("sync calendar booking Pimentae", ())
+
+        failed = service.execute("check discovery", ())
+        self.assertEqual(failed.data["execution_status"], "discovery_evidence_read_failed")
+        self.assertIsNotNone(service.state["active"])
+
+        retried = service.execute("check discovery", ())
+        self.assertEqual(retried.data["execution_status"], "discovery_outcome_review_ready")
+
     def test_gemini_drive_pending_when_no_document_yet(self):
         now = [datetime(2026, 11, 12, 10, 0, tzinfo=timezone.utc)]
         calendar = self._calendar_search_stub([self._pimentae_calendar_event()])

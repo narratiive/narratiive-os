@@ -106,6 +106,26 @@ class TonyProposalDocumentHandbackTests(unittest.TestCase):
 
         self.assertEqual(response.data["execution_status"], "proposal_email_recipient_not_authorised")
 
+    def test_restart_recovery_reloads_documents_approvals_and_drafts(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        store_path = Path(tmp.name) / "state.json"
+        documents_root = Path(tmp.name) / "documents"
+        gmail = Mock(return_value={"verified": True, "sent": False, "draft_id": "draft-1"})
+        service = TonyProposalHandbackCommandService({"Gmail": gmail}, store_path=store_path, documents_root=documents_root)
+        recovery_id = self._register(service).data["proposal_handback"]["recovery_id"]
+        service.approve_document(recovery_id, approver="Matt", rationale="Reviewed.")
+        service.prepare_email_draft(recovery_id, recipient="hello@narratiive.com", subject="SAFE TEST proposal", body="See attached.")
+        service.approve_email(recovery_id, approver="Matt", rationale="Exact email reviewed.")
+
+        restarted = TonyProposalHandbackCommandService({"Gmail": gmail}, store_path=store_path, documents_root=documents_root)
+
+        self.assertIn(recovery_id, restarted.state["documents"])
+        self.assertEqual(restarted.email_approval_status(recovery_id), "approved")
+        # A second runtime instance pointed at the same durable state must not re-register or re-draft.
+        replay = self._register(restarted)
+        self.assertEqual(replay.data["execution_status"], "proposal_document_already_registered")
+
     def test_document_bytes_changed_on_disk_blocks_draft(self):
         service = self._service({"Gmail": Mock(return_value={"verified": True, "sent": False, "draft_id": "d"})})
         result = self._register(service)
