@@ -228,10 +228,6 @@ class InboundLead:
             ),
         )
 
-    def should_prepare_groundwork(self) -> bool:
-        """Only an unstated or explicit Groundwork request may enter that workflow."""
-        return self.selected_service in {"", "GROUNDWORK"}
-
     def briefing_classification(self) -> str:
         text = " ".join(
             (

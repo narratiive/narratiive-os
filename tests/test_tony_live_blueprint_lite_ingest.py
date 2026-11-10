@@ -177,12 +177,18 @@ class TonyLiveBlueprintLiteIngestTests(unittest.TestCase):
             self.assertEqual([lead.lead_id for lead in store.read()], ["submission-123"])
             self.assertEqual(list(preparations.read_all()), ["submission-123"])
 
-    def test_fieldwork_enquiry_alerts_and_skips_groundwork_preparation(self) -> None:
+    def test_fieldwork_enquiry_alerts_and_still_prepares_proportionate_groundwork(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             base = mock.Mock()
             base.bridge_token = "bridge-secret"
             store = FileInboundLeadStore(Path(tmp) / "leads.json")
             preparation = mock.Mock()
+            preparation.enqueue_and_start.return_value = {
+                "state": "preparation_queued",
+                "lead_id": "fieldwork-submission",
+                "approval_required": False,
+                "external_action_taken": False,
+            }
             alerts = mock.Mock()
             alerts.deliver.return_value = InboundLeadAlertResult(
                 "delivered",
@@ -231,9 +237,11 @@ class TonyLiveBlueprintLiteIngestTests(unittest.TestCase):
 
             self.assertTrue(str(observed["status"]).startswith("200"))
             self.assertEqual(result["selected_service"], "FIELDWORK")
-            self.assertEqual(result["preparation_status"], "not_applicable_for_selected_service")
+            # Selecting FIELDWORK changes the expected downstream service, but it
+            # must not remove pre-call Groundwork preparation.
+            self.assertEqual(result["preparation_status"], "preparation_queued")
             self.assertEqual(result["alert_status"], "delivered")
-            preparation.enqueue_and_start.assert_not_called()
+            preparation.enqueue_and_start.assert_called_once()
             saved = store.read()[0]
             self.assertEqual(saved.selected_service, "FIELDWORK")
             self.assertEqual(saved.business_challenge, request["diagnostic"]["challenge"])

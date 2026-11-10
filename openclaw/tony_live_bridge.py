@@ -1015,8 +1015,11 @@ class LeadAwareTonyApplication:
         except Exception:
             return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
 
+        # Every legitimate conversation/Discovery request receives proportionate
+        # Groundwork preparation regardless of the service the prospect selected;
+        # the selection changes downstream routing, not whether Groundwork runs.
         preparation = None
-        if self.blueprint_lite_service is not None and lead.should_prepare_groundwork():
+        if self.blueprint_lite_service is not None:
             try:
                 preparation_payload = request if isinstance(request.get("lead"), dict) else payload
                 preparation = self.blueprint_lite_service.enqueue_and_start(lead, preparation_payload)
@@ -1028,14 +1031,6 @@ class LeadAwareTonyApplication:
                     "approval_required": False,
                     "external_action_taken": False,
                 }
-        elif self.blueprint_lite_service is not None:
-            preparation = {
-                "state": "not_applicable_for_selected_service",
-                "lead_id": lead.lead_id,
-                "selected_service": lead.selected_service,
-                "approval_required": True,
-                "external_action_taken": False,
-            }
 
         alert = None
         alert_failed = False

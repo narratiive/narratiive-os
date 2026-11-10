@@ -60,7 +60,7 @@ class InboundLeadTests(unittest.TestCase):
         self.assertEqual(lead.lead_temperature, "Hot")
         self.assertEqual(lead.recommended_next_action, "Prepare for discovery.")
 
-    def test_fieldwork_enquiry_preserves_service_and_does_not_enter_groundwork(self):
+    def test_fieldwork_enquiry_preserves_service_and_still_routes_next_action(self):
         lead = InboundLead.from_mapping({
             "lead_id": "fieldwork-1",
             "contact": "Synthetic Founder",
@@ -72,7 +72,9 @@ class InboundLeadTests(unittest.TestCase):
         })
         self.assertEqual(lead.selected_service, "FIELDWORK")
         self.assertEqual(lead.business_challenge, "Discovery depends too much on chance.")
-        self.assertFalse(lead.should_prepare_groundwork())
+        # Selecting FIELDWORK changes the expected downstream service, but it
+        # must not remove pre-call Groundwork preparation (handled upstream in
+        # the ingest path, not by this value object).
         self.assertEqual(lead.briefing_classification(), "test_or_rehearsal")
         self.assertIn("FIELDWORK", lead.recommended_next_action)
 
