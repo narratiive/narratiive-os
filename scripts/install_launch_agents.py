@@ -27,11 +27,16 @@ LEGACY_AGENT_LABELS = (
 )
 
 
-def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[AgentSpec, ...]:
+def build_specs(
+    repo_root: Path,
+    python_path: Path,
+    env_file: Path,
+    github_issue_runner_config: Path | None = None,
+) -> tuple[AgentSpec, ...]:
     launcher = repo_root / "scripts" / "run_with_env.py"
     proactive_brief = repo_root / "scripts" / "run_proactive_brief.py"
     gmail_inbox_watch = repo_root / "scripts" / "run_gmail_inbox_watch.py"
-    return (
+    specs = (
         AgentSpec(
             "com.narratiive.runtime",
             (str(python_path), str(launcher), str(env_file), str(python_path), "-m", "runtime.server"),
@@ -116,6 +121,24 @@ def build_specs(repo_root: Path, python_path: Path, env_file: Path) -> tuple[Age
             run_at_load=False,
         ),
     )
+    if github_issue_runner_config is None:
+        return specs
+    return (
+        *specs,
+        AgentSpec(
+            "com.narratiive.github-issue-runner",
+            (
+                str(python_path),
+                str(launcher),
+                str(env_file),
+                str(python_path),
+                str(repo_root / "scripts" / "run_github_issue_runner.py"),
+                "--config",
+                str(github_issue_runner_config),
+            ),
+            True,
+        ),
+    )
 
 
 def render_plist(spec: AgentSpec, repo_root: Path, log_dir: Path) -> bytes:
@@ -190,12 +213,21 @@ def _write_deployment_receipt(repo_root: Path) -> Path:
     return receipt
 
 
-def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, activate: bool) -> list[Path]:
+def install(
+    repo_root: Path,
+    python_path: Path,
+    env_file: Path,
+    home: Path,
+    activate: bool,
+    github_issue_runner_config: Path | None = None,
+) -> list[Path]:
     repo_root = repo_root.expanduser().resolve()
     # Preserve the virtual-environment entry-point path. Resolving its symlink
     # selects the base interpreter and silently drops the venv site-packages.
     python_path = Path(os.path.abspath(str(python_path.expanduser())))
     env_file = env_file.expanduser().resolve()
+    if github_issue_runner_config is not None:
+        github_issue_runner_config = github_issue_runner_config.expanduser().resolve()
     if not (repo_root / "runtime" / "server.py").is_file():
         raise FileNotFoundError("runtime/server.py not found in repository root")
     if not (repo_root / "openclaw" / "tony_live_bridge.py").is_file():
@@ -212,6 +244,13 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
         raise FileNotFoundError(f"environment file not found: {env_file}")
     if env_file.stat().st_mode & 0o077:
         raise PermissionError("environment file must use mode 600")
+    if github_issue_runner_config is not None:
+        if not (repo_root / "scripts" / "run_github_issue_runner.py").is_file():
+            raise FileNotFoundError("GitHub issue runner not found")
+        if not github_issue_runner_config.is_file():
+            raise FileNotFoundError(
+                f"GitHub issue runner config not found: {github_issue_runner_config}"
+            )
 
     agents_dir = home / "Library" / "LaunchAgents"
     log_dir = home / "Library" / "Logs" / "Narratiive"
@@ -220,7 +259,9 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
     written: list[Path] = []
     uid = os.getuid()
     _remove_legacy_agents(home, uid, activate)
-    for spec in build_specs(repo_root, python_path, env_file):
+    for spec in build_specs(
+        repo_root, python_path, env_file, github_issue_runner_config
+    ):
         target = agents_dir / f"{spec.label}.plist"
         target.write_bytes(render_plist(spec, repo_root, log_dir))
         written.append(target)
@@ -231,6 +272,45 @@ def install(repo_root: Path, python_path: Path, env_file: Path, home: Path, acti
     if activate:
         _write_deployment_receipt(repo_root)
     return written
+
+
+def install_github_issue_runner(
+    repo_root: Path,
+    python_path: Path,
+    env_file: Path,
+    home: Path,
+    github_issue_runner_config: Path,
+    activate: bool,
+) -> Path:
+    """Install only the optional engineering runner; leave all other agents alone."""
+    repo_root = repo_root.expanduser().resolve()
+    python_path = Path(os.path.abspath(str(python_path.expanduser())))
+    env_file = env_file.expanduser().resolve()
+    github_issue_runner_config = github_issue_runner_config.expanduser().resolve()
+    if not (repo_root / "scripts" / "run_github_issue_runner.py").is_file():
+        raise FileNotFoundError("GitHub issue runner not found")
+    if not python_path.is_file():
+        raise FileNotFoundError(f"Python executable not found: {python_path}")
+    if not env_file.is_file() or env_file.stat().st_mode & 0o077:
+        raise PermissionError("environment file must exist and use mode 600")
+    if not github_issue_runner_config.is_file():
+        raise FileNotFoundError(
+            f"GitHub issue runner config not found: {github_issue_runner_config}"
+        )
+    spec = build_specs(
+        repo_root, python_path, env_file, github_issue_runner_config
+    )[-1]
+    agents_dir = home / "Library" / "LaunchAgents"
+    log_dir = home / "Library" / "Logs" / "Narratiive"
+    agents_dir.mkdir(parents=True, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
+    target = agents_dir / f"{spec.label}.plist"
+    target.write_bytes(render_plist(spec, repo_root, log_dir))
+    if activate:
+        domain = f"gui/{os.getuid()}"
+        subprocess.run(["launchctl", "bootout", domain, str(target)], check=False, capture_output=True)
+        _run(["launchctl", "bootstrap", domain, str(target)])
+    return target
 
 
 def uninstall(home: Path, deactivate: bool) -> list[Path]:
@@ -246,6 +326,7 @@ def uninstall(home: Path, deactivate: bool) -> list[Path]:
         "com.narratiive.tony-http-bridge",
         "com.narratiive.tony-conversation-worker",
         "com.narratiive.runtime",
+        "com.narratiive.github-issue-runner",
         *LEGACY_AGENT_LABELS,
     ):
         target = agents_dir / f"{label}.plist"
@@ -268,6 +349,8 @@ def main() -> None:
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[1])
     parser.add_argument("--python", type=Path, default=Path(sys.executable))
     parser.add_argument("--env-file", type=Path, default=Path.home() / ".config" / "narratiive" / "runtime.env")
+    parser.add_argument("--github-issue-runner-config", type=Path)
+    parser.add_argument("--github-issue-runner-only", action="store_true")
     parser.add_argument("--no-activate", action="store_true")
     parser.add_argument("--uninstall", action="store_true")
     args = parser.parse_args()
@@ -276,8 +359,27 @@ def main() -> None:
     if args.uninstall:
         paths = uninstall(Path.home(), not args.no_activate)
         print(f"removed {len(paths)} LaunchAgents")
+    elif args.github_issue_runner_only:
+        if args.github_issue_runner_config is None:
+            raise SystemExit("--github-issue-runner-only requires --github-issue-runner-config")
+        path = install_github_issue_runner(
+            args.repo_root,
+            args.python,
+            args.env_file,
+            Path.home(),
+            args.github_issue_runner_config,
+            not args.no_activate,
+        )
+        print(f"installed {path}")
     else:
-        paths = install(args.repo_root, args.python, args.env_file, Path.home(), not args.no_activate)
+        paths = install(
+            args.repo_root,
+            args.python,
+            args.env_file,
+            Path.home(),
+            not args.no_activate,
+            args.github_issue_runner_config,
+        )
         print(f"installed {len(paths)} LaunchAgents")
 
 
