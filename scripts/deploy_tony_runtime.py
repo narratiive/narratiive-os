@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
 import stat
@@ -19,20 +20,41 @@ RUNTIME_LABELS = (
     "com.narratiive.runtime",
     "com.narratiive.tony-http-bridge",
     "com.narratiive.tony-conversation-worker",
-    "com.narratiive.service-supervisor",
 )
 HEALTH_ENDPOINTS = (
     "http://127.0.0.1:8787/health",
     "http://127.0.0.1:8790/health",
 )
 DEPLOYMENT_STATE_PATH = Path("runtime-state") / "deployment.json"
+DEPLOYMENT_LOCK_PATH = Path("runtime-state") / "deployment.lock"
 SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
 ENV_LOADER_PATH = Path("scripts") / "run_with_env.py"
 DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
+CANONICAL_REPOSITORY_ROOT = Path("/Users/admin/Documents/narratiive-os")
 
 
 class DeploymentError(RuntimeError):
     """Raised when a deployment cannot be completed safely."""
+
+
+class DeploymentLock:
+    """Hold an OS lock so the interval supervisor cannot race deployment."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.handle = None
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.handle = self.path.open("a+", encoding="utf-8")
+        fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX)
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        if self.handle is not None:
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
+            self.handle.close()
+            self.handle = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,6 +170,15 @@ def assert_safe_repository(root: Path, runner: CommandRunner = run_command) -> s
     return branch
 
 
+def assert_canonical_deployment_root(root: Path) -> Path:
+    resolved = root.expanduser().resolve()
+    if resolved != CANONICAL_REPOSITORY_ROOT:
+        raise DeploymentError(
+            f"deployment must run from the canonical checkout: {CANONICAL_REPOSITORY_ROOT}"
+        )
+    return resolved
+
+
 def restart_services(
     labels: Sequence[str],
     runner: CommandRunner = run_command,
@@ -230,6 +261,26 @@ def deploy(
     endpoints: Sequence[str] = HEALTH_ENDPOINTS,
 ) -> DeploymentResult:
     root = root.resolve()
+    with DeploymentLock(root / DEPLOYMENT_LOCK_PATH):
+        return _deploy_locked(
+            root,
+            runner=runner,
+            checker=checker,
+            smoke_checker=smoke_checker,
+            labels=labels,
+            endpoints=endpoints,
+        )
+
+
+def _deploy_locked(
+    root: Path,
+    *,
+    runner: CommandRunner,
+    checker: HealthChecker,
+    smoke_checker: SmokeChecker,
+    labels: Sequence[str],
+    endpoints: Sequence[str],
+) -> DeploymentResult:
     branch = assert_safe_repository(root, runner)
     previous = _git(runner, root, "rev-parse", "HEAD")
 
@@ -284,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Safely update, test, restart and smoke-check the local Narratiive OS runtime.",
     )
-    parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--repository", type=Path, default=CANONICAL_REPOSITORY_ROOT)
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -295,7 +346,11 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
-    root = args.repository.resolve()
+    try:
+        root = assert_canonical_deployment_root(args.repository)
+    except DeploymentError as exc:
+        print(json.dumps({"status": "failed", "error": str(exc)}, indent=2, sort_keys=True))
+        return 1
     try:
         branch = assert_safe_repository(root)
         current = _git(run_command, root, "rev-parse", "HEAD")

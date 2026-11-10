@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import fcntl
 import json
 import os
 import subprocess
@@ -8,6 +9,38 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Callable, Sequence
+
+
+DEFAULT_DEPLOYMENT_LOCK_PATH = Path(__file__).resolve().parents[1] / "runtime-state" / "deployment.lock"
+
+
+class DeploymentInProgress(RuntimeError):
+    """Raised when the deployer already owns the coordination lock."""
+
+
+class SupervisorDeploymentLock:
+    """Hold coordination for the supervisor's complete doctor/recovery cycle."""
+
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.handle = None
+
+    def __enter__(self):
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self.handle = self.path.open("a+", encoding="utf-8")
+        try:
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError as exc:
+            self.handle.close()
+            self.handle = None
+            raise DeploymentInProgress from exc
+        return self
+
+    def __exit__(self, *_exc_info) -> None:
+        if self.handle is not None:
+            fcntl.flock(self.handle.fileno(), fcntl.LOCK_UN)
+            self.handle.close()
+            self.handle = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -132,6 +165,26 @@ def _append_event(path: str, report: dict) -> None:
 
 
 def main() -> None:
+    try:
+        with SupervisorDeploymentLock(DEFAULT_DEPLOYMENT_LOCK_PATH):
+            _run_locked()
+    except DeploymentInProgress:
+        report = {
+            "ok": True,
+            "status": "deployment_in_progress",
+            "doctor_exit_code": None,
+            "deployment_unhealthy": False,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "restarts": [],
+        }
+        event_log = os.getenv("NARRATIIVE_SUPERVISOR_EVENT_LOG", "").strip()
+        if event_log:
+            _append_event(event_log, report)
+        print(json.dumps(report, sort_keys=True))
+        raise SystemExit(0)
+
+
+def _run_locked() -> None:
     doctor_command = _doctor_command()
     completed = subprocess.run(
         doctor_command,

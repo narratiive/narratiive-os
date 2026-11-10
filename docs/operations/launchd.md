@@ -1,11 +1,28 @@
 # Narratiive OS launchd installation
 
-The repository can install three per-user macOS LaunchAgents:
+The repository installer creates eight per-user macOS LaunchAgents. The four
+core runtime agents are:
 
 - `com.narratiive.runtime` — authenticated Narratiive runtime gateway;
 - `com.narratiive.tony-http-bridge` — Tony HTTP bridge for n8n and Telegram;
 - `com.narratiive.tony-conversation-worker` — durable long-running Tony work and correlated Telegram follow-up;
 - `com.narratiive.service-supervisor` — health check and narrow recovery every 60 seconds.
+
+The four scheduled support agents are:
+
+- `com.narratiive.proactive-watch` — material escalation and Discovery monitoring every 15 minutes;
+- `com.narratiive.gmail-inbox-watch` — bounded inbox monitoring every 15 minutes;
+- `com.narratiive.proactive-morning` — the morning brief and escalation run at 08:00;
+- `com.narratiive.proactive-evening` — the evening brief and escalation run at 18:00.
+
+The canonical deployment command holds `runtime-state/deployment.lock` across
+repository update, validation, service restart, health checks, smoke checks and
+the new healthy deployment receipt. The interval supervisor holds the same OS
+lock across its complete doctor and recovery cycle. A supervisor arriving during
+deployment exits successfully without inspecting or restarting services; a
+deployment arriving during supervision waits for that short cycle to finish.
+The deployer restarts the three long-running runtime workers, not the interval
+supervisor; supervision resumes naturally after the lock is released.
 
 ## Secure environment file
 
@@ -184,24 +201,18 @@ Run it directly for a manual or externally triggered send:
 ```
 
 `--mode both` (the default) runs the brief and the escalation check in one
-invocation, which is the intended shape for a scheduled trigger. To schedule
-it with launchd, add a fourth per-user LaunchAgent with a fixed
-`StartCalendarInterval` (for example `{"Hour": 8, "Minute": 0}` and
-`{"Hour": 18, "Minute": 0}` as two array entries for morning and evening)
-running:
+invocation. `scripts/install_launch_agents.py` installs the morning and evening
+calendar agents using that mode, while `com.narratiive.proactive-watch` runs
+escalation-only mode every 15 minutes. The scheduled command shape is:
 
 ```text
 scripts/run_with_env.py <env-file> <python> scripts/run_proactive_brief.py --mode both --command morning
 ```
 
-This is deliberately not wired into `scripts/install_launch_agents.py` yet:
-the existing installer's three agents are covered by
-`tests/test_launchd_installer.py` and installing a fourth agent changes what
-runs unattended on Matt's machine, which should be a separate, explicit
-decision once the delivery cadence is confirmed. Use
-`--simulate-transport-failure` only for smoke validation; it forces a
-transient send failure so the bounded-retry and fail-closed path can be
-observed without waiting for a real outage.
+These agents are wired into `scripts/install_launch_agents.py` and covered by
+`tests/test_launchd_installer.py`. Use `--simulate-transport-failure` only for
+smoke validation; it forces a transient send failure so the bounded-retry and
+fail-closed path can be observed without waiting for a real outage.
 
 ## Install
 

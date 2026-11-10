@@ -8,11 +8,15 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
+    CANONICAL_REPOSITORY_ROOT,
+    DEPLOYMENT_LOCK_PATH,
     DEPLOYMENT_STATE_PATH,
+    RUNTIME_LABELS,
     SMOKE_SCRIPT_PATH,
     DeploymentError,
     DeploymentResult,
     assert_safe_repository,
+    assert_canonical_deployment_root,
     deploy,
     restart_services,
     run_smoke_check,
@@ -72,6 +76,20 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         with self.assertRaisesRegex(DeploymentError, "uncommitted changes"):
             assert_safe_repository(root, runner)
 
+    def test_cli_deployment_root_must_be_the_canonical_checkout(self):
+        self.assertEqual(
+            CANONICAL_REPOSITORY_ROOT,
+            Path("/Users/admin/Documents/narratiive-os"),
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            with self.assertRaisesRegex(DeploymentError, "canonical checkout"):
+                assert_canonical_deployment_root(Path(directory))
+
+        self.assertEqual(
+            assert_canonical_deployment_root(CANONICAL_REPOSITORY_ROOT),
+            CANONICAL_REPOSITORY_ROOT,
+        )
+
     def test_restart_uses_user_launchd_domain(self):
         root = self.repository()
         runner = FakeRunner()
@@ -80,6 +98,17 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertIn(
             ("launchctl", "kickstart", "-k", "gui/501/com.narratiive.runtime"),
             runner.calls,
+        )
+
+    def test_deployment_does_not_restart_interval_supervisor_before_receipt(self):
+        self.assertNotIn("com.narratiive.service-supervisor", RUNTIME_LABELS)
+        self.assertEqual(
+            RUNTIME_LABELS,
+            (
+                "com.narratiive.runtime",
+                "com.narratiive.tony-http-bridge",
+                "com.narratiive.tony-conversation-worker",
+            ),
         )
 
     def test_wait_for_health_retries_transient_failure(self):
@@ -193,6 +222,39 @@ class DeployTonyRuntimeTests(unittest.TestCase):
         self.assertEqual(smoked, [root.resolve()])
         receipt = json.loads((root / DEPLOYMENT_STATE_PATH).read_text(encoding="utf-8"))
         self.assertEqual(receipt["deployed_revision"], "same")
+
+    def test_deployment_lock_is_held_through_health_and_released_afterward(self):
+        root = self.repository()
+        runner = FakeRunner(current="same", target="same")
+        lock_observations: list[bool] = []
+
+        def checker(_endpoint, _timeout):
+            import fcntl
+
+            with (root / DEPLOYMENT_LOCK_PATH).open("a+", encoding="utf-8") as handle:
+                try:
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError:
+                    lock_observations.append(True)
+                else:
+                    lock_observations.append(False)
+                    fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+        deploy(
+            root,
+            runner=runner,
+            checker=checker,
+            smoke_checker=lambda *_args: None,
+            labels=("runtime",),
+            endpoints=("http://runtime/health",),
+        )
+
+        self.assertEqual(lock_observations, [True])
+        with (root / DEPLOYMENT_LOCK_PATH).open("a+", encoding="utf-8") as handle:
+            import fcntl
+
+            fcntl.flock(handle.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
     def test_failed_tests_roll_back_before_reporting_failure_without_false_receipt(self):
         root = self.repository()
