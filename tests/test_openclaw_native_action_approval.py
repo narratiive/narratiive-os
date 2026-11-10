@@ -111,11 +111,20 @@ class OpenClawNativeActionApprovalTests(unittest.TestCase):
             "buildWorkflowApprovalRequirement",
             {"operation": "sync_notion", "reference": "SAFE Company", "rationale": "Project approved state"},
         )
+        sketchbook_draft = self._node_json(
+            "buildWorkflowApprovalRequirement",
+            {
+                "operation": "prepare_sketchbook_email_draft",
+                "reference": "test-sketchbook-run",
+                "rationale": "Prepare this exact unsent draft",
+            },
+        )
 
         self.assertFalse(approval["required"])
         self.assertFalse(read["required"])
         self.assertFalse(research["required"])
         self.assertTrue(notion["required"])
+        self.assertTrue(sketchbook_draft["required"])
         self.assertEqual(notion["requireApproval"]["allowedDecisions"], ["allow-once", "deny"])
 
     def test_plugin_uses_before_tool_call_native_approval_hook(self):

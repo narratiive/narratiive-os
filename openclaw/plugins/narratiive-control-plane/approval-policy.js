@@ -65,7 +65,7 @@ export function buildWorkflowApprovalRequirement(params = {}) {
   // Human workflow judgements arrive as authenticated natural Telegram turns and
   // are bound by the control plane to the exact current run/gate/artefact token.
   // Only a separate external Notion write still needs OpenClaw's native UI gate.
-  if (operation !== "sync_notion") {
+  if (!["sync_notion", "prepare_sketchbook_email_draft"].includes(operation)) {
     return { required: false };
   }
   const reference = String(params.reference || "workflow").slice(0, 160);
@@ -75,7 +75,7 @@ export function buildWorkflowApprovalRequirement(params = {}) {
     requireApproval: {
       title: `Approve workflow ${operation.replaceAll("_", " ")}`.slice(0, 80),
       description: `${reference} | ${rationale} | Single use; persisted and auditable.`.slice(0, 512),
-      severity: operation === "sync_notion" ? "warning" : "info",
+      severity: "warning",
       allowedDecisions: ["allow-once", "deny"],
       timeoutMs: 120000,
     },

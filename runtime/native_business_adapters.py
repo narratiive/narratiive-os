@@ -353,10 +353,11 @@ class GmailDispatcher(GoogleAdapter):
             _require_write(contract)
         subject = _text(payload.get("subject") or payload.get("email_subject") or target.get("subject"))
         body = _text(payload.get("body") or payload.get("email_body") or target.get("body"))
+        html_body = _text(payload.get("html_body") or target.get("html_body"))
         if not recipient or "@" not in recipient or not subject or not body:
             raise BusinessAdapterError("gmail_send_requires_exact_recipient_subject_and_body")
         key = _text(contract.get("idempotency_key")) or hashlib.sha256(
-            f"{recipient}\0{subject}\0{body}".encode("utf-8")
+            f"{recipient}\0{subject}\0{body}\0{html_body}".encode("utf-8")
         ).hexdigest()
         message_header = f"<narratiive-{hashlib.sha256(key.encode()).hexdigest()[:32]}@narratiive.invalid>"
         draft = _text(contract.get("operation")) == "create_draft"
@@ -379,6 +380,8 @@ class GmailDispatcher(GoogleAdapter):
         email["Subject"] = subject
         email["Message-ID"] = message_header
         email.set_content(body)
+        if html_body:
+            email.add_alternative(html_body, subtype="html")
         attachments = payload.get("attachments")
         attachment_bytes = 0
         if attachments is not None:
@@ -402,7 +405,7 @@ class GmailDispatcher(GoogleAdapter):
                 email.add_attachment(content, maintype=maintype, subtype=subtype, filename=filename)
         raw = base64.urlsafe_b64encode(email.as_bytes()).decode("ascii").rstrip("=")
         if draft:
-            if len(subject)>1000 or len(body)>20_000 or len(recipient)>320:
+            if len(subject)>1000 or len(body)>20_000 or len(html_body)>100_000 or len(recipient)>320:
                 raise BusinessAdapterError("gmail_draft_headers_or_body_too_large")
             if isinstance(matches, list) and matches:
                 draft_id = _text(_mapping(matches[0]).get("id"))
@@ -419,15 +422,19 @@ class GmailDispatcher(GoogleAdapter):
                 return [(part.get_filename(), hashlib.sha256(part.get_payload(decode=True)).hexdigest())
                         for part in message.iter_attachments()]
             actual_body = actual.get_body(preferencelist=("plain",))
+            actual_html = actual.get_body(preferencelist=("html",))
             if (len(actual.get_all("To", [])) != 1 or len(actual.get_all("Subject", [])) != 1
                 or actual.get_all("Cc", []) or actual.get_all("Bcc", [])
                 or str(actual.get("To")) != recipient or str(actual.get("Subject")) != subject
                 or actual_body is None or actual_body.get_content().replace('\r\n','\n').strip() != body.replace('\r\n','\n').strip()
+                or (html_body and (actual_html is None or actual_html.get_content().replace('\r\n','\n').strip() != html_body.replace('\r\n','\n').strip()))
+                or (not html_body and actual_html is not None)
                 or files(actual) != files(email)):
                 raise BusinessAdapterError("gmail_draft_readback_mismatch")
             return {"verified": True, "sent": False, "draft_id": draft_id,
                 "message_id": _text(_mapping(checked.get("message")).get("id")),
                 "mutation_count": 0 if matches else 1, "duplicate_suppressed": bool(matches),
+                "html_verified": bool(html_body),
                 "attachment_checksums": [checksum for _,checksum in files(actual)]}
         sent = self.client.call(
             f"{self.api_base}/users/me/messages/send",

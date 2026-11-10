@@ -513,6 +513,8 @@ class LeadAwareTonyApplication:
                 "recover": "recover",
                 "manual-recovery": "manual-recovery",
                 "register-document": "handback", "document-brief": "document-brief", "prepare-document-draft": "draft-document",
+                "sketchbook-email-preview": "sketchbook-email-preview",
+                "prepare-sketchbook-email-draft": "draft-sketchbook-email",
                 "projection": "projection",
                 "sync-notion": "sync-notion",
                 "additional-research": "research",
@@ -536,6 +538,7 @@ class LeadAwareTonyApplication:
                 "continue", "additional-research", "deliver-internal-review",
                 "approve", "reject", "request-revision", "commission", "action-preview", "execute-action",
                 "sync-campaign-learning", "classify-synthetic-test", "manual-recovery", "register-document", "prepare-document-draft",
+                "sketchbook-email-preview", "prepare-sketchbook-email-draft",
             }:
                 raise ValueError("workflow inputs are not accepted for this operation")
             if operation not in {"current-work", "approvals", "blockers", "recover", "client-portfolio", "campaign-learning-queue"} and not reference:
@@ -543,9 +546,11 @@ class LeadAwareTonyApplication:
             command = f"/{command_name}" + (f" {shlex.quote(reference)}" if reference else "")
             if rationale:
                 command += f" because {shlex.quote(rationale)}"
-            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery", "register-document", "prepare-document-draft"}:
+            if operation in {"approve", "reject", "request-revision", "commission", "execute-action", "sync-campaign-learning", "classify-synthetic-test", "manual-recovery", "register-document", "prepare-document-draft", "sketchbook-email-preview", "prepare-sketchbook-email-draft"}:
                 if request.get("source") != "openclaw_telegram_workflow_tool" or not self.authorised_principal_id:
                     raise ValueError("workflow decision requires the authorised Telegram principal")
+                if operation == "prepare-sketchbook-email-draft" and request.get("approval_granted") is not True:
+                    raise ValueError("Sketchbook draft preparation requires native single-use approval")
                 if operation in {"approve", "reject", "request-revision"}:
                     instruction = str((inputs or {}).get("approval_instruction") or "")
                     approval_token = str((inputs or {}).get("approval_token") or "").strip()

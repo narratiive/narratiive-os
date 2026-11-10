@@ -75,6 +75,38 @@ class DummyLeadStore:
 
 
 class TelegramInboundTests(unittest.TestCase):
+    def test_sketchbook_draft_requires_native_approval_and_exact_digest(self):
+        workflows = FakeWorkflowCommands()
+        app = LeadAwareTonyApplication(
+            FakeBase(), DummyLeadStore(), agent_gateway=FakeAgentGateway(),
+            workflow_command_service=workflows, authorised_principal_id="telegram:123",
+        )
+
+        def call(*, approved: bool, digest: str = "a" * 64):
+            body = {
+                "operation": "prepare_sketchbook_email_draft",
+                "reference": "test-sketchbook-run",
+                "rationale": "Prepare this exact fictional unsent draft.",
+                "approval_granted": approved,
+                "inputs": {"candidate_id": "test-candidate", "action_digest": digest},
+                "source": "openclaw_telegram_workflow_tool",
+            }
+            raw = json.dumps(body).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST",
+                "PATH_INFO": "/workflow/control",
+                "CONTENT_LENGTH": str(len(raw)),
+                "HTTP_AUTHORIZATION": "Bearer secret",
+                "wsgi.input": io.BytesIO(raw),
+            }
+            return json.loads(b"".join(app(environ, lambda status, headers: None)).decode("utf-8"))
+
+        self.assertFalse(call(approved=False)["ok"])
+        self.assertEqual(workflows.calls, [])
+        self.assertTrue(call(approved=True)["ok"])
+        self.assertEqual(workflows.calls[-1]["principal_id"], "telegram:123")
+        self.assertIn("/draft-sketchbook-email", workflows.calls[-1]["text"])
+
     def test_config_uses_conversational_bridge_path(self):
         with tempfile.TemporaryDirectory() as tmp:
             config = TelegramInboundConfig.from_env(
