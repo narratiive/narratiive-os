@@ -36,6 +36,9 @@ class FakeGroundworkStore:
     def get(self, lead_id):
         return self._records.get(lead_id)
 
+    def put(self, lead_id, record):
+        self._records[lead_id] = dict(record)
+
 
 def _completed_groundwork_record():
     return {
@@ -110,6 +113,40 @@ class TonyPostDiscoveryCommercialTests(unittest.TestCase):
             self.assertIn("governed manual Groundwork registration path", response.message)
             # The approval is retained, not invented away, so a later registration can be retried.
             self.assertIsNotNone(service.state["pending"])
+
+    def test_manually_registered_groundwork_is_used_but_flagged_as_unapproved(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            groundwork = FakeGroundworkStore({})
+            service = TonyPostDiscoveryCommercialCommandService(DiscoveryReviewStub(), {}, store_path=Path(tmp) / "state.json", groundwork_store=groundwork)
+
+            registration = service.register_manual_groundwork(
+                "lead-1",
+                content="Example Co's referral growth is not yet repeatable; a focused channel could change that.",
+                producer="Matt",
+                registered_by="Matt",
+                rationale="Produced outside the system before this workflow existed; registering as an explicit exception.",
+            )
+            self.assertEqual(registration.data["execution_status"], "groundwork_manually_registered")
+            self.assertEqual(registration.data["groundwork_registration"]["approval_status"], "not_accepted_on_registration")
+
+            service.execute("check discovery", ())
+            prepared = service.execute("do that", ())
+
+            self.assertEqual(prepared.data["execution_status"], "proposal_brief_ready")
+            brief = prepared.data["proposal_commission_brief"]
+            self.assertIn("Manually registered by Matt", brief["sections"]["groundwork_provenance"])
+            self.assertIn("not_accepted_on_registration", brief["sections"]["groundwork_provenance"])
+            self.assertIn("Example Co's referral growth is not yet repeatable", brief["copyable_commission"])
+
+    def test_registering_manual_groundwork_requires_exact_fields(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            groundwork = FakeGroundworkStore({})
+            service = TonyPostDiscoveryCommercialCommandService(DiscoveryReviewStub(), {}, store_path=Path(tmp) / "state.json", groundwork_store=groundwork)
+
+            response = service.register_manual_groundwork("lead-1", content="", producer="Matt", registered_by="Matt", rationale="Reason")
+
+            self.assertEqual(response.data["execution_status"], "groundwork_registration_requires_exact_fields")
+            self.assertIsNone(groundwork.get("lead-1"))
 
     def test_groundwork_record_without_completed_version_fails_closed(self):
         with tempfile.TemporaryDirectory() as tmp:

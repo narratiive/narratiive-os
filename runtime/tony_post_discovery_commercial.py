@@ -123,7 +123,60 @@ class TonyPostDiscoveryCommercialCommandService:
             "state": str(record.get("state") or ""),
             "diagnostic_input_package": dict(version.get("diagnostic_input_package") or {}),
             "evidence": dict(version.get("evidence")),
+            "manual_registration": dict(version["manual_registration"]) if isinstance(version.get("manual_registration"), dict) else None,
         }
+
+    def register_manual_groundwork(
+        self,
+        lead_id: str,
+        *,
+        content: str,
+        producer: str,
+        registered_by: str,
+        rationale: str,
+    ) -> CommandResponse:
+        """Governed recovery path for a Groundwork brief produced outside the canonical workflow.
+
+        Registration records the exact manually supplied content, who produced it, who is
+        registering it and why, as an explicit, unapproved exception — it never marks the
+        content as canonically generated, quality-gated or approved.
+        """
+
+        if self.groundwork_store is None:
+            return CommandResponse("post_discovery_commercial", "healthy", "No canonical Groundwork store is configured; I cannot register anything.", {"execution_status": "groundwork_registration_store_unavailable", "external_action_taken": False})
+        if not all(_text(value) for value in (lead_id, content, producer, registered_by, rationale)):
+            return CommandResponse("post_discovery_commercial", "healthy", "Registering a manual Groundwork brief requires the lead id, its exact content, the producer, who is registering it and a rationale.", {"execution_status": "groundwork_registration_requires_exact_fields", "external_action_taken": False})
+        record = self.groundwork_store.get(lead_id) or {}
+        versions = list(record.get("versions") or [])
+        version_number = len(versions) + 1
+        checksum = hashlib.sha256(content.encode("utf-8")).hexdigest()
+        version = {
+            "version": version_number,
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "diagnostic_input_package": dict(record.get("diagnostic_input_package") or {}),
+            "evidence": {"blueprint_lite": content},
+            "manual_registration": {
+                "producer": _text(producer),
+                "registered_by": _text(registered_by),
+                "rationale": _text(rationale),
+                "registered_at": datetime.now(timezone.utc).isoformat(),
+                "approval_status": "not_accepted_on_registration",
+                "checksum": checksum,
+            },
+        }
+        versions.append(version)
+        record = {**record, "canonical_run_id": record.get("canonical_run_id") or lead_id, "state": "manually_registered_awaiting_review", "versions": versions}
+        self.groundwork_store.put(lead_id, record)
+        return CommandResponse(
+            "post_discovery_commercial",
+            "healthy",
+            f"I have registered this manually supplied Groundwork brief for {lead_id} as version {version_number}, attributed to {producer} and recorded by {registered_by}. Registration is not approval; the content is still unapproved and flagged as manually supplied in any brief that uses it.",
+            {
+                "execution_status": "groundwork_manually_registered",
+                "groundwork_registration": {"lead_id": lead_id, "version": version_number, "checksum": checksum, "approval_status": "not_accepted_on_registration"},
+                "external_action_taken": False,
+            },
+        )
 
     def _groundwork_recovery_response(self, lead_id: str, reason: str) -> CommandResponse:
         return CommandResponse(
@@ -179,6 +232,7 @@ def build_proposal_commission_brief(pending: Mapping[str, Any], groundwork: Mapp
     meeting_evidence = dict(pending.get("meeting_evidence") or {})
     review_evidence = dict(pending.get("review_evidence") or {})
     gw_evidence = dict(groundwork.get("evidence") or {})
+    manual_registration = groundwork.get("manual_registration") if isinstance(groundwork.get("manual_registration"), dict) else None
     lineage = gw_evidence.get("fact_interpretation_hypothesis_lineage") if isinstance(gw_evidence.get("fact_interpretation_hypothesis_lineage"), dict) else {}
 
     discovery_learned = _text(review_evidence.get("summary") or review_evidence.get("analysis") or review_evidence.get("work_product"))
@@ -225,6 +279,13 @@ def build_proposal_commission_brief(pending: Mapping[str, Any], groundwork: Mapp
         "recommended_fieldwork_scope": recommended_fieldwork_scope,
         "assumptions": assumptions or ["None explicitly recorded."],
         "sources_and_lineage": sources,
+        "groundwork_provenance": (
+            f"Manually registered by {manual_registration.get('producer')} on {manual_registration.get('registered_at')}; "
+            f"registration status: {manual_registration.get('approval_status')}. Not canonically generated or quality-gated."
+            if manual_registration
+            else f"Canonically generated Groundwork artefact, version {groundwork.get('version')}, state {groundwork.get('state') or 'unknown'}."
+        ),
+        "manually_supplied_groundwork_content": _text(gw_evidence.get("blueprint_lite")) if manual_registration else "",
     }
 
     commission = _render_commission(company, sections, groundwork)
@@ -255,6 +316,8 @@ def _render_commission(company: str, sections: Mapping[str, Any], groundwork: Ma
         "",
         f"What was learned in Discovery: {sections['what_was_learned_in_discovery']}",
         "",
+        f"Groundwork provenance: {sections['groundwork_provenance']}",
+        *([f"Manually supplied Groundwork content (verbatim, unapproved): {sections['manually_supplied_groundwork_content']}"] if sections.get("manually_supplied_groundwork_content") else []),
         "Groundwork hypotheses (from pre-Discovery qualification, run " + str(groundwork.get("canonical_run_id")) + f" v{groundwork.get('version')}):",
         *[f"  - {item}" for item in gw_hyp["groundwork_hypotheses"]],
         "Discovery findings to compare against those hypotheses (confirm, update or replace them yourself — Tony has not pre-judged this):",
