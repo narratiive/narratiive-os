@@ -94,6 +94,7 @@ from runtime.tony_post_discovery_commercial import TonyPostDiscoveryCommercialCo
 from runtime.tony_post_discovery_proposal_execution import TonyPostDiscoveryProposalExecutionCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
+from runtime.tony_proposal_document_handback import TonyProposalHandbackCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
@@ -287,6 +288,7 @@ class LeadAwareTonyApplication:
         model_budget_guard: HostedModelBudgetGuard | None = None,
         model_budget_reserve_usd: Decimal = Decimal("1"),
         inbound_alert_service: InboundLeadAlertService | None = None,
+        proposal_handback_service: Any | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -303,6 +305,7 @@ class LeadAwareTonyApplication:
         self.model_budget_guard = model_budget_guard
         self.model_budget_reserve_usd = model_budget_reserve_usd
         self.inbound_alert_service = inbound_alert_service
+        self.proposal_handback_service = proposal_handback_service
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -1177,6 +1180,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     )
     proposal_execution_service = TonyPostDiscoveryProposalExecutionCommandService(post_discovery_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-proposal-execution.json"))))
     proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
+    proposal_handback_service = TonyProposalHandbackCommandService(
+        live_dispatchers,
+        store_path=Path(os.getenv("TONY_PROPOSAL_HANDBACK_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback.json"))),
+        documents_root=Path(os.getenv("TONY_PROPOSAL_HANDBACK_DOCUMENTS_ROOT", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback-documents"))),
+    )
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
     delivery_bootstrap_service = TonyDeliveryBootstrapCommandService(commercial_close_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BOOTSTRAP_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-bootstrap.json"))))
     drive_workspace_service = TonyDriveDeliveryWorkspaceCommandService(delivery_bootstrap_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DRIVE_DELIVERY_WORKSPACE_PATH", str(REPOSITORY_ROOT / ".runtime" / "drive-delivery-workspace.json"))))
@@ -1367,6 +1375,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         model_budget_guard=model_budget_guard,
         model_budget_reserve_usd=model_budget_reserve_usd,
         inbound_alert_service=inbound_alert_service,
+        proposal_handback_service=proposal_handback_service,
     )
 
 
