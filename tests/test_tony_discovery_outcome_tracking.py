@@ -356,6 +356,67 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
         self.assertIn("Fireflies", response.message)
         self.assertEqual(drive_calls, [])
 
+    def test_exact_ad_hoc_gemini_document_can_be_attributed_without_guessing(self):
+        now = [datetime(2026, 11, 10, 16, 0, tzinfo=timezone.utc)]
+        calls = []
+
+        def drive(contract):
+            calls.append(contract)
+            self.assertEqual(contract["operation"], "export")
+            self.assertEqual(contract["target"]["file_id"], "gemini-pimente-1")
+            return {
+                "verified": True,
+                "read_only": True,
+                "mutation_count": 0,
+                "source_id": "drive:file:gemini-pimente-1",
+                "name": "Discovery Call (Matt Franks) – Notes by Gemini",
+                "webViewLink": "https://docs.google.invalid/gemini-pimente-1",
+                "content": "The fictional Pimente discussion requested a paid-visibility proposal.",
+            }
+
+        service = self._service(
+            {"Google Drive": drive},
+            now,
+            evidence_source="gemini_drive",
+            upstream=NoOpCommandService(),
+        )
+        service.state["active"] = {
+            "calendar_event_id": "future-booking",
+            "lead_id": "pimente-fictional",
+            "company": "Pimente",
+            "slot": {"end": "2026-11-12T09:30:00Z"},
+        }
+
+        response = service.adopt_verified_gemini_document(
+            file_id="gemini-pimente-1",
+            lead_id="pimente-fictional",
+            company="Pimente",
+            meeting_ended_at="2026-11-10T15:30:00Z",
+            confirmed_by="Matt",
+            rationale="Fictional rehearsal call happened ad hoc before the separately booked slot.",
+        )
+
+        self.assertEqual(response.data["execution_status"], "discovery_outcome_tracking_active")
+        self.assertEqual(service.state["active"]["gemini_drive_file_id"], "gemini-pimente-1")
+        self.assertEqual(service.state["corrections"][0]["superseded_active"]["calendar_event_id"], "future-booking")
+        self.assertEqual(len(calls), 1)
+
+    def test_ad_hoc_gemini_recovery_requires_explicit_gemini_source(self):
+        now = [datetime(2026, 11, 10, 16, 0, tzinfo=timezone.utc)]
+        service = self._service({}, now, evidence_source="fireflies", upstream=NoOpCommandService())
+
+        response = service.adopt_verified_gemini_document(
+            file_id="gemini-pimente-1",
+            lead_id="pimente-fictional",
+            company="Pimente",
+            meeting_ended_at="2026-11-10T15:30:00Z",
+            confirmed_by="Matt",
+            rationale="Fictional rehearsal recovery.",
+        )
+
+        self.assertEqual(response.data["execution_status"], "discovery_ad_hoc_recovery_source_mismatch")
+        self.assertIsNone(service.state["active"])
+
 
 if __name__ == "__main__":
     unittest.main()

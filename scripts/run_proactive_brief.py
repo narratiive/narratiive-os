@@ -346,6 +346,16 @@ def main(argv: list[str] | None = None) -> int:
             ok = False
 
     if args.mode in {"escalation", "both"}:
+        # The existing 15-minute proactive watch is Tony's unattended trigger.
+        # Run the bounded Discovery monitor before projecting/escalating Mission
+        # Control so completed Gemini evidence can become an evidence-backed
+        # founder decision without waiting for a chat command.
+        from scripts.run_discovery_monitor import run_monitor_once
+
+        discovery_result = run_monitor_once()
+        results["discovery_monitor"] = discovery_result
+        if discovery_result.get("ok") is not True:
+            ok = False
         escalation_result = run_escalation(
             simulate_transport_failure=args.simulate_transport_failure
         )

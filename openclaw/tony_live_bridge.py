@@ -290,6 +290,9 @@ class LeadAwareTonyApplication:
         model_budget_reserve_usd: Decimal = Decimal("1"),
         inbound_alert_service: InboundLeadAlertService | None = None,
         proposal_handback_service: Any | None = None,
+        discovery_outcome_service: Any | None = None,
+        post_discovery_service: Any | None = None,
+        authoritative_lead_loader: Callable[[], tuple[InboundLead, ...]] | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -307,6 +310,9 @@ class LeadAwareTonyApplication:
         self.model_budget_reserve_usd = model_budget_reserve_usd
         self.inbound_alert_service = inbound_alert_service
         self.proposal_handback_service = proposal_handback_service
+        self.discovery_outcome_service = discovery_outcome_service
+        self.post_discovery_service = post_discovery_service
+        self.authoritative_lead_loader = authoritative_lead_loader
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -1174,7 +1180,7 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         booking_sync_service,
         dispatchers=live_dispatchers,
         store_path=discovery_outcome_tracking_path,
-        evidence_source=str(os.getenv("TONY_DISCOVERY_EVIDENCE_SOURCE", "fireflies")).strip().casefold() or "fireflies",
+        evidence_source=str(os.getenv("TONY_DISCOVERY_EVIDENCE_SOURCE", "gemini_drive")).strip().casefold() or "gemini_drive",
     )
     post_discovery_service = TonyPostDiscoveryCommercialCommandService(
         discovery_outcome_service,
@@ -1409,6 +1415,9 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         model_budget_reserve_usd=model_budget_reserve_usd,
         inbound_alert_service=inbound_alert_service,
         proposal_handback_service=proposal_handback_service,
+        discovery_outcome_service=discovery_outcome_service,
+        post_discovery_service=post_discovery_service,
+        authoritative_lead_loader=authoritative_lead_loader,
     )
 
 

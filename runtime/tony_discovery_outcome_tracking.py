@@ -196,6 +196,109 @@ class TonyDiscoveryOutcomeTrackingCommandService:
             },
         )
 
+    def adopt_verified_gemini_document(
+        self,
+        *,
+        file_id: str,
+        lead_id: str,
+        company: str,
+        meeting_ended_at: str,
+        confirmed_by: str,
+        rationale: str,
+    ) -> CommandResponse:
+        """Register an explicitly identified ad-hoc Gemini call for recovery.
+
+        This is deliberately not a fuzzy fallback for Calendar matching.  It is
+        an operator-attributed correction for the exceptional case where the
+        call genuinely happened outside the tracked Calendar slot.  The exact
+        Drive document is read and verified before the durable tracking record
+        is changed, and the superseded record is retained in correction history.
+        """
+
+        required = (file_id, lead_id, company, meeting_ended_at, confirmed_by, rationale)
+        if not all(str(value or "").strip() for value in required):
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_requires_exact_fields",
+                "Ad-hoc Gemini recovery requires the exact Drive file id, lead id, company, meeting end time, confirming operator and rationale.",
+            )
+        ended = self._parse_timestamp(meeting_ended_at)
+        if ended is None:
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_time_invalid",
+                "The supplied ad-hoc meeting end time is not a valid timezone-aware timestamp.",
+            )
+        if ended > self._now():
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_meeting_not_finished",
+                "The supplied ad-hoc meeting end time is still in the future.",
+            )
+        if self.evidence_source != GEMINI_DRIVE_EVIDENCE_SOURCE:
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_source_mismatch",
+                "Ad-hoc Gemini recovery is available only when Gemini/Drive is the explicitly configured evidence source.",
+            )
+        drive = self.dispatchers.get("Google Drive")
+        if drive is None:
+            return self._sync_error(
+                "discovery_evidence_drive_dispatcher_unavailable",
+                "No live Google Drive dispatcher is configured, so the exact Gemini document cannot be verified.",
+            )
+        evidence = self._export_gemini_document(
+            {
+                "calendar_event_id": "",
+                "lead_id": lead_id.strip(),
+                "company": company.strip(),
+            },
+            drive,
+            file_id.strip(),
+        )
+        if isinstance(evidence, CommandResponse):
+            return evidence
+
+        existing = self.state.get("active") if isinstance(self.state.get("active"), dict) else None
+        active = {
+            "calendar_event_id": "",
+            "notion_receipt": "",
+            "lead_id": lead_id.strip(),
+            "contact": "",
+            "company": company.strip(),
+            "slot": {"start": meeting_ended_at.strip(), "end": meeting_ended_at.strip()},
+            "source": "operator_attributed_ad_hoc_gemini_recovery",
+            "gemini_drive_file_id": file_id.strip(),
+            "recovery_attribution": {
+                "confirmed_by": confirmed_by.strip(),
+                "rationale": rationale.strip(),
+                "recorded_at": self._now().isoformat(),
+            },
+        }
+        history = self.state.get("corrections") if isinstance(self.state.get("corrections"), list) else []
+        history.append(
+            {
+                "recorded_at": self._now().isoformat(),
+                "kind": "ad_hoc_gemini_meeting_attribution",
+                "superseded_active": dict(existing) if isinstance(existing, dict) else None,
+                "replacement": dict(active),
+                "evidence": {
+                    "drive_file_id": evidence.get("drive_file_id", file_id.strip()),
+                    "drive_file_name": evidence.get("drive_file_name", ""),
+                    "drive_web_view_link": evidence.get("drive_web_view_link", ""),
+                },
+            }
+        )
+        self.state["corrections"] = history
+        self.state["active"] = active
+        self._persist()
+        return CommandResponse(
+            "discovery_booking_discovery",
+            "healthy",
+            "I verified the exact Gemini Drive document and recorded an operator-attributed ad-hoc Discovery call. The prior tracking record, if any, remains preserved in correction history; no client communication or commercial state changed.",
+            {
+                "execution_status": "discovery_outcome_tracking_active",
+                "discovery_outcome_tracking": {"state": "active", "write_actions_allowed": False, **active},
+                "external_action_taken": False,
+            },
+        )
+
     def _activate(self, response: CommandResponse) -> CommandResponse:
         data = dict(response.data) if isinstance(response.data, dict) else {}
         tracking = data.get("discovery_tracking") if isinstance(data.get("discovery_tracking"), dict) else {}
@@ -309,6 +412,9 @@ class TonyDiscoveryOutcomeTrackingCommandService:
         drive = self.dispatchers.get("Google Drive")
         if drive is None:
             return self._blocked(active, "discovery_evidence_drive_dispatcher_unavailable", "No live Google Drive dispatcher is configured, so I cannot read any Gemini meeting notes yet.")
+        exact_file_id = str(active.get("gemini_drive_file_id") or "").strip()
+        if exact_file_id:
+            return self._export_gemini_document(active, drive, exact_file_id)
         candidates = self._find_gemini_documents(active, drive)
         if isinstance(candidates, CommandResponse):
             return candidates
@@ -317,6 +423,16 @@ class TonyDiscoveryOutcomeTrackingCommandService:
         if len(candidates) > 1:
             return self._blocked(active, "discovery_evidence_ambiguous", "More than one similarly named Drive document matches this booking's bounded identifiers, so I will not guess which is the genuine Gemini record.")
         file_id = str(candidates[0].get("id") or "")
+        return self._export_gemini_document(active, drive, file_id, candidate=candidates[0])
+
+    def _export_gemini_document(
+        self,
+        active: dict[str, Any],
+        drive: DispatchHandler,
+        file_id: str,
+        *,
+        candidate: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any] | CommandResponse:
         export = {
             "eligible": True,
             "state": "ready_for_autonomous_dispatch",
@@ -341,9 +457,10 @@ class TonyDiscoveryOutcomeTrackingCommandService:
             return self._blocked(active, "discovery_evidence_pending", "There is no decision-grade transcript or meeting summary yet, so I will not invent a discovery outcome.", evidence=evidence)
         enriched = dict(evidence)
         enriched["drive_file_id"] = file_id
-        enriched["drive_file_name"] = str(candidates[0].get("name") or "")
-        enriched["drive_modified_time"] = str(candidates[0].get("modifiedTime") or "")
-        enriched["drive_web_view_link"] = str(candidates[0].get("webViewLink") or "")
+        source = candidate if isinstance(candidate, Mapping) else evidence
+        enriched["drive_file_name"] = str(source.get("name") or evidence.get("name") or "")
+        enriched["drive_modified_time"] = str(source.get("modifiedTime") or evidence.get("modifiedTime") or "")
+        enriched["drive_web_view_link"] = str(source.get("webViewLink") or evidence.get("webViewLink") or evidence.get("source_url") or "")
         enriched.setdefault("transcript", evidence.get("content"))
         enriched.setdefault("meeting_summary", evidence.get("content"))
         return enriched
