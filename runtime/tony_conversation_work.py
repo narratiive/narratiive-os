@@ -53,6 +53,9 @@ class SubstantiveConversationRouter:
         "choose/propose",
         "propose a suitable",
         "prepare a strategy",
+        "prepare a draft",
+        "create a draft",
+        "draft for me",
         "produce a report",
         "specialist",
         "research analyst",
@@ -81,6 +84,11 @@ class SubstantiveConversationRouter:
         "strategy thesis",
         "synthesis",
     )
+    _EXPLICIT_DRAFT_MARKERS = (
+        "prepare a draft",
+        "create a draft",
+        "draft for me",
+    )
 
     def is_status_enquiry(self, text: str) -> bool:
         normalised = " ".join(str(text).casefold().split())
@@ -91,7 +99,9 @@ class SubstantiveConversationRouter:
 
     def requires_durable_work(self, text: str) -> bool:
         normalised = " ".join(str(text).casefold().split())
-        if self.is_status_enquiry(normalised):
+        if self.is_status_enquiry(normalised) and not any(
+            marker in normalised for marker in self._EXPLICIT_DRAFT_MARKERS
+        ):
             return False
         return any(marker in normalised for marker in self._WORK_MARKERS)
 
