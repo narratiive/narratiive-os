@@ -30,7 +30,7 @@ DEPLOYMENT_LOCK_PATH = Path("runtime-state") / "deployment.lock"
 SMOKE_SCRIPT_PATH = Path("scripts") / "smoke_tony_live.py"
 ENV_LOADER_PATH = Path("scripts") / "run_with_env.py"
 DEFAULT_RUNTIME_ENV_PATH = Path.home() / ".config" / "narratiive" / "runtime.env"
-CANONICAL_REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+CANONICAL_REPOSITORY_ROOT = Path("/Users/admin/Documents/narratiive-os")
 
 
 class DeploymentError(RuntimeError):
@@ -335,7 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Safely update, test, restart and smoke-check the local Narratiive OS runtime.",
     )
-    parser.add_argument("--repository", type=Path, default=Path(__file__).resolve().parents[1])
+    parser.add_argument("--repository", type=Path, default=CANONICAL_REPOSITORY_ROOT)
     parser.add_argument(
         "--apply",
         action="store_true",

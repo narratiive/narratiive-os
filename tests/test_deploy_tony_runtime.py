@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from scripts.deploy_tony_runtime import (
+    CANONICAL_REPOSITORY_ROOT,
     DEPLOYMENT_LOCK_PATH,
     DEPLOYMENT_STATE_PATH,
     RUNTIME_LABELS,
@@ -76,13 +77,17 @@ class DeployTonyRuntimeTests(unittest.TestCase):
             assert_safe_repository(root, runner)
 
     def test_cli_deployment_root_must_be_the_canonical_checkout(self):
+        self.assertEqual(
+            CANONICAL_REPOSITORY_ROOT,
+            Path("/Users/admin/Documents/narratiive-os"),
+        )
         with tempfile.TemporaryDirectory() as directory:
             with self.assertRaisesRegex(DeploymentError, "canonical checkout"):
                 assert_canonical_deployment_root(Path(directory))
 
         self.assertEqual(
-            assert_canonical_deployment_root(Path(__file__).resolve().parents[1]),
-            Path(__file__).resolve().parents[1],
+            assert_canonical_deployment_root(CANONICAL_REPOSITORY_ROOT),
+            CANONICAL_REPOSITORY_ROOT,
         )
 
     def test_restart_uses_user_launchd_domain(self):
