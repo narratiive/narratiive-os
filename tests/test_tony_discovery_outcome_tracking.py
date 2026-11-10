@@ -113,6 +113,23 @@ class TonyDiscoveryOutcomeTrackingTests(unittest.TestCase):
         self.assertIn("not yet a win", response.message)
         self.assertIn("approval-gated", response.message)
 
+    def test_meeting_not_yet_finished_is_never_treated_as_an_outcome(self):
+        # The fixture booking's slot is 10:00-10:30 Europe/London (+01:00), i.e.
+        # 09:00-09:30 UTC. Checking at 09:15 UTC is mid-meeting.
+        calls = []
+        now = [datetime(2026, 8, 18, 9, 0, tzinfo=timezone.utc)]
+        service = self._service({"Fireflies": lambda contract: calls.append(contract) or {}}, now)
+        service.execute("do that", ())
+
+        now[0] = datetime(2026, 8, 18, 9, 15, tzinfo=timezone.utc)
+        response = service.execute("check discovery", ())
+
+        self.assertEqual(response.data["execution_status"], "discovery_meeting_not_finished")
+        self.assertEqual(response.data["discovery_outcome_tracking"]["state"], "active")
+        self.assertFalse(response.data["external_action_taken"])
+        self.assertIn("has not finished yet", response.message)
+        self.assertEqual(calls, [])
+
     def test_missing_fireflies_dispatcher_never_infers_meeting_outcome(self):
         now = [datetime(2026, 8, 18, 10, 45, tzinfo=timezone.utc)]
         service = self._service({}, now)
