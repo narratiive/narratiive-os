@@ -29,6 +29,12 @@ For inbound Growth Diagnostic leads, the canonical customer journey is:
 
 `Growth Diagnostic → Blueprint Lite → Discovery → Growth Sprint → Growth Blueprint → Campaign World`
 
+That historical compatibility path applies only when the captured request is
+Groundwork or does not state a service. A website enquiry that explicitly selects
+Fieldwork, Sketchbook, Launchpad or Discovery must preserve that selection and the
+submitted challenge, stop for a service-fit decision, and must not silently start
+Groundwork/Blueprint Lite preparation.
+
 ## Capture surfaces
 
 The following should all converge on the same contract:
@@ -73,6 +79,13 @@ Explicit later commercial judgement always wins. Tony never overwrites a supplie
 The Narratiive website Growth Diagnostic must POST its completed lead package to the production diagnostic webhook after local submission persistence. The webhook is the bridge into the canonical commercial system; a local website database row alone is not a completed lead handoff.
 
 Website records retain `Source = Growth Diagnostic`. The immediate browser result is the Growth Diagnostic result. Blueprint Lite is a separate personalised follow-up and must not be described as sent until the downstream workflow has decision-grade delivery evidence.
+
+Website conversation requests must also preserve `selected_service` and the
+business challenge as structured fields. Tony emits one founder-only alert for a
+legitimate inbound submission. That alert is operational notification, not client
+acknowledgement or permission to contact the prospect. Customer email remains a
+separately approved client-facing action; a Calendar appointment confirmation is
+not evidence that Tony has sent one.
 
 The website must be safe to retry. Replaying the same logical submission must not create duplicate canonical leads, duplicate Blueprint Lite generation jobs, or duplicate sends.
 

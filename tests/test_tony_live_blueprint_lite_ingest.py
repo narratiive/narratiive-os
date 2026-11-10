@@ -9,6 +9,7 @@ from unittest import mock
 
 from openclaw.tony_live_bridge import LeadAwareTonyApplication, build_runtime_lead_loader
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.inbound_lead_alerts import InboundLeadAlertResult
 
 
 class TonyLiveBlueprintLiteIngestTests(unittest.TestCase):
@@ -175,6 +176,84 @@ class TonyLiveBlueprintLiteIngestTests(unittest.TestCase):
             self.assertTrue(replay["preparation"]["replay"])
             self.assertEqual([lead.lead_id for lead in store.read()], ["submission-123"])
             self.assertEqual(list(preparations.read_all()), ["submission-123"])
+
+    def test_fieldwork_enquiry_alerts_and_skips_groundwork_preparation(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = mock.Mock()
+            base.bridge_token = "bridge-secret"
+            store = FileInboundLeadStore(Path(tmp) / "leads.json")
+            preparation = mock.Mock()
+            alerts = mock.Mock()
+            alerts.deliver.return_value = InboundLeadAlertResult(
+                "delivered",
+                "inbound-lead-alert:fieldwork-submission",
+                "fieldwork-submission",
+                1,
+                receipt={"provider": "telegram", "message_id": "502"},
+            )
+            app = LeadAwareTonyApplication(
+                base,
+                store,
+                agent_gateway=mock.Mock(),
+                blueprint_lite_service=preparation,
+                inbound_alert_service=alerts,
+            )
+            request = {
+                "lead": {
+                    "id": "notion-page-fieldwork",
+                    "properties": {
+                        "Contact": {"title": [{"plain_text": "Controlled Prospect"}]},
+                        "Company": {"rich_text": [{"plain_text": "Controlled Company"}]},
+                        "Email": {"email": "prospect@controlled.example"},
+                        "Source": {"select": {"name": "Website"}},
+                    },
+                },
+                "diagnostic": {
+                    "lead_id": "fieldwork-submission",
+                    "selected_service": "FIELDWORK",
+                    "challenge": "Growth depends on accidental discovery.",
+                },
+            }
+            payload = json.dumps(request).encode("utf-8")
+            environ = {
+                "REQUEST_METHOD": "POST",
+                "PATH_INFO": "/leads/ingest",
+                "REMOTE_ADDR": "127.0.0.1",
+                "CONTENT_LENGTH": str(len(payload)),
+                "CONTENT_TYPE": "application/json",
+                "HTTP_AUTHORIZATION": "Bearer bridge-secret",
+                "wsgi.input": io.BytesIO(payload),
+            }
+            observed: dict[str, object] = {}
+
+            response = app(environ, lambda status, headers: observed.update(status=status, headers=headers))
+            result = json.loads(b"".join(response))
+
+            self.assertTrue(str(observed["status"]).startswith("200"))
+            self.assertEqual(result["selected_service"], "FIELDWORK")
+            self.assertEqual(result["preparation_status"], "not_applicable_for_selected_service")
+            self.assertEqual(result["alert_status"], "delivered")
+            preparation.enqueue_and_start.assert_not_called()
+            saved = store.read()[0]
+            self.assertEqual(saved.selected_service, "FIELDWORK")
+            self.assertEqual(saved.business_challenge, request["diagnostic"]["challenge"])
+            alerts.deliver.assert_called_once_with(saved)
+
+    def test_alert_failure_does_not_erase_persisted_lead(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = mock.Mock()
+            base.bridge_token = "bridge-secret"
+            store = FileInboundLeadStore(Path(tmp) / "leads.json")
+            alerts = mock.Mock()
+            alerts.deliver.side_effect = RuntimeError("alert journal unavailable")
+            app = LeadAwareTonyApplication(base, store, agent_gateway=mock.Mock(), inbound_alert_service=alerts)
+
+            status, payload = self._call(app)
+
+            self.assertTrue(status.startswith("200"))
+            self.assertEqual(payload["status"], "lead_ingested")
+            self.assertEqual(payload["alert_status"], "delivery_failed")
+            self.assertEqual(len(store.read()), 1)
 
 
 if __name__ == "__main__":

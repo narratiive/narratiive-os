@@ -56,6 +56,45 @@ def _default_inbound_next_action(contact: str, company: str) -> str:
     )
 
 
+def _normalise_selected_service(value: str) -> str:
+    """Normalise current product labels without rewriting historical values."""
+    compact = " ".join(value.strip().split())
+    current = {
+        "groundwork": "GROUNDWORK",
+        "discovery": "DISCOVERY",
+        "fieldwork": "FIELDWORK",
+        "sketchbook": "SKETCHBOOK",
+        "launchpad": "LAUNCHPAD",
+    }
+    return current.get(compact.casefold(), compact)
+
+
+def _service_next_action(service: str, contact: str, company: str) -> str:
+    subject = company or contact or "this lead"
+    if service == "FIELDWORK":
+        return (
+            f"Review {subject}'s stated FIELDWORK need and submitted challenge. If the fit is credible, decide whether "
+            "to invite the prospect to Discovery. Do not initiate research, send a reply, or make a client commitment "
+            "without approval."
+        )
+    if service == "SKETCHBOOK":
+        return (
+            f"Review {subject}'s stated SKETCHBOOK need and confirm the required approved FIELDWORK inputs before "
+            "proposing a next step. Do not start creative development or contact the prospect without approval."
+        )
+    if service == "LAUNCHPAD":
+        return (
+            f"Review {subject}'s stated LAUNCHPAD need and confirm the approved strategy, creative and production "
+            "prerequisites. Do not activate media, commission production, or contact the prospect without approval."
+        )
+    if service == "DISCOVERY":
+        return (
+            f"Review {subject}'s request for Discovery, confirm fit, and decide whether to offer a conversation. "
+            "Do not book or contact the prospect without approval."
+        )
+    return _default_inbound_next_action(contact, company)
+
+
 @dataclass(frozen=True, slots=True)
 class InboundLead:
     lead_id: str
@@ -71,6 +110,8 @@ class InboundLead:
     notion_url: str = ""
     notes: str = ""
     ai_summary: str = ""
+    selected_service: str = ""
+    business_challenge: str = ""
     disposition: str = "active"
     disposition_reason: str = ""
     disposition_actor: str = ""
@@ -113,6 +154,10 @@ class InboundLead:
         lead_temperature = choose("lead_temperature", "Lead Temperature")
         recommended_next_action = choose("recommended_next_action", "Recommended Next Action")
         ai_summary = choose("ai_summary", "AI Summary")
+        selected_service = _normalise_selected_service(
+            choose("selected_service", "service_preference", "servicePreference", "Selected Service")
+        )
+        business_challenge = choose("business_challenge", "challenge", "Growth Challenge")
         disposition = choose("disposition", "Disposition", default="active") or "active"
         disposition_reason = choose("disposition_reason", "Disposition Reason")
         disposition_actor = choose("disposition_actor", "Disposition Actor")
@@ -127,9 +172,9 @@ class InboundLead:
             if not lead_temperature:
                 lead_temperature = "Warm"
             if not recommended_next_action:
-                recommended_next_action = _default_inbound_next_action(contact, company)
+                recommended_next_action = _service_next_action(selected_service, contact, company)
             if not ai_summary:
-                ai_summary = _default_summary(contact, company, notes)
+                ai_summary = _default_summary(contact, company, business_challenge or notes)
 
         return cls(
             lead_id=lead_id.strip(), contact=contact.strip(), company=company.strip(), email=email.strip(),
@@ -137,6 +182,7 @@ class InboundLead:
             lead_temperature=lead_temperature.strip(),
             recommended_next_action=(recommended_next_action.strip() or "Review the lead and decide the next commercial action."),
             created_at=created_at.strip(), notion_url=notion_url.strip(), notes=notes.strip(), ai_summary=ai_summary.strip(),
+            selected_service=selected_service.strip(), business_challenge=business_challenge.strip(),
             disposition=disposition.strip().casefold(), disposition_reason=disposition_reason.strip(),
             disposition_actor=disposition_actor.strip(), disposition_at=disposition_at.strip(), disposition_evidence=disposition_evidence,
         )
@@ -149,6 +195,8 @@ class InboundLead:
         if self.company:
             label = f"{self.contact} — {self.company}"
         qualifiers = [self.source]
+        if self.selected_service:
+            qualifiers.append(self.selected_service)
         if self.lead_temperature:
             qualifiers.append(self.lead_temperature)
         if self.pipeline_stage:
@@ -157,10 +205,11 @@ class InboundLead:
             f"source:{self.source}", f"status:{self.status}",
             f"pipeline_stage:{self.pipeline_stage}" if self.pipeline_stage else "",
             f"lead_temperature:{self.lead_temperature}" if self.lead_temperature else "",
+            f"selected_service:{self.selected_service}" if self.selected_service else "",
             f"notion:{self.notion_url}" if self.notion_url else "",
         )))
         classification = self.briefing_classification()
-        significance = "P2" if classification == "verified_commercial_opportunity" else "P4"
+        significance = "P2" if classification in {"verified_commercial_opportunity", "legitimate_inbound_enquiry"} else "P4"
         return AgencyItem(
             item_id=f"lead-{self.lead_id}", area=AgencyArea.COMMERCIAL,
             title=f"New lead: {label} ({' / '.join(qualifiers)})",
@@ -171,15 +220,30 @@ class InboundLead:
             classification=classification,
             significance=significance,
             why_matters=(
+                f"The prospect explicitly selected {self.selected_service}, creating a concrete service-fit decision."
+                if self.selected_service else
                 "A verified opportunity may create near-term commercial value."
                 if significance == "P2"
                 else "The record is not verified as a genuine commercial opportunity."
             ),
         )
 
+    def should_prepare_groundwork(self) -> bool:
+        """Only an unstated or explicit Groundwork request may enter that workflow."""
+        return self.selected_service in {"", "GROUNDWORK"}
+
     def briefing_classification(self) -> str:
         text = " ".join(
-            (self.contact, self.company, self.email, self.source, self.status, self.notes)
+            (
+                self.contact,
+                self.company,
+                self.email,
+                self.source,
+                self.status,
+                self.notes,
+                self.business_challenge,
+                self.selected_service,
+            )
         ).casefold()
         if self.disposition == "test" or any(
             marker in text for marker in ("safe", "synthetic", "test only", ".invalid")
@@ -203,6 +267,10 @@ class InboundLead:
         }
         if self.status.strip().casefold() in verified_statuses or self.pipeline_stage.strip().casefold() in verified_stages:
             return "verified_commercial_opportunity"
+        if self.source.strip().casefold() in {"growth diagnostic", "website", "tally"} and (
+            self.selected_service or self.business_challenge or self.notes
+        ):
+            return "legitimate_inbound_enquiry"
         return "unverified_submission"
 
 

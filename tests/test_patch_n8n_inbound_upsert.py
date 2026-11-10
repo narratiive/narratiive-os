@@ -21,7 +21,7 @@ class PatchN8nInboundUpsertTests(unittest.TestCase):
             {
                 "name": NORMALISE,
                 "parameters": {
-                    "jsCode": "const body = $json.body || $json;\nconst tallyData = null;\nconst isTally =\n  Boolean(tallyData) ||\n  String(body.source || '').toLowerCase() === 'tally';\nconst lead = {\n  lead_id:\n    body.lead_id ||\n    body.leadId ||\n    body.id ||\n    (tallyData && (tallyData.responseId || tallyData.submissionId)) ||\n    '',\n};"
+                    "jsCode": "const body = $json.body || $json;\nconst tallyData = null;\nfunction tallyValue() { return ''; }\nconst isTally =\n  Boolean(tallyData) ||\n  String(body.source || '').toLowerCase() === 'tally';\nconst lead = {\n  source: isTally ? 'Tally' : 'Growth Diagnostic',\n  lead_id:\n    body.lead_id ||\n    body.leadId ||\n    body.id ||\n    (tallyData && (tallyData.responseId || tallyData.submissionId)) ||\n    '',\n  challenge:\n    body.challenge ||\n    tallyValue(\n      'biggest growth challenge',\n      'growth challenge',\n      'challenge'\n    ) ||\n    '',\n};"
                 },
             },
             {
@@ -53,8 +53,12 @@ class PatchN8nInboundUpsertTests(unittest.TestCase):
         self.assertTrue({QUERY, BRANCH, EXISTING, MERGE}.issubset(by_name))
         self.assertIn("sourceSubmissionId", by_name[NORMALISE]["parameters"]["jsCode"])
         self.assertIn("sourceType", by_name[NORMALISE]["parameters"]["jsCode"])
+        self.assertIn("website_enquiry", by_name[NORMALISE]["parameters"]["jsCode"])
+        self.assertIn("parseWebsiteEnquiry", by_name[NORMALISE]["parameters"]["jsCode"])
+        self.assertIn("selected_service", by_name[NORMALISE]["parameters"]["jsCode"])
         self.assertIn("Source Submission ID", by_name[CREATE]["parameters"]["jsonBody"])
         self.assertIn("Inbound Message ID", by_name[CREATE]["parameters"]["jsonBody"])
+        self.assertIn("Selected Service", by_name[CREATE]["parameters"]["jsonBody"])
         headers = by_name[CREATE]["parameters"]["headerParameters"]["parameters"]
         self.assertNotIn("authorization", {item["name"].casefold() for item in headers})
         self.assertEqual(by_name[CREATE]["credentials"]["notionApi"]["id"], "credential-1")
