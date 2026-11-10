@@ -9,11 +9,12 @@ The repository can install four per-user macOS LaunchAgents:
 
 The canonical deployment command holds `runtime-state/deployment.lock` across
 repository update, validation, service restart, health checks, smoke checks and
-the new healthy deployment receipt. The interval supervisor checks that OS lock
-before running and exits successfully without inspecting or restarting services
-while deployment is active. The deployer restarts the three long-running runtime
-workers, not the interval supervisor; the supervisor resumes naturally on its
-next 60-second interval after the lock is released.
+the new healthy deployment receipt. The interval supervisor holds the same OS
+lock across its complete doctor and recovery cycle. A supervisor arriving during
+deployment exits successfully without inspecting or restarting services; a
+deployment arriving during supervision waits for that short cycle to finish.
+The deployer restarts the three long-running runtime workers, not the interval
+supervisor; supervision resumes naturally after the lock is released.
 
 ## Secure environment file
 

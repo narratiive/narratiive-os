@@ -41,9 +41,53 @@ class ServiceSupervisorTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             with path.open("a+", encoding="utf-8") as handle:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
-                self.assertTrue(service_supervisor._deployment_in_progress(path))
+                with self.assertRaises(service_supervisor.DeploymentInProgress):
+                    with service_supervisor.SupervisorDeploymentLock(path):
+                        self.fail("supervisor must not enter while deployment owns the lock")
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
-            self.assertFalse(service_supervisor._deployment_in_progress(path))
+            with service_supervisor.SupervisorDeploymentLock(path):
+                pass
+
+    def test_supervisor_holds_lock_until_its_complete_cycle_finishes(self) -> None:
+        import threading
+        import time
+
+        from scripts.deploy_tony_runtime import DeploymentLock
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime-state" / "deployment.lock"
+            deployment_acquired = threading.Event()
+
+            def begin_deployment() -> None:
+                with DeploymentLock(path):
+                    deployment_acquired.set()
+
+            with service_supervisor.SupervisorDeploymentLock(path):
+                contender = threading.Thread(target=begin_deployment)
+                contender.start()
+                time.sleep(0.05)
+                self.assertFalse(deployment_acquired.is_set())
+
+            contender.join(timeout=2)
+            self.assertFalse(contender.is_alive())
+            self.assertTrue(deployment_acquired.is_set())
+
+    def test_main_skips_doctor_and_restarts_when_deployment_owns_lock(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "runtime-state" / "deployment.lock"
+            path.parent.mkdir(parents=True)
+            with path.open("a+", encoding="utf-8") as handle:
+                fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+                with (
+                    mock.patch.object(service_supervisor, "DEFAULT_DEPLOYMENT_LOCK_PATH", path),
+                    mock.patch.object(service_supervisor, "_run_locked") as run_locked,
+                    self.assertRaises(SystemExit) as stopped,
+                ):
+                    service_supervisor.main()
+                fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+
+            self.assertEqual(stopped.exception.code, 0)
+            run_locked.assert_not_called()
 
     def test_healthy_services_require_no_restart(self) -> None:
         runner = RecordingRunner()
