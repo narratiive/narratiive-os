@@ -246,6 +246,46 @@ class NativeBusinessAdapterTests(unittest.TestCase):
         self.assertEqual(result["mutation_count"], 0)
         self.assertEqual(len(router.requests), 1)
 
+    def test_gmail_draft_round_trip_verifies_plain_html_and_attachments(self):
+        created_raw = {}
+
+        def create(req):
+            created_raw["raw"] = json.loads(req.data)["message"]["raw"]
+            return {"id": "draft-html-1"}
+
+        def read_back(_req):
+            return {"message": {"id": "message-html-1", "raw": created_raw["raw"]}}
+
+        router = Router([{"drafts": []}, create, read_back])
+        adapter = GmailDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+        result = adapter(
+            {
+                "execution_mode": "approved_write",
+                "approval_granted": True,
+                "operation": "create_draft",
+                "idempotency_key": "safe-html-draft",
+                "payload": {
+                    "recipient_email": "client@example.test",
+                    "subject": "SAFE Sketchbook",
+                    "body": "Plain equivalent",
+                    "html_body": "<html><body><p>Plain equivalent</p></body></html>",
+                    "attachments": [
+                        {
+                            "filename": "SAFE-Sketchbook.pdf",
+                            "mime_type": "application/pdf",
+                            "content_base64": base64.b64encode(b"%PDF-1.4 SAFE").decode("ascii"),
+                        }
+                    ],
+                },
+            }
+        )
+
+        self.assertTrue(result["verified"])
+        self.assertFalse(result["sent"])
+        self.assertTrue(result["html_verified"])
+        self.assertEqual(result["draft_id"], "draft-html-1")
+        self.assertEqual(len(result["attachment_checksums"]), 1)
+
     def test_gmail_internal_review_exception_is_exact_and_supports_attachment(self):
         contract = {
             "execution_mode": "authorised_internal_review_write",

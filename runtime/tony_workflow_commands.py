@@ -101,6 +101,15 @@ class WorkflowCommandBackend(Protocol):
     def projection(self, state: WorkflowState) -> Mapping[str, Any]: ...
     def sync_projection(self, state: WorkflowState, *, approver: str, rationale: str) -> Mapping[str, Any]: ...
     def deliver_internal_review(self, state: WorkflowState, *, recipient: str) -> Mapping[str, Any]: ...
+    def sketchbook_email(
+        self,
+        state: WorkflowState,
+        *,
+        operation: str,
+        inputs: Mapping[str, Any],
+        principal: str,
+        rationale: str,
+    ) -> Mapping[str, Any]: ...
     def commission(
         self,
         state: WorkflowState,
@@ -367,6 +376,22 @@ class FileWorkflowCommandBackend:
         if operation == "handback": return service.register(state, inputs, principal)
         if not principal: raise ValueError("Authenticated principal required for internal draft")
         return service.draft(state, str(inputs.get("candidate_id") or ""))
+
+    def sketchbook_email(self, state, *, operation, inputs, principal, rationale):
+        from runtime.sketchbook_client_email import SketchbookClientEmailService
+
+        service = SketchbookClientEmailService(self._runtime(state), self.dispatchers)
+        if operation == "sketchbook-email-preview":
+            return service.register_preview(state, inputs, principal=principal)
+        if not principal:
+            raise ValueError("Authenticated principal required for Sketchbook draft approval")
+        return service.prepare_draft(
+            state,
+            candidate_id=str(inputs.get("candidate_id") or ""),
+            action_digest=str(inputs.get("action_digest") or ""),
+            approver=principal,
+            rationale=rationale,
+        )
 
     def artifact_detail(self, state: WorkflowState) -> Mapping[str, Any]:
         return WorkflowActionPreviewService(
@@ -718,6 +743,7 @@ class TonyWorkflowCommandService:
         "workflow", "client", "work", "approvals", "blockers", "artefact", "artifact",
         "proposed", "approve", "reject", "revise", "resume", "recover", "manual-recovery",
         "handback", "document-brief", "draft-document",
+        "sketchbook-email-preview", "draft-sketchbook-email",
         "projection", "sync-notion", "research",
         "deliver-review",
         "commission",
@@ -944,6 +970,43 @@ class TonyWorkflowCommandService:
                     "document-brief": "Specialist handoff brief ready. No production invoked.",
                     "draft-document": "Exact approved attachment is in a verified unsent internal Gmail draft. Separate send authorisation remains required."
                 }[name], result)
+            if name in {"sketchbook-email-preview", "draft-sketchbook-email"}:
+                if reference != state.run_id:
+                    raise ValueError("Use the exact Creative Bible run ID for Sketchbook email preparation")
+                if not principal_id.strip():
+                    return self._error(
+                        name,
+                        "authorised_principal_required",
+                        "Sketchbook presentation adoption and draft preparation require Matt's authenticated identity.",
+                    )
+                if name == "draft-sketchbook-email" and not rationale:
+                    return self._error(
+                        name,
+                        "rationale_required",
+                        "Exact Sketchbook draft approval requires a rationale.",
+                    )
+                result = dict(
+                    self.backend.sketchbook_email(
+                        state,
+                        operation=name,
+                        inputs=dict(inputs or {}),
+                        principal=principal_id,
+                        rationale=rationale,
+                    )
+                )
+                if name == "sketchbook-email-preview":
+                    return CommandResponse(
+                        name,
+                        "healthy",
+                        "Exact Sketchbook client email preview registered. No draft or client send occurred; approve its action digest to prepare one unsent draft.",
+                        result,
+                    )
+                return CommandResponse(
+                    name,
+                    "healthy",
+                    "The exact approved Sketchbook email is a verified unsent Gmail draft. Client sending remains unavailable and separately approval-gated.",
+                    result,
+                )
             if name == "manual-recovery" and reference != state.run_id:
                 return self._error(
                     name,

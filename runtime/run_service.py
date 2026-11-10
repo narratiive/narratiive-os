@@ -982,6 +982,67 @@ class WorkflowRunService:
         self._commit(state, "asset_suite.approved", decision)
         return state
 
+    def record_sketchbook_presentation_approval(
+        self,
+        run_id: str,
+        *,
+        approver: str,
+        rationale: str,
+        candidate_id: str,
+        candidate_checksum: str,
+        action_digest: str,
+    ) -> WorkflowState:
+        """Approve one exact Sketchbook presentation for client-draft preparation.
+
+        This approval does not approve sending, release protected links, start
+        production or change payment state. It is additive to the completed
+        Creative Bible run and never reopens that history.
+        """
+
+        state = self.repository.load(run_id)
+        if state.workflow_id != "campaign_world_to_creative_bible":
+            raise ValueError("Sketchbook presentation approval belongs to the Creative Bible workflow")
+        if state.status is not WorkflowStatus.COMPLETE or state.approval_status != "approved":
+            raise ValueError("Sketchbook presentation approval requires a completed approved Creative Bible run")
+        if "matt" not in {token for token in re.split(r"[^a-z0-9]+", approver.strip().casefold()) if token}:
+            raise ValueError("Sketchbook presentation approval requires Matt's authenticated identity")
+        decision = {
+            "decision": "sketchbook_presentation_approval",
+            "approver": approver.strip(),
+            "rationale": rationale.strip(),
+            "candidate_id": candidate_id.strip(),
+            "candidate_checksum": candidate_checksum.strip(),
+            "action_digest": action_digest.strip(),
+            "approved_at": datetime.now(timezone.utc).isoformat(),
+            "draft_preparation_authorised": True,
+            "client_send_authorised": False,
+            "production_authorised": False,
+            "payment_authorised": False,
+        }
+        if any(
+            not decision[key]
+            for key in ("approver", "rationale", "candidate_id", "candidate_checksum", "action_digest")
+        ):
+            raise ValueError("Sketchbook presentation approval requires exact-version evidence")
+        existing = [
+            item
+            for item in state.approval_history
+            if item.get("decision") == "sketchbook_presentation_approval"
+        ]
+        if existing:
+            prior = existing[-1]
+            if (
+                prior.get("candidate_id") == decision["candidate_id"]
+                and prior.get("candidate_checksum") == decision["candidate_checksum"]
+                and prior.get("action_digest") == decision["action_digest"]
+            ):
+                return state
+            raise ValueError("a different Sketchbook presentation version is already approved")
+        state.approval_history.append(decision)
+        state.touch()
+        self._commit(state, "sketchbook.presentation_approved", decision)
+        return state
+
     def record_handoff(
         self,
         run_id: str,
