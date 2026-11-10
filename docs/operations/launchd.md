@@ -117,6 +117,23 @@ This does not add a new dashboard, state engine or source of truth: generation
 still goes through `TonyExecutiveCommandService` and the same brief archive
 and Mission Control loaders the Telegram bridge already uses.
 
+The existing 15-minute `com.narratiive.proactive-watch` invocation also runs
+Tony's bounded Discovery monitor before the normal Mission Control escalation.
+The monitor uses the same canonical lead, Calendar, Discovery, Groundwork and
+post-Discovery services as the conversational command chain. It may adopt one
+unambiguous Calendar booking read-only, check a tracked meeting only after its
+verified end time, read Gemini notes from Google Drive, and send Matt one
+deduplicated internal update when a review or blocker materially changes. It
+does not send client email, prepare a finished proposal, approve an artefact or
+change commercial state. `TONY_DISCOVERY_EVIDENCE_SOURCE` defaults to
+`gemini_drive`; `fireflies` remains available only when explicitly configured.
+
+An ad-hoc call whose actual time differs from the booked Calendar slot is never
+matched fuzzily. The operator recovery command in
+`scripts/run_discovery_monitor.py` requires the exact Drive file id, lead id,
+company, meeting end time, confirming operator and rationale. The superseded
+tracking record is retained in correction history.
+
 Configure outbound delivery in the same secure environment file:
 
 ```text

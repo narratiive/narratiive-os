@@ -813,6 +813,98 @@ class NativeBusinessAdapterTests(unittest.TestCase):
             adapter.probe()
         self.assertNotIn("sensitive", str(raised.exception))
 
+    def test_calendar_get_event_reads_exact_identifiers_without_mutation(self):
+        router = Router([
+            {
+                "id": "event-123",
+                "summary": "Narratiive x SAFE TEST ONLY — Discovery",
+                "status": "confirmed",
+                "start": {"dateTime": "2026-11-12T09:00:00Z"},
+                "end": {"dateTime": "2026-11-12T09:30:00Z"},
+                "attendees": [{"email": "alex@safe-test.invalid"}, {"email": "hello@narratiive.com"}],
+                "htmlLink": "https://calendar.google.invalid/event-123",
+            }
+        ])
+        adapter = GoogleCalendarDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({"execution_mode": "autonomous_read", "operation": "get_event", "target": {"event_id": "event-123"}})
+
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertEqual(result["result_count"], 1)
+        event = result["events"][0]
+        self.assertEqual(event["event_id"], "event-123")
+        self.assertEqual(event["start"], "2026-11-12T09:00:00Z")
+        self.assertEqual(event["end"], "2026-11-12T09:30:00Z")
+        self.assertIn("alex@safe-test.invalid", event["attendees"])
+
+    def test_calendar_get_event_missing_returns_empty_without_raising(self):
+        router = Router([HTTPError("https://calendar.google.invalid", 404, "not found", {}, None)])
+        adapter = GoogleCalendarDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({"execution_mode": "autonomous_read", "operation": "get_event", "target": {"event_id": "missing"}})
+
+        self.assertEqual(result["result_count"], 0)
+        self.assertEqual(result["events"], [])
+
+    def test_calendar_search_filters_to_matching_window(self):
+        router = Router([
+            {
+                "items": [
+                    {
+                        "id": "event-123",
+                        "summary": "SAFE TEST ONLY — Discovery",
+                        "start": {"dateTime": "2026-11-12T09:00:00Z"},
+                        "end": {"dateTime": "2026-11-12T09:30:00Z"},
+                        "attendees": [{"email": "alex@safe-test.invalid"}],
+                    }
+                ]
+            }
+        ])
+        adapter = GoogleCalendarDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": "SAFE TEST ONLY", "time_min": "2026-11-12T00:00:00Z", "time_max": "2026-11-13T00:00:00Z"},
+        })
+
+        self.assertEqual(result["result_count"], 1)
+        self.assertEqual(result["events"][0]["event_id"], "event-123")
+        self.assertIn("q=SAFE", router.requests[0].full_url.replace("%20", " "))
+
+    def test_drive_export_reads_plain_text_without_mutation(self):
+        class RawResponse:
+            def __init__(self, text):
+                self.text = text.encode("utf-8")
+
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+            def read(self, _size=-1):
+                return self.text
+
+        class RawRouter:
+            def __init__(self, text):
+                self.text = text
+                self.requests = []
+
+            def __call__(self, req, timeout):
+                self.requests.append(req)
+                return RawResponse(self.text)
+
+        router = RawRouter("Transcript\nSAFE TEST ONLY meeting notes by Gemini.")
+        adapter = GoogleDriveDispatcher(GoogleOAuthConfig(access_token="synthetic"), opener=router)
+
+        result = adapter({"execution_mode": "autonomous_read", "operation": "export", "target": {"file_id": "doc-1"}})
+
+        self.assertTrue(result["verified"])
+        self.assertEqual(result["mutation_count"], 0)
+        self.assertIn("SAFE TEST ONLY", result["content"])
+        self.assertIn("mimeType=text%2Fplain", router.requests[0].full_url)
+
 
 if __name__ == "__main__":
     unittest.main()

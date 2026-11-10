@@ -148,6 +148,28 @@ class RunProactiveBriefTests(_ProactiveBriefTestEnvironment, unittest.TestCase):
         # No command is required for escalation-only invocations.
         self.assertIn(exit_code, (0, 1))
 
+    def test_discovery_notification_failure_does_not_skip_existing_escalation_watch(self):
+        with (
+            patch(
+                "scripts.run_discovery_monitor.run_monitor_once",
+                return_value={
+                    "ok": True,
+                    "status": "post_discovery_proposal_approval_required",
+                    "notification_sent": False,
+                    "notification_error": "Telegram temporarily unavailable",
+                },
+            ),
+            patch.object(
+                run_proactive_brief,
+                "run_escalation",
+                return_value={"status": "no_material_change"},
+            ) as escalation,
+        ):
+            exit_code = run_proactive_brief.main(["--mode", "escalation"])
+
+        self.assertEqual(exit_code, 0)
+        escalation.assert_called_once_with(simulate_transport_failure=False)
+
     def test_command_is_required_for_brief_mode(self):
         with self.assertRaises(SystemExit):
             run_proactive_brief.main(["--mode", "brief"])

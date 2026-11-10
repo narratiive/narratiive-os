@@ -479,6 +479,9 @@ class GoogleCalendarDispatcher(GoogleAdapter):
         payload, target = _mapping(contract.get("payload")), _mapping(contract.get("target"))
         if mode == "autonomous_read":
             _require_read(contract)
+            operation = _text(contract.get("operation")).casefold()
+            if operation in {"get_event", "search"}:
+                return self._read_events(operation, target, payload)
             time_min, time_max = self._read_range(target, payload)
             result = self.client.call(
                 f"{self.api_base}/freeBusy",
@@ -579,6 +582,76 @@ class GoogleCalendarDispatcher(GoogleAdapter):
             return start.isoformat(), (start + timedelta(days=days_ahead)).isoformat()
         raise BusinessAdapterError("calendar_read_requires_time_range")
 
+    def _read_events(self, operation: str, target: Mapping[str, Any], payload: Mapping[str, Any]) -> dict[str, Any]:
+        calendar_id = parse.quote(self.calendar_id, safe="")
+        if operation == "get_event":
+            event_id = _text(target.get("event_id") or payload.get("event_id"))
+            if not event_id:
+                raise BusinessAdapterError("calendar_read_requires_event_id")
+            try:
+                item = self.client.call(
+                    f"{self.api_base}/calendars/{calendar_id}/events/{parse.quote(event_id, safe='')}",
+                    headers=self._headers(),
+                )
+            except BusinessAdapterError as exc:
+                if str(exc) == "provider_http_404":
+                    return {
+                        "verified": True,
+                        "read_only": True,
+                        "mutation_count": 0,
+                        "source_id": f"calendar:{self.calendar_id}",
+                        "events": [],
+                        "result_count": 0,
+                        "summary": "No calendar event exists with that exact identifier.",
+                    }
+                raise
+            raw_events = [item] if _text(item.get("id")) == event_id else []
+        else:
+            query_text = _text(target.get("query") or payload.get("query"))
+            time_min, time_max = self._read_range(target, payload)
+            query_clause = f"&q={parse.quote(query_text, safe='')}" if query_text else ""
+            result = self.client.call(
+                f"{self.api_base}/calendars/{calendar_id}/events"
+                f"?timeMin={parse.quote(time_min, safe='')}&timeMax={parse.quote(time_max, safe='')}"
+                f"&singleEvents=true{query_clause}",
+                headers=self._headers(),
+            )
+            items = result.get("items")
+            raw_events = [item for item in items if isinstance(item, Mapping)] if isinstance(items, list) else []
+        events = [
+            self._normalise_event(item)
+            for item in raw_events
+            if isinstance(item, Mapping) and _text(item.get("id"))
+        ]
+        return {
+            "verified": True,
+            "read_only": True,
+            "mutation_count": 0,
+            "source_id": f"calendar:{self.calendar_id}",
+            "events": events,
+            "result_count": len(events),
+            "summary": "Calendar event detail was read without mutation.",
+        }
+
+    @staticmethod
+    def _normalise_event(item: Mapping[str, Any]) -> dict[str, Any]:
+        start, end = _mapping(item.get("start")), _mapping(item.get("end"))
+        attendees = item.get("attendees")
+        emails = (
+            [_text(_mapping(entry).get("email")) for entry in attendees if _text(_mapping(entry).get("email"))]
+            if isinstance(attendees, list)
+            else []
+        )
+        return {
+            "event_id": _text(item.get("id")),
+            "summary": _text(item.get("summary")),
+            "status": _text(item.get("status")),
+            "start": _text(start.get("dateTime") or start.get("date")),
+            "end": _text(end.get("dateTime") or end.get("date")),
+            "attendees": emails,
+            "html_link": _text(item.get("htmlLink")),
+        }
+
 
 class GoogleDriveDispatcher(GoogleAdapter):
     api_base = "https://www.googleapis.com/drive/v3"
@@ -651,6 +724,34 @@ class GoogleDriveDispatcher(GoogleAdapter):
                     "files": files,
                     "result_count": len(files),
                     "summary": "Drive metadata was listed without mutation." if list_operation and not query_text else "Drive metadata was searched without mutation.",
+                }
+            if operation == "export":
+                if not file_id:
+                    raise BusinessAdapterError("drive_export_requires_file_id")
+                mime_type = _text(target.get("export_mime_type") or payload.get("export_mime_type")) or "text/plain"
+                mime = parse.quote(mime_type, safe="")
+                req = request.Request(
+                    f"{self.api_base}/files/{parse.quote(file_id, safe='')}/export?mimeType={mime}",
+                    headers=self._headers(),
+                )
+                try:
+                    with self.client.opener(req, timeout=20) as response:
+                        data = response.read(5_000_001)
+                except HTTPError as exc:
+                    raise BusinessAdapterError(f"provider_http_{exc.code}") from exc
+                except (URLError, TimeoutError, OSError) as exc:
+                    raise BusinessAdapterError("provider_unavailable") from exc
+                if len(data) > 5_000_000:
+                    raise BusinessAdapterError("drive_export_too_large")
+                return {
+                    "verified": True,
+                    "read_only": True,
+                    "mutation_count": 0,
+                    "source_id": f"drive:file:{file_id}",
+                    "file_id": file_id,
+                    "content": data.decode("utf-8", errors="replace"),
+                    "export_mime_type": mime_type,
+                    "summary": "Drive document content was exported without mutation.",
                 }
             if not file_id:
                 raise BusinessAdapterError("drive_read_requires_file_id")

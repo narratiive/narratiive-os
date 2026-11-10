@@ -25,6 +25,8 @@ from runtime.executive_visibility import ExecutiveVisibilityPolicy
 from runtime.execution_journal import ExecutionJournal
 from runtime.campaign_engine import CampaignIdentity
 from runtime.inbound_leads import FileInboundLeadStore, InboundLead
+from runtime.inbound_lead_alerts import InboundLeadAlertJournal, InboundLeadAlertService
+from runtime.proactive_executive_delivery import FileDeliveryKeyStore
 from runtime.agency_state_projection import AgencyStateProjector
 from runtime.lead_attention import LeadAttentionService
 from runtime.briefing_intelligence import (
@@ -43,6 +45,7 @@ from runtime.media_control import (
 )
 from runtime.media_provider_transports import build_configured_media_adapters
 from runtime.mission_control_operator import OperatorMissionControlProjector
+from runtime.discovery_proposal_mission_control import project_discovery_proposal_journey
 from runtime.meta_oauth import (
     META_PERMISSION_NAMES,
     META_REDIRECT_URI,
@@ -92,6 +95,7 @@ from runtime.tony_post_discovery_commercial import TonyPostDiscoveryCommercialCo
 from runtime.tony_post_discovery_proposal_execution import TonyPostDiscoveryProposalExecutionCommandService
 from runtime.tony_post_send_notion_sync import TonyPostSendNotionSyncCommandService
 from runtime.tony_proposal_outcome_tracking import TonyProposalOutcomeTrackingCommandService
+from runtime.tony_proposal_document_handback import TonyProposalHandbackCommandService
 from runtime.tony_terminology_commands import TonyTerminologyCommandService
 from runtime.tony_verified_execution_status import TonyVerifiedExecutionStatusCommandService
 from runtime.tony_workflow_commands import FileWorkflowCommandBackend, TonyWorkflowCommandService
@@ -104,6 +108,7 @@ from runtime.model_usage_budget import (
     ModelBudgetExceeded,
 )
 from openclaw.telegram_output_policy import protect_telegram_output
+from openclaw.telegram_outbound import TelegramConfig, TelegramSender
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 
@@ -283,6 +288,11 @@ class LeadAwareTonyApplication:
         mission_control_web: MissionControlWebApplication | None = None,
         model_budget_guard: HostedModelBudgetGuard | None = None,
         model_budget_reserve_usd: Decimal = Decimal("1"),
+        inbound_alert_service: InboundLeadAlertService | None = None,
+        proposal_handback_service: Any | None = None,
+        discovery_outcome_service: Any | None = None,
+        post_discovery_service: Any | None = None,
+        authoritative_lead_loader: Callable[[], tuple[InboundLead, ...]] | None = None,
     ) -> None:
         self.base = base
         self.lead_store = lead_store
@@ -298,6 +308,11 @@ class LeadAwareTonyApplication:
         self.mission_control_web = mission_control_web
         self.model_budget_guard = model_budget_guard
         self.model_budget_reserve_usd = model_budget_reserve_usd
+        self.inbound_alert_service = inbound_alert_service
+        self.proposal_handback_service = proposal_handback_service
+        self.discovery_outcome_service = discovery_outcome_service
+        self.post_discovery_service = post_discovery_service
+        self.authoritative_lead_loader = authoritative_lead_loader
 
     def __getattr__(self, name: str):
         return getattr(self.base, name)
@@ -986,6 +1001,23 @@ class LeadAwareTonyApplication:
                 # retries from becoming separate Tony leads and preparation jobs.
                 payload = dict(payload)
                 payload["lead_id"] = source_submission_id
+            else:
+                payload = dict(payload)
+            selected_service = str(
+                diagnostic.get("selected_service")
+                or diagnostic.get("selectedService")
+                or diagnostic.get("service_preference")
+                or ""
+            ).strip()
+            business_challenge = str(
+                diagnostic.get("business_challenge")
+                or diagnostic.get("challenge")
+                or ""
+            ).strip()
+            if selected_service:
+                payload["selected_service"] = selected_service
+            if business_challenge:
+                payload["business_challenge"] = business_challenge
             lead = InboundLead.from_mapping(payload)
             self.lead_store.upsert(lead)
         except (ValueError, TypeError, UnicodeDecodeError, json.JSONDecodeError) as exc:
@@ -993,6 +1025,9 @@ class LeadAwareTonyApplication:
         except Exception:
             return self._respond(start_response, HTTPStatus.INTERNAL_SERVER_ERROR, {"ok": False, "error": {"code": "lead_store_error", "message": "Tony could not persist inbound lead state"}})
 
+        # Every legitimate conversation/Discovery request receives proportionate
+        # Groundwork preparation regardless of the service the prospect selected;
+        # the selection changes downstream routing, not whether Groundwork runs.
         preparation = None
         if self.blueprint_lite_service is not None:
             try:
@@ -1007,16 +1042,30 @@ class LeadAwareTonyApplication:
                     "external_action_taken": False,
                 }
 
+        alert = None
+        alert_failed = False
+        if self.inbound_alert_service is not None:
+            try:
+                alert = self.inbound_alert_service.deliver(lead)
+            except Exception:
+                alert_failed = True
+
         response: dict[str, Any] = {
             "ok": True,
             "status": "lead_ingested",
             "lead_id": lead.lead_id,
             "contact": lead.contact,
             "source": lead.source,
+            "selected_service": lead.selected_service,
         }
         if preparation is not None:
             response["preparation_status"] = preparation.get("state", "unknown")
             response["preparation"] = preparation
+        if alert is not None:
+            response["alert_status"] = alert.status
+            response["alert"] = alert.to_dict()
+        elif alert_failed:
+            response["alert_status"] = "delivery_failed"
         return self._respond(start_response, HTTPStatus.OK, response)
 
     @staticmethod
@@ -1097,10 +1146,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     workflow_runtime_root = Path(
         os.getenv("TONY_WORKFLOW_RUNTIME_ROOT", str(REPOSITORY_ROOT / ".runtime" / "workflow-runtime"))
     )
+    groundwork_preparation_store = FileBlueprintLitePreparationStore(
+        Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
+    )
     blueprint_lite_service = TonyInboundBlueprintLiteService(
-        FileBlueprintLitePreparationStore(
-            Path(os.getenv("TONY_BLUEPRINT_LITE_PREPARATION_PATH", str(REPOSITORY_ROOT / ".runtime" / "blueprint-lite-preparation.json")))
-        ),
+        groundwork_preparation_store,
         dispatchers=live_dispatchers,
         workflow_runtime_root=workflow_runtime_root,
         researcher=BlueprintLiteWebsiteResearch(workflow_runtime_root / "blueprint-lite-research"),
@@ -1123,10 +1173,28 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
     meeting_reply_service = TonyMeetingReplyPreparationCommandService(followup_service, dispatchers=live_dispatchers, verified_result_sink=accept_verified_commercial_result)
     meeting_booking_service = TonyConfirmedMeetingBookingCommandService(meeting_reply_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_MEETING_BOOKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "meeting-booking.json"))))
     booking_sync_service = TonyPostBookingNotionSyncCommandService(meeting_booking_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_BOOKING_NOTION_SYNC_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-booking-notion-sync.json"))))
-    discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(booking_sync_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json"))))
-    post_discovery_service = TonyPostDiscoveryCommercialCommandService(discovery_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json"))))
+    discovery_outcome_tracking_path = Path(os.getenv("TONY_DISCOVERY_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "discovery-outcome-tracking.json")))
+    post_discovery_commercial_path = Path(os.getenv("TONY_POST_DISCOVERY_COMMERCIAL_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-commercial.json")))
+    proposal_handback_path = Path(os.getenv("TONY_PROPOSAL_HANDBACK_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback.json")))
+    discovery_outcome_service = TonyDiscoveryOutcomeTrackingCommandService(
+        booking_sync_service,
+        dispatchers=live_dispatchers,
+        store_path=discovery_outcome_tracking_path,
+        evidence_source=str(os.getenv("TONY_DISCOVERY_EVIDENCE_SOURCE", "gemini_drive")).strip().casefold() or "gemini_drive",
+    )
+    post_discovery_service = TonyPostDiscoveryCommercialCommandService(
+        discovery_outcome_service,
+        dispatchers=live_dispatchers,
+        store_path=post_discovery_commercial_path,
+        groundwork_store=groundwork_preparation_store,
+    )
     proposal_execution_service = TonyPostDiscoveryProposalExecutionCommandService(post_discovery_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_POST_DISCOVERY_PROPOSAL_EXECUTION_PATH", str(REPOSITORY_ROOT / ".runtime" / "post-discovery-proposal-execution.json"))))
     proposal_outcome_service = TonyProposalOutcomeTrackingCommandService(proposal_execution_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_PROPOSAL_OUTCOME_TRACKING_PATH", str(REPOSITORY_ROOT / ".runtime" / "proposal-outcome-tracking.json"))))
+    proposal_handback_service = TonyProposalHandbackCommandService(
+        live_dispatchers,
+        store_path=proposal_handback_path,
+        documents_root=Path(os.getenv("TONY_PROPOSAL_HANDBACK_DOCUMENTS_ROOT", str(REPOSITORY_ROOT / ".runtime" / "proposal-handback-documents"))),
+    )
     commercial_close_service = TonyCommercialCloseCommandService(proposal_outcome_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_COMMERCIAL_CLOSE_PATH", str(REPOSITORY_ROOT / ".runtime" / "commercial-close.json"))))
     delivery_bootstrap_service = TonyDeliveryBootstrapCommandService(commercial_close_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DELIVERY_BOOTSTRAP_PATH", str(REPOSITORY_ROOT / ".runtime" / "delivery-bootstrap.json"))))
     drive_workspace_service = TonyDriveDeliveryWorkspaceCommandService(delivery_bootstrap_service, dispatchers=live_dispatchers, store_path=Path(os.getenv("TONY_DRIVE_DELIVERY_WORKSPACE_PATH", str(REPOSITORY_ROOT / ".runtime" / "drive-delivery-workspace.json"))))
@@ -1267,11 +1335,40 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
                     )
             except (OSError, UnicodeDecodeError, json.JSONDecodeError):
                 pass
-        return operator_projector.project(
+        snapshot = operator_projector.project(
             states=workflow_backend.list_states(),
             leads=lead_store.read(),
             system_snapshot=system,
         )
+        snapshot["discovery_proposal_journeys"] = _discovery_proposal_journeys()
+        return snapshot
+
+    def _discovery_proposal_journeys() -> list[dict[str, Any]]:
+        """Truthful, read-only Discovery-to-proposal states for every lead this
+        runtime has evidence for — including a Calendar booking Tony adopted
+        rather than created, which carries no separate CRM lead record."""
+
+        lead_ids = {lead.lead_id for lead in lead_store.read()}
+        for path in (discovery_outcome_tracking_path, post_discovery_commercial_path):
+            try:
+                stored = json.loads(path.read_text(encoding="utf-8"))
+            except (FileNotFoundError, OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if not isinstance(stored, dict):
+                continue
+            for key in ("active", "last_completed", "pending", "last_prepared"):
+                record = stored.get(key)
+                if isinstance(record, dict) and str(record.get("lead_id") or "").strip():
+                    lead_ids.add(str(record["lead_id"]).strip())
+        return [
+            project_discovery_proposal_journey(
+                lead_id,
+                discovery_tracking_path=discovery_outcome_tracking_path,
+                post_discovery_path=post_discovery_commercial_path,
+                proposal_handback_path=proposal_handback_path,
+            )
+            for lead_id in sorted(lead_ids)
+        ]
 
     mission_control_web = MissionControlWebApplication(
         load_operator_snapshot,
@@ -1286,6 +1383,20 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         model_budget_guard.default_request_reserve_usd
         if model_budget_guard is not None
         else Decimal("1")
+    )
+    inbound_alert_root = Path(
+        os.getenv("TONY_INBOUND_ALERT_ROOT", str(REPOSITORY_ROOT / ".runtime" / "inbound-lead-alerts"))
+    ).resolve()
+
+    def send_inbound_alert(chat_id: str, text: str) -> dict[str, Any]:
+        return TelegramSender(TelegramConfig.from_env(os.environ)).send(chat_id, text)
+
+    inbound_alert_service = InboundLeadAlertService(
+        send_message=send_inbound_alert,
+        chat_id=os.getenv("TONY_TELEGRAM_CHAT_ID", ""),
+        key_store=FileDeliveryKeyStore(inbound_alert_root / "delivery-keys.json"),
+        journal=InboundLeadAlertJournal(inbound_alert_root / "events.jsonl"),
+        lock_path=inbound_alert_root / "delivery.lock",
     )
     return LeadAwareTonyApplication(
         app,
@@ -1302,6 +1413,11 @@ def build_app(*, recover_workflows: bool = False) -> LeadAwareTonyApplication:
         mission_control_web=mission_control_web,
         model_budget_guard=model_budget_guard,
         model_budget_reserve_usd=model_budget_reserve_usd,
+        inbound_alert_service=inbound_alert_service,
+        proposal_handback_service=proposal_handback_service,
+        discovery_outcome_service=discovery_outcome_service,
+        post_discovery_service=post_discovery_service,
+        authoritative_lead_loader=authoritative_lead_loader,
     )
 
 

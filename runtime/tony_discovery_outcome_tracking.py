@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterable, Mapping
 
@@ -11,14 +11,25 @@ from runtime.tony_command_service import CommandResponse
 
 DispatchHandler = Callable[[dict[str, Any]], dict[str, Any]]
 
+INTERNAL_EMAIL_DOMAIN = "@narratiive.com"
+GEMINI_DRIVE_EVIDENCE_SOURCE = "gemini_drive"
+FIREFLIES_EVIDENCE_SOURCE = "fireflies"
+_EVIDENCE_SOURCES = {GEMINI_DRIVE_EVIDENCE_SOURCE, FIREFLIES_EVIDENCE_SOURCE}
+_SYNC_PREFIX = ("sync", "calendar", "booking")
+
 
 class TonyDiscoveryOutcomeTrackingCommandService:
-    """Track a verified booked discovery meeting through evidence-backed review.
+    """Track a booked discovery meeting through evidence-backed review.
 
-    A verified Notion `Discovery booked` transition starts a durable watch. Once the
-    scheduled slot has ended, Tony may read meeting evidence autonomously from
-    Fireflies and ask Claude to prepare an evidence-grounded commercial assessment.
-    No CRM stage change, email or other consequential write is performed here.
+    A verified Notion `Discovery booked` transition starts a durable watch, and so
+    does an explicitly verified existing Calendar booking that Tony did not create
+    itself (see `discover_from_calendar`/the "sync calendar booking" command).
+    Once the scheduled slot has ended, Tony may read meeting evidence autonomously
+    from exactly one explicitly configured source — either Google Drive evidence
+    attributable to Gemini, or Fireflies — and ask Claude to prepare an
+    evidence-grounded commercial assessment. The two sources are never silently
+    substituted for one another. No CRM stage change, email or other consequential
+    action is performed here.
     """
 
     CHECK_MARKERS = {
@@ -38,11 +49,15 @@ class TonyDiscoveryOutcomeTrackingCommandService:
         *,
         store_path: Path,
         clock: Callable[[], datetime] | None = None,
+        evidence_source: str = FIREFLIES_EVIDENCE_SOURCE,
     ) -> None:
+        if evidence_source not in _EVIDENCE_SOURCES:
+            raise ValueError(f"discovery_evidence_source_unsupported: {evidence_source}")
         self.command_service = command_service
         self.dispatchers = dict(dispatchers or {})
         self.store_path = store_path
         self.clock = clock or (lambda: datetime.now(timezone.utc))
+        self.evidence_source = evidence_source
         self.state = self._load()
 
     @property
@@ -59,11 +74,230 @@ class TonyDiscoveryOutcomeTrackingCommandService:
         if active and normalized in self.CHECK_MARKERS:
             return self._check(active)
 
+        tokens = command.strip().split()
+        if len(tokens) >= 4 and tuple(token.casefold() for token in tokens[:3]) == _SYNC_PREFIX:
+            query = " ".join(tokens[3:]).strip()
+            now = self._now()
+            return self.discover_from_calendar(
+                query=query,
+                time_min=now.isoformat(),
+                time_max=(now + timedelta(days=30)).isoformat(),
+            )
+
         response = self.command_service.execute(command, objects)
         data = response.data if isinstance(response.data, dict) else {}
         if data.get("execution_status") == "discovery_commercial_state_sync_verified":
             return self._activate(response)
         return response
+
+    def discover_from_calendar(
+        self,
+        *,
+        query: str,
+        time_min: str,
+        time_max: str,
+        expected_email: str = "",
+        lead_id: str = "",
+    ) -> CommandResponse:
+        """Verify an existing Calendar booking Tony did not create, then adopt it.
+
+        Idempotent and durable: replaying the same query against the same booking
+        never duplicates the tracking record, and Tony refuses (fails closed)
+        rather than silently overwrite a different booking already being tracked.
+        """
+
+        if not query.strip():
+            return self._sync_error("discovery_booking_query_required", "I need at least a company or contact name to search Calendar for an existing booking.")
+        calendar = self.dispatchers.get("Google Calendar")
+        if calendar is None:
+            return self._sync_error("discovery_booking_calendar_dispatcher_unavailable", "No live Google Calendar dispatcher is configured, so I cannot verify any existing booking.")
+        search = {
+            "eligible": True,
+            "state": "ready_for_autonomous_dispatch",
+            "worker": "Google Calendar",
+            "instruction": f"Search Calendar for an existing Discovery booking matching '{query}' between {time_min} and {time_max}. Read only; do not change any event.",
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": query, "time_min": time_min, "time_max": time_max},
+            "expected_evidence": "verified Calendar event list with bounded identifiers",
+            "return_to": "Tony",
+            "execution_truth": "not_dispatched",
+            "payload": {"kind": "discovery_booking_lookup", "query": query},
+        }
+        try:
+            evidence = calendar(dict(search))
+        except Exception as exc:
+            return self._sync_error("discovery_booking_calendar_read_failed", f"The Calendar search failed: {exc}")
+        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(search, evidence)
+        if not verified:
+            return self._sync_error("discovery_booking_calendar_unverified", f"Calendar returned data, but it did not satisfy the read-only evidence contract ({reason}).")
+
+        candidates = [
+            event
+            for event in evidence.get("events", [])
+            if isinstance(event, dict) and str(event.get("event_id") or "").strip() and event.get("status") != "cancelled"
+        ]
+        if expected_email.strip():
+            needle = expected_email.strip().casefold()
+            candidates = [event for event in candidates if needle in {str(a).casefold() for a in event.get("attendees", [])}]
+        if len(candidates) != 1:
+            status = "discovery_booking_ambiguous" if candidates else "discovery_booking_not_found"
+            message = (
+                f"I found {len(candidates)} Calendar events matching '{query}' in that window, so I will not guess which one is the Discovery booking."
+                if candidates
+                else f"I could not find a verified Calendar event matching '{query}' in that window."
+            )
+            return self._sync_error(status, message)
+
+        event = candidates[0]
+        event_id = str(event.get("event_id") or "").strip()
+        existing_active = self.state.get("active") if isinstance(self.state.get("active"), dict) else None
+        if isinstance(existing_active, dict) and existing_active.get("calendar_event_id") == event_id:
+            return CommandResponse(
+                "discovery_booking_discovery",
+                "healthy",
+                "I am already tracking this exact Calendar booking; replaying this check did not create a duplicate record.",
+                {
+                    "execution_status": "discovery_outcome_tracking_active",
+                    "discovery_outcome_tracking": {"state": "active", "write_actions_allowed": False, **existing_active},
+                    "external_action_taken": False,
+                },
+            )
+        last_completed = self.state.get("last_completed") if isinstance(self.state.get("last_completed"), dict) else None
+        if isinstance(last_completed, dict) and last_completed.get("calendar_event_id") == event_id:
+            return self._sync_error("discovery_outcome_already_reviewed", "This exact Calendar booking has already been reviewed; I will not reopen tracking for it.")
+        if isinstance(existing_active, dict) and existing_active.get("calendar_event_id") != event_id:
+            return self._sync_error("discovery_booking_tracking_conflict", "I am already tracking a different Discovery booking; resolve or review that one before adopting this one.")
+
+        contact = next(
+            (attendee for attendee in event.get("attendees", []) if isinstance(attendee, str) and INTERNAL_EMAIL_DOMAIN not in attendee.casefold()),
+            "",
+        )
+        active = {
+            "calendar_event_id": event_id,
+            "notion_receipt": "",
+            "lead_id": lead_id or f"calendar:{event_id}",
+            "contact": contact,
+            "company": query,
+            "slot": {"start": str(event.get("start") or ""), "end": str(event.get("end") or "")},
+            "source": "calendar_adoption",
+            "calendar_evidence": {"summary": str(event.get("summary") or ""), "html_link": str(event.get("html_link") or "")},
+        }
+        self.state["active"] = active
+        self._persist()
+        return CommandResponse(
+            "discovery_booking_discovery",
+            "healthy",
+            f"I verified an existing Calendar booking ({event.get('summary') or event_id}) that I did not create, and I am now tracking its Discovery outcome. No commercial state has changed.",
+            {
+                "execution_status": "discovery_outcome_tracking_active",
+                "discovery_outcome_tracking": {"state": "active", "write_actions_allowed": False, **active},
+                "external_action_taken": False,
+            },
+        )
+
+    def adopt_verified_gemini_document(
+        self,
+        *,
+        file_id: str,
+        lead_id: str,
+        company: str,
+        meeting_ended_at: str,
+        confirmed_by: str,
+        rationale: str,
+    ) -> CommandResponse:
+        """Register an explicitly identified ad-hoc Gemini call for recovery.
+
+        This is deliberately not a fuzzy fallback for Calendar matching.  It is
+        an operator-attributed correction for the exceptional case where the
+        call genuinely happened outside the tracked Calendar slot.  The exact
+        Drive document is read and verified before the durable tracking record
+        is changed, and the superseded record is retained in correction history.
+        """
+
+        required = (file_id, lead_id, company, meeting_ended_at, confirmed_by, rationale)
+        if not all(str(value or "").strip() for value in required):
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_requires_exact_fields",
+                "Ad-hoc Gemini recovery requires the exact Drive file id, lead id, company, meeting end time, confirming operator and rationale.",
+            )
+        ended = self._parse_timestamp(meeting_ended_at)
+        if ended is None:
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_time_invalid",
+                "The supplied ad-hoc meeting end time is not a valid timezone-aware timestamp.",
+            )
+        if ended > self._now():
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_meeting_not_finished",
+                "The supplied ad-hoc meeting end time is still in the future.",
+            )
+        if self.evidence_source != GEMINI_DRIVE_EVIDENCE_SOURCE:
+            return self._sync_error(
+                "discovery_ad_hoc_recovery_source_mismatch",
+                "Ad-hoc Gemini recovery is available only when Gemini/Drive is the explicitly configured evidence source.",
+            )
+        drive = self.dispatchers.get("Google Drive")
+        if drive is None:
+            return self._sync_error(
+                "discovery_evidence_drive_dispatcher_unavailable",
+                "No live Google Drive dispatcher is configured, so the exact Gemini document cannot be verified.",
+            )
+        evidence = self._export_gemini_document(
+            {
+                "calendar_event_id": "",
+                "lead_id": lead_id.strip(),
+                "company": company.strip(),
+            },
+            drive,
+            file_id.strip(),
+        )
+        if isinstance(evidence, CommandResponse):
+            return evidence
+
+        existing = self.state.get("active") if isinstance(self.state.get("active"), dict) else None
+        active = {
+            "calendar_event_id": "",
+            "notion_receipt": "",
+            "lead_id": lead_id.strip(),
+            "contact": "",
+            "company": company.strip(),
+            "slot": {"start": meeting_ended_at.strip(), "end": meeting_ended_at.strip()},
+            "source": "operator_attributed_ad_hoc_gemini_recovery",
+            "gemini_drive_file_id": file_id.strip(),
+            "recovery_attribution": {
+                "confirmed_by": confirmed_by.strip(),
+                "rationale": rationale.strip(),
+                "recorded_at": self._now().isoformat(),
+            },
+        }
+        history = self.state.get("corrections") if isinstance(self.state.get("corrections"), list) else []
+        history.append(
+            {
+                "recorded_at": self._now().isoformat(),
+                "kind": "ad_hoc_gemini_meeting_attribution",
+                "superseded_active": dict(existing) if isinstance(existing, dict) else None,
+                "replacement": dict(active),
+                "evidence": {
+                    "drive_file_id": evidence.get("drive_file_id", file_id.strip()),
+                    "drive_file_name": evidence.get("drive_file_name", ""),
+                    "drive_web_view_link": evidence.get("drive_web_view_link", ""),
+                },
+            }
+        )
+        self.state["corrections"] = history
+        self.state["active"] = active
+        self._persist()
+        return CommandResponse(
+            "discovery_booking_discovery",
+            "healthy",
+            "I verified the exact Gemini Drive document and recorded an operator-attributed ad-hoc Discovery call. The prior tracking record, if any, remains preserved in correction history; no client communication or commercial state changed.",
+            {
+                "execution_status": "discovery_outcome_tracking_active",
+                "discovery_outcome_tracking": {"state": "active", "write_actions_allowed": False, **active},
+                "external_action_taken": False,
+            },
+        )
 
     def _activate(self, response: CommandResponse) -> CommandResponse:
         data = dict(response.data) if isinstance(response.data, dict) else {}
@@ -78,7 +312,11 @@ class TonyDiscoveryOutcomeTrackingCommandService:
             "contact": str(tracking.get("contact") or ""),
             "company": str(tracking.get("company") or ""),
             "slot": dict(tracking.get("slot") or {}) if isinstance(tracking.get("slot"), dict) else {},
+            "source": "tony_booking_flow",
         }
+        existing = self.state.get("active") if isinstance(self.state.get("active"), dict) else None
+        if isinstance(existing, dict) and existing.get("calendar_event_id") == event_id:
+            return response
         self.state["active"] = active
         self._persist()
         updated = dict(data)
@@ -101,19 +339,13 @@ class TonyDiscoveryOutcomeTrackingCommandService:
                 {"execution_status": "discovery_meeting_not_finished", "discovery_outcome_tracking": {"state": "active", **dict(active)}, "external_action_taken": False},
             )
 
-        fireflies = self.dispatchers.get("Fireflies")
-        if fireflies is None:
-            return self._blocked(active, "discovery_evidence_dispatcher_unavailable", "No live Fireflies dispatcher is configured, so I cannot verify attendance or meeting content yet.")
-        read_dispatch = self._fireflies_dispatch(active)
-        try:
-            evidence = fireflies(dict(read_dispatch))
-        except Exception as exc:
-            return self._blocked(active, "discovery_evidence_read_failed", f"The meeting-evidence read failed: {exc}")
-        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(read_dispatch, evidence)
-        if not verified:
-            return self._blocked(active, "discovery_evidence_unverified", f"Fireflies returned data, but it did not satisfy the read-only evidence contract ({reason}).", evidence=evidence)
-        if not self._meeting_content(evidence):
-            return self._blocked(active, "discovery_evidence_pending", "There is no decision-grade transcript or meeting summary yet, so I will not invent a discovery outcome.", evidence=evidence)
+        if self.evidence_source == GEMINI_DRIVE_EVIDENCE_SOURCE:
+            evidence_result = self._read_gemini_drive_evidence(active)
+        else:
+            evidence_result = self._read_fireflies_evidence(active)
+        if isinstance(evidence_result, CommandResponse):
+            return evidence_result
+        evidence = evidence_result
 
         claude = self.dispatchers.get("Claude")
         if claude is None:
@@ -128,7 +360,7 @@ class TonyDiscoveryOutcomeTrackingCommandService:
             return self._blocked(active, "discovery_review_unverified", f"Claude's discovery review did not satisfy the work-product contract ({review_reason}).", evidence=evidence)
 
         self.state["active"] = None
-        self.state["last_completed"] = {**dict(active), "meeting_evidence": dict(evidence), "review_evidence": dict(review), "reviewed_at": self._now().isoformat()}
+        self.state["last_completed"] = {**dict(active), "meeting_evidence": dict(evidence), "review_evidence": dict(review), "reviewed_at": self._now().isoformat(), "evidence_source": self.evidence_source}
         self._persist()
         recommendation = self._first_text(review, ("recommended_next_action", "recommendation", "next_action"))
         summary = self._first_text(review, ("summary", "analysis", "work_product", "result"))
@@ -150,6 +382,7 @@ class TonyDiscoveryOutcomeTrackingCommandService:
                     "lead_id": active.get("lead_id", ""),
                     "contact": active.get("contact", ""),
                     "company": active.get("company", ""),
+                    "evidence_source": self.evidence_source,
                     "meeting_evidence": dict(evidence),
                     "review_evidence": dict(review),
                     "recommended_next_action": recommendation,
@@ -158,6 +391,148 @@ class TonyDiscoveryOutcomeTrackingCommandService:
                 "external_action_taken": False,
             },
         )
+
+    def _read_fireflies_evidence(self, active: dict[str, Any]) -> dict[str, Any] | CommandResponse:
+        fireflies = self.dispatchers.get("Fireflies")
+        if fireflies is None:
+            return self._blocked(active, "discovery_evidence_dispatcher_unavailable", "No live Fireflies dispatcher is configured, so I cannot verify attendance or meeting content yet.")
+        read_dispatch = self._fireflies_dispatch(active)
+        try:
+            evidence = fireflies(dict(read_dispatch))
+        except Exception as exc:
+            return self._blocked(active, "discovery_evidence_read_failed", f"The meeting-evidence read failed: {exc}")
+        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(read_dispatch, evidence)
+        if not verified:
+            return self._blocked(active, "discovery_evidence_unverified", f"Fireflies returned data, but it did not satisfy the read-only evidence contract ({reason}).", evidence=evidence)
+        if not self._meeting_content(evidence):
+            return self._blocked(active, "discovery_evidence_pending", "There is no decision-grade transcript or meeting summary yet, so I will not invent a discovery outcome.", evidence=evidence)
+        return evidence
+
+    def _read_gemini_drive_evidence(self, active: dict[str, Any]) -> dict[str, Any] | CommandResponse:
+        drive = self.dispatchers.get("Google Drive")
+        if drive is None:
+            return self._blocked(active, "discovery_evidence_drive_dispatcher_unavailable", "No live Google Drive dispatcher is configured, so I cannot read any Gemini meeting notes yet.")
+        exact_file_id = str(active.get("gemini_drive_file_id") or "").strip()
+        if exact_file_id:
+            return self._export_gemini_document(active, drive, exact_file_id)
+        candidates = self._find_gemini_documents(active, drive)
+        if isinstance(candidates, CommandResponse):
+            return candidates
+        if len(candidates) == 0:
+            return self._blocked(active, "discovery_evidence_pending", "No Gemini meeting document matching this exact booking has appeared in Drive yet.")
+        if len(candidates) > 1:
+            return self._blocked(active, "discovery_evidence_ambiguous", "More than one similarly named Drive document matches this booking's bounded identifiers, so I will not guess which is the genuine Gemini record.")
+        file_id = str(candidates[0].get("id") or "")
+        return self._export_gemini_document(active, drive, file_id, candidate=candidates[0])
+
+    def _export_gemini_document(
+        self,
+        active: dict[str, Any],
+        drive: DispatchHandler,
+        file_id: str,
+        *,
+        candidate: Mapping[str, Any] | None = None,
+    ) -> dict[str, Any] | CommandResponse:
+        export = {
+            "eligible": True,
+            "state": "ready_for_autonomous_dispatch",
+            "worker": "Google Drive",
+            "instruction": f"Export the verified Gemini meeting document {file_id} as plain text. Read only.",
+            "execution_mode": "autonomous_read",
+            "operation": "export",
+            "target": {"file_id": file_id},
+            "expected_evidence": "verified read-only Gemini meeting transcript or summary with source identifier",
+            "return_to": "Tony",
+            "execution_truth": "not_dispatched",
+            "payload": {"kind": "discovery_meeting_evidence", "calendar_event_id": active.get("calendar_event_id", ""), "file_id": file_id},
+        }
+        try:
+            evidence = drive(dict(export))
+        except Exception as exc:
+            return self._blocked(active, "discovery_evidence_read_failed", f"The Gemini document read failed: {exc}")
+        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(export, evidence)
+        if not verified:
+            return self._blocked(active, "discovery_evidence_unverified", f"Drive returned data, but it did not satisfy the read-only evidence contract ({reason}).", evidence=evidence)
+        if not self._meeting_content(evidence):
+            return self._blocked(active, "discovery_evidence_pending", "There is no decision-grade transcript or meeting summary yet, so I will not invent a discovery outcome.", evidence=evidence)
+        enriched = dict(evidence)
+        enriched["drive_file_id"] = file_id
+        source = candidate if isinstance(candidate, Mapping) else evidence
+        enriched["drive_file_name"] = str(source.get("name") or evidence.get("name") or "")
+        enriched["drive_modified_time"] = str(source.get("modifiedTime") or evidence.get("modifiedTime") or "")
+        enriched["drive_web_view_link"] = str(source.get("webViewLink") or evidence.get("webViewLink") or evidence.get("source_url") or "")
+        enriched.setdefault("transcript", evidence.get("content"))
+        enriched.setdefault("meeting_summary", evidence.get("content"))
+        return enriched
+
+    def _find_gemini_documents(self, active: dict[str, Any], drive: DispatchHandler) -> list[dict[str, Any]] | CommandResponse:
+        """Match a candidate Gemini document to bounded identifiers only.
+
+        Bounds: the document name must reference the meeting title/company/contact
+        this exact booking is tracking, and it must have been modified inside a
+        bounded window around the verified slot. A similarly named document that
+        falls outside those bounds is never accepted.
+        """
+
+        label = str(active.get("company") or active.get("contact") or "").strip()
+        if not label:
+            return self._blocked(active, "discovery_evidence_lookup_requires_identifier", "This tracked booking has no company or contact name recorded, so I cannot bound a Drive search to it.")
+        search = {
+            "eligible": True,
+            "state": "ready_for_autonomous_dispatch",
+            "worker": "Google Drive",
+            "instruction": f"Search Drive for a Gemini meeting document naming '{label}'. Read only.",
+            "execution_mode": "autonomous_read",
+            "operation": "search",
+            "target": {"query": label, "max_results": 10},
+            "expected_evidence": "verified Drive file list",
+            "return_to": "Tony",
+            "execution_truth": "not_dispatched",
+            "payload": {"kind": "discovery_meeting_document_lookup", "query": label},
+        }
+        try:
+            result = drive(dict(search))
+        except Exception as exc:
+            return self._blocked(active, "discovery_evidence_read_failed", f"The Drive search failed: {exc}")
+        verified, reason = TonyAutonomousDispatchCommandService._verify_evidence(search, result)
+        if not verified:
+            return self._blocked(active, "discovery_evidence_unverified", f"Drive returned data, but it did not satisfy the read-only evidence contract ({reason}).", evidence=result)
+        window_start, window_end = self._evidence_window(active)
+        matches = []
+        for item in result.get("files", []):
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "")
+            if label.casefold() not in name.casefold():
+                continue
+            modified = self._parse_timestamp(item.get("modifiedTime"))
+            if window_start is not None:
+                # A booking-bounded match requires a trustworthy timestamp.
+                # Missing or malformed metadata cannot prove the document falls
+                # inside the meeting window and must therefore remain pending.
+                if modified is None or not (window_start <= modified <= window_end):
+                    continue
+            matches.append(item)
+        return matches
+
+    def _evidence_window(self, active: dict[str, Any]) -> tuple[datetime | None, datetime | None]:
+        end = self._slot_end(active)
+        if end is None:
+            return None, None
+        return end - timedelta(hours=2), end + timedelta(days=2)
+
+    @staticmethod
+    def _parse_timestamp(value: Any) -> datetime | None:
+        raw = str(value or "").strip()
+        if not raw:
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
 
     @staticmethod
     def _fireflies_dispatch(active: dict[str, Any]) -> dict[str, Any]:
@@ -227,6 +602,10 @@ class TonyDiscoveryOutcomeTrackingCommandService:
         if isinstance(evidence, dict):
             data["meeting_evidence"] = dict(evidence)
         return CommandResponse("discovery_outcome", "healthy", message + " No commercial outcome or external change has been inferred.", data)
+
+    @staticmethod
+    def _sync_error(status: str, message: str) -> CommandResponse:
+        return CommandResponse("discovery_booking_discovery", "healthy", message + " Nothing has been tracked or changed.", {"execution_status": status, "external_action_taken": False})
 
     def _load(self) -> dict[str, Any]:
         try:

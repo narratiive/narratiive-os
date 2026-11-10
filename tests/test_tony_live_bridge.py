@@ -60,6 +60,10 @@ class TonyLiveBridgeTests(unittest.TestCase):
         commissioning=blueprint.command_service; self.assertIsInstance(commissioning,TonyDeliveryCommissioningCommandService); self.assertEqual(commissioning.dispatchers,{})
         drive=commissioning.command_service; self.assertIsInstance(drive,TonyDriveDeliveryWorkspaceCommandService); self.assertEqual(drive.dispatchers,{})
         delivery=drive.command_service; self.assertIsInstance(delivery,TonyDeliveryBootstrapCommandService); commercial_close=delivery.command_service; self.assertIsInstance(commercial_close,TonyCommercialCloseCommandService); proposal_outcome=commercial_close.command_service; self.assertIsInstance(proposal_outcome,TonyProposalOutcomeTrackingCommandService); proposal=proposal_outcome.command_service; self.assertIsInstance(proposal,TonyPostDiscoveryProposalExecutionCommandService); post_discovery=proposal.command_service; self.assertIsInstance(post_discovery,TonyPostDiscoveryCommercialCommandService); discovery=post_discovery.command_service; self.assertIsInstance(discovery,TonyDiscoveryOutcomeTrackingCommandService); booking_sync=discovery.command_service; self.assertIsInstance(booking_sync,TonyPostBookingNotionSyncCommandService); booking=booking_sync.command_service; self.assertIsInstance(booking,TonyConfirmedMeetingBookingCommandService); meeting=booking.command_service; self.assertIsInstance(meeting,TonyMeetingReplyPreparationCommandService); followup=meeting.command_service; self.assertIsInstance(followup,TonyCommercialFollowupCommandService); post_send=followup.command_service; self.assertIsInstance(post_send,TonyPostSendNotionSyncCommandService); dispatch=post_send.command_service; self.assertIsInstance(dispatch,TonyAutonomousDispatchCommandService); memory=dispatch.command_service; self.assertIsInstance(memory,TonyMemoryCommandService); adaptive=memory.command_service; self.assertIsInstance(adaptive,TonyAdaptiveResponseCommandService); learning=adaptive.command_service; self.assertIsInstance(learning,TonyExecutiveLearningCommandService); outcome_evidence=learning.command_service; self.assertIsInstance(outcome_evidence,TonyOutcomeEvidenceCommandService); outcomes=outcome_evidence.command_service; self.assertIsInstance(outcomes,TonyOutcomeAccountabilityCommandService); focus=outcomes.command_service; self.assertIsInstance(focus,TonyPersistentAgencyFocusCommandService); watch=focus.command_service; self.assertIsInstance(watch,TonyCommercialWatchCommandService); capability=watch.command_service; self.assertIsInstance(capability,TonyCapabilityCommandService); executive=capability.command_service; self.assertIsInstance(executive,TonyExecutiveCommandService); self.assertIs(executive.command_service,base_service)
+        self.assertIs(app.discovery_outcome_service, discovery)
+        self.assertIs(app.post_discovery_service, post_discovery)
+        self.assertEqual(discovery.evidence_source, "gemini_drive")
+        self.assertIsNotNone(app.authoritative_lead_loader)
     def test_build_app_configures_explicit_live_dispatchers(self):
         with tempfile.TemporaryDirectory() as tmp: app,_,_=self._build(tmp,{"TONY_DISPATCH_GMAIL_URL":"http://127.0.0.1:9999/gmail","TONY_DISPATCH_FIREFLIES_URL":"http://127.0.0.1:9999/fireflies","TONY_DISPATCH_NOTION_URL":"http://127.0.0.1:9999/notion","TONY_DISPATCH_GOOGLE_DRIVE_URL":"http://127.0.0.1:9999/drive"})
         execution_status=app.command_service.command_service; persistence=execution_status.command_service; self.assertIsInstance(persistence,TonyBlueprintRevisionPersistenceCommandService); self.assertEqual(set(persistence.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); revision=persistence.command_service; self.assertIsInstance(revision,TonyBlueprintRevisionCycleCommandService); self.assertEqual(set(revision.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); feedback=revision.command_service; self.assertIsInstance(feedback,TonyBlueprintClientFeedbackCommandService); self.assertEqual(set(feedback.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); notion_sync=feedback.command_service; self.assertIsInstance(notion_sync,TonyBlueprintDeliveryNotionSyncCommandService); self.assertEqual(set(notion_sync.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); client_delivery=notion_sync.command_service; self.assertIsInstance(client_delivery,TonyBlueprintClientDeliveryCommandService); self.assertEqual(set(client_delivery.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); blueprint=client_delivery.command_service; self.assertIsInstance(blueprint,TonyDeliveryBlueprintReviewCommandService); self.assertEqual(set(blueprint.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); commissioning=blueprint.command_service; self.assertIsInstance(commissioning,TonyDeliveryCommissioningCommandService); self.assertEqual(set(commissioning.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); drive=commissioning.command_service; self.assertIsInstance(drive,TonyDriveDeliveryWorkspaceCommandService); self.assertEqual(set(drive.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"}); delivery=drive.command_service; self.assertIsInstance(delivery,TonyDeliveryBootstrapCommandService); self.assertEqual(set(delivery.dispatchers),{"Gmail","Fireflies","Notion","Google Drive"})
@@ -96,4 +100,38 @@ class TonyLiveBridgeTests(unittest.TestCase):
                 with mock.patch.object(tony_live_bridge,"build_base_app",return_value=base_app),mock.patch.dict("os.environ",env,clear=True):
                     tony_live_bridge.build_app(recover_workflows=True)
                 self.assertEqual(recover.call_count, 1)
+
+    def test_mission_control_api_reports_discovery_proposal_journeys(self):
+        from datetime import datetime, timedelta, timezone
+        with tempfile.TemporaryDirectory() as tmp:
+            discovery_path = Path(tmp) / "discovery.json"
+            future_start = datetime.now(timezone.utc) + timedelta(hours=1)
+            future_end = future_start + timedelta(minutes=30)
+            discovery_path.write_text(json.dumps({
+                "active": {
+                    "calendar_event_id": "pimentae-event-1",
+                    "lead_id": "calendar:pimentae-event-1",
+                    "slot": {"start": future_start.isoformat(), "end": future_end.isoformat()},
+                },
+                "last_completed": None,
+            }), encoding="utf-8")
+            app, _, _ = self._build(tmp)
+
+            environ = {
+                "REQUEST_METHOD": "GET",
+                "PATH_INFO": "/mission-control/api",
+                "REMOTE_ADDR": "127.0.0.1",
+                "CONTENT_LENGTH": "0",
+                "wsgi.input": io.BytesIO(b""),
+            }
+            captured = {}
+            body = b"".join(app.mission_control_web.handle(environ, lambda status, headers: captured.update(status=status, headers=dict(headers))))
+
+            self.assertEqual(captured["status"], "200 OK")
+            snapshot = json.loads(body)
+            journeys = {item["lead_id"]: item for item in snapshot["discovery_proposal_journeys"]}
+            self.assertIn("calendar:pimentae-event-1", journeys)
+            self.assertTrue(journeys["calendar:pimentae-event-1"]["states"]["meeting_booked"])
+            self.assertFalse(journeys["calendar:pimentae-event-1"]["states"]["verified_sent"])
+
 if __name__=="__main__": unittest.main()
