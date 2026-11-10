@@ -199,14 +199,14 @@ class SketchbookClientEmailTests(unittest.TestCase):
             self.state,
             candidate_id=preview["candidate_id"],
             action_digest=preview["action_digest"],
-            approver="telegram:matt",
+            approver="telegram:12345",
             rationale="Approve this exact fictional Sketchbook version for client-presentation draft review.",
         )
         replay = self.service().prepare_draft(
             self.state,
             candidate_id=preview["candidate_id"],
             action_digest=preview["action_digest"],
-            approver="telegram:matt",
+            approver="telegram:12345",
             rationale="Approve this exact fictional Sketchbook version for client-presentation draft review.",
         )
 
@@ -225,6 +225,42 @@ class SketchbookClientEmailTests(unittest.TestCase):
         self.assertEqual(persisted.approval_history[-1]["decision"], "sketchbook_presentation_approval")
         self.assertFalse(persisted.approval_history[-1]["client_send_authorised"])
 
+    def test_corrected_candidate_receives_a_fresh_append_only_approval(self) -> None:
+        first = self.service().register_preview(self.state, self.inputs(), principal="telegram:12345")
+        self.service().prepare_draft(
+            self.state,
+            candidate_id=first["candidate_id"],
+            action_digest=first["action_digest"],
+            approver="telegram:12345",
+            rationale="Approve the first exact fictional candidate.",
+        )
+
+        corrected_inputs = self.inputs()
+        corrected_inputs["client_summary"]["recipient_email"] = "corrected@example.test"
+        corrected_inputs["client_summary"]["recipient_evidence_ref"] = "test-contact-record:2"
+        corrected = self.service().register_preview(
+            self.state,
+            corrected_inputs,
+            principal="telegram:12345",
+        )
+        self.service().prepare_draft(
+            self.state,
+            candidate_id=corrected["candidate_id"],
+            action_digest=corrected["action_digest"],
+            approver="telegram:12345",
+            rationale="Approve the corrected recipient and exact fictional candidate.",
+        )
+
+        persisted = self.runtime.runs.load_run(self.state.run_id)
+        approvals = [
+            item
+            for item in persisted.approval_history
+            if item.get("decision") == "sketchbook_presentation_approval"
+        ]
+        self.assertEqual(len(approvals), 2)
+        self.assertNotEqual(approvals[0]["candidate_id"], approvals[1]["candidate_id"])
+        self.assertEqual(approvals[1]["candidate_id"], corrected["candidate_id"])
+
     def test_changed_document_or_message_digest_invalidates_approval(self) -> None:
         preview = self.service().register_preview(self.state, self.inputs(), principal="telegram:matt")
         with self.assertRaisesRegex(SketchbookClientEmailError, "stale or incorrect"):
@@ -232,7 +268,7 @@ class SketchbookClientEmailTests(unittest.TestCase):
                 self.state,
                 candidate_id=preview["candidate_id"],
                 action_digest="0" * 64,
-                approver="telegram:matt",
+                approver="telegram:12345",
                 rationale="Synthetic test only.",
             )
         self.assertEqual(self.gmail.call_count, 0)
@@ -245,7 +281,7 @@ class SketchbookClientEmailTests(unittest.TestCase):
                 self.state,
                 candidate_id=preview["candidate_id"],
                 action_digest=preview["action_digest"],
-                approver="telegram:matt",
+                approver="telegram:12345",
                 rationale="Synthetic failure test only.",
             )
         persisted = self.runtime.runs.load_run(self.state.run_id)
